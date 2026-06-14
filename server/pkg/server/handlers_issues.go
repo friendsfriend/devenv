@@ -354,4 +354,719 @@ func (s *Server) handleGitLabIssueComments(w http.ResponseWriter, r *http.Reques
 	json.NewEncoder(w).Encode(comments)
 }
 
+// ─── GitHub Mutation Handlers ────────────────────────────────────────────────
+
+// handleGitHubCloseIssue — POST /api/github/issues/{n}/close
+func (s *Server) handleGitHubCloseIssue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	var closeReq struct {
+		Reason string `json:"reason"`
+	}
+	// Reason is optional — ignore decode errors
+	_ = json.NewDecoder(r.Body).Decode(&closeReq)
+
+	issue, err := issuesClient.CloseIssue(nil, number, closeReq.Reason)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to close issue: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitHubReopenIssue — POST /api/github/issues/{n}/reopen
+func (s *Server) handleGitHubReopenIssue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.ReopenIssue(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to reopen issue: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitHubSetLabels — POST /api/github/issues/{n}/labels
+func (s *Server) handleGitHubSetLabels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	var payload struct {
+		Labels []string `json:"labels"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.SetLabels(nil, number, payload.Labels)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to set labels: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitHubSetAssignee — POST /api/github/issues/{n}/assignee
+func (s *Server) handleGitHubSetAssignee(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	var payload struct {
+		Assignee string `json:"assignee"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.AddAssignee(nil, number, payload.Assignee)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to set assignee: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitHubRemoveAssignee — POST /api/github/issues/{n}/unassign
+func (s *Server) handleGitHubRemoveAssignee(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.RemoveAssignee(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to remove assignee: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitHubRepoLabels — GET /api/github/labels
+func (s *Server) handleGitHubRepoLabels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	if appIdent == "" {
+		respondBadRequest(w, "appIdent parameter required")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	labels, err := issuesClient.GetRepoLabels(nil)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch labels: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string][]string{"labels": labels})
+}
+
+// handleGitHubRepoCollaborators — GET /api/github/collaborators
+func (s *Server) handleGitHubRepoCollaborators(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	if appIdent == "" {
+		respondBadRequest(w, "appIdent parameter required")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	collaborators, err := issuesClient.GetRepoCollaborators(nil)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch collaborators: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string][]string{"collaborators": collaborators})
+}
+
+// ─── GitLab Mutation Handlers ────────────────────────────────────────────────
+
+// handleGitLabCloseIssue — POST /api/gitlab/issues/{n}/close
+func (s *Server) handleGitLabCloseIssue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	var closeReq struct {
+		Reason string `json:"reason"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&closeReq)
+
+	issue, err := issuesClient.CloseIssue(nil, number, closeReq.Reason)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to close issue: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitLabReopenIssue — POST /api/gitlab/issues/{n}/reopen
+func (s *Server) handleGitLabReopenIssue(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.ReopenIssue(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to reopen issue: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitLabSetLabels — POST /api/gitlab/issues/{n}/labels
+func (s *Server) handleGitLabSetLabels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	var payload struct {
+		Labels []string `json:"labels"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.SetLabels(nil, number, payload.Labels)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to set labels: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitLabSetAssignee — POST /api/gitlab/issues/{n}/assignee
+func (s *Server) handleGitLabSetAssignee(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	var payload struct {
+		Assignee string `json:"assignee"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.AddAssignee(nil, number, payload.Assignee)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to set assignee: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitLabRemoveAssignee — POST /api/gitlab/issues/{n}/unassign
+func (s *Server) handleGitLabRemoveAssignee(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	issue, err := issuesClient.RemoveAssignee(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to remove assignee: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issue)
+}
+
+// handleGitLabRepoLabels — GET /api/gitlab/labels
+func (s *Server) handleGitLabRepoLabels(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	if appIdent == "" {
+		respondBadRequest(w, "appIdent parameter required")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	labels, err := issuesClient.GetRepoLabels(nil)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch labels: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string][]string{"labels": labels})
+}
+
+// handleGitLabRepoCollaborators — GET /api/gitlab/collaborators
+func (s *Server) handleGitLabRepoCollaborators(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	if appIdent == "" {
+		respondBadRequest(w, "appIdent parameter required")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	collaborators, err := issuesClient.GetRepoCollaborators(nil)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch collaborators: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string][]string{"collaborators": collaborators})
+}
+
+// handleGitHubAddComment — POST /api/github/issues/{n}/comment
+func (s *Server) handleGitHubAddComment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	var payload struct {
+		Body string `json:"body"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+
+	client, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	comment, err := client.AddComment(nil, number, payload.Body)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(comment)
+}
+
+// handleGitLabAddComment — POST /api/gitlab/issues/{n}/comment
+func (s *Server) handleGitLabAddComment(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	var payload struct {
+		Body string `json:"body"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+
+	client, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	comment, err := client.AddComment(nil, number, payload.Body)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to add comment: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(comment)
+}
+
 var _ = log.Printf

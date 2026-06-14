@@ -250,10 +250,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
 					<text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
 						Comments
-						<Show when={props.comments.length > 0}>
-							{" "}
-							({props.comments.length})
-						</Show>
+						{props.comments.length > 0 ? ` (${props.comments.length})` : ""}
 					</text>
 				</box>
 

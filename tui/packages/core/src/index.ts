@@ -66,7 +66,19 @@ import {
 	switchWorktree,
 	gitCreateBranch,
 } from "./git-client";
-import { getIssues, getIssue, getIssueComments } from "./issues-client";
+import {
+	getIssues,
+	getIssue,
+	getIssueComments,
+	closeIssue,
+	reopenIssue,
+	setIssueLabels,
+	setIssueAssignee,
+	removeIssueAssignee,
+	addIssueComment,
+	getRepoLabels,
+	getRepoCollaborators,
+} from "./issues-client";
 import {
 	analyzeLogsWithAI,
 	analyzeLogsWithAIStream,
@@ -298,6 +310,74 @@ export class DevEnvClient {
 	): Promise<import("@devenv/types").IssueCommentListResult> {
 		return getIssueComments(this.deps, appIdent, number, sourceType);
 	}
+
+	// ─── Issue Mutations ───────────────────────────────────────────────────
+
+	closeIssue(
+		appIdent: string,
+		number: number,
+		sourceType: string | undefined,
+		reason?: string,
+	): Promise<import("@devenv/types").Issue> {
+		return closeIssue(this.deps, appIdent, number, sourceType, reason);
+	}
+
+	reopenIssue(
+		appIdent: string,
+		number: number,
+		sourceType: string | undefined,
+	): Promise<import("@devenv/types").Issue> {
+		return reopenIssue(this.deps, appIdent, number, sourceType);
+	}
+
+	setIssueLabels(
+		appIdent: string,
+		number: number,
+		sourceType: string | undefined,
+		labels: string[],
+	): Promise<import("@devenv/types").Issue> {
+		return setIssueLabels(this.deps, appIdent, number, sourceType, labels);
+	}
+
+	setIssueAssignee(
+		appIdent: string,
+		number: number,
+		sourceType: string | undefined,
+		assignee: string,
+	): Promise<import("@devenv/types").Issue> {
+		return setIssueAssignee(this.deps, appIdent, number, sourceType, assignee);
+	}
+
+	removeIssueAssignee(
+		appIdent: string,
+		number: number,
+		sourceType: string | undefined,
+	): Promise<import("@devenv/types").Issue> {
+		return removeIssueAssignee(this.deps, appIdent, number, sourceType);
+	}
+
+	addIssueComment(
+		appIdent: string,
+		number: number,
+		sourceType: string | undefined,
+		body: string,
+	): Promise<import("@devenv/types").IssueComment> {
+		return addIssueComment(this.deps, appIdent, number, sourceType, body);
+	}
+
+	getRepoLabels(
+		appIdent: string,
+		sourceType: string | undefined,
+	): Promise<string[]> {
+		return getRepoLabels(this.deps, appIdent, sourceType);
+	}
+
+	getRepoCollaborators(
+		appIdent: string,
+		sourceType: string | undefined,
+	): Promise<string[]> {
+		return getRepoCollaborators(this.deps, appIdent, sourceType);
+	}
 	getPipelineJobs(
 		appIdent: string,
 		pipelineId: number,
@@ -505,9 +585,7 @@ export class DevEnvClient {
 	gitFetch(appIdent: string): Promise<void> {
 		return gitFetch(this.deps, appIdent);
 	}
-	getBranches(
-		appIdent: string,
-	): Promise<{
+	getBranches(appIdent: string): Promise<{
 		appIdent: string;
 		currentBranch: string;
 		localBranches: string[];

@@ -403,5 +403,300 @@ func (ic *IssuesClient) GetIssueComments(info *issues.RepoInfo, number int) (*is
 	}, nil
 }
 
+// --- Mutation implementations ---
+
+// CloseIssue implements issues.Client.CloseIssue for GitHub.
+func (ic *IssuesClient) CloseIssue(info *issues.RepoInfo, number int, reason string) (*issues.Issue, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	type closePayload struct {
+		State       string `json:"state"`
+		StateReason string `json:"state_reason,omitempty"`
+	}
+	payload := closePayload{State: "closed", StateReason: reason}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d", ghInfo.Owner, ghInfo.Repo, number)
+	resp, err := ic.c.doRequest("PATCH", apiURL, strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var ghIss ghIssue
+	if err := json.Unmarshal(body, &ghIss); err != nil {
+		return nil, fmt.Errorf("failed to parse closed issue: %w", err)
+	}
+
+	result := convertGHIssue(ghIss)
+	return &result, nil
+}
+
+// ReopenIssue implements issues.Client.ReopenIssue for GitHub.
+func (ic *IssuesClient) ReopenIssue(info *issues.RepoInfo, number int) (*issues.Issue, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	payload := map[string]string{"state": "open"}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d", ghInfo.Owner, ghInfo.Repo, number)
+	resp, err := ic.c.doRequest("PATCH", apiURL, strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var ghIss ghIssue
+	if err := json.Unmarshal(body, &ghIss); err != nil {
+		return nil, fmt.Errorf("failed to parse reopened issue: %w", err)
+	}
+
+	result := convertGHIssue(ghIss)
+	return &result, nil
+}
+
+// SetLabels implements issues.Client.SetLabels for GitHub.
+func (ic *IssuesClient) SetLabels(info *issues.RepoInfo, number int, labels []string) (*issues.Issue, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	type labelsPayload struct {
+		Labels []string `json:"labels"`
+	}
+
+	payload := labelsPayload{Labels: labels}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal labels payload: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/labels", ghInfo.Owner, ghInfo.Repo, number)
+	resp, err := ic.c.doRequest("PUT", apiURL, strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Re-fetch the issue to get updated state
+	return ic.GetIssue(info, number)
+}
+
+// AddAssignee implements issues.Client.AddAssignee for GitHub.
+func (ic *IssuesClient) AddAssignee(info *issues.RepoInfo, number int, assignee string) (*issues.Issue, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	type assigneePayload struct {
+		Assignees []string `json:"assignees"`
+	}
+
+	payload := assigneePayload{Assignees: []string{assignee}}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal assignee payload: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/assignees", ghInfo.Owner, ghInfo.Repo, number)
+	resp, err := ic.c.doRequest("POST", apiURL, strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	return ic.GetIssue(info, number)
+}
+
+// RemoveAssignee implements issues.Client.RemoveAssignee for GitHub.
+func (ic *IssuesClient) RemoveAssignee(info *issues.RepoInfo, number int) (*issues.Issue, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	type assigneePayload struct {
+		Assignees []string `json:"assignees"`
+	}
+
+	payload := assigneePayload{Assignees: []string{}}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal remove assignee payload: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/assignees", ghInfo.Owner, ghInfo.Repo, number)
+	resp, err := ic.c.doRequest("DELETE", apiURL, strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	return ic.GetIssue(info, number)
+}
+
+// GetRepoLabels implements issues.Client.GetRepoLabels for GitHub.
+func (ic *IssuesClient) GetRepoLabels(info *issues.RepoInfo) ([]string, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/labels?per_page=100", ghInfo.Owner, ghInfo.Repo)
+	resp, err := ic.c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var ghLabels []ghLabel
+	if err := json.Unmarshal(body, &ghLabels); err != nil {
+		return nil, fmt.Errorf("failed to parse labels: %w", err)
+	}
+
+	result := make([]string, 0, len(ghLabels))
+	for _, l := range ghLabels {
+		result = append(result, l.Name)
+	}
+	return result, nil
+}
+
+// GetRepoCollaborators implements issues.Client.GetRepoCollaborators for GitHub.
+func (ic *IssuesClient) GetRepoCollaborators(info *issues.RepoInfo) ([]string, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/collaborators?per_page=100", ghInfo.Owner, ghInfo.Repo)
+	resp, err := ic.c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var users []ghUser
+	if err := json.Unmarshal(body, &users); err != nil {
+		return nil, fmt.Errorf("failed to parse collaborators: %w", err)
+	}
+
+	result := make([]string, 0, len(users))
+	for _, u := range users {
+		result = append(result, u.Login)
+	}
+	return result, nil
+}
+
+// AddComment implements issues.Client.AddComment for GitHub.
+func (ic *IssuesClient) AddComment(info *issues.RepoInfo, number int, body string) (*issues.IssueComment, error) {
+	ghInfo := ic.info
+	if info != nil && info.Owner != "" && info.Repo != "" {
+		ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+	}
+
+	type commentPayload struct {
+		Body string `json:"body"`
+	}
+	payload := commentPayload{Body: body}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments",
+		ghInfo.Owner, ghInfo.Repo, number)
+	resp, err := ic.c.doRequest("POST", apiURL, strings.NewReader(string(jsonPayload)))
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	bodyBytes, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	var ghComment ghIssueComment
+	if err := json.Unmarshal(bodyBytes, &ghComment); err != nil {
+		return nil, fmt.Errorf("failed to parse comment: %w", err)
+	}
+
+	result := convertGHIssueComment(ghComment)
+	return &result, nil
+}
+
 // ensure logger import is used
 var _ = log.Printf

@@ -1,5 +1,6 @@
 import type {
 	Issue,
+	IssueComment,
 	IssueCommentListResult,
 	IssueListResult,
 	IssueScope,
@@ -92,4 +93,176 @@ export async function getIssueComments(
 	}
 
 	return (await response.json()) as IssueCommentListResult;
+}
+
+// ─── Mutation Functions ───────────────────────────────────────────────────────
+
+async function issueMutation(
+	deps: ClientDeps,
+	endpoint: string,
+	appIdent: string,
+	number: number | undefined,
+	body: unknown,
+	method: string = "POST",
+): Promise<Issue> {
+	let url = `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}`;
+	if (number !== undefined) {
+		url += `&number=${number}`;
+	}
+
+	const response = await deps.fetchFn(url, {
+		method,
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify(body),
+	});
+
+	if (!response.ok) {
+		await handleFetchError(response, deps.onError);
+	}
+
+	return (await response.json()) as Issue;
+}
+
+/**
+ * Close an issue with an optional reason.
+ * reason: "completed" | "not_planned" | "" (empty for no reason)
+ */
+export async function closeIssue(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType: string | undefined,
+	reason?: string,
+): Promise<Issue> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	return issueMutation(deps, `${prefix}/issues/close`, appIdent, number, {
+		reason: reason ?? "",
+	});
+}
+
+/**
+ * Reopen an issue.
+ */
+export async function reopenIssue(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType: string | undefined,
+): Promise<Issue> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	return issueMutation(deps, `${prefix}/issues/reopen`, appIdent, number, {});
+}
+
+/**
+ * Set labels on an issue.
+ */
+export async function setIssueLabels(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType: string | undefined,
+	labels: string[],
+): Promise<Issue> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	return issueMutation(deps, `${prefix}/issues/labels`, appIdent, number, {
+		labels,
+	});
+}
+
+/**
+ * Set assignee on an issue.
+ */
+export async function setIssueAssignee(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType: string | undefined,
+	assignee: string,
+): Promise<Issue> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	return issueMutation(deps, `${prefix}/issues/assignee`, appIdent, number, {
+		assignee,
+	});
+}
+
+/**
+ * Remove assignee from an issue.
+ */
+export async function removeIssueAssignee(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType: string | undefined,
+): Promise<Issue> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	return issueMutation(deps, `${prefix}/issues/unassign`, appIdent, number, {});
+}
+
+/**
+ * Get all labels for a repository.
+ */
+export async function getRepoLabels(
+	deps: ClientDeps,
+	appIdent: string,
+	sourceType: string | undefined,
+): Promise<string[]> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	const response = await deps.fetchFn(
+		`${deps.baseUrl}/api/${prefix}/labels?appIdent=${encodeURIComponent(appIdent)}`,
+	);
+
+	if (!response.ok) {
+		await handleFetchError(response, deps.onError);
+	}
+
+	const data = (await response.json()) as { labels: string[] };
+	return data.labels;
+}
+
+/**
+ * Add a comment to an issue.
+ */
+export async function addIssueComment(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType: string | undefined,
+	body: string,
+): Promise<IssueComment> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	const response = await deps.fetchFn(
+		`${deps.baseUrl}/api/${prefix}/issues/comment?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ body }),
+		},
+	);
+
+	if (!response.ok) {
+		await handleFetchError(response, deps.onError);
+	}
+
+	return (await response.json()) as IssueComment;
+}
+
+/**
+ * Get all collaborators for a repository.
+ */
+export async function getRepoCollaborators(
+	deps: ClientDeps,
+	appIdent: string,
+	sourceType: string | undefined,
+): Promise<string[]> {
+	const prefix = sourceType === "github" ? "github" : "gitlab";
+	const response = await deps.fetchFn(
+		`${deps.baseUrl}/api/${prefix}/collaborators?appIdent=${encodeURIComponent(appIdent)}`,
+	);
+
+	if (!response.ok) {
+		await handleFetchError(response, deps.onError);
+	}
+
+	const data = (await response.json()) as { collaborators: string[] };
+	return data.collaborators;
 }

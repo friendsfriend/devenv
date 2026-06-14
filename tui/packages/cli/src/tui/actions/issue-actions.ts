@@ -18,6 +18,15 @@ export function createIssueActions(
 	const getSelectedApp = () =>
 		appStore.tableFilteredApps()[appStore.selectedIndex()];
 
+	const getSelectedAppSafe = (): {
+		app: NonNullable<ReturnType<typeof getSelectedApp>>;
+		sourceType: string | undefined;
+	} | null => {
+		const app = getSelectedApp();
+		if (!app) return null;
+		return { app, sourceType: app.sourceType };
+	};
+
 	const loadAllIssues = async (
 		scope: IssueScope = issueStore.issueScope(),
 		page?: number,
@@ -141,6 +150,214 @@ export function createIssueActions(
 		void loadAllIssues(scope);
 	};
 
+	// ─── Mutation Actions ───────────────────────────────────────────────────
+
+	const closeIssue = async (number: number, reason?: string) => {
+		const ctx = getSelectedAppSafe();
+		if (!ctx) return;
+
+		issueStore.setIssueSubmitting(true);
+		issueStore.setIssueSubmitError("");
+
+		try {
+			const issue = await client.closeIssue(
+				ctx.app.ident,
+				number,
+				ctx.sourceType,
+				reason,
+			);
+			issueStore.setIssueSubmitting(false);
+			issueStore.setSelectedIssue(issue);
+			void loadAllIssues(issueStore.issueScope());
+		} catch (e) {
+			issueStore.setIssueSubmitError(errMsg(e));
+			issueStore.setIssueSubmitting(false);
+		}
+	};
+
+	const reopenIssue = async (number: number) => {
+		const ctx = getSelectedAppSafe();
+		if (!ctx) return;
+
+		issueStore.setIssueSubmitting(true);
+		issueStore.setIssueSubmitError("");
+
+		try {
+			const issue = await client.reopenIssue(
+				ctx.app.ident,
+				number,
+				ctx.sourceType,
+			);
+			issueStore.setIssueSubmitting(false);
+			issueStore.setSelectedIssue(issue);
+			void loadAllIssues(issueStore.issueScope());
+		} catch (e) {
+			issueStore.setIssueSubmitError(errMsg(e));
+			issueStore.setIssueSubmitting(false);
+		}
+	};
+
+	const setIssueLabels = async (number: number, labels: string[]) => {
+		const ctx = getSelectedAppSafe();
+		if (!ctx) return;
+
+		issueStore.setIssueSubmitting(true);
+		issueStore.setIssueSubmitError("");
+
+		try {
+			const issue = await client.setIssueLabels(
+				ctx.app.ident,
+				number,
+				ctx.sourceType,
+				labels,
+			);
+			issueStore.setIssueSubmitting(false);
+			issueStore.setShowLabelPicker(false);
+			issueStore.setSelectedIssue(issue);
+			void loadAllIssues(issueStore.issueScope());
+		} catch (e) {
+			issueStore.setIssueSubmitError(errMsg(e));
+			issueStore.setIssueSubmitting(false);
+		}
+	};
+
+	const setIssueAssignee = async (number: number, assignee: string) => {
+		const ctx = getSelectedAppSafe();
+		if (!ctx) return;
+
+		issueStore.setIssueSubmitting(true);
+		issueStore.setIssueSubmitError("");
+
+		try {
+			const issue = await client.setIssueAssignee(
+				ctx.app.ident,
+				number,
+				ctx.sourceType,
+				assignee,
+			);
+			issueStore.setIssueSubmitting(false);
+			issueStore.setShowAssigneePicker(false);
+			issueStore.setSelectedIssue(issue);
+			void loadAllIssues(issueStore.issueScope());
+		} catch (e) {
+			issueStore.setIssueSubmitError(errMsg(e));
+			issueStore.setIssueSubmitting(false);
+		}
+	};
+
+	const removeIssueAssignee = async (number: number) => {
+		const ctx = getSelectedAppSafe();
+		if (!ctx) return;
+
+		issueStore.setIssueSubmitting(true);
+		issueStore.setIssueSubmitError("");
+
+		try {
+			const issue = await client.removeIssueAssignee(
+				ctx.app.ident,
+				number,
+				ctx.sourceType,
+			);
+			issueStore.setIssueSubmitting(false);
+			issueStore.setShowAssigneePicker(false);
+			issueStore.setSelectedIssue(issue);
+			void loadAllIssues(issueStore.issueScope());
+		} catch (e) {
+			issueStore.setIssueSubmitError(errMsg(e));
+			issueStore.setIssueSubmitting(false);
+		}
+	};
+
+	const fetchRepoLabels = async () => {
+		const ctx = getSelectedAppSafe();
+		if (!ctx) return;
+
+		try {
+			const labels = await client.getRepoLabels(ctx.app.ident, ctx.sourceType);
+			issueStore.setAvailableLabels(labels);
+		} catch (e) {
+			showError("Failed to fetch labels", errMsg(e));
+		}
+	};
+
+	const fetchRepoCollaborators = async () => {
+		const ctx = getSelectedAppSafe();
+		if (!ctx) return;
+
+		try {
+			const collaborators = await client.getRepoCollaborators(
+				ctx.app.ident,
+				ctx.sourceType,
+			);
+			issueStore.setAvailableCollaborators(collaborators);
+		} catch (e) {
+			showError("Failed to fetch collaborators", errMsg(e));
+		}
+	};
+
+	// ─── Comment Actions ──────────────────────────────────────────────────
+
+	const addComment = async () => {
+		const issue = issueStore.selectedIssue();
+		const ctx = getSelectedAppSafe();
+		if (!issue || !ctx) return;
+
+		const body = issueStore.commentText().trim();
+		if (!body) return;
+
+		issueStore.setIssueSubmitting(true);
+		issueStore.setIssueSubmitError("");
+
+		try {
+			await client.addIssueComment(
+				ctx.app.ident,
+				issue.iid,
+				ctx.sourceType,
+				body,
+			);
+			issueStore.setShowCommentModal(false);
+			issueStore.setCommentText("");
+			issueStore.setIssueSubmitting(false);
+
+			// Refresh comments
+			try {
+				const comments = await client.getIssueComments(
+					ctx.app.ident,
+					issue.iid,
+					ctx.sourceType,
+				);
+				issueStore.setIssueComments(comments.items ?? []);
+			} catch {
+				// Comments refresh is best-effort
+			}
+		} catch (e) {
+			issueStore.setIssueSubmitError(errMsg(e));
+			issueStore.setIssueSubmitting(false);
+		}
+	};
+
+	const openCommentModal = () => {
+		issueStore.setCommentText("");
+		issueStore.setIssueSubmitError("");
+		issueStore.setShowCommentModal(true);
+	};
+
+	// ─── Modal Actions ──────────────────────────────────────────────────────
+
+	const openLabelPicker = () => {
+		issueStore.setIssueSubmitError("");
+		issueStore.setLabelPickerIndex(0);
+		void fetchRepoLabels();
+		issueStore.setShowLabelPicker(true);
+	};
+
+	const openAssigneePicker = () => {
+		issueStore.setIssueSubmitError("");
+		issueStore.setAssigneePickerIndex(0);
+		void fetchRepoCollaborators();
+		issueStore.setShowAssigneePicker(true);
+	};
+
 	return {
 		loadAllIssues,
 		showIssueDetail,
@@ -148,6 +365,17 @@ export function createIssueActions(
 		prevPage,
 		backToIssueList,
 		selectScope,
+		closeIssue,
+		reopenIssue,
+		setIssueLabels,
+		setIssueAssignee,
+		removeIssueAssignee,
+		fetchRepoLabels,
+		fetchRepoCollaborators,
+		addComment,
+		openCommentModal,
+		openLabelPicker,
+		openAssigneePicker,
 	};
 }
 

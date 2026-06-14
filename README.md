@@ -826,8 +826,3 @@ bun run build:single   # Current platform only
 
 - **Server logs:** `<devenv_home>/logs/status.log`
 - **App logs:** `<devenv_home>/logs/<app-ident>.log`
-- **Server stdout:** Visible when running `devenv server` directly
-
-## License
-
-Proprietary

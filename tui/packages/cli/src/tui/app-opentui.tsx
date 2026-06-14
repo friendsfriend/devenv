@@ -143,7 +143,13 @@ export function TUIApp(props: TUIAppProps) {
 		client,
 		showError,
 	);
-	const helpActions = createHelpActions(appStore, logStore, mrStore, uiStore);
+	const helpActions = createHelpActions(
+		appStore,
+		issueStore,
+		logStore,
+		mrStore,
+		uiStore,
+	);
 
 	const launchPi = (sessionPath: string | null) =>
 		agentActions.launchPi(sessionPath, renderer);

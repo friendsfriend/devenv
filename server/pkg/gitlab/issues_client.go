@@ -1,6 +1,7 @@
 package gitlab
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -336,6 +337,389 @@ func (ic *IssuesClient) GetIssueComments(info *issues.RepoInfo, number int) (*is
 		CurrentPage: 1,
 		PerPage:     100,
 	}, nil
+}
+
+// --- HTTP helpers for mutations ---
+
+func (ic *IssuesClient) doPost(urlStr string, body []byte) ([]byte, int, error) {
+	req, err := http.NewRequest("POST", urlStr, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("PRIVATE-TOKEN", ic.c.token)
+	req.Header.Set("User-Agent", "devenv-cli")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ic.c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response: %w", err)
+	}
+	return respBody, resp.StatusCode, nil
+}
+
+func (ic *IssuesClient) doPut(urlStr string, body []byte) ([]byte, int, error) {
+	req, err := http.NewRequest("PUT", urlStr, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("PRIVATE-TOKEN", ic.c.token)
+	req.Header.Set("User-Agent", "devenv-cli")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := ic.c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response: %w", err)
+	}
+	return respBody, resp.StatusCode, nil
+}
+
+func (ic *IssuesClient) doDelete(urlStr string, body []byte) ([]byte, int, error) {
+	req, err := http.NewRequest("DELETE", urlStr, bytes.NewReader(body))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("PRIVATE-TOKEN", ic.c.token)
+	req.Header.Set("User-Agent", "devenv-cli")
+	req.Header.Set("Accept", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := ic.c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read response: %w", err)
+	}
+	return respBody, resp.StatusCode, nil
+}
+
+// --- Label name→ID cache helper ---
+
+// labelNameToID fetches all project labels and returns a map of label name→ID.
+func (ic *IssuesClient) labelNameToID(proj *ProjectInfo) (map[string]int, error) {
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/labels?per_page=100", ic.c.baseURL, projectPath)
+
+	body, statusCode, err := ic.doGet(apiURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error fetching labels (status %d): %s", statusCode, string(body))
+	}
+
+	var glLabels []struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(body, &glLabels); err != nil {
+		return nil, fmt.Errorf("failed to parse labels: %w", err)
+	}
+
+	result := make(map[string]int, len(glLabels))
+	for _, l := range glLabels {
+		result[l.Name] = l.ID
+	}
+	return result, nil
+}
+
+// --- Mutation implementations ---
+
+// CloseIssue implements issues.Client.CloseIssue for GitLab.
+func (ic *IssuesClient) CloseIssue(info *issues.RepoInfo, number int, reason string) (*issues.Issue, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d", ic.c.baseURL, projectPath, number)
+
+	payload := map[string]string{"state_event": "close"}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	respBody, statusCode, err := ic.doPut(apiURL, jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(respBody))
+	}
+
+	var glIss glIssue
+	if err := json.Unmarshal(respBody, &glIss); err != nil {
+		return nil, fmt.Errorf("failed to parse closed issue: %w", err)
+	}
+
+	result := convertGLIssue(glIss)
+	return &result, nil
+}
+
+// ReopenIssue implements issues.Client.ReopenIssue for GitLab.
+func (ic *IssuesClient) ReopenIssue(info *issues.RepoInfo, number int) (*issues.Issue, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d", ic.c.baseURL, projectPath, number)
+
+	payload := map[string]string{"state_event": "reopen"}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	respBody, statusCode, err := ic.doPut(apiURL, jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(respBody))
+	}
+
+	var glIss glIssue
+	if err := json.Unmarshal(respBody, &glIss); err != nil {
+		return nil, fmt.Errorf("failed to parse reopened issue: %w", err)
+	}
+
+	result := convertGLIssue(glIss)
+	return &result, nil
+}
+
+// SetLabels implements issues.Client.SetLabels for GitLab.
+func (ic *IssuesClient) SetLabels(info *issues.RepoInfo, number int, labels []string) (*issues.Issue, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d", ic.c.baseURL, projectPath, number)
+
+	payload := map[string]interface{}{
+		"labels": labels,
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	respBody, statusCode, err := ic.doPut(apiURL, jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(respBody))
+	}
+
+	var glIss glIssue
+	if err := json.Unmarshal(respBody, &glIss); err != nil {
+		return nil, fmt.Errorf("failed to parse updated issue: %w", err)
+	}
+
+	result := convertGLIssue(glIss)
+	return &result, nil
+}
+
+// AddAssignee implements issues.Client.AddAssignee for GitLab.
+func (ic *IssuesClient) AddAssignee(info *issues.RepoInfo, number int, assignee string) (*issues.Issue, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d", ic.c.baseURL, projectPath, number)
+
+	payload := map[string]interface{}{
+		"assignee_ids": []string{assignee},
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	respBody, statusCode, err := ic.doPut(apiURL, jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(respBody))
+	}
+
+	var glIss glIssue
+	if err := json.Unmarshal(respBody, &glIss); err != nil {
+		return nil, fmt.Errorf("failed to parse updated issue: %w", err)
+	}
+
+	result := convertGLIssue(glIss)
+	return &result, nil
+}
+
+// RemoveAssignee implements issues.Client.RemoveAssignee for GitLab.
+func (ic *IssuesClient) RemoveAssignee(info *issues.RepoInfo, number int) (*issues.Issue, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d", ic.c.baseURL, projectPath, number)
+
+	payload := map[string]interface{}{
+		"assignee_ids": []int{},
+	}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	respBody, statusCode, err := ic.doPut(apiURL, jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(respBody))
+	}
+
+	var glIss glIssue
+	if err := json.Unmarshal(respBody, &glIss); err != nil {
+		return nil, fmt.Errorf("failed to parse updated issue: %w", err)
+	}
+
+	result := convertGLIssue(glIss)
+	return &result, nil
+}
+
+// GetRepoLabels implements issues.Client.GetRepoLabels for GitLab.
+func (ic *IssuesClient) GetRepoLabels(info *issues.RepoInfo) ([]string, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/labels?per_page=100", ic.c.baseURL, projectPath)
+
+	body, statusCode, err := ic.doGet(apiURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(body))
+	}
+
+	var glLabels []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal(body, &glLabels); err != nil {
+		return nil, fmt.Errorf("failed to parse labels: %w", err)
+	}
+
+	result := make([]string, 0, len(glLabels))
+	for _, l := range glLabels {
+		result = append(result, l.Name)
+	}
+	return result, nil
+}
+
+// GetRepoCollaborators implements issues.Client.GetRepoCollaborators for GitLab.
+func (ic *IssuesClient) GetRepoCollaborators(info *issues.RepoInfo) ([]string, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/members?per_page=100", ic.c.baseURL, projectPath)
+
+	body, statusCode, err := ic.doGet(apiURL)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(body))
+	}
+
+	var members []struct {
+		Name     string `json:"name"`
+		Username string `json:"username"`
+	}
+	if err := json.Unmarshal(body, &members); err != nil {
+		return nil, fmt.Errorf("failed to parse members: %w", err)
+	}
+
+	result := make([]string, 0, len(members))
+	for _, m := range members {
+		result = append(result, m.Username)
+	}
+	return result, nil
+}
+
+// AddComment implements issues.Client.AddComment for GitLab.
+func (ic *IssuesClient) AddComment(info *issues.RepoInfo, number int, body string) (*issues.IssueComment, error) {
+	proj := ic.project
+	if info != nil && info.Namespace != "" && info.Project != "" {
+		proj = &ProjectInfo{Host: info.Host, Namespace: info.Namespace, Project: info.Project}
+	}
+
+	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
+	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d/notes", ic.c.baseURL, projectPath, number)
+
+	payload := map[string]string{"body": body}
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	respBody, statusCode, err := ic.doPost(apiURL, jsonPayload)
+	if err != nil {
+		return nil, err
+	}
+
+	if statusCode != http.StatusCreated {
+		return nil, fmt.Errorf("GitLab API error (status %d): %s", statusCode, string(respBody))
+	}
+
+	var glNote glIssueNote
+	if err := json.Unmarshal(respBody, &glNote); err != nil {
+		return nil, fmt.Errorf("failed to parse created note: %w", err)
+	}
+
+	result := convertGLIssueNote(glNote)
+	return &result, nil
 }
 
 var _ = log.Printf

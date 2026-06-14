@@ -20,6 +20,10 @@ import {
 	ScriptAddModal,
 	MrAiReviewOverlay,
 	IssueScopeModal,
+	CloseReasonModal,
+	CommentModal,
+	LabelPickerModal,
+	AssigneePickerModal,
 	uiColors,
 } from "@devenv/ui";
 import type { ModalOverlaysProps } from "./types";
@@ -34,7 +38,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 		uiStore,
 		agentStore,
 	} = props.stores;
-	const { dockerActions, mrActions, logActions } = props.actions;
+	const { dockerActions, mrActions, logActions, issueActions } = props.actions;
 
 	return (
 		<>
@@ -52,6 +56,64 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					}}
 				/>
 			</Show>
+
+			<Show when={issueStore.showCommentModal()}>
+				<CommentModal
+					text={issueStore.commentText()}
+					submitting={issueStore.issueSubmitting()}
+					error={issueStore.issueSubmitError()}
+					onInput={(text) => issueStore.setCommentText(text)}
+					onSubmit={() => issueActions.addComment()}
+					onCancel={() => {
+						issueStore.setShowCommentModal(false);
+						issueStore.setCommentText("");
+					}}
+				/>
+			</Show>
+
+			<Show when={issueStore.showCloseReasonModal()}>
+				<CloseReasonModal
+					selectedIndex={issueStore.closeReasonIndex()}
+					onSelect={(idx) => issueStore.setCloseReasonIndex(idx)}
+					onSubmit={(reason: string) => {
+						const { issueActions } = props.actions;
+						issueStore.setShowCloseReasonModal(false);
+						const issue = issueStore.selectedIssue();
+						if (issue) {
+							issueActions.closeIssue(issue.iid, reason);
+						}
+					}}
+					onCancel={() => issueStore.setShowCloseReasonModal(false)}
+				/>
+			</Show>
+
+			<Show when={issueStore.showLabelPicker()}>
+				<LabelPickerModal
+					labels={issueStore.availableLabels()}
+					selectedLabels={issueStore.selectedIssue()?.labels ?? []}
+					selectedIndex={issueStore.labelPickerIndex()}
+					loading={issueStore.issueLoading()}
+					onSelect={(idx) => issueStore.setLabelPickerIndex(idx)}
+					onToggle={() => {}}
+					onConfirm={() => issueStore.setShowLabelPicker(false)}
+					onCancel={() => issueStore.setShowLabelPicker(false)}
+				/>
+			</Show>
+
+			<Show when={issueStore.showAssigneePicker()}>
+				<AssigneePickerModal
+					collaborators={issueStore.availableCollaborators()}
+					currentAssignee={
+						issueStore.selectedIssue()?.assignees?.[0]?.username ?? ""
+					}
+					selectedIndex={issueStore.assigneePickerIndex()}
+					loading={issueStore.issueLoading()}
+					onSelect={(idx) => issueStore.setAssigneePickerIndex(idx)}
+					onPick={() => {}}
+					onCancel={() => issueStore.setShowAssigneePicker(false)}
+				/>
+			</Show>
+
 			<Show when={appStore.viewMode() === "sshPicker"}>
 				<SshHostPickerView
 					hosts={agentStore.sshHosts()}

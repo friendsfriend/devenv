@@ -32,6 +32,26 @@ export function createIssueStore() {
 	const [issueCommentsLoading, setIssueCommentsLoading] = createSignal(false);
 	const [issueCommentsError, setIssueCommentsError] = createSignal("");
 
+	// ─── Mutation state ─────────────────────────────────────────────────────
+	const [issueSubmitting, setIssueSubmitting] = createSignal(false);
+	const [issueSubmitError, setIssueSubmitError] = createSignal("");
+	const [availableLabels, setAvailableLabels] = createSignal<string[]>([]);
+	const [availableCollaborators, setAvailableCollaborators] = createSignal<
+		string[]
+	>([]);
+
+	// Comment modal
+	const [showCommentModal, setShowCommentModal] = createSignal(false);
+	const [commentText, setCommentText] = createSignal("");
+
+	// Modal visibility
+	const [showLabelPicker, setShowLabelPicker] = createSignal(false);
+	const [labelPickerIndex, setLabelPickerIndex] = createSignal(0);
+	const [assigneePickerIndex, setAssigneePickerIndex] = createSignal(0);
+	const [showCloseReasonModal, setShowCloseReasonModal] = createSignal(false);
+	const [closeReasonIndex, setCloseReasonIndex] = createSignal(0);
+	const [showAssigneePicker, setShowAssigneePicker] = createSignal(false);
+
 	const issuesFiltered = createMemo(() => {
 		const q = issueSearchQuery().toLowerCase();
 		if (!q) return issues();
@@ -79,6 +99,30 @@ export function createIssueStore() {
 		setIssueCommentsLoading,
 		issueCommentsError,
 		setIssueCommentsError,
+		issueSubmitting,
+		setIssueSubmitting,
+		issueSubmitError,
+		setIssueSubmitError,
+		availableLabels,
+		setAvailableLabels,
+		availableCollaborators,
+		setAvailableCollaborators,
+		showCommentModal,
+		setShowCommentModal,
+		commentText,
+		setCommentText,
+		showLabelPicker,
+		setShowLabelPicker,
+		labelPickerIndex,
+		setLabelPickerIndex,
+		assigneePickerIndex,
+		setAssigneePickerIndex,
+		showCloseReasonModal,
+		setShowCloseReasonModal,
+		closeReasonIndex,
+		setCloseReasonIndex,
+		showAssigneePicker,
+		setShowAssigneePicker,
 		issuesFiltered,
 	};
 }
