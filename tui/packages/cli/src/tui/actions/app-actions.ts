@@ -1,0 +1,376 @@
+import { getLogger } from '@devenv/core';
+import type { DevEnvClient } from '@devenv/core';
+import type { StatusLogEntry } from '@devenv/types';
+import type { AppStore } from '../stores/app-store';
+import type { AppDetailStore } from '../stores/app-detail-store';
+import type { UiStore } from '../stores/ui-store';
+import { exitApp } from '../exit';
+
+let appDetailAbortController: AbortController | null = null;
+
+export function createAppActions(
+  appStore: AppStore,
+  appDetailStore: AppDetailStore,
+  uiStore: UiStore,
+  client: DevEnvClient,
+  showError: (title: string, message: string) => void,
+) {
+  const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
+
+  const fetchStatus = async () => {
+    try {
+      const statuses = await client.getStatus();
+      appStore.setApps((prevApps) =>
+        prevApps.map((app) => {
+          const status = statuses.find((s) => s.ident === app.ident);
+          if (!status) return app;
+          const updated: typeof app = {
+            ...app,
+            dockerInfo: status.dockerInfo,
+            branch: status.branch || app.branch,
+            operationStatus: status.operationStatus,
+          };
+          if (status.activeWorktree) updated.activeWorktree = status.activeWorktree;
+          else delete updated.activeWorktree;
+          return updated;
+        }),
+      );
+    } catch (e) {
+      console.error('Failed to fetch status:', e);
+    }
+  };
+
+  const subscribeToUpdates = async () => {
+    try {
+      appStore.setLiveUpdatesActive(true);
+      getLogger().write('INFO', 'Starting SSE subscription...');
+      for await (const event of client.subscribeToEvents()) {
+        if (event.type === 'connection.established') {
+          appStore.setLiveUpdatesActive(true);
+          continue;
+        }
+
+        if (event.type === 'status.updated') {
+          const { ident, dockerInfo, branch, operationStatus, activeWorktree } = event.properties;
+          appStore.setLastUpdateTime(new Date());
+          appStore.setApps((prevApps) =>
+            prevApps.map((app) => {
+              if (app.ident !== ident) return app;
+              const updated: typeof app = { ...app, dockerInfo: dockerInfo ?? app.dockerInfo, branch: branch || app.branch };
+              if ('activeWorktree' in event.properties) {
+                if (activeWorktree == null) delete updated.activeWorktree;
+                else updated.activeWorktree = activeWorktree;
+              }
+              if ('operationStatus' in event.properties) {
+                if (operationStatus == null) delete updated.operationStatus;
+                else updated.operationStatus = operationStatus;
+              }
+              return updated;
+            }),
+          );
+          appStore.setInfraServices((prev) =>
+            prev.map((svc) => {
+              if (svc.ident !== ident) return svc;
+              const updated: typeof svc = { ...svc, dockerInfo: dockerInfo ?? svc.dockerInfo };
+              if ('operationStatus' in event.properties) {
+                if (operationStatus == null) delete updated.operationStatus;
+                else updated.operationStatus = operationStatus;
+              }
+              return updated;
+            }),
+          );
+        }
+
+        if (event.type === 'operation.status.changed') {
+          const { appIdent, operation, status, message } = event.properties;
+          appStore.setApps((prevApps) =>
+            prevApps.map((app) => (app.ident === appIdent ? { ...app, operationStatus: { operation, status, message } } : app)),
+          );
+        }
+
+        if (event.type === 'operation.status.cleared') {
+          const { appIdent } = event.properties;
+          appStore.setApps((prevApps) =>
+            prevApps.map((app) => {
+              if (app.ident !== appIdent) return app;
+              const { operationStatus: _op, ...rest } = app;
+              return rest;
+            }),
+          );
+        }
+
+        if (event.type === 'statuslog.entry') {
+          const { timestamp, appIdent, appName, operation, status, message } = event.properties;
+          const entry: StatusLogEntry = {
+            Timestamp: timestamp,
+            AppIdent: appIdent,
+            AppName: appName,
+            Operation: operation,
+            Status: status,
+            Message: message,
+          };
+          appStore.setStatusLogEntries((prev) => [...prev, entry].slice(-50));
+        }
+      }
+    } catch (e) {
+      appStore.setLiveUpdatesActive(false);
+      getLogger().write('ERROR', `SSE error: ${e instanceof Error ? e.message : String(e)}`);
+      console.error('SSE error:', e);
+    }
+  };
+
+  const fetchStatusLog = async () => {
+    try {
+      appStore.setStatusLogEntries(await client.getStatusLog(50));
+    } catch (e) {
+      console.error('Failed to fetch status log:', e);
+    }
+  };
+
+  const normalizeScriptRelativePath = (value: string) => value.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/g, '');
+
+  const parentScriptPath = (value: string) => {
+    const normalized = normalizeScriptRelativePath(value);
+    if (!normalized) return '';
+    const parts = normalized.split('/');
+    if (parts.length <= 1) return '';
+    parts.pop();
+    return parts.join('/');
+  };
+
+  const loadScripts = async (focusRelativePath?: string) => {
+    try {
+      const data = await client.getScripts();
+      appStore.setScriptsTree(data.scripts || []);
+      appStore.setAllScriptFoldersExpanded();
+
+      if (!focusRelativePath) return;
+      const normalizedFocus = normalizeScriptRelativePath(focusRelativePath);
+      const rows = appStore.tableFilteredApps();
+      let targetPath = normalizedFocus;
+      let idx = rows.findIndex((row) => row.scriptRelativePath === targetPath);
+      while (idx < 0 && targetPath.includes('/')) {
+        targetPath = parentScriptPath(targetPath);
+        idx = rows.findIndex((row) => row.scriptRelativePath === targetPath);
+      }
+      if (idx >= 0) appStore.setSelectedIndex(idx);
+    } catch (e) {
+      showError('Failed to Load Scripts', e instanceof Error ? e.message : 'Unknown error');
+    }
+  };
+
+  const openAddScriptModal = () => {
+    if (appStore.activeTab() !== 'scripts') return;
+
+    const selected = appStore.tableFilteredApps()[appStore.selectedIndex()];
+    let prefill = '';
+    if (selected?.resourceType === 'script-folder') {
+      prefill = normalizeScriptRelativePath(selected.scriptRelativePath || '');
+    } else if (selected?.resourceType === 'script-file') {
+      prefill = parentScriptPath(selected.scriptRelativePath || '');
+    }
+
+    uiStore.setScriptAddMode('create');
+    uiStore.setScriptAddTargetPath(prefill);
+    uiStore.setScriptAddSourcePath('');
+    uiStore.setScriptAddSelectedField(1);
+    uiStore.setScriptAddError(null);
+    uiStore.setShowScriptAddModal(true);
+  };
+
+  const closeAddScriptModal = () => {
+    uiStore.setShowScriptAddModal(false);
+    uiStore.setScriptAddError(null);
+    uiStore.setScriptAddSelectedField(0);
+  };
+
+  const submitAddScript = async () => {
+    const targetPath = uiStore.scriptAddTargetPath().trim();
+    const mode = uiStore.scriptAddMode();
+
+    if (!targetPath) {
+      uiStore.setScriptAddError('Target name/path is required.');
+      return;
+    }
+
+    if (mode === 'link' && !uiStore.scriptAddSourcePath().trim()) {
+      uiStore.setScriptAddError('Source script path is required for "Use existing script".');
+      return;
+    }
+
+    try {
+      const result = mode === 'create'
+        ? await client.createScript(targetPath)
+        : await client.linkScript(targetPath, uiStore.scriptAddSourcePath().trim());
+
+      closeAddScriptModal();
+      await loadScripts(result.relativePath);
+      getLogger().write('INFO', `Script ${result.operation} succeeded: ${result.relativePath}`);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Unknown error';
+      uiStore.setScriptAddError(message);
+      getLogger().write('WARN', `Script add failed: ${message}`);
+    }
+  };
+
+  const toggleScriptFolder = () => {
+    const row = appStore.tableFilteredApps()[appStore.selectedIndex()];
+    if (!row || row.resourceType !== 'script-folder' || !row.scriptRelativePath) return;
+
+    appStore.setExpandedScriptFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(row.scriptRelativePath!)) next.delete(row.scriptRelativePath!);
+      else next.add(row.scriptRelativePath!);
+      return next;
+    });
+  };
+
+  // executeSelectedScript was removed — the foreground path (runSelectedScriptInForeground)
+  // is the canonical interactive path. Use utilActions.runSelectedScriptInForeground() instead.
+
+  const openAppDetail = async () => {
+    const app = getSelectedApp();
+    if (!app) return;
+    const kind = appStore.activeTab() === 'infrastructure' ? 'infra' : app.appType === 'LIB' ? 'library' : 'app';
+    appDetailStore.setAppDetailKind(kind);
+    appDetailStore.setAppDetailApp(app);
+    appDetailStore.setAppDetailLoading(true);
+    appDetailStore.setAppDetailGitInfo(undefined);
+    appDetailStore.setAppDetailMRs([]);
+    appDetailStore.setAppDetailMRsLoading(kind !== 'infra');
+    appDetailStore.setAppDetailLogs('');
+    appDetailStore.setAppDetailStatsHistory([]);
+    appDetailStore.setAppDetailMemHistory([]);
+    appDetailStore.setAppDetailLatestStats(undefined);
+    appStore.setViewMode('appDetail');
+
+    if (kind !== 'infra') {
+      try {
+        appDetailStore.setAppDetailGitInfo(await client.getGitInfo(app.ident));
+      } catch {
+        appDetailStore.setAppDetailGitInfo({ branch: app.branch || '?', status: 'unknown' });
+      }
+
+      try {
+        const result = await client.getMergeRequests(app.ident, 'opened', 'current', app.sourceType);
+        if (result.items.length > 0) appDetailStore.setAppDetailMRs(result.items.slice(0, 5));
+        else appDetailStore.setAppDetailMRs((await client.getMergeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
+      } catch {
+        try {
+          appDetailStore.setAppDetailMRs((await client.getMergeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
+        } catch {
+          appDetailStore.setAppDetailMRs([]);
+        }
+      }
+      appDetailStore.setAppDetailMRsLoading(false);
+    }
+
+    appDetailStore.setAppDetailLoading(false);
+    const containerID = app.dockerInfo?.ContainerID;
+    if (!containerID) return;
+
+    appDetailAbortController = new AbortController();
+    const signal = appDetailAbortController.signal;
+    void client.streamContainerLogs(containerID, signal, (line) => {
+      appDetailStore.setAppDetailLogs((prev) => {
+        const updated = prev ? `${prev}\n${line}` : line;
+        const lines = updated.split('\n');
+        return lines.length > 500 ? lines.slice(-500).join('\n') : updated;
+      });
+    });
+    void client.streamContainerStats(containerID, signal, (stats) => {
+      appDetailStore.setAppDetailLatestStats(stats);
+      appDetailStore.setAppDetailStatsHistory((prev) => {
+        const next = [...prev, stats.cpuPercent];
+        return next.length > 200 ? next.slice(-200) : next;
+      });
+      appDetailStore.setAppDetailMemHistory((prev) => {
+        const next = [...prev, stats.memoryPercent];
+        return next.length > 200 ? next.slice(-200) : next;
+      });
+    });
+  };
+
+  const closeAppDetail = () => {
+    if (appDetailAbortController) {
+      appDetailAbortController.abort();
+      appDetailAbortController = null;
+    }
+    appStore.setViewMode('table');
+  };
+
+
+
+  const performRemoveScriptTarget = async (relativePath: string) => {
+    try {
+      const result = await client.deleteScript(relativePath);
+      await loadScripts(parentScriptPath(result.relativePath));
+      getLogger().write('INFO', `Script target deleted: ${result.relativePath}`);
+    } catch (e) {
+      showError('Delete Script Failed', e instanceof Error ? e.message : 'Unknown error');
+    }
+  };
+
+  const requestRemoveScript = () => {
+    if (appStore.activeTab() !== 'scripts') return;
+    const selected = appStore.tableFilteredApps()[appStore.selectedIndex()];
+    if (!selected || !selected.scriptRelativePath) return;
+
+    if (selected.resourceType === 'script-file') {
+      uiStore.setConfirmDialogTitle('Delete Script');
+      uiStore.setConfirmDialogMessage(
+        `Delete script "${selected.displayName}" (${selected.scriptRelativePath})? This cannot be undone.`,
+      );
+    } else if (selected.resourceType === 'script-folder') {
+      uiStore.setConfirmDialogTitle('Delete Script Folder');
+      uiStore.setConfirmDialogMessage(
+        `Delete folder "${selected.displayName}" (${selected.scriptRelativePath}) and all nested scripts/files? This cannot be undone.`,
+      );
+    } else {
+      return;
+    }
+
+    uiStore.setConfirmDialogAction(() => () => void performRemoveScriptTarget(selected.scriptRelativePath!));
+    uiStore.setShowConfirmDialog(true);
+  };
+
+  const performRemoveApp = async (ident: string) => {
+    try {
+      await client.deleteApp(ident);
+      appStore.setApps(await client.getApps());
+    } catch (e) {
+      showError('Remove App Failed', e instanceof Error ? e.message : 'Unknown error');
+    }
+  };
+
+  const requestRemoveApp = () => {
+    const app = getSelectedApp();
+    if (!app || appStore.activeTab() === 'scripts') return;
+    uiStore.setConfirmDialogTitle('Remove Application');
+    uiStore.setConfirmDialogMessage(
+      `Remove "${app.displayName}" (${app.ident})? This will delete the local directory and remove it from the configuration.`,
+    );
+    uiStore.setConfirmDialogAction(() => () => void performRemoveApp(app.ident));
+    uiStore.setShowConfirmDialog(true);
+  };
+
+  return {
+    fetchStatus,
+    subscribeToUpdates,
+    fetchStatusLog,
+    loadScripts,
+    openAddScriptModal,
+    closeAddScriptModal,
+    submitAddScript,
+    toggleScriptFolder,
+    openAppDetail,
+    closeAppDetail,
+    exitApp,
+    requestRemoveScript,
+    performRemoveScriptTarget,
+    requestRemoveApp,
+    performRemoveApp,
+  };
+}
+
+export type AppActions = ReturnType<typeof createAppActions>;

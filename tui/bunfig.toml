@@ -1,0 +1,6 @@
+# Bun configuration for OpenTUI + SolidJS
+# Based on OpenCode's configuration: https://github.com/sst/opencode
+
+# CRITICAL: Preload OpenTUI's JSX runtime before any code executes
+# This prevents "React is not defined" errors
+preload = ["@opentui/solid/preload"]

@@ -1,0 +1,31 @@
+{
+  "name": "devenv",
+  "version": "1.0.0",
+  "description": "DevEnv - Development Environment TUI",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "packages/*"
+  ],
+  "bin": {
+    "devenv": "./bin/devenv"
+  },
+  "scripts": {
+    "dev": "bun run packages/cli/src/spawn.ts",
+    "build": "bun run scripts/build.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@tsconfig/bun": "^1.0.10",
+    "@types/bun": "^1.3.14",
+    "typescript": "^6.0.3"
+  },
+  "engines": {
+    "bun": ">=1.3.14"
+  },
+  "dependencies": {
+    "@opentui/core": "0.4.1",
+    "@opentui/solid": "0.4.1",
+    "opentui-spinner": "^0.0.7"
+  }
+}

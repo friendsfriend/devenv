@@ -1,0 +1,368 @@
+import { TextAttributes } from '@opentui/core';
+import { Show, For, createMemo } from 'solid-js';
+import { useTerminalDimensions } from '@opentui/solid';
+import { uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import type { App, MergeRequest, ContainerStats } from '@devenv/types';
+
+export type AppDetailKind = 'app' | 'library' | 'infra';
+
+interface AppDetailViewProps {
+  app: App;
+  kind: AppDetailKind;
+  gitInfo?: { branch: string; status: string };
+  mergeRequests: MergeRequest[];
+  logs: string;
+  statsHistory: number[];
+  memHistory: number[];
+  latestStats?: ContainerStats;
+  loading: boolean;
+  mrsLoading: boolean;
+}
+
+export function AppDetailView(props: AppDetailViewProps) {
+  const dimensions = useTerminalDimensions();
+
+  const labelWidth = 5;
+
+  const sparklineWidth = createMemo(() => {
+    const termWidth = dimensions().width;
+    const rightPct = props.kind === 'infra' ? 0.65 : 0.50;
+    const panelWidth = Math.floor(termWidth * rightPct);
+    return Math.max(5, panelWidth - 4 - labelWidth);
+  });
+
+  const toHalfBlockSparkline = (values: number[]): { topRow: string; bottomRow: string } => {
+    const width = sparklineWidth();
+    const topChars = [' ', '▂', '▄', '▆', '█'];
+    const botChars = [' ', '▂', '▄', '▆', '█'];
+
+    if (values.length === 0) {
+      return { topRow: ' '.repeat(width), bottomRow: ' '.repeat(width) };
+    }
+
+    const display = values.length > width ? values.slice(-width) : values;
+    const pad = width - display.length;
+
+    let top = '';
+    let bot = '';
+    for (const value of display) {
+      const clamped = Math.max(0, Math.min(100, value));
+      const height = Math.round((clamped / 100) * 8);
+      const botLevel = height === 0 ? 1 : Math.min(height, 4);
+      const topLevel = Math.max(0, height - 4);
+      bot += botChars[botLevel];
+      top += topChars[topLevel];
+    }
+
+    const padStr = ' '.repeat(pad);
+    return { topRow: padStr + top, bottomRow: padStr + bot };
+  };
+
+  const formatMB = (bytes: number): string => {
+    const mb = Math.round(bytes / (1024 * 1024));
+    return `${mb}MB`;
+  };
+
+  const recentLogLines = () => props.logs.split('\n').slice(-10);
+
+  const hasDocker = () => props.kind === 'app' || props.kind === 'infra';
+  const hasGit = () => props.kind === 'app' || props.kind === 'library';
+  const hasMRs = () => props.kind === 'app' || props.kind === 'library';
+
+  const leftWidth = () => {
+    if (props.kind === 'library') return '100%';
+    if (props.kind === 'infra') return '35%';
+    return '50%';
+  };
+
+  const rightWidth = () => {
+    if (props.kind === 'infra') return '65%';
+    return '50%';
+  };
+
+  return (
+    <box
+      style={{
+        width: '100%',
+        height: '100%',
+        flexDirection: 'row',
+        gap: 0,
+      }}
+    >
+      {/* LEFT COLUMN */}
+      <box
+        style={{
+          width: leftWidth(),
+          height: '100%',
+          flexDirection: 'column',
+          gap: 0,
+        }}
+      >
+        {/* Info Panel */}
+        <box
+          border={true}
+          borderStyle="rounded"
+          borderColor={uiColors.textMuted}
+          style={{
+            width: '100%',
+            flexGrow: 1,
+            flexBasis: 0,
+            flexDirection: 'column',
+            overflow: 'hidden',
+          }}
+        >
+          <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
+            <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
+              {props.app.displayName}
+            </text>
+          </box>
+          <scrollbox
+            scrollbarOptions={SCROLLBAR_OPTIONS}
+            style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+          >
+            <Show when={props.kind !== 'infra'}>
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Type: </text>
+                <text fg={uiColors.textSecondary}>{props.app.appType}</text>
+              </box>
+
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Provider: </text>
+                <text fg={uiColors.textSecondary}>{props.app.provider || props.app.sourceType || 'unknown'}</text>
+              </box>
+
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Repository: </text>
+                <text fg={uiColors.textSecondary}>{props.app.repositoryPath}</text>
+              </box>
+            </Show>
+
+            <Show when={hasGit()}>
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Branch: </text>
+                <Show
+                  when={props.gitInfo}
+                  fallback={<text fg={uiColors.warning}>Loading...</text>}
+                >
+                  <text fg={uiColors.textSecondary}>{props.gitInfo?.branch}</text>
+                </Show>
+              </box>
+
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Git Status: </text>
+                <Show
+                  when={props.gitInfo}
+                  fallback={<text fg={uiColors.warning}>Loading...</text>}
+                >
+                  <text fg={uiColors.textSecondary}>{props.gitInfo?.status}</text>
+                </Show>
+              </box>
+            </Show>
+
+            <Show when={props.kind === 'infra'}>
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Container: </text>
+                <text fg={uiColors.textSecondary}>{props.app.containerBaseName}</text>
+              </box>
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Status: </text>
+                <text fg={props.app.dockerInfo?.Status?.toLowerCase().startsWith('up') ? uiColors.success : uiColors.textMuted}>
+                  {props.app.dockerInfo?.Status || 'unknown'}
+                </text>
+              </box>
+              <Show when={props.app.dockerInfo?.Ports}>
+                <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                  <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Ports: </text>
+                  <text fg={uiColors.textSecondary}>{props.app.dockerInfo?.Ports}</text>
+                </box>
+              </Show>
+            </Show>
+
+            <Show when={props.kind === 'library'}>
+              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, marginTop: 1 }}>
+                <text fg={uiColors.textMuted}>No container — library only</text>
+              </box>
+            </Show>
+          </scrollbox>
+        </box>
+
+        {/* MRs Panel — app and library only */}
+        <Show when={hasMRs()}>
+          <box
+            border={true}
+            borderStyle="rounded"
+            borderColor={uiColors.textMuted}
+            style={{
+              width: '100%',
+              flexGrow: 1,
+              flexBasis: 0,
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
+              <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
+                Open Merge Requests
+              </text>
+            </box>
+            <scrollbox
+              scrollbarOptions={SCROLLBAR_OPTIONS}
+              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+            >
+              <Show when={props.mrsLoading}>
+                <box style={{ paddingLeft: 1, paddingRight: 1 }}>
+                  <text fg={uiColors.warning}>Loading...</text>
+                </box>
+              </Show>
+              <Show when={!props.mrsLoading && props.mergeRequests.length === 0}>
+                <box style={{ paddingLeft: 1, paddingRight: 1 }}>
+                  <text fg={uiColors.textMuted}>No open merge requests</text>
+                </box>
+              </Show>
+              <For each={props.mergeRequests.slice(0, 5)}>
+                {(mr) => (
+                  <>
+                    <box style={{ paddingLeft: 1, paddingRight: 1 }}>
+                      <text fg={uiColors.textPrimary}>!{mr.iid} {mr.title}</text>
+                    </box>
+                    <box style={{ paddingLeft: 3, paddingRight: 1 }}>
+                      <text fg={uiColors.textSecondary}>{mr.source_branch} → {mr.target_branch}</text>
+                    </box>
+                  </>
+                )}
+              </For>
+            </scrollbox>
+          </box>
+        </Show>
+      </box>
+
+      {/* RIGHT COLUMN — docker only (app and infra) */}
+      <Show when={hasDocker()}>
+        <box
+          style={{
+            width: rightWidth(),
+            height: '100%',
+            flexDirection: 'column',
+            gap: 0,
+          }}
+        >
+          {/* Stats Panel */}
+          <box
+            border={true}
+            borderStyle="rounded"
+            borderColor={uiColors.textMuted}
+            style={{
+              width: '100%',
+              height: 9,
+              flexShrink: 0,
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
+              <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
+                Container Stats
+              </text>
+            </box>
+            <scrollbox
+              scrollbarOptions={SCROLLBAR_OPTIONS}
+              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+            >
+              <Show
+                when={props.latestStats}
+                fallback={
+                  <box style={{ paddingLeft: 1, paddingRight: 1 }}>
+                    <text fg={uiColors.textMuted}>No container running</text>
+                  </box>
+                }
+              >
+                {(stats) => {
+                  const cpuSpark = () => toHalfBlockSparkline(props.statsHistory);
+                  const memSpark = () => toHalfBlockSparkline(props.memHistory);
+                  return (
+                    <>
+                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
+                        <box style={{ width: labelWidth, flexShrink: 0 }}>
+                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>CPU  </text>
+                        </box>
+                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
+                          <text fg={uiColors.primary}>{cpuSpark().topRow}</text>
+                        </box>
+                      </box>
+                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
+                        <box style={{ width: labelWidth, flexShrink: 0 }}>
+                          <text fg={uiColors.textSecondary}>{stats().cpuPercent.toFixed(1)}%</text>
+                        </box>
+                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
+                          <text fg={uiColors.primary}>{cpuSpark().bottomRow}</text>
+                        </box>
+                      </box>
+                      <box style={{ height: 1 }} />
+                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
+                        <box style={{ width: labelWidth, flexShrink: 0 }}>
+                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>MEM  </text>
+                        </box>
+                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
+                          <text fg={uiColors.success}>{memSpark().topRow}</text>
+                        </box>
+                      </box>
+                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
+                        <box style={{ width: labelWidth, flexShrink: 0 }}>
+                          <text fg={uiColors.textSecondary}>{formatMB(stats().memoryUsage)}/{formatMB(stats().memoryLimit)}</text>
+                        </box>
+                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
+                          <text fg={uiColors.success}>{memSpark().bottomRow}</text>
+                        </box>
+                      </box>
+                    </>
+                  );
+                }}
+              </Show>
+            </scrollbox>
+          </box>
+
+          {/* Logs Panel */}
+          <box
+            border={true}
+            borderStyle="rounded"
+            borderColor={uiColors.textMuted}
+            style={{
+              width: '100%',
+              flexGrow: 1,
+              flexBasis: 0,
+              flexDirection: 'column',
+              overflow: 'hidden',
+            }}
+          >
+            <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
+              <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
+                Container Logs
+              </text>
+            </box>
+            <scrollbox
+              scrollbarOptions={SCROLLBAR_OPTIONS}
+              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+            >
+              <Show
+                when={props.logs.trim().length > 0}
+                fallback={
+                  <box style={{ paddingLeft: 1, paddingRight: 1 }}>
+                    <text fg={uiColors.textMuted}>No logs available</text>
+                  </box>
+                }
+              >
+                <For each={recentLogLines()}>
+                  {(line) => (
+                    <box style={{ paddingLeft: 1, paddingRight: 1 }}>
+                      <text fg={uiColors.textSecondary}>{line}</text>
+                    </box>
+                  )}
+                </For>
+              </Show>
+            </scrollbox>
+          </box>
+        </box>
+      </Show>
+    </box>
+  );
+}
