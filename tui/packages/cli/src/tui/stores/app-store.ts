@@ -23,7 +23,11 @@ export type ViewMode =
 	| "appDetail"
 	| "issues"
 	| "issueDetail"
-	| "issueScopePicker";
+	| "issueScopePicker"
+	| "linkedMRs"
+	| "referencedIssues"
+	| "mrLinkedIssues"
+	| "references";
 
 export type TabType =
 	| "applications"

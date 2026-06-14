@@ -78,6 +78,9 @@ import {
 	addIssueComment,
 	getRepoLabels,
 	getRepoCollaborators,
+	getIssueLinkedMRs,
+	getIssueReferencedIssues,
+	getMRLinkedIssues,
 } from "./issues-client";
 import {
 	analyzeLogsWithAI,
@@ -377,6 +380,30 @@ export class DevEnvClient {
 		sourceType: string | undefined,
 	): Promise<string[]> {
 		return getRepoCollaborators(this.deps, appIdent, sourceType);
+	}
+
+	getIssueLinkedMRs(
+		appIdent: string,
+		number: number,
+		sourceType?: string,
+	): Promise<import("@devenv/types").MergeRequest[]> {
+		return getIssueLinkedMRs(this.deps, appIdent, number, sourceType);
+	}
+
+	getIssueReferencedIssues(
+		appIdent: string,
+		number: number,
+		sourceType?: string,
+	): Promise<import("@devenv/types").Issue[]> {
+		return getIssueReferencedIssues(this.deps, appIdent, number, sourceType);
+	}
+
+	getMRLinkedIssues(
+		appIdent: string,
+		number: number,
+		sourceType?: string,
+	): Promise<import("@devenv/types").Issue[]> {
+		return getMRLinkedIssues(this.deps, appIdent, number, sourceType);
 	}
 	getPipelineJobs(
 		appIdent: string,

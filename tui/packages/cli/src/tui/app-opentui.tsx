@@ -61,6 +61,8 @@ import {
 	handleWorktreeManagerKeys,
 	handleIssueListKeys,
 	handleIssueDetailKeys,
+	handleLinkedMRsKeys,
+	handleReferencesKeys,
 	handleTableKeys,
 	handlePaste,
 	type KeyboardStores,
@@ -261,6 +263,8 @@ export function TUIApp(props: TUIAppProps) {
 		if (await handleMrDetailKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleLinkedMRsKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleReferencesKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleChangedFilesKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleTestResultsKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleDiscussionsKeys(event, kbStores, kbActions, kbCtx)) return;

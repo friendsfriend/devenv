@@ -11,12 +11,14 @@ export async function handleIssueListKeys(
 	actions: KeyboardActions,
 	_ctx: KeyboardContext,
 ): Promise<boolean> {
-	const { appStore, issueStore } = stores;
+	const { appStore, issueStore, mrStore } = stores;
 	const { issueActions } = actions;
 
 	if (
 		appStore.viewMode() !== "issues" &&
-		appStore.viewMode() !== "issueScopePicker"
+		appStore.viewMode() !== "issueScopePicker" &&
+		appStore.viewMode() !== "referencedIssues" &&
+		appStore.viewMode() !== "mrLinkedIssues"
 	) {
 		return false;
 	}
@@ -66,6 +68,91 @@ export async function handleIssueListKeys(
 		}
 
 		return true; // Eat all other keys in scope picker
+	}
+
+	// MR linked issues sub-view
+	if (appStore.viewMode() === "mrLinkedIssues") {
+		const linkedIssues = mrStore.mrLinkedIssues();
+		const selectedIdx = mrStore.selectedMrLinkedIssueIndex();
+
+		if (event.name === "down" || event.name === "j") {
+			mrStore.setSelectedMrLinkedIssueIndex(
+				Math.min(selectedIdx + 1, linkedIssues.length - 1),
+			);
+			return true;
+		}
+		if (event.name === "up" || event.name === "k") {
+			mrStore.setSelectedMrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
+			return true;
+		}
+		if (event.name === "g" && !event.ctrl) {
+			mrStore.setSelectedMrLinkedIssueIndex(0);
+			return true;
+		}
+		if (
+			(event.name === "G" || (event.name === "g" && event.shift)) &&
+			!event.ctrl
+		) {
+			mrStore.setSelectedMrLinkedIssueIndex(
+				Math.max(0, linkedIssues.length - 1),
+			);
+			return true;
+		}
+		if (event.name === "return" || event.name === "enter") {
+			const issue = linkedIssues[selectedIdx];
+			if (issue) {
+				void issueActions.showIssueDetail(issue);
+			}
+			return true;
+		}
+		if (event.name === "escape" || event.name === "q") {
+			mrStore.setSelectedMrLinkedIssueIndex(0);
+			appStore.setViewMode("mergeRequestDetail");
+			return true;
+		}
+		return true;
+	}
+
+	// Referenced issues sub-view
+	if (appStore.viewMode() === "referencedIssues") {
+		const refIssues = issueStore.referencedIssues();
+		const selectedIdx = issueStore.selectedReferencedIssueIndex();
+
+		if (event.name === "down" || event.name === "j") {
+			issueStore.setSelectedReferencedIssueIndex(
+				Math.min(selectedIdx + 1, refIssues.length - 1),
+			);
+			return true;
+		}
+		if (event.name === "up" || event.name === "k") {
+			issueStore.setSelectedReferencedIssueIndex(Math.max(selectedIdx - 1, 0));
+			return true;
+		}
+		if (event.name === "g" && !event.ctrl) {
+			issueStore.setSelectedReferencedIssueIndex(0);
+			return true;
+		}
+		if (
+			(event.name === "G" || (event.name === "g" && event.shift)) &&
+			!event.ctrl
+		) {
+			issueStore.setSelectedReferencedIssueIndex(
+				Math.max(0, refIssues.length - 1),
+			);
+			return true;
+		}
+		if (event.name === "return" || event.name === "enter") {
+			const issue = refIssues[selectedIdx];
+			if (issue) {
+				void issueActions.showIssueDetail(issue);
+			}
+			return true;
+		}
+		if (event.name === "escape" || event.name === "q") {
+			issueActions.backToIssueDetailFromReferences();
+			return true;
+		}
+		return true;
 	}
 
 	// Issue list view mode

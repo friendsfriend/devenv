@@ -1,19 +1,30 @@
 import { TextAttributes } from "@opentui/core";
 import { For, Show } from "solid-js";
-import type { Issue, IssueComment } from "@devenv/types";
+import type { Issue, IssueComment, MergeRequest } from "@devenv/types";
 import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+
+type RefItem =
+	| { type: "mr"; data: MergeRequest }
+	| { type: "issue"; data: Issue };
 
 interface IssueDetailViewProps {
 	issue: Issue;
 	comments: IssueComment[];
 	issueCommentsLoading: boolean;
 	error: string;
+	linkedMRs?: MergeRequest[];
+	linkedMRsLoading?: boolean;
+	linkedMRsError?: string;
+	referencedIssues?: Issue[];
+	referencedIssuesLoading?: boolean;
+	referencedIssuesError?: string;
+	references?: RefItem[];
+	spinnerFrames?: string[];
+	spinnerFrame?: () => number;
 }
 
 /**
  * IssueDetailView Component - Shows detailed issue information
- * Styled to match MergeRequestDetailView pattern: bordered panel, scrollable content,
- * metadata with bold muted labels and colored values.
  */
 export function IssueDetailView(props: IssueDetailViewProps) {
 	const formatDate = (dateStr: string) => {
@@ -52,14 +63,13 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					overflow: "hidden",
 				}}
 			>
-				{/* Title - Fixed header outside scrollbox */}
+				{/* Title */}
 				<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
 					<text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
 						{issue().title}
 					</text>
 				</box>
 
-				{/* Scrollable content */}
 				<scrollbox
 					scrollbarOptions={SCROLLBAR_OPTIONS}
 					style={{
@@ -70,11 +80,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				>
 					{/* State */}
 					<box
-						style={{
-							flexDirection: "row",
-							paddingLeft: 1,
-							paddingRight: 1,
-						}}
+						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
 					>
 						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 							State:{" "}
@@ -93,29 +99,18 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 					{/* Author */}
 					<box
-						style={{
-							flexDirection: "row",
-							paddingLeft: 1,
-							paddingRight: 1,
-						}}
+						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
 					>
 						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 							Author:{" "}
 						</text>
-						<text fg={uiColors.textPrimary}>
-							{issue().author.name}
-							{/* Don't have username in IssueAuthor yet */}
-						</text>
+						<text fg={uiColors.textPrimary}>{issue().author.name}</text>
 					</box>
 
 					{/* Labels */}
 					<Show when={(issue().labels ?? []).length > 0}>
 						<box
-							style={{
-								flexDirection: "row",
-								paddingLeft: 1,
-								paddingRight: 1,
-							}}
+							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
 						>
 							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 								Labels:{" "}
@@ -129,11 +124,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					{/* Assignees */}
 					<Show when={(issue().assignees ?? []).length > 0}>
 						<box
-							style={{
-								flexDirection: "row",
-								paddingLeft: 1,
-								paddingRight: 1,
-							}}
+							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
 						>
 							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 								Assignees:{" "}
@@ -157,11 +148,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					{/* Milestone */}
 					<Show when={issue().milestone != null}>
 						<box
-							style={{
-								flexDirection: "row",
-								paddingLeft: 1,
-								paddingRight: 1,
-							}}
+							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
 						>
 							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 								Milestone:{" "}
@@ -174,11 +161,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 					{/* Created */}
 					<box
-						style={{
-							flexDirection: "row",
-							paddingLeft: 1,
-							paddingRight: 1,
-						}}
+						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
 					>
 						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 							Created:{" "}
@@ -190,11 +173,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 					{/* Updated */}
 					<box
-						style={{
-							flexDirection: "row",
-							paddingLeft: 1,
-							paddingRight: 1,
-						}}
+						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
 					>
 						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 							Updated:{" "}
@@ -233,6 +212,109 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				</scrollbox>
 			</box>
 
+			{/* REFERENCES — combined issues + MRs */}
+			<box
+				border={true}
+				borderStyle="rounded"
+				borderColor={uiColors.textMuted}
+				style={{
+					width: "100%",
+					flexGrow: 0,
+					flexShrink: 0,
+					maxHeight: 7,
+					flexDirection: "column",
+					overflow: "hidden",
+				}}
+			>
+				<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
+					<text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
+						References
+						{props.references && props.references.length > 0
+							? ` (${props.references.length})`
+							: ""}
+					</text>
+				</box>
+
+				<Show when={props.linkedMRsLoading || props.referencedIssuesLoading}>
+					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
+						<text fg={uiColors.primary}>
+							{props.spinnerFrames && props.spinnerFrame !== undefined
+								? props.spinnerFrames[props.spinnerFrame()]
+								: "●"}
+						</text>
+					</box>
+				</Show>
+
+				<Show
+					when={
+						!props.linkedMRsLoading &&
+						!props.referencedIssuesLoading &&
+						(!props.references || props.references.length === 0)
+					}
+				>
+					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
+						<text fg={uiColors.textMuted}>No references</text>
+					</box>
+				</Show>
+
+				<Show when={props.references && props.references.length > 0}>
+					<scrollbox
+						scrollbarOptions={SCROLLBAR_OPTIONS}
+						style={{
+							width: "100%",
+							maxHeight: 6,
+							flexDirection: "column",
+						}}
+					>
+						<For each={props.references!.slice(0, 3)}>
+							{(ref) => (
+								<box
+									style={{
+										flexDirection: "row",
+										paddingLeft: 1,
+										paddingRight: 1,
+									}}
+								>
+									<text
+										fg={
+											ref.type === "mr"
+												? uiColors.primary
+												: uiColors.textSecondary
+										}
+									>
+										{ref.type === "mr" ? "!" : "#"}
+										{ref.data.iid}
+									</text>
+									<text fg={uiColors.textSecondary}>
+										{ref.data.state === "opened" || ref.data.state === "open"
+											? " ○ "
+											: ref.data.state === "merged"
+												? " ● "
+												: " ◌ "}
+									</text>
+									<text fg={uiColors.textSecondary}>
+										{ref.data.title.slice(0, 80)}
+									</text>
+								</box>
+							)}
+						</For>
+						<Show when={props.references!.length > 3}>
+							<box
+								style={{
+									flexDirection: "row",
+									paddingLeft: 1,
+									paddingRight: 1,
+								}}
+							>
+								<text fg={uiColors.primary}>
+									View all {props.references!.length} →
+								</text>
+							</box>
+						</Show>
+					</scrollbox>
+				</Show>
+			</box>
+
 			{/* COMMENTS PANEL */}
 			<box
 				border={true}
@@ -240,13 +322,13 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				borderColor={uiColors.textMuted}
 				style={{
 					width: "100%",
-					flexGrow: 1,
-					flexBasis: 0,
+					flexGrow: 0,
+					flexShrink: 0,
+					maxHeight: 6,
 					flexDirection: "column",
 					overflow: "hidden",
 				}}
 			>
-				{/* Title - Fixed header */}
 				<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
 					<text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
 						Comments
@@ -254,21 +336,22 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					</text>
 				</box>
 
-				{/* Loading */}
 				<Show when={props.issueCommentsLoading}>
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-						<text fg={uiColors.warning}>Loading comments...</text>
+						<text fg={uiColors.primary}>
+							{props.spinnerFrames && props.spinnerFrame !== undefined
+								? props.spinnerFrames[props.spinnerFrame()]
+								: "●"}
+						</text>
 					</box>
 				</Show>
 
-				{/* Error */}
 				<Show when={!props.issueCommentsLoading && props.error}>
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
 						<text fg={uiColors.error}>Error: {props.error}</text>
 					</box>
 				</Show>
 
-				{/* No comments */}
 				<Show
 					when={
 						!props.issueCommentsLoading &&
@@ -281,13 +364,16 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					</box>
 				</Show>
 
-				{/* Comments list */}
 				<Show when={!props.issueCommentsLoading && props.comments.length > 0}>
 					<scrollbox
 						scrollbarOptions={SCROLLBAR_OPTIONS}
-						style={{ flexGrow: 1, minHeight: 0 }}
+						style={{
+							width: "100%",
+							maxHeight: 3,
+							flexDirection: "column",
+						}}
 					>
-						<For each={props.comments}>
+						<For each={props.comments.slice(-3)}>
 							{(comment) => (
 								<box
 									style={{

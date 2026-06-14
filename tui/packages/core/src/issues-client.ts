@@ -247,6 +247,78 @@ export async function addIssueComment(
 }
 
 /**
+ * Get linked merge requests for an issue.
+ */
+export async function getIssueLinkedMRs(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType?: string,
+): Promise<import("@devenv/types").MergeRequest[]> {
+	const endpoint =
+		sourceType === "github"
+			? "github/issues/linked-mrs"
+			: "gitlab/issues/linked-mrs";
+	const response = await deps.fetchFn(
+		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+	);
+
+	if (!response.ok) {
+		await handleFetchError(response, deps.onError);
+	}
+
+	return (await response.json()) as import("@devenv/types").MergeRequest[];
+}
+
+/**
+ * Get issues referenced in an issue's body.
+ */
+export async function getIssueReferencedIssues(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType?: string,
+): Promise<import("@devenv/types").Issue[]> {
+	const endpoint =
+		sourceType === "github"
+			? "github/issues/references"
+			: "gitlab/issues/references";
+	const response = await deps.fetchFn(
+		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+	);
+
+	if (!response.ok) {
+		await handleFetchError(response, deps.onError);
+	}
+
+	return (await response.json()) as import("@devenv/types").Issue[];
+}
+
+/**
+ * Get linked issues for a merge request.
+ */
+export async function getMRLinkedIssues(
+	deps: ClientDeps,
+	appIdent: string,
+	number: number,
+	sourceType?: string,
+): Promise<import("@devenv/types").Issue[]> {
+	const endpoint =
+		sourceType === "github"
+			? "github/mr/linked-issues"
+			: "gitlab/mr/linked-issues";
+	const response = await deps.fetchFn(
+		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+	);
+
+	if (!response.ok) {
+		await handleFetchError(response, deps.onError);
+	}
+
+	return (await response.json()) as import("@devenv/types").Issue[];
+}
+
+/**
  * Get all collaborators for a repository.
  */
 export async function getRepoCollaborators(

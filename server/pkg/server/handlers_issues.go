@@ -1018,6 +1018,94 @@ func (s *Server) handleGitHubAddComment(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(comment)
 }
 
+// ─── Linked MRs Handlers ───────────────────────────────────────────────────
+
+// handleGitHubIssueLinkedMRs — GET /api/github/issues/{n}/linked-mrs
+func (s *Server) handleGitHubIssueLinkedMRs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	mrs, err := issuesClient.GetIssueLinkedMRs(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked MRs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mrs)
+}
+
+// handleGitLabIssueLinkedMRs — GET /api/gitlab/issues/{n}/linked-mrs
+func (s *Server) handleGitLabIssueLinkedMRs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	mrs, err := issuesClient.GetIssueLinkedMRs(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked MRs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(mrs)
+}
+
 // handleGitLabAddComment — POST /api/gitlab/issues/{n}/comment
 func (s *Server) handleGitLabAddComment(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1067,6 +1155,208 @@ func (s *Server) handleGitLabAddComment(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(comment)
+}
+
+// ─── MR Linked Issues Handlers ───────────────────────────────────────────
+
+// handleGitHubMRLinkedIssues — GET /api/github/mr/{n}/linked-issues
+func (s *Server) handleGitHubMRLinkedIssues(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, repoInfo, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	// Cast to concrete type to access GetMRLinkedIssues
+	ghIssuesClient, ok := issuesClient.(*github.IssuesClient)
+	if !ok {
+		respondErrorMessage(w, "Failed to resolve GitHub issues client", http.StatusInternalServerError)
+		return
+	}
+
+	issues, err := ghIssuesClient.GetMRLinkedIssues(repoInfo, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked issues: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issues)
+}
+
+// handleGitLabMRLinkedIssues — GET /api/gitlab/mr/{n}/linked-issues
+func (s *Server) handleGitLabMRLinkedIssues(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, projectInfo, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	// Cast to concrete type to access GetMRLinkedIssues
+	glIssuesClient, ok := issuesClient.(*gitlab.IssuesClient)
+	if !ok {
+		respondErrorMessage(w, "Failed to resolve GitLab issues client", http.StatusInternalServerError)
+		return
+	}
+
+	issues, err := glIssuesClient.GetMRLinkedIssues(projectInfo, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked issues: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(issues)
+}
+
+// ─── Issue Referenced Issues Handlers ───────────────────────────────────────
+
+// handleGitHubIssueReferencedIssues — GET /api/github/issues/{n}/references
+func (s *Server) handleGitHubIssueReferencedIssues(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	ghIssuesClient, ok := issuesClient.(*github.IssuesClient)
+	if !ok {
+		respondErrorMessage(w, "Failed to resolve GitHub issues client", http.StatusInternalServerError)
+		return
+	}
+
+	referenced, err := ghIssuesClient.GetIssueReferencedIssues(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch referenced issues: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(referenced)
+}
+
+// handleGitLabIssueReferencedIssues — GET /api/gitlab/issues/{n}/references
+func (s *Server) handleGitLabIssueReferencedIssues(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	numberStr := r.URL.Query().Get("number")
+
+	if appIdent == "" || numberStr == "" {
+		respondBadRequest(w, "appIdent and number parameters required")
+		return
+	}
+
+	number, err := strconv.Atoi(numberStr)
+	if err != nil {
+		respondBadRequest(w, "Invalid number")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	glIssuesClient, ok := issuesClient.(*gitlab.IssuesClient)
+	if !ok {
+		respondErrorMessage(w, "Failed to resolve GitLab issues client", http.StatusInternalServerError)
+		return
+	}
+
+	referenced, err := glIssuesClient.GetIssueReferencedIssues(nil, number)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch referenced issues: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(referenced)
 }
 
 var _ = log.Printf

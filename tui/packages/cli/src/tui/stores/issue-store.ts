@@ -1,5 +1,14 @@
 import { createMemo, createSignal } from "solid-js";
-import type { Issue, IssueComment, IssueScope } from "@devenv/types";
+import type {
+	Issue,
+	IssueComment,
+	IssueScope,
+	MergeRequest,
+} from "@devenv/types";
+
+export type ReferenceItem =
+	| { type: "mr"; data: MergeRequest }
+	| { type: "issue"; data: Issue };
 
 export function createIssueStore() {
 	const [issues, setIssues] = createSignal<Issue[]>([]);
@@ -39,6 +48,24 @@ export function createIssueStore() {
 	const [availableCollaborators, setAvailableCollaborators] = createSignal<
 		string[]
 	>([]);
+
+	// Linked MRs
+	const [linkedMRs, setLinkedMRs] = createSignal<MergeRequest[]>([]);
+	const [linkedMRsLoading, setLinkedMRsLoading] = createSignal(false);
+	const [linkedMRsError, setLinkedMRsError] = createSignal("");
+	const [selectedLinkedMRIndex, setSelectedLinkedMRIndex] = createSignal(0);
+
+	// Unified References — merged list of referenced issues + linked MRs
+	const [references, setReferences] = createSignal<ReferenceItem[]>([]);
+	const [selectedReferenceIndex, setSelectedReferenceIndex] = createSignal(0);
+
+	// Referenced Issues
+	const [referencedIssues, setReferencedIssues] = createSignal<Issue[]>([]);
+	const [referencedIssuesLoading, setReferencedIssuesLoading] =
+		createSignal(false);
+	const [referencedIssuesError, setReferencedIssuesError] = createSignal("");
+	const [selectedReferencedIssueIndex, setSelectedReferencedIssueIndex] =
+		createSignal(0);
 
 	// Comment modal
 	const [showCommentModal, setShowCommentModal] = createSignal(false);
@@ -124,6 +151,32 @@ export function createIssueStore() {
 		showAssigneePicker,
 		setShowAssigneePicker,
 		issuesFiltered,
+
+		// Linked MRs
+		linkedMRs,
+		setLinkedMRs,
+		linkedMRsLoading,
+		setLinkedMRsLoading,
+		linkedMRsError,
+		setLinkedMRsError,
+		selectedLinkedMRIndex,
+		setSelectedLinkedMRIndex,
+
+		// Referenced Issues
+		referencedIssues,
+		setReferencedIssues,
+		referencedIssuesLoading,
+		setReferencedIssuesLoading,
+		referencedIssuesError,
+		setReferencedIssuesError,
+		selectedReferencedIssueIndex,
+		setSelectedReferencedIssueIndex,
+
+		// Unified References
+		references,
+		setReferences,
+		selectedReferenceIndex,
+		setSelectedReferenceIndex,
 	};
 }
 

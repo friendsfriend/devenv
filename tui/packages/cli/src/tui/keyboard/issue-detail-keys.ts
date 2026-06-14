@@ -200,9 +200,30 @@ export async function handleIssueDetailKeys(
 		return true;
 	}
 
-	// r - Add comment (reply)
-	if (event.name === "r" && !event.ctrl) {
+	// R (Shift+R) — Open combined references sub-view (must be before lowercase r)
+	if ((event.name === "r" && event.shift) || event.name === "R") {
+		issueStore.setSelectedReferenceIndex(0);
+		issueActions.showReferencesSubView();
+		return true;
+	}
+
+	// r — Add comment (reply)
+	if (event.name === "r" && !event.ctrl && !event.shift) {
 		issueActions.openCommentModal();
+		return true;
+	}
+
+	// M (Shift+M) - Open linked MRs sub-view
+	if ((event.name === "m" && event.shift) || event.name === "M") {
+		issueStore.setSelectedLinkedMRIndex(0);
+		issueActions.showLinkedMRsSubView();
+		return true;
+	}
+
+	// I (Shift+I) - Open referenced issues sub-view
+	if ((event.name === "i" && event.shift) || event.name === "I") {
+		issueStore.setSelectedReferencedIssueIndex(0);
+		issueActions.showReferencedIssuesSubView();
 		return true;
 	}
 

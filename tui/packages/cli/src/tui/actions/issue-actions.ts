@@ -91,6 +91,13 @@ export function createIssueActions(
 		issueStore.setIssueCommentsLoading(true);
 		issueStore.setIssueCommentsError("");
 		issueStore.setIssueComments([]);
+		issueStore.setLinkedMRs([]);
+		issueStore.setLinkedMRsError("");
+		issueStore.setLinkedMRsLoading(true);
+		issueStore.setReferencedIssues([]);
+		issueStore.setReferencedIssuesError("");
+		issueStore.setReferencedIssuesLoading(true);
+		issueStore.setReferences([]);
 		appStore.setViewMode("issueDetail");
 
 		const app = getSelectedApp();
@@ -99,19 +106,58 @@ export function createIssueActions(
 			return;
 		}
 
-		try {
-			const comments = await client.getIssueComments(
-				app.ident,
-				issue.iid,
-				app.sourceType,
-			);
-			issueStore.setIssueComments(comments.items ?? []);
-		} catch (e) {
-			issueStore.setIssueCommentsError(errMsg(e));
-		} finally {
-			issueStore.setIssueDetailLoading(false);
-			issueStore.setIssueCommentsLoading(false);
+		// Fetch comments, linked MRs, and referenced issues independently
+		// so one failure doesn't block the others.
+		const [commentsResult, linkedMRsResult, referencedIssuesResult] =
+			await Promise.allSettled([
+				client.getIssueComments(app.ident, issue.iid, app.sourceType),
+				client.getIssueLinkedMRs(app.ident, issue.iid, app.sourceType),
+				client.getIssueReferencedIssues(app.ident, issue.iid, app.sourceType),
+			]);
+
+		const comments =
+			commentsResult.status === "fulfilled" ? commentsResult.value : null;
+		const linkedMRs =
+			linkedMRsResult.status === "fulfilled" ? linkedMRsResult.value : null;
+		const referencedIssues =
+			referencedIssuesResult.status === "fulfilled"
+				? referencedIssuesResult.value
+				: null;
+
+		issueStore.setIssueComments(comments?.items ?? []);
+		if (linkedMRsResult.status === "rejected") {
+			issueStore.setLinkedMRsError(errMsg(linkedMRsResult.reason));
 		}
+		issueStore.setLinkedMRs(linkedMRs ?? []);
+		if (referencedIssuesResult.status === "rejected") {
+			issueStore.setReferencedIssuesError(
+				errMsg(referencedIssuesResult.reason),
+			);
+		}
+		issueStore.setReferencedIssues(referencedIssues ?? []);
+
+		// Merge into unified references list
+		const refs: import("../stores/issue-store").ReferenceItem[] = [
+			...(linkedMRs ?? []).map((mr) => ({
+				type: "mr" as const,
+				data: mr,
+			})),
+			...(referencedIssues ?? []).map((iss) => ({
+				type: "issue" as const,
+				data: iss,
+			})),
+		];
+		issueStore.setReferences(refs);
+
+		// Also handle comments errors independently
+		if (commentsResult.status === "rejected") {
+			issueStore.setIssueCommentsError(errMsg(commentsResult.reason));
+		}
+
+		issueStore.setIssueDetailLoading(false);
+		issueStore.setIssueCommentsLoading(false);
+		issueStore.setLinkedMRsLoading(false);
+		issueStore.setReferencedIssuesLoading(false);
 	};
 
 	const nextPage = async () => {
@@ -358,6 +404,53 @@ export function createIssueActions(
 		issueStore.setShowAssigneePicker(true);
 	};
 
+	// ─── Linked MRs Actions ────────────────────────────────────────────────
+
+	const loadIssueLinkedMRs = async (issueIID: number) => {
+		const app = getSelectedApp();
+		if (!app) return;
+
+		issueStore.setLinkedMRsLoading(true);
+		issueStore.setLinkedMRsError("");
+		issueStore.setLinkedMRs([]);
+
+		try {
+			const mrs = await client.getIssueLinkedMRs(
+				app.ident,
+				issueIID,
+				app.sourceType,
+			);
+			issueStore.setLinkedMRs(mrs ?? []);
+		} catch (e) {
+			issueStore.setLinkedMRsError(errMsg(e));
+		} finally {
+			issueStore.setLinkedMRsLoading(false);
+		}
+	};
+
+	const showLinkedMRsSubView = () => {
+		appStore.setViewMode("linkedMRs");
+	};
+
+	const backToIssueDetailFromLinkedMRs = () => {
+		issueStore.setSelectedLinkedMRIndex(0);
+		appStore.setViewMode("issueDetail");
+	};
+
+	const showReferencedIssuesSubView = () => {
+		appStore.setViewMode("referencedIssues");
+	};
+
+	const showReferencesSubView = () => {
+		appStore.setViewMode("references");
+	};
+
+	const backToIssueDetailFromReferences = () => {
+		issueStore.setSelectedReferencedIssueIndex(0);
+		issueStore.setSelectedReferenceIndex(0);
+		appStore.setViewMode("issueDetail");
+	};
+
 	return {
 		loadAllIssues,
 		showIssueDetail,
@@ -376,6 +469,16 @@ export function createIssueActions(
 		openCommentModal,
 		openLabelPicker,
 		openAssigneePicker,
+
+		// Linked MRs
+		loadIssueLinkedMRs,
+		showLinkedMRsSubView,
+		backToIssueDetailFromLinkedMRs,
+
+		// Referenced Issues
+		showReferencedIssuesSubView,
+		showReferencesSubView,
+		backToIssueDetailFromReferences,
 	};
 }
 

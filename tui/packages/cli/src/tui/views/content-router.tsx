@@ -4,6 +4,8 @@ import {
 	StatusLogView,
 	IssueView,
 	IssueDetailView,
+	LinkedMRsView,
+	ReferencesView,
 	MergeRequestView,
 	MergeRequestDetailView,
 	ChangedFilesView,
@@ -21,7 +23,8 @@ import { StartupSplash } from "./startup-splash";
 export function ContentRouter(props: ContentRouterProps) {
 	const { appStore, issueStore, mrStore, providerStore, appDetailStore } =
 		props.stores;
-	const { helpActions, pipelineActions, logActions, mrActions } = props.actions;
+	const { helpActions, issueActions, pipelineActions, logActions, mrActions } =
+		props.actions;
 	const tableColumns = () =>
 		appStore.activeTab() === "scripts"
 			? props.scriptColumns
@@ -33,7 +36,55 @@ export function ContentRouter(props: ContentRouterProps) {
 
 	return (
 		<>
-			{appStore.loading() ? (
+			{appStore.viewMode() === "references" ? (
+				<ReferencesView
+					references={issueStore.references()}
+					selectedIndex={issueStore.selectedReferenceIndex()}
+					loading={
+						issueStore.linkedMRsLoading() ||
+						issueStore.referencedIssuesLoading()
+					}
+					error={
+						issueStore.linkedMRsError() || issueStore.referencedIssuesError()
+					}
+					onClose={() => issueActions.backToIssueDetailFromReferences()}
+				/>
+			) : appStore.viewMode() === "mrLinkedIssues" ? (
+				<IssueView
+					issues={mrStore.mrLinkedIssues()}
+					selectedIndex={mrStore.selectedMrLinkedIssueIndex()}
+					loading={mrStore.mrLinkedIssuesLoading()}
+					error={mrStore.mrLinkedIssuesError()}
+					currentPage={1}
+					totalPages={1}
+					totalCount={mrStore.mrLinkedIssues().length}
+					scope={"all"}
+					onClose={() => {
+						mrStore.setSelectedMrLinkedIssueIndex(0);
+						appStore.setViewMode("mergeRequestDetail");
+					}}
+				/>
+			) : appStore.viewMode() === "referencedIssues" ? (
+				<IssueView
+					issues={issueStore.referencedIssues()}
+					selectedIndex={issueStore.selectedReferencedIssueIndex()}
+					loading={issueStore.referencedIssuesLoading()}
+					error={issueStore.referencedIssuesError()}
+					currentPage={1}
+					totalPages={1}
+					totalCount={issueStore.referencedIssues().length}
+					scope={"all"}
+					onClose={() => issueActions.backToIssueDetailFromReferences()}
+				/>
+			) : appStore.viewMode() === "linkedMRs" ? (
+				<LinkedMRsView
+					mergeRequests={issueStore.linkedMRs()}
+					selectedIndex={issueStore.selectedLinkedMRIndex()}
+					loading={issueStore.linkedMRsLoading()}
+					error={issueStore.linkedMRsError()}
+					onClose={() => {}}
+				/>
+			) : appStore.loading() ? (
 				<StartupSplash appStore={appStore} />
 			) : appStore.error() ? (
 				<box
@@ -251,6 +302,9 @@ export function ContentRouter(props: ContentRouterProps) {
 																discussions={mrStore.mrDiscussions()}
 																discussionsLoading={mrStore.mrDiscussionsLoading()}
 																discussionsError={mrStore.mrDiscussionsError()}
+																linkedIssues={mrStore.mrLinkedIssues()}
+																linkedIssuesLoading={mrStore.mrLinkedIssuesLoading()}
+																linkedIssuesError={mrStore.mrLinkedIssuesError()}
 																onClose={mrActions.backToMRList}
 															/>
 														</Show>
@@ -282,6 +336,15 @@ export function ContentRouter(props: ContentRouterProps) {
 												comments={issueStore.issueComments()}
 												issueCommentsLoading={issueStore.issueCommentsLoading()}
 												error={issueStore.issueDetailError()}
+												linkedMRs={issueStore.linkedMRs()}
+												linkedMRsLoading={issueStore.linkedMRsLoading()}
+												linkedMRsError={issueStore.linkedMRsError()}
+												referencedIssues={issueStore.referencedIssues()}
+												referencedIssuesLoading={issueStore.referencedIssuesLoading()}
+												referencedIssuesError={issueStore.referencedIssuesError()}
+												references={issueStore.references()}
+												spinnerFrames={props.spinnerFrames}
+												spinnerFrame={appStore.spinnerFrame}
 											/>
 										</Show>
 									}

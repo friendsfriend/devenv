@@ -25,6 +25,8 @@ export { MergeRequestDetailView } from "./components/MergeRequestDetailView";
 export { TestResultsDetailView } from "./components/TestResultsDetailView";
 export { JobsDetailView } from "./components/JobsDetailView";
 export { ChangedFilesView } from "./components/ChangedFilesView";
+export { LinkedMRsView } from "./components/LinkedMRsView";
+export { ReferencesView } from "./components/ReferencesView";
 export { DiscussionsView } from "./components/DiscussionsView";
 export { DiffViewModal } from "./components/DiffViewModal";
 export { TestDetailModal } from "./components/TestDetailModal";

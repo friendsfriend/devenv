@@ -12,6 +12,8 @@ export { handleLogModalKeys } from "./log-modal-keys";
 export { handleJobsKeys } from "./jobs-keys";
 export { handleIssueListKeys } from "./issue-list-keys";
 export { handleIssueDetailKeys } from "./issue-detail-keys";
+export { handleLinkedMRsKeys } from "./linked-mrs-keys";
+export { handleReferencesKeys } from "./references-keys";
 export { handleMrListKeys } from "./mr-list-keys";
 export { handleMrDetailKeys } from "./mr-detail-keys";
 export { handleChangedFilesKeys } from "./changed-files-keys";
