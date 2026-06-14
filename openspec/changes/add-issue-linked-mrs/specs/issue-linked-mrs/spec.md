@@ -1,0 +1,77 @@
+## ADDED Requirements
+
+### Requirement: User can see linked MRs inline in issue detail
+
+The issue detail view SHALL display a compact "Linked Merge Requests" section at the bottom of the scroll, showing the count of linked MRs and the titles of the first 3. The section SHALL indicate when data is loading and when no linked MRs exist.
+
+#### Scenario: Inline linked MRs summary with data
+- **WHEN** the issue detail view is displayed and linked MR data has loaded
+- **THEN** the system SHALL show a section titled "Linked Merge Requests"
+- **AND** SHALL show the count of linked MRs (e.g., "3 linked merge requests")
+- **AND** SHALL show the title, state, and ID for the first 3 linked MRs
+- **AND** SHALL show a "View all N →" cue to open the full sub-view
+
+#### Scenario: Inline linked MRs loading state
+- **WHEN** the issue detail view is displayed and linked MRs are still loading
+- **THEN** the system SHALL show a loading indicator in the linked MRs section
+
+#### Scenario: Inline linked MRs empty state
+- **WHEN** the issue detail view is displayed and no linked MRs exist
+- **THEN** the system SHALL show "No linked merge requests" in the section
+
+### Requirement: User can view all linked MRs in full sub-view
+
+The system SHALL provide a full-screen linked MRs sub-view, navigable from the issue detail by pressing `M`. The sub-view SHALL display all linked MRs in a table format using the existing `MergeRequestView` component, with keyboard navigation for list traversal and Escape to return to issue detail.
+
+#### Scenario: Open linked MRs sub-view
+- **WHEN** user presses `M` (Shift+M) from the issue detail view
+- **THEN** the system SHALL switch to the linked MRs sub-view
+- **AND** SHALL display all linked MRs in a table format
+- **AND** SHALL support j/k navigation, Enter to open MR detail (reusing existing MR machinery), and Escape to return
+
+#### Scenario: Open linked MRs with no data
+- **WHEN** user presses `M` from the issue detail view and no linked MRs exist
+- **THEN** the system SHALL display an empty state message "No linked merge requests"
+- **AND** SHALL return to issue detail on Escape
+
+#### Scenario: Return to issue detail from linked MRs
+- **WHEN** user presses Escape from the linked MRs sub-view
+- **THEN** the system SHALL return to the issue detail view
+
+## MODIFIED Requirements
+
+### Requirement: User can view issue detail
+
+*(From: `add-issues-basic` change, `issue-viewing` capability)*
+
+The system SHALL display a detail view when the user selects an issue from the list. The detail view SHALL show issue title, author, state, labels, assignee, milestone, created/updated dates, description, web URL, threaded comments, and a linked MRs summary panel.
+
+#### Scenario: View issue metadata
+- **WHEN** the issue detail view is displayed
+- **THEN** the system SHALL show the issue title as a bold header
+- **AND** SHALL show author name and username
+- **AND** SHALL show state with color coding (opened=green, closed=muted)
+- **AND** SHALL show labels (if any)
+- **AND** SHALL show assignee name (if any)
+- **AND** SHALL show milestone title (if any)
+- **AND** SHALL show created and updated dates
+- **AND** SHALL show the description text (if any)
+- **AND** SHALL show the web URL
+- **AND** SHALL show a linked MRs summary panel at the bottom
+
+### Requirement: System supports both GitHub and GitLab
+
+*(From: `add-issues-basic` change, `issue-viewing` capability)*
+
+The system SHALL provide issue viewing for both GitHub Issues and GitLab Issues, determined by the app's configured provider type. Both providers SHALL return a unified issue shape to the TUI. The system SHALL also support fetching linked MRs for issues from both providers.
+
+#### Scenario: GitHub issue linked MRs
+- **WHEN** the issue detail for a GitHub issue is displayed
+- **THEN** the system SHALL parse the issue description for closing references (closes, fixes, resolves, etc.)
+- **AND** SHALL fetch any referenced PRs and display them as linked MRs
+
+#### Scenario: GitLab issue linked MRs
+- **WHEN** the issue detail for a GitLab issue is displayed
+- **THEN** the system SHALL call the GitLab `closed_by` API endpoint
+- **AND** SHALL also parse the issue description for `!{n}` references
+- **AND** SHALL display the combined results as linked MRs

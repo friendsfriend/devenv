@@ -1,465 +1,519 @@
 // Type definitions for DevEnv TUI
 
 // Provider types
-export type ProviderType = 'github' | 'gitlab';
+export type ProviderType = "github" | "gitlab";
 
 export interface Provider {
-  name: string;
-  type: ProviderType;
-  username: string;
-  has_token: boolean;
+	name: string;
+	type: ProviderType;
+	username: string;
+	has_token: boolean;
 }
 
 export interface ProviderCreateRequest {
-  name: string;
-  type: ProviderType;
-  username: string;
-  token: string;
+	name: string;
+	type: ProviderType;
+	username: string;
+	token: string;
 }
 
 export interface ProviderUpdateRequest {
-  username?: string;
-  token?: string;
+	username?: string;
+	token?: string;
 }
 
 export interface App {
-  ident: string;
-  displayName: string;
-  localDirectoryPath: string;
-  repositoryPath: string;
-  branch: string;
-  appType: 'APP' | 'LIB';
-  containerBaseName: string;
-  sourceType?: ProviderType;
-  provider?: string;
-  activeWorktree?: string;
-  mainWorktreeBranch?: string;
-  dockerInfo?: DockerInfo;
-  operationStatus?: OperationStatus;
-  resourceType?: 'app' | 'script-folder' | 'script-file';
-  scriptPath?: string;
-  scriptRelativePath?: string;
-  scriptDepth?: number;
-  scriptExpanded?: boolean;
-  scriptExecutable?: boolean;
-  interpreter?: string | null;
-  scriptParameters?: ScriptParameter[];
+	ident: string;
+	displayName: string;
+	localDirectoryPath: string;
+	repositoryPath: string;
+	branch: string;
+	appType: "APP" | "LIB";
+	containerBaseName: string;
+	sourceType?: ProviderType;
+	provider?: string;
+	activeWorktree?: string;
+	mainWorktreeBranch?: string;
+	dockerInfo?: DockerInfo;
+	operationStatus?: OperationStatus;
+	resourceType?: "app" | "script-folder" | "script-file";
+	scriptPath?: string;
+	scriptRelativePath?: string;
+	scriptDepth?: number;
+	scriptExpanded?: boolean;
+	scriptExecutable?: boolean;
+	interpreter?: string | null;
+	scriptParameters?: ScriptParameter[];
 }
 
 export interface AppStatus {
-  ident: string;
-  dockerInfo?: DockerInfo;
-  gitStatus?: string;
-  branch?: string;
-  activeWorktree?: string;
-  operationStatus?: OperationStatus; // NEW: Current operation status
+	ident: string;
+	dockerInfo?: DockerInfo;
+	gitStatus?: string;
+	branch?: string;
+	activeWorktree?: string;
+	operationStatus?: OperationStatus; // NEW: Current operation status
 }
 
 // Operation status for showing in-progress operations
 export interface OperationStatus {
-  operation: OperationType; // What operation is running
-  status: StatusType; // Current status
-  message: string; // Display message
+	operation: OperationType; // What operation is running
+	status: StatusType; // Current status
+	message: string; // Display message
 }
 
-export type OperationType = 
-  | 'pull' 
-  | 'push' 
-  | 'fetch' 
-  | 'checkout' 
-  | 'build' 
-  | 'test'
-  | 'run'
-  | 'start' 
-  | 'stop'
-  | 'script';
+export type OperationType =
+	| "pull"
+	| "push"
+	| "fetch"
+	| "checkout"
+	| "build"
+	| "test"
+	| "run"
+	| "start"
+	| "stop"
+	| "script";
 
-export type StatusType = 
-  | 'pending' 
-  | 'active' 
-  | 'completed' 
-  | 'failed';
+export type StatusType = "pending" | "active" | "completed" | "failed";
 
 export interface DockerInfo {
-  Status: string;  // Go uses PascalCase
-  ContainerID: string;  // Go uses PascalCase
-  Ports: string;  // Go uses PascalCase
+	Status: string; // Go uses PascalCase
+	ContainerID: string; // Go uses PascalCase
+	Ports: string; // Go uses PascalCase
 }
 
 export interface InfraService {
-  ident: string;
-  displayName: string;
-  containerBaseName: string;
-  dockerInfo?: DockerInfo;
-  operationStatus?: OperationStatus;
+	ident: string;
+	displayName: string;
+	containerBaseName: string;
+	dockerInfo?: DockerInfo;
+	operationStatus?: OperationStatus;
 }
 
-export type ScriptParameterType = 'string' | 'int' | 'bool' | 'enum';
+export type ScriptParameterType = "string" | "int" | "bool" | "enum";
 
 export interface ScriptParameter {
-  name: string;
-  type: ScriptParameterType;
-  required: boolean;
-  description?: string;
-  defaultValue?: string;
-  choices?: string[];
-  flag?: string;
+	name: string;
+	type: ScriptParameterType;
+	required: boolean;
+	description?: string;
+	defaultValue?: string;
+	choices?: string[];
+	flag?: string;
 }
 
 export interface ScriptNode {
-  name: string;
-  relativePath: string;
-  absolutePath: string;
-  nodeType: 'folder' | 'script';
-  interpreter?: string;
-  parameters?: ScriptParameter[];
-  children?: ScriptNode[];
+	name: string;
+	relativePath: string;
+	absolutePath: string;
+	nodeType: "folder" | "script";
+	interpreter?: string;
+	parameters?: ScriptParameter[];
+	children?: ScriptNode[];
 }
 
 export interface ScriptListResponse {
-  scripts: ScriptNode[];
+	scripts: ScriptNode[];
 }
 
 export interface ScriptMetadataResponse {
-  parameters: ScriptParameter[];
+	parameters: ScriptParameter[];
 }
 
 export interface ExecuteScriptRequest {
-  relativePath: string;
-  args?: string[];
+	relativePath: string;
+	args?: string[];
 }
 
 export interface ExecuteScriptResponse {
-  success: boolean;
-  relativePath: string;
-  interpreter: string;
-  output?: string;
+	success: boolean;
+	relativePath: string;
+	interpreter: string;
+	output?: string;
 }
 
 export interface CreateScriptRequest {
-  targetPath: string;
+	targetPath: string;
 }
 
 export interface LinkScriptRequest {
-  targetPath: string;
-  sourcePath: string;
+	targetPath: string;
+	sourcePath: string;
 }
 
 export interface DeleteScriptRequest {
-  relativePath: string;
+	relativePath: string;
 }
 
 export interface ScriptMutationResponse {
-  success: boolean;
-  operation: 'create' | 'link' | 'delete';
-  relativePath: string;
-  absolutePath: string;
+	success: boolean;
+	operation: "create" | "link" | "delete";
+	relativePath: string;
+	absolutePath: string;
 }
 
 export interface ScriptArgsHistoryResponse {
-  relativePath: string;
-  entries: Record<string, string>[];
+	relativePath: string;
+	entries: Record<string, string>[];
 }
 
 export interface ScriptArgsHistoryRequest {
-  relativePath: string;
-  values: Record<string, string>;
+	relativePath: string;
+	values: Record<string, string>;
 }
 
 export interface ScriptVisibleRow {
-  name: string;
-  relativePath: string;
-  absolutePath: string;
-  nodeType: 'folder' | 'script';
-  interpreter?: string;
-  parameters?: ScriptParameter[];
-  depth: number;
+	name: string;
+	relativePath: string;
+	absolutePath: string;
+	nodeType: "folder" | "script";
+	interpreter?: string;
+	parameters?: ScriptParameter[];
+	depth: number;
 }
 
 export interface GitInfo {
-  branch: string;
-  status: string;
+	branch: string;
+	status: string;
 }
 
 export interface ServerEvent {
-  type: string;
-  properties: Record<string, any>;
-  timestamp: string;
+	type: string;
+	properties: Record<string, any>;
+	timestamp: string;
 }
 
 // GitLab Merge Request types
 
 // MRListResult represents a paginated response from the merge request list endpoint.
 export interface MRListResult {
-  items: MergeRequest[];
-  totalCount: number;
-  totalPages: number;
-  currentPage: number;
-  perPage: number;
+	items: MergeRequest[];
+	totalCount: number;
+	totalPages: number;
+	currentPage: number;
+	perPage: number;
 }
 
 export interface MergeRequest {
-  id: number;
-  iid: number;
-  title: string;
-  description: string;
-  source_branch: string;
-  target_branch: string;
-  state: string; // opened, merged, closed
-  web_url: string;
-  created_at: string;
-  updated_at: string;
-  author: {
-    name: string;
-    username: string;
-  };
-  head_pipeline?: {
-    id: number;
-    status: string;
-    web_url: string;
-    sha?: string;
-  };
-  merge_status: string;
-  detailed_merge_status: string;
-  draft: boolean;
-  work_in_progress: boolean;
-  has_conflicts: boolean;
-  blocking_discussions_resolved: boolean;
-  rebase_in_progress: boolean;
-  merge_error?: string; // error message if merge/rebase failed
-  approvals?: MRApprovals;
+	id: number;
+	iid: number;
+	title: string;
+	description: string;
+	source_branch: string;
+	target_branch: string;
+	state: string; // opened, merged, closed
+	web_url: string;
+	created_at: string;
+	updated_at: string;
+	author: {
+		name: string;
+		username: string;
+	};
+	head_pipeline?: {
+		id: number;
+		status: string;
+		web_url: string;
+		sha?: string;
+	};
+	merge_status: string;
+	detailed_merge_status: string;
+	draft: boolean;
+	work_in_progress: boolean;
+	has_conflicts: boolean;
+	blocking_discussions_resolved: boolean;
+	rebase_in_progress: boolean;
+	merge_error?: string; // error message if merge/rebase failed
+	approvals?: MRApprovals;
 }
 
 export interface MRApprovals {
-  approvals_required: number;
-  approvals_left: number;
-  approved_by: Array<{
-    user: {
-      name: string;
-      username: string;
-    };
-  }>;
+	approvals_required: number;
+	approvals_left: number;
+	approved_by: Array<{
+		user: {
+			name: string;
+			username: string;
+		};
+	}>;
 }
 
 export interface MRChange {
-  old_path: string;
-  new_path: string;
-  a_mode: string;
-  b_mode: string;
-  new_file: boolean;
-  renamed_file: boolean;
-  deleted_file: boolean;
-  diff: string;
-  lines_added: number;
-  lines_deleted: number;
-  diff_lines?: DiffLine[]; // Parsed diff lines with line codes
+	old_path: string;
+	new_path: string;
+	a_mode: string;
+	b_mode: string;
+	new_file: boolean;
+	renamed_file: boolean;
+	deleted_file: boolean;
+	diff: string;
+	lines_added: number;
+	lines_deleted: number;
+	diff_lines?: DiffLine[]; // Parsed diff lines with line codes
 }
 
 export interface DiffLine {
-  line_code: string;   // GitLab's unique identifier for this line
-  type: string;        // "new", "old", "match" (context)
-  old_line?: number;   // Line number in old file (undefined for added lines)
-  new_line?: number;   // Line number in new file (undefined for deleted lines)
-  text: string;        // The actual line content
-  rich_text?: string;  // HTML-formatted text (if available)
+	line_code: string; // GitLab's unique identifier for this line
+	type: string; // "new", "old", "match" (context)
+	old_line?: number; // Line number in old file (undefined for added lines)
+	new_line?: number; // Line number in new file (undefined for deleted lines)
+	text: string; // The actual line content
+	rich_text?: string; // HTML-formatted text (if available)
 }
 
 // Discussion/Comment types
 export interface Discussion {
-  id: string;
-  individual_note: boolean; // true if single comment, false if thread
-  notes: Note[];
-  position?: NotePosition; // Position in diff (for diff comments)
+	id: string;
+	individual_note: boolean; // true if single comment, false if thread
+	notes: Note[];
+	position?: NotePosition; // Position in diff (for diff comments)
 }
 
 export interface Note {
-  id: number;
-  type: string; // "DiffNote", "DiscussionNote", etc.
-  body: string; // Comment text (markdown)
-  author: NoteAuthor;
-  created_at: string;
-  updated_at: string;
-  system: boolean; // true for system-generated notes
-  position?: NotePosition; // Position in diff
-  resolvable: boolean; // Can this note be resolved?
-  resolved: boolean; // Is this note resolved?
-  resolved_by?: NoteAuthor;
-  resolved_at?: string;
+	id: number;
+	type: string; // "DiffNote", "DiscussionNote", etc.
+	body: string; // Comment text (markdown)
+	author: NoteAuthor;
+	created_at: string;
+	updated_at: string;
+	system: boolean; // true for system-generated notes
+	position?: NotePosition; // Position in diff
+	resolvable: boolean; // Can this note be resolved?
+	resolved: boolean; // Is this note resolved?
+	resolved_by?: NoteAuthor;
+	resolved_at?: string;
 }
 
 export interface NoteAuthor {
-  id: number;
-  username: string;
-  name: string;
-  avatar_url: string;
+	id: number;
+	username: string;
+	name: string;
+	avatar_url: string;
 }
 
 export interface NotePosition {
-  base_sha: string;
-  start_sha: string;
-  head_sha: string;
-  old_path: string;
-  new_path: string;
-  position_type: string; // "text", "image", or "file"
-  old_line?: number;
-  new_line?: number;
-  line_range?: {
-    start: {
-      line_code: string;
-      type: string;
-      old_line?: number;
-      new_line?: number;
-    };
-    end: {
-      line_code: string;
-      type: string;
-      old_line?: number;
-      new_line?: number;
-    };
-  }; // For multi-line comments
+	base_sha: string;
+	start_sha: string;
+	head_sha: string;
+	old_path: string;
+	new_path: string;
+	position_type: string; // "text", "image", or "file"
+	old_line?: number;
+	new_line?: number;
+	line_range?: {
+		start: {
+			line_code: string;
+			type: string;
+			old_line?: number;
+			new_line?: number;
+		};
+		end: {
+			line_code: string;
+			type: string;
+			old_line?: number;
+			new_line?: number;
+		};
+	}; // For multi-line comments
 }
 
 // GitLab Pipeline types
 export interface Pipeline {
-  id: number;
-  iid: number;
-  project_id: number;
-  status: string; // success, failed, running, pending, canceled, skipped
-  ref: string; // branch name
-  sha: string;
-  web_url: string;
-  created_at: string;
-  updated_at: string;
-  user: {
-    name: string;
-    username: string;
-  };
-  source: string;
+	id: number;
+	iid: number;
+	project_id: number;
+	status: string; // success, failed, running, pending, canceled, skipped
+	ref: string; // branch name
+	sha: string;
+	web_url: string;
+	created_at: string;
+	updated_at: string;
+	user: {
+		name: string;
+		username: string;
+	};
+	source: string;
 }
 
 export interface Job {
-  id: number;
-  name: string;
-  stage: string;
-  status: string; // success, failed, running, pending, canceled, skipped, created, manual
-  web_url: string;
-  created_at?: string;
-  started_at?: string;
-  finished_at?: string;
-  duration?: number; // in seconds
-  queued_duration?: number; // in seconds
-  runner?: {
-    id: number;
-    description: string;
-    name: string;
-  };
-  pipeline: {
-    id: number;
-  };
+	id: number;
+	name: string;
+	stage: string;
+	status: string; // success, failed, running, pending, canceled, skipped, created, manual
+	web_url: string;
+	created_at?: string;
+	started_at?: string;
+	finished_at?: string;
+	duration?: number; // in seconds
+	queued_duration?: number; // in seconds
+	runner?: {
+		id: number;
+		description: string;
+		name: string;
+	};
+	pipeline: {
+		id: number;
+	};
 }
 
 // Test results types
 export interface TestCase {
-  name: string;
-  classname: string;
-  status: string; // success, failed, skipped, error
-  execution_time: number;
-  system_output?: string;
-  stack_trace?: string;
+	name: string;
+	classname: string;
+	status: string; // success, failed, skipped, error
+	execution_time: number;
+	system_output?: string;
+	stack_trace?: string;
 }
 
 export interface TestSuite {
-  name: string;
-  test_cases: TestCase[];
+	name: string;
+	test_cases: TestCase[];
 }
 
 export interface FailedTestGroup {
-  class_name: string;
-  test_methods: string[];
+	class_name: string;
+	test_methods: string[];
 }
 
 export interface TestSummary {
-  total: number;
-  success: number;
-  failed: number;
-  skipped: number;
-  error: number;
-  test_suites?: TestSuite[];
-  failed_test_groups?: FailedTestGroup[];
+	total: number;
+	success: number;
+	failed: number;
+	skipped: number;
+	error: number;
+	test_suites?: TestSuite[];
+	failed_test_groups?: FailedTestGroup[];
 }
 
 // Status Log types
 export interface StatusLogEntry {
-  Timestamp: string; // ISO 8601 format from Go
-  AppIdent: string;
-  AppName: string;
-  Operation: string; // pull, push, fetch, build, start, stop
-  Status: string; // pending, in_progress, active, completed, failed
-  Message: string;
+	Timestamp: string; // ISO 8601 format from Go
+	AppIdent: string;
+	AppName: string;
+	Operation: string; // pull, push, fetch, build, start, stop
+	Status: string; // pending, in_progress, active, completed, failed
+	Message: string;
 }
 
 // Agent space types
 export interface AgentSpace {
-  id: string;
-  name: string;
-  description: string;
-  repoDirs: string[];
-  hasAgent: boolean;
+	id: string;
+	name: string;
+	description: string;
+	repoDirs: string[];
+	hasAgent: boolean;
 }
 
 export interface AgentSessionInfo {
-  id: string;
-  title: string;
-  timeCreated: number; // Unix ms
-  timeUpdated: number; // Unix ms
+	id: string;
+	title: string;
+	timeCreated: number; // Unix ms
+	timeUpdated: number; // Unix ms
 }
 
 export interface AgentGroup {
-  name: string;   // e.g. "Sisyphus (Ultraworker)"
-  model: string;  // e.g. "claude-opus-4.6"
-  sessions: AgentSessionInfo[];
+	name: string; // e.g. "Sisyphus (Ultraworker)"
+	model: string; // e.g. "claude-opus-4.6"
+	sessions: AgentSessionInfo[];
 }
 
 export interface SshHost {
-  alias: string;       // Host alias from ~/.ssh/config (e.g. "prod-server")
-  hostname?: string;   // HostName directive value
-  user?: string;       // User directive value
-  port?: number;       // Port directive value (default 22)
-  identityFile?: string; // IdentityFile directive value
+	alias: string; // Host alias from ~/.ssh/config (e.g. "prod-server")
+	hostname?: string; // HostName directive value
+	user?: string; // User directive value
+	port?: number; // Port directive value (default 22)
+	identityFile?: string; // IdentityFile directive value
 }
 
 export interface RepoSearchResult {
-  name: string;
-  fullPath: string;
-  url: string;
-  defaultBranch: string;
+	name: string;
+	fullPath: string;
+	url: string;
+	defaultBranch: string;
 }
 
 export interface RepoSearchRequest {
-  provider: string;
-  query: string;
-  host?: string;
+	provider: string;
+	query: string;
+	host?: string;
 }
 
 export interface CreateAppRequest {
-  displayName: string;
-  repositoryURL: string;
-  branch: string;
-  provider: string;
-  appType: 'APP' | 'LIB';
+	displayName: string;
+	repositoryURL: string;
+	branch: string;
+	provider: string;
+	appType: "APP" | "LIB";
 }
 
 export interface WorktreeInfo {
-  branch: string;
-  path: string;
-  isMain: boolean;
-  active: boolean;
+	branch: string;
+	path: string;
+	isMain: boolean;
+	active: boolean;
+}
+
+// Issue types
+export type IssueScope =
+	| "all"
+	| "assigned-to-me"
+	| "created-by-me"
+	| "no-assignee";
+
+export interface Issue {
+	id: number;
+	iid: number;
+	title: string;
+	description: string;
+	state: string;
+	web_url: string;
+	author: {
+		name: string;
+		username: string;
+	};
+	labels: string[];
+	assignees: Array<{
+		name: string;
+		username: string;
+	}>;
+	milestone?: {
+		title: string;
+	};
+	created_at: string;
+	updated_at: string;
+}
+
+export interface IssueListResult {
+	items: Issue[];
+	totalCount: number;
+	totalPages: number;
+	currentPage: number;
+	perPage: number;
+}
+
+export interface IssueComment {
+	id: number;
+	body: string;
+	author: {
+		name: string;
+		username: string;
+	};
+	created_at: string;
+	updated_at: string;
+	system: boolean;
+}
+
+export interface IssueCommentListResult {
+	items: IssueComment[];
+	totalCount: number;
+	totalPages: number;
+	currentPage: number;
+	perPage: number;
 }
 
 export interface ContainerStats {
-  cpuPercent: number;
-  memoryUsage: number;
-  memoryLimit: number;
-  memoryPercent: number;
-  timestamp: string;
+	cpuPercent: number;
+	memoryUsage: number;
+	memoryLimit: number;
+	memoryPercent: number;
+	timestamp: string;
 }
