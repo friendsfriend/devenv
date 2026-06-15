@@ -185,7 +185,8 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 	params.Set("state", state)
 	params.Set("page", fmt.Sprintf("%d", page))
 	params.Set("per_page", fmt.Sprintf("%d", perPage))
-	params.Set("sort", "updated_desc")
+	params.Set("order_by", "updated_at")
+	params.Set("sort", "desc")
 
 	// Map scope to GitLab API params.
 	// GitLab uses underscore-separated values for the scope parameter.
