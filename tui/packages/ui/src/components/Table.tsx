@@ -1,40 +1,49 @@
-import { For, Show, type JSX } from 'solid-js';
-import { TextAttributes } from '@opentui/core';
-import type { App } from '@devenv/types';
-import { colors, uiColors } from '../colors';
-import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
+import { For, Show, type JSX } from "solid-js";
+import { TextAttributes } from "@opentui/core";
+import type { App } from "@devenv/types";
+import { colors, uiColors } from "../colors";
+import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 
 export interface TableColumn {
-  key: string;
-  header: string;
-  width: number | string;
-  render?: (app: App) => string;
-  renderParts?: (app: App, isSelected: boolean) => Array<{ text: string; color?: string }>;
-  color?: (app: App) => string; // Optional color function for styled rendering
+	key: string;
+	header: string;
+	width: number | string;
+	render?: (app: App) => string;
+	renderParts?: (
+		app: App,
+		isSelected: boolean,
+	) => Array<{ text: string; color?: string }>;
+	color?: (app: App) => string; // Optional color function for styled rendering
 }
 
 export interface TableTab<T = string> {
-  id: T;
-  label: string;
-  count?: number; // Optional count to display after label
+	id: T;
+	label: string;
+	count?: number; // Optional count to display after label
 }
 
 export interface TableProps<T = string> {
-  apps: App[];
-  columns: TableColumn[];
-  selectedIndex: number;
-  onSelect?: (index: number) => void;
-  showBorder?: boolean; // Optional: show border around table (default true)
+	apps: App[];
+	columns: TableColumn[];
+	selectedIndex: number;
+	onSelect?: (index: number) => void;
+	showBorder?: boolean; // Optional: show border around table (default true)
 
-  // Optional tabs feature
-  tabs?: TableTab<T>[];
-  activeTab?: T;
-  onTabChange?: (tabId: T) => void;
-  getTabBorderColor?: (tabId: T) => string; // Function to get border color for each tab
+	// Optional tabs feature
+	tabs?: TableTab<T>[];
+	activeTab?: T;
+	onTabChange?: (tabId: T) => void;
+	getTabBorderColor?: (tabId: T) => string; // Function to get border color for each tab
 
-  // Search
-  searchMode?: boolean;  // true while user is typing after /
-  searchQuery?: string;  // current query string (empty = no active search)
+	// Search
+	searchMode?: boolean; // true while user is typing after /
+	searchQuery?: string; // current query string (empty = no active search)
+
+	/** Optional: total lines available for this component before its own chrome (border, tabs, header).
+	 *  When provided, `reservedLines` is ignored and the list height is computed from this value
+	 *  minus the Table's own chrome.  Used when the Table shares the content area with other elements
+	 *  (e.g. StatusLogView) so the caller can communicate the exact height budget. */
+	availableLines?: number;
 }
 
 /**
@@ -49,217 +58,269 @@ export interface TableProps<T = string> {
  * - / search: filters rows (no highlighting)
  */
 export function Table<T = string>(props: TableProps<T>) {
-  const getColumnWidth = (width: number | string): any => {
-    if (typeof width === 'string' && width.endsWith('%')) {
-      return { width };
-    }
-    return { width };
-  };
+	const getColumnWidth = (width: number | string): any => {
+		if (typeof width === "string" && width.endsWith("%")) {
+			return { width };
+		}
+		return { width };
+	};
 
-  const getCellValue = (app: App, column: TableColumn): string => {
-    if (column.render) {
-      return column.render(app);
-    }
-    return String((app as any)[column.key] || '');
-  };
+	const getCellValue = (app: App, column: TableColumn): string => {
+		if (column.render) {
+			return column.render(app);
+		}
+		return String((app as any)[column.key] || "");
+	};
 
-  const getCellColor = (app: App, column: TableColumn, isSelected: boolean): string => {
-    if (column.color) {
-      return column.color(app);
-    }
-    return isSelected ? uiColors.textPrimary : uiColors.textSecondary;
-  };
+	const getCellColor = (
+		app: App,
+		column: TableColumn,
+		isSelected: boolean,
+	): string => {
+		if (column.color) {
+			return column.color(app);
+		}
+		return isSelected ? uiColors.textPrimary : uiColors.textSecondary;
+	};
 
-  const isSelected = (index: number) => index === props.selectedIndex;
+	const isSelected = (index: number) => index === props.selectedIndex;
 
-  /**
-   * Lines of fixed chrome outside the table body.
-   * Auto-computed from props so callers never need to pass a magic number:
-   *
-   *   Layout chrome                    = LAYOUT_CHROME_LINES (6)
-   *   Outer rounded border (if shown)  = 2
-   *   Tab bar (if tabs present)        = 3
-   *   Table column-header row          = 1
-   */
-  const reservedLines = () => {
-    let lines = LAYOUT_CHROME_LINES + 1; // layout + table header
-    if (props.showBorder !== false) lines += 2; // rounded border top + bottom
-    if (props.tabs && props.tabs.length > 0) lines += 3; // tab bar
-    return lines;
-  };
+	/**
+	 * Lines of fixed chrome outside the table body.
+	 * Auto-computed from props so callers never need to pass a magic number:
+	 *
+	 *   Layout chrome                    = LAYOUT_CHROME_LINES (6)
+	 *   Outer rounded border (if shown)  = 2
+	 *   Tab bar (if tabs present)        = 3
+	 *   Table column-header row          = 1
+	 */
+	// When caller provides an exact height budget (e.g. content-router knows
+	// Layout chrome + StatusLogView consumption), subtract Table's own chrome
+	// and pass the remainder to ScrollableList via availableLines.
+	const scrollableLines = (): number | undefined => {
+		if (props.availableLines === undefined) return undefined;
+		let lines = props.availableLines;
+		if (props.showBorder !== false) lines -= 2;
+		if (props.tabs && props.tabs.length > 0) lines -= 3;
+		lines -= 1; // column header
+		return Math.max(1, lines);
+	};
 
-  const hasSearch = () => (props.searchQuery ?? '').length > 0;
+	// Legacy reserved-lines path (fallback when no availableLines is given).
+	const reservedLines = () => {
+		let lines = LAYOUT_CHROME_LINES + 1;
+		if (props.showBorder !== false) lines += 2;
+		if (props.tabs && props.tabs.length > 0) lines += 3;
+		return lines;
+	};
 
-  const tableContent = () => (
-    <>
-      {/* Optional Tabs */}
-      <Show when={props.tabs && props.tabs.length > 0}>
-        <box
-          style={{
-            width: '100%',
-            flexDirection: 'row',
-            gap: 1,
-          }}
-        >
-          <For each={props.tabs}>
-            {(tab) => {
-              const isActive = () => props.activeTab === tab.id;
-              const borderColor = () => {
-                if (isActive()) return uiColors.primary;
-                return props.getTabBorderColor
-                  ? props.getTabBorderColor(tab.id)
-                  : uiColors.textMuted;
-              };
-              return (
-                <box
-                  border={true}
-                  borderStyle="rounded"
-                  borderColor={borderColor()}
-                  style={{
-                    paddingLeft: 2,
-                    paddingRight: 2,
-                    height: 3,
-                    alignItems: 'center',
-                  }}
-                >
-                  <box
-                    backgroundColor={isActive() ? uiColors.bgSurface0 : undefined}
-                    style={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <text
-                      fg={isActive() ? uiColors.primary : uiColors.textMuted}
-                      attributes={isActive() ? TextAttributes.BOLD : undefined}
-                    >
-                      {tab.label}{tab.count !== undefined ? ` (${tab.count})` : ''}
-                    </text>
-                  </box>
-                </box>
-              );
-            }}
-          </For>
-        </box>
-      </Show>
+	const hasSearch = () => (props.searchQuery ?? "").length > 0;
 
-      {/* Table Header row — doubles as search input bar while searchMode is active */}
-      <box
-        backgroundColor={uiColors.bgSurface1}
-        style={{
-          width: '100%',
-          height: 1,
-          flexDirection: 'row',
-          paddingLeft: 1,
-          paddingRight: 1,
-        }}
-      >
-        <Show
-          when={props.searchMode || hasSearch()}
-          fallback={
-            <For each={props.columns}>
-              {(column) => (
-                <box style={getColumnWidth(column.width)}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                    {column.header}
-                  </text>
-                </box>
-              )}
-            </For>
-          }
-        >
-          {/* Search input / active-query display */}
-          <box flexDirection="row" alignItems="center" style={{ flexGrow: 1 }}>
-            <text fg={colors.peach}>/</text>
-            <text fg={uiColors.textPrimary}>{props.searchQuery ?? ''}</text>
-            <Show when={props.searchMode}>
-              <text fg={uiColors.primary}>█</text>
-            </Show>
-            <Show when={!props.searchMode && hasSearch()}>
-              <text fg={uiColors.textMuted}> ({props.apps.length} results)</text>
-            </Show>
-          </box>
-        </Show>
-      </box>
+	const tableContent = () => (
+		<box
+			style={{
+				width: "100%",
+				flexGrow: 1,
+				minHeight: 0,
+				flexDirection: "column",
+			}}
+		>
+			{/* Optional Tabs */}
+			<Show when={props.tabs && props.tabs.length > 0}>
+				<box
+					style={{
+						width: "100%",
+						flexDirection: "row",
+						gap: 1,
+					}}
+				>
+					<For each={props.tabs}>
+						{(tab) => {
+							const isActive = () => props.activeTab === tab.id;
+							const borderColor = () => {
+								if (isActive()) return uiColors.primary;
+								return props.getTabBorderColor
+									? props.getTabBorderColor(tab.id)
+									: uiColors.textMuted;
+							};
+							return (
+								<box
+									border={true}
+									borderStyle="rounded"
+									borderColor={borderColor()}
+									style={{
+										paddingLeft: 2,
+										paddingRight: 2,
+										height: 3,
+										alignItems: "center",
+									}}
+								>
+									<box
+										backgroundColor={
+											isActive() ? uiColors.bgSurface0 : undefined
+										}
+										style={{
+											flexGrow: 1,
+											alignItems: "center",
+											justifyContent: "center",
+										}}
+									>
+										<text
+											fg={isActive() ? uiColors.primary : uiColors.textMuted}
+											attributes={isActive() ? TextAttributes.BOLD : undefined}
+										>
+											{tab.label}
+											{tab.count !== undefined ? ` (${tab.count})` : ""}
+										</text>
+									</box>
+								</box>
+							);
+						}}
+					</For>
+				</box>
+			</Show>
 
-      {/* Table Body — virtual scroll keeps selected row always visible */}
-      <Show
-        when={props.apps.length > 0}
-        fallback={
-          <box
-            style={{
-              width: '100%',
-              flexGrow: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <text fg={uiColors.textMuted}>
-              {hasSearch() ? 'No results' : 'No applications in this tab'}
-            </text>
-          </box>
-        }
-      >
-        <ScrollableList<App>
-          items={props.apps}
-          selectedIndex={props.selectedIndex}
-          reservedLines={reservedLines()}
-          estimatedItemHeight={1}
-          showScrollIndicator={false}
-          renderItem={(app, isSelected, index) => (
-            <box
-              backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
-              style={{
-                width: '100%',
-                height: 1,
-                flexDirection: 'row',
-                paddingLeft: 1,
-                paddingRight: 1,
-              }}
-            >
-              <For each={props.columns}>
-                {(column) => (
-                  <box style={getColumnWidth(column.width)}>
-                    <Show
-                      when={column.renderParts}
-                      fallback={
-                        <text style={{ fg: getCellColor(app, column, isSelected()) }}>
-                          {getCellValue(app, column)}
-                        </text>
-                      }
-                    >
-                      <box style={{ flexDirection: 'row' }}>
-                        <For each={column.renderParts?.(app, isSelected()) ?? []}>
-                          {(part) => (
-                            <text fg={part.color ?? getCellColor(app, column, isSelected())}>
-                              {part.text}
-                            </text>
-                          )}
-                        </For>
-                      </box>
-                    </Show>
-                  </box>
-                )}
-              </For>
-            </box>
-          )}
-        />
-      </Show>
-    </>
-  );
+			{/* Table Header row — doubles as search input bar while searchMode is active */}
+			<box
+				backgroundColor={uiColors.bgSurface1}
+				style={{
+					width: "100%",
+					height: 1,
+					flexDirection: "row",
+					paddingLeft: 1,
+					paddingRight: 1,
+				}}
+			>
+				<Show
+					when={props.searchMode || hasSearch()}
+					fallback={
+						<For each={props.columns}>
+							{(column) => (
+								<box style={getColumnWidth(column.width)}>
+									<text
+										fg={uiColors.textPrimary}
+										attributes={TextAttributes.BOLD}
+									>
+										{column.header}
+									</text>
+								</box>
+							)}
+						</For>
+					}
+				>
+					{/* Search input / active-query display */}
+					<box flexDirection="row" alignItems="center" style={{ flexGrow: 1 }}>
+						<text fg={colors.peach}>/</text>
+						<text fg={uiColors.textPrimary}>{props.searchQuery ?? ""}</text>
+						<Show when={props.searchMode}>
+							<text fg={uiColors.primary}>█</text>
+						</Show>
+						<Show when={!props.searchMode && hasSearch()}>
+							<text fg={uiColors.textMuted}>
+								{" "}
+								({props.apps.length} results)
+							</text>
+						</Show>
+					</box>
+				</Show>
+			</box>
 
-  // If showBorder is false, render content directly without wrapper box
-  return props.showBorder === false ? (
-    tableContent()
-  ) : (
-    <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.textMuted}
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'column',
-      }}
-    >
-      {tableContent()}
-    </box>
-  );
+			{/* Table Body — virtual scroll keeps selected row always visible */}
+			<Show
+				when={props.apps.length > 0}
+				fallback={
+					<box
+						style={{
+							width: "100%",
+							flexGrow: 1,
+							justifyContent: "center",
+							alignItems: "center",
+						}}
+					>
+						<text fg={uiColors.textMuted}>
+							{hasSearch() ? "No results" : "No applications in this tab"}
+						</text>
+					</box>
+				}
+			>
+				<ScrollableList<App>
+					items={props.apps}
+					selectedIndex={props.selectedIndex}
+					availableLines={scrollableLines()}
+					reservedLines={
+						props.availableLines === undefined ? reservedLines() : undefined
+					}
+					estimatedItemHeight={1}
+					showScrollIndicator={false}
+					renderItem={(app, isSelected, index) => (
+						<box
+							backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+							style={{
+								width: "100%",
+								height: 1,
+								flexDirection: "row",
+								paddingLeft: 1,
+								paddingRight: 1,
+							}}
+						>
+							<For each={props.columns}>
+								{(column) => (
+									<box style={getColumnWidth(column.width)}>
+										<Show
+											when={column.renderParts}
+											fallback={
+												<text
+													style={{
+														fg: getCellColor(app, column, isSelected()),
+													}}
+												>
+													{getCellValue(app, column)}
+												</text>
+											}
+										>
+											<box style={{ flexDirection: "row" }}>
+												<For
+													each={column.renderParts?.(app, isSelected()) ?? []}
+												>
+													{(part) => (
+														<text
+															fg={
+																part.color ??
+																getCellColor(app, column, isSelected())
+															}
+														>
+															{part.text}
+														</text>
+													)}
+												</For>
+											</box>
+										</Show>
+									</box>
+								)}
+							</For>
+						</box>
+					)}
+				/>
+			</Show>
+		</box>
+	);
+
+	// If showBorder is false, render content directly without wrapper box
+	return props.showBorder === false ? (
+		tableContent()
+	) : (
+		<box
+			border={true}
+			borderStyle="rounded"
+			borderColor={uiColors.textMuted}
+			style={{
+				width: "100%",
+				flexGrow: 1,
+				minHeight: 0,
+				flexDirection: "column",
+			}}
+		>
+			{tableContent()}
+		</box>
+	);
 }
