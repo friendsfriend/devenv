@@ -139,6 +139,18 @@ func (s *store) Save(p Provider) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	for name := range s.providers {
+		if name != p.Name && sanitizeProviderEnvName(name) == sanitizeProviderEnvName(p.Name) {
+			return fmt.Errorf("provider name %q collides with existing provider %q for env credential keys", p.Name, name)
+		}
+	}
+
+	if p.Token == "" {
+		if existing, ok := s.providers[p.Name]; ok {
+			p.Token = existing.Token
+		}
+	}
+
 	s.providers[p.Name] = p
 	return s.saveProviderLocked(p)
 }
@@ -155,6 +167,12 @@ func (s *store) Delete(name string) error {
 	filePath := filepath.Join(s.dir, name+".json")
 	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete provider file %s: %w", filePath, err)
+	}
+
+	if s.envFilePath != "" {
+		if err := resources.RemoveEnvFileKeys(s.envFilePath, providerCredentialEnvKeys(name)); err != nil {
+			return fmt.Errorf("failed to remove provider credential env entries: %w", err)
+		}
 	}
 
 	delete(s.providers, name)
@@ -178,7 +196,20 @@ func (s *store) saveProviderLocked(p Provider) error {
 		return fmt.Errorf("failed to create providers directory: %w", err)
 	}
 
-	data, err := json.MarshalIndent(p, "", "  ")
+	toWrite := p
+	if s.envFilePath != "" {
+		keys := providerCredentialEnvKeys(p.Name)
+		if err := resources.UpsertEnvFile(s.envFilePath, map[string]string{
+			keys[0]: p.Username,
+			keys[1]: p.Token,
+		}); err != nil {
+			return fmt.Errorf("failed to write provider credentials to env file: %w", err)
+		}
+		toWrite.Username = "${" + keys[0] + "}"
+		toWrite.Token = "${" + keys[1] + "}"
+	}
+
+	data, err := json.MarshalIndent(toWrite, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal provider %s: %w", p.Name, err)
 	}
@@ -192,6 +223,29 @@ func (s *store) saveProviderLocked(p Provider) error {
 }
 
 // validateProvider checks that a provider has valid required fields.
+func providerCredentialEnvKeys(name string) []string {
+	base := "DEVENV_PROVIDER_" + sanitizeProviderEnvName(name)
+	return []string{base + "_USERNAME", base + "_TOKEN"}
+}
+
+func sanitizeProviderEnvName(name string) string {
+	var b strings.Builder
+	lastUnderscore := false
+	for _, r := range strings.ToUpper(name) {
+		valid := (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+		if valid {
+			b.WriteRune(r)
+			lastUnderscore = false
+			continue
+		}
+		if !lastUnderscore {
+			b.WriteByte('_')
+			lastUnderscore = true
+		}
+	}
+	return strings.Trim(b.String(), "_")
+}
+
 func validateProvider(p Provider) error {
 	if p.Name == "" {
 		return fmt.Errorf("provider name is required")
@@ -202,6 +256,9 @@ func validateProvider(p Provider) error {
 	// Name must be filesystem-safe (no slashes, etc.)
 	if strings.ContainsAny(p.Name, `/\:*?"<>|`) {
 		return fmt.Errorf("provider name contains invalid characters")
+	}
+	if sanitizeProviderEnvName(p.Name) == "" {
+		return fmt.Errorf("provider name must contain a letter or number")
 	}
 	return nil
 }
