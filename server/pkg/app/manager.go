@@ -75,8 +75,6 @@ type appConfigFile struct {
 	GitMode           string `json:"gitMode,omitempty"`
 }
 
-
-
 // Manager manages application configuration and persistence.
 type Manager interface {
 	// GetApps returns all configured applications.
@@ -277,6 +275,17 @@ func (am *appManager) AddApp(newApp App) error {
 		return err
 	}
 
+	if am.stateStore != nil && newApp.Branch != "" {
+		st := state.AppState{Ident: newApp.Ident, Branch: newApp.Branch}
+		if newApp.ActiveWorktree != "" || newApp.MainWorktreeBranch != "" || newApp.GitMode == GitModeWorktree {
+			st.ActiveWorktree = newApp.Branch
+			st.MainWorktreeBranch = newApp.Branch
+		}
+		if err := am.stateStore.SetAppState(st); err != nil {
+			return err
+		}
+	}
+
 	am.apps = append(am.apps, newApp)
 	for i := range am.apps {
 		if !filepath.IsAbs(am.apps[i].LocalDirectoryPath) {
@@ -427,7 +436,14 @@ func (am *appManager) updateBranches() {
 		// If the directory does not exist, clear the stale cached branch so the
 		// app is shown as "not cloned" rather than displaying an outdated branch.
 		if _, err := os.Stat(am.apps[i].LocalDirectoryPath); os.IsNotExist(err) {
-			am.apps[i].Branch = ""
+			if am.stateStore == nil {
+				am.apps[i].Branch = ""
+				continue
+			}
+			st, err := am.stateStore.GetAppState(am.apps[i].Ident)
+			if err != nil || st.Branch == "" {
+				am.apps[i].Branch = ""
+			}
 		}
 	}
 }
@@ -720,8 +736,6 @@ func (am *appManager) loadInfraServicesFromDirectory() ([]InfraService, error) {
 
 	return infraServices, nil
 }
-
-
 
 func (am *appManager) saveAppFile(app App) error {
 	if app.Ident == "" {

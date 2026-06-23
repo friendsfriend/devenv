@@ -5,6 +5,10 @@ When a `WORKTREE`-mode app is created and the main branch is active, the system 
 - **WHEN** a `WORKTREE`-mode app has just been created and the main branch is selected
 - **THEN** triggering a build does NOT emit "Error: Checkout needed"
 
+#### Scenario: Initial checkout uses selected branch
+- **WHEN** a new app is created with a selected branch
+- **THEN** initial async checkout runs with that selected branch, not an empty branch
+
 #### Scenario: LocalDirectoryPath always points to an existing directory for valid active worktree
 - **WHEN** `activeWorktree` is a branch for which `AddWorktree` has been called (including the main branch via primary dir)
 - **THEN** `LocalDirectoryPath` resolves to a directory that exists on disk

@@ -168,8 +168,6 @@ func TestInfraServiceJSONRoundTrip(t *testing.T) {
 	}
 }
 
-
-
 func TestLoadConfigFromSplitFiles(t *testing.T) {
 	homeDir := t.TempDir()
 	configDir := t.TempDir()
@@ -273,6 +271,65 @@ func TestAddAppWritesSplitFile(t *testing.T) {
 
 	if _, err := os.Stat(configDir + "/libraries/definitions/new-split-lib.json"); err != nil {
 		t.Fatalf("expected split library file to exist: %v", err)
+	}
+}
+
+func TestAddWorktreeAppPersistsInitialRuntimeState(t *testing.T) {
+	homeDir := t.TempDir()
+	configDir := t.TempDir()
+
+	store, err := state.Open(filepath.Join(homeDir, "db"))
+	if err != nil {
+		t.Fatalf("Open state store: %v", err)
+	}
+	defer store.Close()
+
+	mgr := NewManager(homeDir, configDir, store)
+	if err := mgr.LoadConfig(); err != nil {
+		t.Fatalf("LoadConfig before AddApp: %v", err)
+	}
+
+	newApp := App{
+		Ident:              "new-worktree-app",
+		DisplayName:        "New Worktree App",
+		RepositoryPath:     "https://example.com/new-worktree-app.git",
+		Branch:             "develop",
+		ActiveWorktree:     "develop",
+		MainWorktreeBranch: "develop",
+		AppType:            TypeAPP,
+		GitMode:            GitModeWorktree,
+	}
+	if err := mgr.AddApp(newApp); err != nil {
+		t.Fatalf("AddApp: %v", err)
+	}
+
+	st, err := store.GetAppState("new-worktree-app")
+	if err != nil {
+		t.Fatalf("GetAppState: %v", err)
+	}
+	if st.Branch != "develop" || st.ActiveWorktree != "develop" || st.MainWorktreeBranch != "develop" {
+		t.Fatalf("unexpected persisted state: %+v", st)
+	}
+
+	data, err := os.ReadFile(filepath.Join(configDir, "apps", "definitions", "new-worktree-app.json"))
+	if err != nil {
+		t.Fatalf("Read app file: %v", err)
+	}
+	for _, forbidden := range []string{"branch", "activeWorktree", "mainWorktreeBranch", "localDirectoryPath"} {
+		if strings.Contains(string(data), forbidden) {
+			t.Fatalf("app file contains runtime field %q: %s", forbidden, data)
+		}
+	}
+
+	if err := mgr.LoadConfig(); err != nil {
+		t.Fatalf("LoadConfig after AddApp: %v", err)
+	}
+	reloaded, ok := mgr.GetAppByIdent("new-worktree-app")
+	if !ok {
+		t.Fatal("new app missing after reload")
+	}
+	if reloaded.Branch != "develop" || reloaded.ActiveWorktree != "develop" || reloaded.MainWorktreeBranch != "develop" {
+		t.Fatalf("unexpected reloaded app state: %+v", reloaded)
 	}
 }
 
@@ -696,5 +753,3 @@ func TestSetMainWorktreeBranchBeforeReloadConfig(t *testing.T) {
 			filepath.Join(homeDir, "installer-fe", "installer-fe.develop"))
 	}
 }
-
-
