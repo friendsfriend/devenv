@@ -17,12 +17,12 @@ When a `WORKTREE`-mode app has `ActiveWorktree` equal to `MainWorktreeBranch`, t
 - **WHEN** `activeWorktree` is non-empty AND differs from `mainWorktreeBranch`
 - **THEN** `resolveActiveWorktreePath` returns `$DEVENV_HOME/{ident}/{ident}.{sanitized-branch}/`
 
-### Requirement: MainWorktreeBranch is populated synchronously at app creation
-When a `WORKTREE`-mode app is created, the system SHALL write `MainWorktreeBranch` with the requested branch name before any path resolution occurs.
+### Requirement: Initial runtime state is populated synchronously at app creation
+When a `WORKTREE`-mode app is created, the system SHALL write `Branch`, `ActiveWorktree`, and `MainWorktreeBranch` with the requested branch name before any path resolution or initial checkout occurs.
 
-#### Scenario: MainWorktreeBranch is set at creation time
+#### Scenario: Runtime state is set at creation time
 - **WHEN** a new `WORKTREE`-mode app is created with a requested branch
-- **THEN** `MainWorktreeBranch` is persisted in SQLite immediately (synchronously) using the requested branch name
+- **THEN** `Branch`, `ActiveWorktree`, and `MainWorktreeBranch` are persisted in SQLite immediately (synchronously) using the requested branch name
 
 #### Scenario: Async clone overwrites MainWorktreeBranch with actual branch
 - **WHEN** the initial clone completes and `actualBranch` differs from the requested branch (e.g., fallback to default branch)
