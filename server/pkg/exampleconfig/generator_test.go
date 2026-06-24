@@ -52,6 +52,28 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 	}
 }
 
+func TestGenerateAllowsEmptyStartupCreatedDirs(t *testing.T) {
+	configDir := t.TempDir()
+	homeDir := t.TempDir()
+	for _, dir := range []string{
+		filepath.Join(configDir, "providers"),
+		filepath.Join(configDir, "apps", "definitions"),
+		filepath.Join(configDir, "libraries", "definitions"),
+		filepath.Join(configDir, "infrastructure", "definitions"),
+		filepath.Join(homeDir, "scripts", "nested"),
+	} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := (Generator{ConfigDir: configDir, HomeDir: homeDir}).Generate(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(configDir, "apps", "definitions", "go-rest-postgres.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGenerateRejectsNonEmptyConfigDirWithoutWrites(t *testing.T) {
 	configDir := t.TempDir()
 	homeDir := t.TempDir()

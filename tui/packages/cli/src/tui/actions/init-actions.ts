@@ -98,6 +98,7 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
     const fetchedInfraServices = await client.getInfraServices();
     getLogger().write('DEBUG', `Fetched ${fetchedInfraServices.length} infrastructure services`);
     appStore.setInfraServices(fetchedInfraServices);
+    await appActions.loadScripts();
 
     getLogger().write('INFO', 'Initial data fetch complete');
     appStore.setStartupState({

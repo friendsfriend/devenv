@@ -226,6 +226,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/repos/search", s.handleRepoSearch)
 	mux.HandleFunc("/api/repos/branches", s.handleRepoBranches)
 	mux.HandleFunc("/api/apps/create", s.handleCreateApp)
+	mux.HandleFunc("/api/example-config", s.handleCreateExampleConfig)
 	mux.HandleFunc("/api/apps/{ident}/delete", s.handleDeleteApp)
 	mux.HandleFunc("/api/apps/{ident}/profiles", s.handleGetProfiles)
 	mux.HandleFunc("/api/scripts", s.handleScripts)

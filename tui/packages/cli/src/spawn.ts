@@ -240,7 +240,7 @@ program
     // Determine the command to spawn TUI
     const bin = process.execPath;
     const cmd: string[] = bin.endsWith('bun')
-      ? [bin, 'run', '--conditions', 'browser', __filename, 'attach', serverUrl]
+      ? [bin, '--conditions', 'browser', __filename, 'attach', serverUrl]
       : [bin, 'attach', serverUrl];
 
     const tuiProcess = Bun.spawn(cmd, {

@@ -100,6 +100,47 @@ export async function handleGlobalKeys(
     return true;
   }
 
+  if (appStore.showFirstSteps() && appStore.viewMode() === 'table') {
+    const runFirstStep = async (idx: number) => {
+      if (idx === 0) actions.providerActions.openAddProviderModal();
+      if (idx === 1) await actions.providerActions.openAddAppModal();
+      if (idx === 2) void actions.appActions.createExampleConfig();
+      if (idx === 3) actions.helpActions.showHelp();
+    };
+    if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
+      appStore.setFirstStepsDismissed(true);
+      return true;
+    }
+    if (event.name === 'j' || event.name === 'down' || event.name === 'Down') {
+      appStore.setFirstStepsSelectedIndex((i) => Math.min(i + 1, 3));
+      return true;
+    }
+    if (event.name === 'k' || event.name === 'up' || event.name === 'Up') {
+      appStore.setFirstStepsSelectedIndex((i) => Math.max(i - 1, 0));
+      return true;
+    }
+    if (event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter') {
+      await runFirstStep(appStore.firstStepsSelectedIndex());
+      return true;
+    }
+    if (event.name === '1') {
+      await runFirstStep(0);
+      return true;
+    }
+    if (event.name === '2') {
+      await runFirstStep(1);
+      return true;
+    }
+    if (event.name === '3') {
+      await runFirstStep(2);
+      return true;
+    }
+    if (event.name === '?' || event.name === 'h') {
+      await runFirstStep(3);
+      return true;
+    }
+  }
+
   const isPasteShortcut = (event.ctrl || event.meta) && (event.name === 'v' || event.name === 'V');
   if (isPasteShortcut) {
     const { readFromClipboard } = await import('@devenv/core');

@@ -50,8 +50,13 @@ func ensureEmpty(dir, label string) error {
 	if err != nil {
 		return err
 	}
-	if len(entries) > 0 {
-		return fmt.Errorf("%s %q is not empty; move existing files or choose a clean directory", label, dir)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			return fmt.Errorf("%s %q is not empty; move existing files or choose a clean directory", label, dir)
+		}
+		if err := ensureEmpty(filepath.Join(dir, entry.Name()), label); err != nil {
+			return err
+		}
 	}
 	return nil
 }

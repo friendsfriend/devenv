@@ -9,11 +9,9 @@ export function createProviderActions(
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
 ) {
-  const loadProviders = async () => {
-    if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+  const refreshProviders = async () => {
     providerStore.setProvidersLoading(true);
     providerStore.setProvidersError('');
-    appStore.setViewMode('providers');
     try {
       providerStore.setProviders(await client.getProviders());
     } catch (e) {
@@ -22,6 +20,12 @@ export function createProviderActions(
     } finally {
       providerStore.setProvidersLoading(false);
     }
+  };
+
+  const loadProviders = async () => {
+    if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+    appStore.setViewMode('providers');
+    await refreshProviders();
   };
 
   const resetConnectProviderModal = () => {
@@ -212,6 +216,7 @@ export function createProviderActions(
 
   return {
     loadProviders,
+    refreshProviders,
     resetConnectProviderModal,
     resetAddAppModal,
     openAddAppModal,
