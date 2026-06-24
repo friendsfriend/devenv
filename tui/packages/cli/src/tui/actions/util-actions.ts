@@ -596,7 +596,11 @@ export function createUtilActions(
 
   const handleCopySelection = async () => {
     const selectedText = renderer.getSelection()?.getSelectedText();
-    if (!selectedText) return;
+    if (!selectedText) {
+      uiStore.setCopyStatus('Nothing selected');
+      setTimeout(() => uiStore.setCopyStatus(null), 1500);
+      return;
+    }
     const { copyToClipboard } = await import('@devenv/core');
     const base64 = Buffer.from(selectedText).toString('base64');
     const osc52 = `\x1b]52;c;${base64}\x07`;

@@ -13,6 +13,9 @@ import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
  * - Ctrl+C to exit
  * - Ctrl+Shift+C to copy selection
  */
+// Track last Ctrl+C press time for double-press exit detection
+let _lastCtrlCTime = 0;
+
 export async function handleGlobalKeys(
   event: KeyboardEvent,
   stores: KeyboardStores,
@@ -188,7 +191,7 @@ export async function handleGlobalKeys(
     }
   }
 
-  const isPasteShortcut = (event.ctrl || event.meta) && (event.name === 'v' || event.name === 'V');
+  const isPasteShortcut = (event.ctrl || event.meta || event.super) && (event.name === 'v' || event.name === 'V');
   if (isPasteShortcut) {
     const { readFromClipboard } = await import('@devenv/core');
     const pastedText = readFromClipboard();
@@ -197,16 +200,32 @@ export async function handleGlobalKeys(
     }
   }
 
-  // GLOBAL: Ctrl+C — exit (we handle this manually because exitOnCtrlC: false is required
-  // so that Kitty keyboard protocol can disambiguate Ctrl+C from Ctrl+Shift+C)
-  if (event.ctrl && !event.shift && event.name === 'c') {
-    appActions.exitApp();
+  // GLOBAL: Ctrl+C — copy on single press, exit on double-press (500ms window)
+  // Inside tmux, Kitty protocol cannot disambiguate Ctrl+C from Ctrl+Shift+C
+  // (both send \x03), so single Ctrl+C always copies the current selection.
+  // Double Ctrl+C exits the app. With Kitty protocol, plain Ctrl+C arrives as
+  // lowercase 'c' (no shift), while Ctrl+Shift+C arrives as uppercase 'C' with
+  // shift=true — those are handled separately below.
+  if (event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'c') {
+    const now = Date.now();
+    if (now - _lastCtrlCTime < 500) {
+      _lastCtrlCTime = 0;
+      appActions.exitApp();
+      return true;
+    }
+    _lastCtrlCTime = now;
+    // Single Ctrl+C copies selection (works inside tmux where shift can't be detected)
+    await utilActions.handleCopySelection();
     return true;
   }
 
-  // GLOBAL: Ctrl+Shift+C — copy current terminal selection to clipboard (works in any view)
-  // Requires useKittyKeyboard + exitOnCtrlC:false so the shift flag is actually set.
-  if (event.ctrl && event.shift && event.name === 'c') {
+  // GLOBAL: Ctrl+Shift+C, Cmd+C, or Super+C — copy selection to clipboard
+  // Kitty protocol sends uppercase 'C' for Ctrl+Shift+C (codepoint 67='C', shift flag set).
+  // Ghostty on macOS sends Cmd+C with super flag. Inside tmux, Kitty protocol CSI-u
+  // sequences are lost, so this branch is only reached when Ghostty forwards the
+  // CSI-u sequence through tmux, or on macOS with Cmd+C/Super+C.
+  if ((event.ctrl && event.shift || event.meta || event.super) && (event.name === 'c' || event.name === 'C')) {
+    _lastCtrlCTime = 0;
     await utilActions.handleCopySelection();
     return true;
   }
