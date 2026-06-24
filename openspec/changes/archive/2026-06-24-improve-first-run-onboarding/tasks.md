@@ -3,13 +3,13 @@
 - [x] 1.1 Add a server endpoint that invokes the existing example config generator.
 - [x] 1.2 Preserve no-overwrite guards and return clear error responses on generator failure.
 - [x] 1.3 Refresh server in-memory app and infrastructure state after successful generation.
-- [ ] 1.4 Add backend tests for success, guarded-directory failure, and refreshed app/infra responses.
+- [x] 1.4 Add backend tests for success, guarded-directory failure, and refreshed app/infra responses.
 
 ## 2. Core Client Support
 
 - [x] 2.1 Add a core client method for the example config generation endpoint.
 - [x] 2.2 Expose the client method through the existing DevEnv client facade.
-- [ ] 2.3 Add or update client tests for success and non-success responses if client tests exist for this package.
+- [x] 2.3 Add or update client tests for success and non-success responses if client tests exist for this package.
 
 ## 3. First-Steps TUI State and Actions
 
@@ -28,7 +28,7 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Add TUI tests or focused component/action checks for empty-state visibility and action routing where practical.
+- [x] 5.1 Add TUI tests or focused component/action checks for empty-state visibility and action routing where practical.
 - [x] 5.2 Run TUI type-check.
 - [x] 5.3 Run Go tests.
 - [x] 5.4 Run the full test suite before finishing.

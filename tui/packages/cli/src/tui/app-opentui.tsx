@@ -211,7 +211,8 @@ export function TUIApp(props: TUIAppProps) {
 			appActions,
 			showError,
 			serverUrl: props.serverUrl,
-		}).then(() => providerActions.refreshProviders());
+			refreshProviders: providerActions.refreshProviders,
+		});
 	});
 
 	// --- Columns ---

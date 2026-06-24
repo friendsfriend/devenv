@@ -1,7 +1,8 @@
+import { getGuide } from '../guides';
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 import { routePastedText } from './paste-handler';
 
-import { isDownKey, isUpKey } from './nav-keys';
+import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
 /**
  * Handles global keys that apply regardless of view mode:
  * - ESC to close console overlay
@@ -46,6 +47,30 @@ export async function handleGlobalKeys(
     }
     // Any other key closes the dialog
     uiStore.setShowErrorDialog(false);
+    return true;
+  }
+
+  if (uiStore.showMarkdownModal()) {
+    if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
+      uiStore.setShowMarkdownModal(false);
+      uiStore.markdownModalScrollBoxRef = undefined;
+      return true;
+    }
+    const sb = uiStore.markdownModalScrollBoxRef;
+    if (isDownKey(event)) { sb?.scrollBy(1); return true; }
+    if (isUpKey(event)) { sb?.scrollBy(-1); return true; }
+    if (event.name === 'd') {
+      const half = Math.floor((sb?.viewport.height ?? 20) / 2);
+      sb?.scrollBy(Math.max(1, half));
+      return true;
+    }
+    if (event.name === 'u') {
+      const half = Math.floor((sb?.viewport.height ?? 20) / 2);
+      sb?.scrollBy(-Math.max(1, half));
+      return true;
+    }
+    if (event.name === 'g' && !event.shift) { sb?.scrollTo(0); return true; }
+    if (event.name === 'G') { sb?.scrollTo(sb?.scrollHeight ?? 0); return true; }
     return true;
   }
 
@@ -106,18 +131,35 @@ export async function handleGlobalKeys(
       if (idx === 0) actions.providerActions.openAddProviderModal();
       if (idx === 1) await actions.providerActions.openAddAppModal();
       if (idx === 2) void actions.appActions.createExampleConfig();
-      if (idx === 3) actions.helpActions.showHelp();
+      if (idx === 3) {
+        const guide = getGuide('config-repository');
+        if (guide) {
+          const content = await guide.import();
+          uiStore.setMarkdownModalTitle(guide.title);
+          uiStore.setMarkdownModalContent(content);
+        }
+        uiStore.setShowMarkdownModal(true);
+      }
+      if (idx === 4) actions.helpActions.showHelp();
     };
     if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
       appStore.setFirstStepsDismissed(true);
       return true;
     }
     if (isDownKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => Math.min(i + 1, 3));
+      appStore.setFirstStepsSelectedIndex((i) => i === 0 ? 1 : 4);
       return true;
     }
     if (isUpKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => Math.max(i - 1, 0));
+      appStore.setFirstStepsSelectedIndex((i) => i === 4 ? 1 : 0);
+      return true;
+    }
+    if (isLeftKey(event)) {
+      appStore.setFirstStepsSelectedIndex((i) => i >= 2 && i <= 3 ? i - 1 : i);
+      return true;
+    }
+    if (isRightKey(event)) {
+      appStore.setFirstStepsSelectedIndex((i) => i >= 1 && i <= 2 ? i + 1 : i);
       return true;
     }
     if (event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter') {
@@ -136,8 +178,12 @@ export async function handleGlobalKeys(
       await runFirstStep(2);
       return true;
     }
-    if (event.name === '?' || event.name === 'h') {
+    if (event.name === '4') {
       await runFirstStep(3);
+      return true;
+    }
+    if (event.name === '?' || event.name === 'h') {
+      await runFirstStep(4);
       return true;
     }
   }
