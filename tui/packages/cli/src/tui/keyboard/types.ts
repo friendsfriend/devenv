@@ -29,6 +29,7 @@ export interface KeyboardEvent {
 	ctrl?: boolean;
 	shift?: boolean;
 	meta?: boolean;
+	super?: boolean;
 	raw?: string;
 }
 
