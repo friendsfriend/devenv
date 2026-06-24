@@ -2,7 +2,9 @@ package exampleconfig
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -42,12 +44,22 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"hello.sh", "hello.py", "hello.ts"} {
-		info, err := os.Stat(filepath.Join(homeDir, "scripts", name))
+		path := filepath.Join(homeDir, "scripts", name)
+		info, err := os.Stat(path)
 		if err != nil {
 			t.Fatalf("missing script %s: %v", name, err)
 		}
 		if info.Mode()&0111 == 0 {
 			t.Fatalf("script %s is not executable: %v", name, info.Mode())
+		}
+		if name == "hello.sh" {
+			out, err := exec.Command(path, "--devenv-metadata").Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(out), `"parameters"`) && !strings.Contains(string(out), `"name"`) {
+				t.Fatalf("expected metadata output, got %s", out)
+			}
 		}
 	}
 }

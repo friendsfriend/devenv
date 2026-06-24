@@ -1,5 +1,6 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions } from './types';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Add App modal wizard flow:
  * selectProvider → selectAppType → findRepo → appName → selectBranch → confirm
@@ -45,11 +46,11 @@ export function handleAddAppModalKeys(
 
   if (step === 'selectProvider') {
     const providers = providerStore.addAppProviders();
-    if (event.name === 'j' || event.name === 'down') {
+    if (isDownKey(event)) {
       providerStore.setAddAppSelectedProviderIndex(i => (i + 1) % Math.max(1, providers.length));
       return true;
     }
-    if (event.name === 'k' || event.name === 'up') {
+    if (isUpKey(event)) {
       providerStore.setAddAppSelectedProviderIndex(i => (i - 1 + providers.length) % Math.max(1, providers.length));
       return true;
     }
@@ -74,11 +75,11 @@ export function handleAddAppModalKeys(
   }
 
   if (step === 'selectAppType') {
-    if (event.name === 'j' || event.name === 'down') {
+    if (isDownKey(event)) {
       providerStore.setAddAppAppTypeIndex(i => (i + 1) % 2);
       return true;
     }
-    if (event.name === 'k' || event.name === 'up') {
+    if (isUpKey(event)) {
       providerStore.setAddAppAppTypeIndex(i => (i - 1 + 2) % 2);
       return true;
     }
@@ -94,11 +95,11 @@ export function handleAddAppModalKeys(
   if (step === 'findRepo') {
     const mode = providerStore.addAppFindRepoMode();
     if (mode === 'selectMode') {
-      if (event.name === 'j' || event.name === 'down') {
+      if (isDownKey(event)) {
         providerStore.setAddAppFindRepoModeIndex(i => (i + 1) % 2);
         return true;
       }
-      if (event.name === 'k' || event.name === 'up') {
+      if (isUpKey(event)) {
         providerStore.setAddAppFindRepoModeIndex(i => (i - 1 + 2) % 2);
         return true;
       }
@@ -145,14 +146,14 @@ export function handleAddAppModalKeys(
         }
         return true;
       }
-      if (event.name === 'j' || event.name === 'down') {
+      if (isDownKey(event)) {
         const results = providerStore.addAppSearchResults();
         if (results.length > 0) {
           providerStore.setAddAppSelectedResultIndex(i => (i + 1) % results.length);
         }
         return true;
       }
-      if (event.name === 'k' || event.name === 'up') {
+      if (isUpKey(event)) {
         const results = providerStore.addAppSearchResults();
         if (results.length > 0) {
           providerStore.setAddAppSelectedResultIndex(i => (i - 1 + results.length) % results.length);
@@ -213,13 +214,13 @@ export function handleAddAppModalKeys(
       }
       return true;
     }
-    if (event.name === 'j' || event.name === 'down') {
+    if (isDownKey(event)) {
       if (filteredBranchList.length > 0) {
         providerStore.setAddAppSelectedBranchIndex(i => (i + 1) % filteredBranchList.length);
       }
       return true;
     }
-    if (event.name === 'k' || event.name === 'up') {
+    if (isUpKey(event)) {
       if (filteredBranchList.length > 0) {
         providerStore.setAddAppSelectedBranchIndex(i => (i - 1 + filteredBranchList.length) % filteredBranchList.length);
       }

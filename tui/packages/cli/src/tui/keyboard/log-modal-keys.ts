@@ -1,5 +1,6 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Log modal:
  * - AI prompt mode (type prompt, submit, dismiss)
@@ -243,7 +244,7 @@ export async function handleLogModalKeys(
   }
 
   // j / Down — move cursor down, keep it centered
-  if (event.name === 'j' || event.name === 'down' || event.name === 'Down') {
+  if (isDownKey(event)) {
     const next = Math.min(logStore.logSelectedLine() + 1, maxLine);
     logStore.setLogSelectedLine(next);
     scrollToCenter(next);
@@ -251,7 +252,7 @@ export async function handleLogModalKeys(
   }
 
   // k / Up — move cursor up, keep it centered
-  if (event.name === 'k' || event.name === 'up' || event.name === 'Up') {
+  if (isUpKey(event)) {
     const next = Math.max(logStore.logSelectedLine() - 1, 0);
     logStore.setLogSelectedLine(next);
     scrollToCenter(next);

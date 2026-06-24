@@ -1,4 +1,5 @@
 import { getLogger } from "@devenv/core";
+import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -95,14 +96,13 @@ export async function handleTableKeys(
 			}
 			if (uiStore.branchSelectorWorktreeCreateMode()) {
 				void gitActions.createWorktreeFromBranchSelector();
+			} else {
+				void gitActions.performCheckout();
 			}
-			// Non-worktree mode: Enter no longer triggers checkout; use 's' instead
 			return true;
 		}
 		if (
-			event.name === "down" ||
-			event.name === "Down" ||
-			(event.ctrl && event.name === "j")
+			isDownKey(event)
 		) {
 			uiStore.setBranchSelectorIndex((prev) =>
 				Math.min(prev + 1, uiStore.filteredBranches().length - 1),
@@ -110,9 +110,7 @@ export async function handleTableKeys(
 			return true;
 		}
 		if (
-			event.name === "up" ||
-			event.name === "Up" ||
-			(event.ctrl && event.name === "k")
+			isUpKey(event)
 		) {
 			uiStore.setBranchSelectorIndex((prev) => Math.max(prev - 1, 0));
 			return true;
@@ -143,13 +141,13 @@ export async function handleTableKeys(
 			const rows = process.stdout.rows ?? 24;
 			return Math.max(1, Math.max(5, Math.floor(rows * 0.7) - 5 - 2));
 		})();
-		if (event.name === "j") {
+		if (isDownKey(event)) {
 			uiStore.setBranchSelectorIndex((prev) =>
 				Math.min(prev + 1, branchMaxIdx),
 			);
 			return true;
 		}
-		if (event.name === "k") {
+		if (isUpKey(event)) {
 			uiStore.setBranchSelectorIndex((prev) => Math.max(prev - 1, 0));
 			return true;
 		}

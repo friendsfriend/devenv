@@ -2,6 +2,7 @@ import { getLogger } from '@devenv/core';
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 import { computeInitialSplitView } from './diff-modal-utils';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Discussions view:
  * - q to quit (works even in reply mode)
@@ -223,7 +224,7 @@ export async function handleDiscussionsKeys(
   }
 
   // j or Down to move down
-  if (event.name === 'j' || event.sequence === 'j' || event.name === 'down' || event.name === 'Down') {
+  if (isDownKey(event)) {
     if (mrStore.selectedDiscussionIndex() < totalDiscussions - 1) {
       mrStore.setSelectedDiscussionIndex(prev => prev + 1);
     }
@@ -231,7 +232,7 @@ export async function handleDiscussionsKeys(
   }
 
   // k or Up to move up
-  if (event.name === 'k' || event.sequence === 'k' || event.name === 'up' || event.name === 'Up') {
+  if (isUpKey(event)) {
     if (mrStore.selectedDiscussionIndex() > 0) {
       mrStore.setSelectedDiscussionIndex(prev => prev - 1);
     }

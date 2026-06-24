@@ -1,6 +1,7 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 import { EDITOR_OPTIONS } from '@devenv/ui';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for miscellaneous modals and views:
  * - Passphrase modal (ESC to cancel, Enter to submit, text input)
@@ -35,12 +36,12 @@ export async function handleMiscModalKeys(
 
     const maxIdx = EDITOR_OPTIONS.length - 1;
 
-    if (event.name === 'j' || event.name === 'down' || event.name === 'Down') {
+    if (isDownKey(event)) {
       uiStore.setEditorPickerSelectedIndex((prev) => Math.min(prev + 1, maxIdx));
       return true;
     }
 
-    if (event.name === 'k' || event.name === 'up' || event.name === 'Up') {
+    if (isUpKey(event)) {
       uiStore.setEditorPickerSelectedIndex((prev) => Math.max(prev - 1, 0));
       return true;
     }
@@ -77,12 +78,12 @@ export async function handleMiscModalKeys(
       return true;
     }
 
-    if (event.name === 'tab' || event.name === 'down' || event.name === 'Down' || event.name === 'j') {
+    if (event.name === 'tab' || isDownKey(event)) {
       uiStore.setScriptAddSelectedField((prev) => (prev + 1) % fieldCount);
       return true;
     }
 
-    if (event.name === 'up' || event.name === 'Up' || event.name === 'k') {
+    if (isUpKey(event)) {
       uiStore.setScriptAddSelectedField((prev) => (prev - 1 + fieldCount) % fieldCount);
       return true;
     }
@@ -155,7 +156,7 @@ export async function handleMiscModalKeys(
       return true;
     }
 
-    if (event.name === 'up' || event.name === 'Up') {
+    if (isUpKey(event)) {
       const history = uiStore.scriptArgsHistoryForCurrent();
       if (history.length > 0) {
         const current = uiStore.scriptArgsHistoryCursor();
@@ -165,7 +166,7 @@ export async function handleMiscModalKeys(
       return true;
     }
 
-    if (event.name === 'down' || event.name === 'Down') {
+    if (isDownKey(event)) {
       const history = uiStore.scriptArgsHistoryForCurrent();
       if (history.length > 0) {
         const current = uiStore.scriptArgsHistoryCursor();
@@ -178,12 +179,12 @@ export async function handleMiscModalKeys(
       return true;
     }
 
-    if (event.name === 'j') {
+    if (isDownKey(event)) {
       if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.min(prev + 1, params.length - 1));
       return true;
     }
 
-    if (event.name === 'k') {
+    if (isUpKey(event)) {
       if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.max(prev - 1, 0));
       return true;
     }
@@ -340,12 +341,12 @@ export async function handleMiscModalKeys(
       : agentStore.sshHosts();
     const maxIdx = Math.max(0, filtered.length - 1);
 
-    if ((event.ctrl && event.name === 'j') || event.name === 'down' || event.name === 'Down') {
+    if ((event.ctrl && isDownKey(event)) || isDownKey(event)) {
       agentStore.setSelectedSshIndex((prev) => Math.min(prev + 1, maxIdx));
       return true;
     }
 
-    if ((event.ctrl && event.name === 'k') || event.name === 'up' || event.name === 'Up') {
+    if ((event.ctrl && isUpKey(event)) || isUpKey(event)) {
       agentStore.setSelectedSshIndex((prev) => Math.max(prev - 1, 0));
       return true;
     }
@@ -380,11 +381,11 @@ export async function handleMiscModalKeys(
       const rows = process.stdout.rows ?? 24;
       return Math.max(1, Math.max(5, Math.floor(rows * 0.7) - 4 - 2));
     })();
-    if (event.name === 'j') {
+    if (isDownKey(event)) {
       agentStore.setSelectedSshIndex((prev) => Math.min(prev + 1, maxIdx));
       return true;
     }
-    if (event.name === 'k') {
+    if (isUpKey(event)) {
       agentStore.setSelectedSshIndex((prev) => Math.max(prev - 1, 0));
       return true;
     }
@@ -451,12 +452,12 @@ export async function handleMiscModalKeys(
       const selectableRows = getSelectableRows(rows);
       const maxSelectableIdx = Math.max(0, selectableRows.length - 1);
 
-      if ((event.ctrl && event.name === 'j') || event.name === 'down' || event.name === 'Down') {
+      if ((event.ctrl && isDownKey(event)) || isDownKey(event)) {
         agentStore.setSelectedAgentItemIndex((prev) => Math.min(prev + 1, maxSelectableIdx));
         return true;
       }
 
-      if ((event.ctrl && event.name === 'k') || event.name === 'up' || event.name === 'Up') {
+      if ((event.ctrl && isUpKey(event)) || isUpKey(event)) {
         agentStore.setSelectedAgentItemIndex((prev) => Math.max(prev - 1, 0));
         return true;
       }
@@ -496,11 +497,11 @@ export async function handleMiscModalKeys(
         const termRows = process.stdout.rows ?? 24;
         return Math.max(1, Math.max(5, Math.floor(termRows * 0.75) - 4 - 2));
       })();
-      if (event.name === 'j') {
+      if (isDownKey(event)) {
         agentStore.setSelectedAgentItemIndex((prev) => Math.min(prev + 1, maxSelectableIdx));
         return true;
       }
-      if (event.name === 'k') {
+      if (isUpKey(event)) {
         agentStore.setSelectedAgentItemIndex((prev) => Math.max(prev - 1, 0));
         return true;
       }
@@ -541,11 +542,11 @@ export async function handleMiscModalKeys(
       return true;
     }
 
-    if ((event.name === 'j' || event.name === 'down') && providerList.length > 0) {
+    if ((isDownKey(event)) && providerList.length > 0) {
       providerStore.setSelectedProviderIndex(i => Math.min(i + 1, providerList.length - 1));
       return true;
     }
-    if ((event.name === 'k' || event.name === 'up') && providerList.length > 0) {
+    if ((isUpKey(event)) && providerList.length > 0) {
       providerStore.setSelectedProviderIndex(i => Math.max(i - 1, 0));
       return true;
     }

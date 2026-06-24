@@ -43,7 +43,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 
 	return (
 		<>
-			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table"}>
+			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddAppModal()}>
 				<FirstStepsView appStore={appStore} providerStore={providerStore} />
 			</Show>
 			<Show when={appStore.viewMode() === "issueScopePicker"}>

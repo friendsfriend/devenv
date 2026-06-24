@@ -1,5 +1,6 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Test Results view:
  * - q to quit, ? for help (early guard from parent handler)
@@ -152,14 +153,14 @@ export async function handleTestResultsKeys(
   // Block navigation while detail modal is open
   if (mrStore.showTestDetailModal()) return true;
 
-  if (event.name === 'j' || event.sequence === 'j' || event.name === 'down' || event.name === 'Down') {
+  if (isDownKey(event)) {
     if (mrStore.selectedTestIndex() < totalTests - 1) {
       mrStore.setSelectedTestIndex(prev => prev + 1);
     }
     return true;
   }
 
-  if (event.name === 'k' || event.sequence === 'k' || event.name === 'up' || event.name === 'Up') {
+  if (isUpKey(event)) {
     if (mrStore.selectedTestIndex() > 0) {
       mrStore.setSelectedTestIndex(prev => prev - 1);
     }

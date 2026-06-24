@@ -1,6 +1,7 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 import { routePastedText } from './paste-handler';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles global keys that apply regardless of view mode:
  * - ESC to close console overlay
@@ -67,7 +68,7 @@ export async function handleGlobalKeys(
       uiStore.setShowProfilePicker(false);
       return true;
     }
-    if (event.name === 'j' || event.name === 'down' || event.name === 'Down') {
+    if (isDownKey(event)) {
       const opts: string[] = [];
       if (uiStore.profilePickerHasDockerfile()) opts.push('default (no profile)');
       opts.push(...uiStore.profilePickerProfiles());
@@ -75,7 +76,7 @@ export async function handleGlobalKeys(
       uiStore.setProfilePickerSelectedIndex((prev) => Math.min(prev + 1, max));
       return true;
     }
-    if (event.name === 'k' || event.name === 'up' || event.name === 'Up') {
+    if (isUpKey(event)) {
       uiStore.setProfilePickerSelectedIndex((prev) => Math.max(prev - 1, 0));
       return true;
     }
@@ -100,7 +101,7 @@ export async function handleGlobalKeys(
     return true;
   }
 
-  if (appStore.showFirstSteps() && appStore.viewMode() === 'table') {
+  if (appStore.showFirstSteps() && appStore.viewMode() === 'table' && !stores.providerStore.showConnectProviderModal() && !stores.providerStore.showAddAppModal()) {
     const runFirstStep = async (idx: number) => {
       if (idx === 0) actions.providerActions.openAddProviderModal();
       if (idx === 1) await actions.providerActions.openAddAppModal();
@@ -111,11 +112,11 @@ export async function handleGlobalKeys(
       appStore.setFirstStepsDismissed(true);
       return true;
     }
-    if (event.name === 'j' || event.name === 'down' || event.name === 'Down') {
+    if (isDownKey(event)) {
       appStore.setFirstStepsSelectedIndex((i) => Math.min(i + 1, 3));
       return true;
     }
-    if (event.name === 'k' || event.name === 'up' || event.name === 'Up') {
+    if (isUpKey(event)) {
       appStore.setFirstStepsSelectedIndex((i) => Math.max(i - 1, 0));
       return true;
     }
