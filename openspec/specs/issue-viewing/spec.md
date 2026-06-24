@@ -1,5 +1,8 @@
-## MODIFIED Requirements
+# issue-viewing Specification
 
+## Purpose
+TBD - created by archiving change add-issue-linked-mrs. Update Purpose after archive.
+## Requirements
 ### Requirement: User can view issue detail
 
 The system SHALL display a detail view when the user selects an issue from the list. The detail view SHALL show issue title, author, state, labels, assignee, milestone, created/updated dates, description, web URL, threaded comments, and a linked MRs summary panel.
@@ -31,3 +34,4 @@ The system SHALL provide issue viewing for both GitHub Issues and GitLab Issues,
 - **THEN** the system SHALL call the GitLab `closed_by` API endpoint
 - **AND** SHALL also parse the issue description for `!{n}` references
 - **AND** SHALL display the combined results as linked MRs
+
