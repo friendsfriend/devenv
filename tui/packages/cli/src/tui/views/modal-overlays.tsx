@@ -11,6 +11,7 @@ import {
 	AgentSpaceView,
 	ConnectProviderModal,
 	AddAppModal,
+	MarkdownModal,
 	SshHostPickerView,
 	PassphraseModal,
 	ProfilePickerView,
@@ -27,6 +28,7 @@ import {
 	uiColors,
 } from "@devenv/ui";
 import type { ModalOverlaysProps } from "./types";
+import { FirstStepsView } from "./first-steps-view";
 
 export function ModalOverlays(props: ModalOverlaysProps) {
 	const {
@@ -42,6 +44,17 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 
 	return (
 		<>
+			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddAppModal() && !uiStore.showMarkdownModal()}>
+				<FirstStepsView appStore={appStore} providerStore={providerStore} />
+			</Show>
+			<Show when={uiStore.showMarkdownModal()}>
+				<MarkdownModal
+					title={uiStore.markdownModalTitle()}
+					content={uiStore.markdownModalContent()}
+					onScrollBoxReady={(scrollBox) => { uiStore.markdownModalScrollBoxRef = scrollBox; }}
+				/>
+			</Show>
+
 			<Show when={appStore.viewMode() === "issueScopePicker"}>
 				<IssueScopeModal
 					selectedIndex={issueStore.issueScopePickerIndex()}

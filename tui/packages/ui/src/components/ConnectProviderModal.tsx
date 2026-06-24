@@ -72,39 +72,42 @@ export function ConnectProviderModal(props: ConnectProviderModalProps) {
       title={title()}
       helpText={helpText()}
       widthPercent={0.4}
-      heightPercent={0.35}
+      heightPercent={0.45}
     >
       {/* Step 1: Select provider type */}
       <Show when={props.step === 'selectProvider'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>Select a git provider:</text>
-        </box>
+        <box style={{ width: '100%', flexDirection: 'column' }}>
+          <box style={{ width: '100%', height: 1, flexShrink: 0 }}>
+            <text fg={uiColors.textMuted}>Select a git provider:</text>
+          </box>
+          <box style={{ width: '100%', height: 1, flexShrink: 0 }} />
 
-        {providers.map((p, idx) => {
-          const isSelected = () => props.selectedProviderIndex === idx;
-          const label = p === 'github' ? 'GitHub' : 'GitLab';
+          {providers.map((p, idx) => {
+            const isSelected = () => props.selectedProviderIndex === idx;
+            const label = p === 'github' ? 'GitHub' : 'GitLab';
 
-          return (
-            <box
-              style={{
-                width: '100%',
-                height: 1,
-                flexDirection: 'row',
-                flexShrink: 0,
-              }}
-            >
-              <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                {isSelected() ? '▸ ' : '  '}
-              </text>
-              <text
-                fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
-                attributes={isSelected() ? TextAttributes.BOLD : undefined}
+            return (
+              <box
+                style={{
+                  width: '100%',
+                  height: 1,
+                  flexDirection: 'row',
+                  flexShrink: 0,
+                }}
               >
-                {label}
-              </text>
-            </box>
-          );
-        })}
+                <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
+                  {isSelected() ? '▸ ' : '  '}
+                </text>
+                <text
+                  fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
+                  attributes={isSelected() ? TextAttributes.BOLD : undefined}
+                >
+                  {label}
+                </text>
+              </box>
+            );
+          })}
+        </box>
       </Show>
 
       {/* Step 2: Provider name */}

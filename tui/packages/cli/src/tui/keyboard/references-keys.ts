@@ -1,3 +1,4 @@
+import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -26,12 +27,12 @@ export async function handleReferencesKeys(
 	const refs = issueStore.references();
 	const idx = issueStore.selectedReferenceIndex();
 
-	if (event.name === "j" || event.name === "down") {
+	if (isDownKey(event)) {
 		issueStore.setSelectedReferenceIndex(Math.min(idx + 1, refs.length - 1));
 		return true;
 	}
 
-	if (event.name === "k" || event.name === "up") {
+	if (isUpKey(event)) {
 		issueStore.setSelectedReferenceIndex(Math.max(idx - 1, 0));
 		return true;
 	}

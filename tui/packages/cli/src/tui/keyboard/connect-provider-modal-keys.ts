@@ -1,6 +1,7 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions } from './types';
 import type { ProviderType } from '@devenv/types';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Connect Provider modal:
  * selectProvider → name → username → token → save
@@ -38,11 +39,11 @@ export function handleConnectProviderModalKeys(
   }
 
   if (step === 'selectProvider') {
-    if (event.name === 'j' || event.name === 'down') {
+    if (isDownKey(event)) {
       providerStore.setConnectProviderIndex(i => (i + 1) % 2);
       return true;
     }
-    if (event.name === 'k' || event.name === 'up') {
+    if (isUpKey(event)) {
       providerStore.setConnectProviderIndex(i => (i - 1 + 2) % 2);
       return true;
     }

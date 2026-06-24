@@ -4,6 +4,7 @@ import type { BranchInfo, AppDetailKind } from '@devenv/ui';
 import type { SshHost } from '@devenv/types';
 
 export function createUiStore() {
+  let markdownModalScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
   const [showErrorDialog, setShowErrorDialog] = createSignal(false);
   const [errorDialogTitle, setErrorDialogTitle] = createSignal('Error');
   const [errorDialogMessage, setErrorDialogMessage] = createSignal('');
@@ -57,6 +58,9 @@ export function createUiStore() {
   const [scriptArgsHistory, setScriptArgsHistory] = createSignal<Record<string, Record<string, string>[]>>({});
   const [scriptArgsHistoryCursor, setScriptArgsHistoryCursor] = createSignal(-1);
   const [scriptArgsParameters, setScriptArgsParameters] = createSignal<import('@devenv/types').ScriptParameter[]>([]);
+  const [showMarkdownModal, setShowMarkdownModal] = createSignal(false);
+  const [markdownModalTitle, setMarkdownModalTitle] = createSignal('');
+  const [markdownModalContent, setMarkdownModalContent] = createSignal('');
 
   const filteredBranches = createMemo(() => {
     const query = branchFilterQuery().toLowerCase();
@@ -181,6 +185,14 @@ export function createUiStore() {
     scriptArgsHistoryForCurrent,
     scriptArgsParameters,
     setScriptArgsParameters,
+    showMarkdownModal,
+    setShowMarkdownModal,
+    markdownModalTitle,
+    setMarkdownModalTitle,
+    markdownModalContent,
+    setMarkdownModalContent,
+    get markdownModalScrollBoxRef() { return markdownModalScrollBoxRef; },
+    set markdownModalScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) { markdownModalScrollBoxRef = value; },
     filteredBranches,
     showError,
   };

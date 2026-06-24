@@ -211,6 +211,7 @@ export function TUIApp(props: TUIAppProps) {
 			appActions,
 			showError,
 			serverUrl: props.serverUrl,
+			refreshProviders: providerActions.refreshProviders,
 		});
 	});
 

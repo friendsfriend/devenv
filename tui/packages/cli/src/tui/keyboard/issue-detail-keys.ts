@@ -1,3 +1,4 @@
+import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -27,13 +28,13 @@ export async function handleIssueDetailKeys(
 
 	// Label picker modal
 	if (issueStore.showLabelPicker()) {
-		if (event.name === "j" || event.name === "down") {
+		if (isDownKey(event)) {
 			const idx = issueStore.labelPickerIndex();
 			const labels = issueStore.availableLabels();
 			issueStore.setLabelPickerIndex(Math.min(idx + 1, labels.length - 1));
 			return true;
 		}
-		if (event.name === "k" || event.name === "up") {
+		if (isUpKey(event)) {
 			const idx = issueStore.labelPickerIndex();
 			issueStore.setLabelPickerIndex(Math.max(idx - 1, 0));
 			return true;
@@ -56,13 +57,13 @@ export async function handleIssueDetailKeys(
 
 	// Assignee picker modal
 	if (issueStore.showAssigneePicker()) {
-		if (event.name === "j" || event.name === "down") {
+		if (isDownKey(event)) {
 			const idx = issueStore.assigneePickerIndex();
 			const collabs = issueStore.availableCollaborators();
 			issueStore.setAssigneePickerIndex(Math.min(idx + 1, collabs.length - 1));
 			return true;
 		}
-		if (event.name === "k" || event.name === "up") {
+		if (isUpKey(event)) {
 			const idx = issueStore.assigneePickerIndex();
 			issueStore.setAssigneePickerIndex(Math.max(idx - 1, 0));
 			return true;
@@ -128,13 +129,13 @@ export async function handleIssueDetailKeys(
 	// Close reason modal
 	if (issueStore.showCloseReasonModal()) {
 		const REASON_VALUES = ["completed", "not_planned", ""];
-		if (event.name === "j" || event.name === "down") {
+		if (isDownKey(event)) {
 			issueStore.setCloseReasonIndex(
 				Math.min(issueStore.closeReasonIndex() + 1, 2),
 			);
 			return true;
 		}
-		if (event.name === "k" || event.name === "up") {
+		if (isUpKey(event)) {
 			issueStore.setCloseReasonIndex(
 				Math.max(issueStore.closeReasonIndex() - 1, 0),
 			);
@@ -161,10 +162,10 @@ export async function handleIssueDetailKeys(
 	}
 
 	// j/k scrolling within the detail view
-	if (event.name === "down" || event.name === "j") {
+	if (isDownKey(event)) {
 		return true;
 	}
-	if (event.name === "up" || event.name === "k") {
+	if (isUpKey(event)) {
 		return true;
 	}
 

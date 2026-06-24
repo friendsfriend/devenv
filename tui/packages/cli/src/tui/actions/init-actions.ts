@@ -8,6 +8,7 @@ interface InitDeps {
   appActions: AppActions;
   showError: (title: string, message: string) => void;
   serverUrl: string;
+  refreshProviders?: () => Promise<void>;
 }
 
 /**
@@ -15,7 +16,7 @@ interface InitDeps {
  * initial data fetch (apps, infra), and starts background subscriptions.
  */
 export async function initializeApp(deps: InitDeps): Promise<void> {
-  const { client, appStore, appActions, showError, serverUrl } = deps;
+  const { client, appStore, appActions, showError, serverUrl, refreshProviders } = deps;
 
   getLogger().write('INFO', '====== TUI APP MOUNTED ======');
   getLogger().write('INFO', `Server URL: ${serverUrl}`);
@@ -98,6 +99,8 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
     const fetchedInfraServices = await client.getInfraServices();
     getLogger().write('DEBUG', `Fetched ${fetchedInfraServices.length} infrastructure services`);
     appStore.setInfraServices(fetchedInfraServices);
+    await appActions.loadScripts();
+    await refreshProviders?.();
 
     getLogger().write('INFO', 'Initial data fetch complete');
     appStore.setStartupState({

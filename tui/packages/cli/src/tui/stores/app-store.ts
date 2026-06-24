@@ -118,6 +118,10 @@ export function createAppStore() {
 		error: null,
 	});
 	const [scriptsTree, setScriptsTree] = createSignal<ScriptNode[]>([]);
+	const [firstStepsDismissed, setFirstStepsDismissed] = createSignal(false);
+	const [exampleConfigLoading, setExampleConfigLoading] = createSignal(false);
+	const [exampleConfigMessage, setExampleConfigMessage] = createSignal<string | null>(null);
+	const [firstStepsSelectedIndex, setFirstStepsSelectedIndex] = createSignal(0);
 	const [expandedScriptFolders, setExpandedScriptFolders] = createSignal<
 		Set<string>
 	>(new Set());
@@ -187,6 +191,14 @@ export function createAppStore() {
 		);
 	});
 
+	const showFirstSteps = createMemo(() =>
+		!firstStepsDismissed() &&
+		startupState().phase === "complete" &&
+		apps().length === 0 &&
+		infraServices().length === 0 &&
+		scriptVisibleRows().length === 0,
+	);
+
 	const tableTabs = createMemo((): TableTab<TabType>[] => {
 		const allApps = apps();
 		return [
@@ -250,6 +262,15 @@ export function createAppStore() {
 		setSpinnerFrame,
 		scriptsTree,
 		setScriptsTree,
+		firstStepsDismissed,
+		setFirstStepsDismissed,
+		exampleConfigLoading,
+		setExampleConfigLoading,
+		exampleConfigMessage,
+		setExampleConfigMessage,
+		firstStepsSelectedIndex,
+		setFirstStepsSelectedIndex,
+		showFirstSteps,
 		expandedScriptFolders,
 		setExpandedScriptFolders,
 		scriptVisibleRows,

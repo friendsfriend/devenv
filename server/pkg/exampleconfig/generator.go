@@ -50,8 +50,13 @@ func ensureEmpty(dir, label string) error {
 	if err != nil {
 		return err
 	}
-	if len(entries) > 0 {
-		return fmt.Errorf("%s %q is not empty; move existing files or choose a clean directory", label, dir)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			return fmt.Errorf("%s %q is not empty; move existing files or choose a clean directory", label, dir)
+		}
+		if err := ensureEmpty(filepath.Join(dir, entry.Name()), label); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -86,11 +91,83 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "apps", "build", "bhvr-site-test.Dockerfile"):          bunTestDockerfile,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-build.Dockerfile"):   bunLibBuildDockerfile,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-test.Dockerfile"):    bunLibTestDockerfile,
-		filepath.Join(s, "hello.sh"):                                            "#!/usr/bin/env bash\nset -euo pipefail\necho 'Hello from DevEnv shell script'\n",
-		filepath.Join(s, "hello.py"):                                            "#!/usr/bin/env python3\nprint('Hello from DevEnv Python script')\n",
-		filepath.Join(s, "hello.ts"):                                            "#!/usr/bin/env bun\nconsole.log('Hello from DevEnv Bun script')\n",
+		filepath.Join(s, "hello.sh"):                                            helloShellScript,
+		filepath.Join(s, "hello.py"):                                            helloPythonScript,
+		filepath.Join(s, "hello.ts"):                                            helloTypescriptScript,
 	}
 }
+
+const helloShellScript = `#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "${1:-}" == "--devenv-metadata" ]]; then
+  cat <<'JSON'
+[
+  {"name":"name","type":"string","required":true,"description":"Name to greet","defaultValue":"DevEnv","flag":"--name"},
+  {"name":"environment","type":"enum","required":true,"description":"Target environment","defaultValue":"dev","choices":["dev","test","prod"],"flag":"--env"},
+  {"name":"excited","type":"bool","required":false,"description":"Add extra enthusiasm","flag":"--excited"}
+]
+JSON
+  exit 0
+fi
+
+name="DevEnv"
+environment="dev"
+excited=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --name) name="${2:-DevEnv}"; shift 2 ;;
+    --env) environment="${2:-dev}"; shift 2 ;;
+    --excited) excited=true; shift ;;
+    *) shift ;;
+  esac
+done
+
+suffix="."
+if [[ "$excited" == true ]]; then suffix="!"; fi
+echo "Hello ${name} from ${environment}${suffix}"
+`
+
+const helloPythonScript = `#!/usr/bin/env python3
+import argparse
+import json
+import sys
+
+if "--devenv-metadata" in sys.argv:
+    print(json.dumps([
+        {"name":"count","type":"int","required":true,"description":"How many greetings to print","defaultValue":"3","flag":"--count"},
+        {"name":"style","type":"enum","required":false,"description":"Greeting style","defaultValue":"friendly","choices":["friendly","formal"],"flag":"--style"},
+    ]))
+    raise SystemExit(0)
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--count", type=int, default=3)
+parser.add_argument("--style", choices=["friendly", "formal"], default="friendly")
+args = parser.parse_args()
+message = "Hello from DevEnv Python" if args.style == "friendly" else "Greetings from DevEnv Python"
+for _ in range(args.count):
+    print(message)
+`
+
+const helloTypescriptScript = `#!/usr/bin/env bun
+if (process.argv.includes("--devenv-metadata")) {
+  console.log(JSON.stringify([
+    { name: "service", type: "enum", required: true, description: "Service to inspect", defaultValue: "api", choices: ["api", "worker", "db"], flag: "--service" },
+    { name: "verbose", type: "bool", required: false, description: "Print extra details", flag: "--verbose" },
+  ]));
+  process.exit(0);
+}
+
+const args = process.argv.slice(2);
+const value = (flag: string, fallback: string) => {
+  const idx = args.indexOf(flag);
+  return idx >= 0 ? args[idx + 1] ?? fallback : fallback;
+};
+const service = value("--service", "api");
+const verbose = args.includes("--verbose");
+console.log("Checking " + service);
+if (verbose) console.log("Verbose mode enabled");
+`
 
 const goCompose = `services:
   go-rest-postgres:

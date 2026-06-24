@@ -354,6 +354,22 @@ export function createAppActions(
     uiStore.setShowConfirmDialog(true);
   };
 
+  const createExampleConfig = async () => {
+    appStore.setExampleConfigLoading(true);
+    appStore.setExampleConfigMessage('Creating example config...');
+    try {
+      await client.createExampleConfig();
+      appStore.setApps(await client.getApps());
+      appStore.setInfraServices(await client.getInfraServices());
+      await loadScripts();
+      appStore.setExampleConfigMessage('Example config created.');
+    } catch (e) {
+      appStore.setExampleConfigMessage(e instanceof Error ? e.message : 'Failed to create example config');
+    } finally {
+      appStore.setExampleConfigLoading(false);
+    }
+  };
+
   return {
     fetchStatus,
     subscribeToUpdates,
@@ -370,6 +386,7 @@ export function createAppActions(
     performRemoveScriptTarget,
     requestRemoveApp,
     performRemoveApp,
+    createExampleConfig,
   };
 }
 

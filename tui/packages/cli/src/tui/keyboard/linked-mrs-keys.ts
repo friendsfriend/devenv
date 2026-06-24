@@ -1,3 +1,4 @@
+import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -26,14 +27,14 @@ export async function handleLinkedMRsKeys(
 
 	const mrs = issueStore.linkedMRs();
 
-	if (event.name === "j" || event.name === "down") {
+	if (isDownKey(event)) {
 		issueStore.setSelectedLinkedMRIndex(
 			Math.min(issueStore.selectedLinkedMRIndex() + 1, mrs.length - 1),
 		);
 		return true;
 	}
 
-	if (event.name === "k" || event.name === "up") {
+	if (isUpKey(event)) {
 		issueStore.setSelectedLinkedMRIndex(
 			Math.max(issueStore.selectedLinkedMRIndex() - 1, 0),
 		);

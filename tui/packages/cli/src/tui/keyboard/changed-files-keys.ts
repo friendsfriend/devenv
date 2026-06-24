@@ -2,6 +2,7 @@ import { getLogger } from '@devenv/core';
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 import { computeInitialSplitView } from './diff-modal-utils';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Changed Files view:
  * - Search mode (type query, clear)
@@ -104,13 +105,13 @@ export async function handleChangedFilesKeys(
   }
 
   // j or Down to move down
-  if (event.name === 'j' || event.sequence === 'j' || event.name === 'down' || event.name === 'Down') {
+  if (isDownKey(event)) {
     mrStore.setSelectedChangedFileIndex((prev) => Math.min(prev + 1, changes.length - 1));
     return true;
   }
 
   // k or Up to move up
-  if (event.name === 'k' || event.sequence === 'k' || event.name === 'up' || event.name === 'Up') {
+  if (isUpKey(event)) {
     mrStore.setSelectedChangedFileIndex((prev) => Math.max(prev - 1, 0));
     return true;
   }

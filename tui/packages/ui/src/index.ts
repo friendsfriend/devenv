@@ -102,6 +102,7 @@ export { getMarkdownSyntaxStyle } from "./markdownSyntax";
 
 // Export HTML-to-text utility
 export { gitlabHtmlToMarkdown, containsHtml } from "./utils/gitlabHtml";
+export { MarkdownModal } from "./components/MarkdownModal";
 
 // Export status utilities
 export {

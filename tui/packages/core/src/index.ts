@@ -54,6 +54,7 @@ import {
 	testApp,
 } from "./docker-client";
 import { health, subscribeToEvents } from "./events-client";
+import { createExampleConfig } from "./example-config-client";
 import {
 	getBranches,
 	gitCheckout,
@@ -150,6 +151,9 @@ export class DevEnvClient {
 
 	getApps(): Promise<App[]> {
 		return getApps(this.deps);
+	}
+	createExampleConfig(): Promise<void> {
+		return createExampleConfig(this.deps);
 	}
 	getScripts(): Promise<import("@devenv/types").ScriptListResponse> {
 		return getScripts(this.deps);

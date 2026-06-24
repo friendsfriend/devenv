@@ -86,7 +86,7 @@ export function BranchSelectorView(props: BranchSelectorProps) {
             ]
           : [
               { key: '↑/↓', action: 'Navigate' },
-              { key: 's', action: 'Switch' },
+              { key: 'Enter/s', action: 'Switch' },
               { key: 'g', action: 'Status' },
               { key: 'l', action: 'Log' },
               { key: 'f', action: 'Fetch' },

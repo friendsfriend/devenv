@@ -67,6 +67,10 @@ bun run build:single
 
 **Output:** `dist/tui/devenv-<platform>-<arch>/bin/devenv`
 
+### Guides
+
+- [Configuration Repository Guide](tui/packages/cli/src/tui/guides/config-repository.md) - step-by-step guide on setting up a shared config repository
+
 ### Run
 
 The built binary is self-contained — it includes the Go server embedded inside:

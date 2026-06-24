@@ -1,5 +1,6 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Worktree Manager modal.
  * Consumes all events while the modal is open.
@@ -33,7 +34,7 @@ export async function handleWorktreeManagerKeys(
   }
 
   // Move cursor down
-  if (event.name === 'down' || event.name === 'Down' || event.name === 'j') {
+  if (isDownKey(event)) {
     const max = Math.max(0, uiStore.worktreeManagerWorktrees().length - 1);
     uiStore.setWorktreeManagerSelectedIndex((prev) =>
       Math.min(Math.max(prev, 0) + 1, max),
@@ -42,7 +43,7 @@ export async function handleWorktreeManagerKeys(
   }
 
   // Move cursor up
-  if (event.name === 'up' || event.name === 'Up' || event.name === 'k') {
+  if (isUpKey(event)) {
     uiStore.setWorktreeManagerSelectedIndex((prev) => Math.max(prev - 1, 0));
     return true;
   }

@@ -1,6 +1,7 @@
 import { getLogger } from '@devenv/core';
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Diff modal:
  * - Comment modal (on top of diff)
@@ -258,13 +259,13 @@ export async function handleDiffModalKeys(
   }
 
   // j or Down to move down one line in diff
-  if (event.name === 'j' || event.name === 'down' || event.name === 'Down') {
+  if (isDownKey(event)) {
     mrStore.setDiffModalSelectedLine(mrStore.diffModalSelectedLine() + 1);
     return true;
   }
 
   // k or Up to move up one line in diff
-  if (event.name === 'k' || event.name === 'up' || event.name === 'Up') {
+  if (isUpKey(event)) {
     mrStore.setDiffModalSelectedLine(Math.max(mrStore.diffModalSelectedLine() - 1, 0));
     return true;
   }

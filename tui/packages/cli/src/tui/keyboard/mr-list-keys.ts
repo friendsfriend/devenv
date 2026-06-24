@@ -1,5 +1,6 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
+import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the MR list view:
  * - Search mode (type query, clear)
@@ -107,13 +108,13 @@ export async function handleMrListKeys(
   if (mrs.length === 0) return true;
 
   // j or Down to move down
-  if (event.name === 'j' || event.name === 'down' || event.name === 'Down') {
+  if (isDownKey(event)) {
     mrStore.setSelectedMRIndex((prev) => Math.min(prev + 1, mrs.length - 1));
     return true;
   }
 
   // k or Up to move up
-  if (event.name === 'k' || event.name === 'up' || event.name === 'Up') {
+  if (isUpKey(event)) {
     mrStore.setSelectedMRIndex((prev) => Math.max(prev - 1, 0));
     return true;
   }

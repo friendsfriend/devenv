@@ -2,7 +2,9 @@ package exampleconfig
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -42,13 +44,45 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"hello.sh", "hello.py", "hello.ts"} {
-		info, err := os.Stat(filepath.Join(homeDir, "scripts", name))
+		path := filepath.Join(homeDir, "scripts", name)
+		info, err := os.Stat(path)
 		if err != nil {
 			t.Fatalf("missing script %s: %v", name, err)
 		}
 		if info.Mode()&0111 == 0 {
 			t.Fatalf("script %s is not executable: %v", name, info.Mode())
 		}
+		if name == "hello.sh" {
+			out, err := exec.Command(path, "--devenv-metadata").Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(string(out), `"parameters"`) && !strings.Contains(string(out), `"name"`) {
+				t.Fatalf("expected metadata output, got %s", out)
+			}
+		}
+	}
+}
+
+func TestGenerateAllowsEmptyStartupCreatedDirs(t *testing.T) {
+	configDir := t.TempDir()
+	homeDir := t.TempDir()
+	for _, dir := range []string{
+		filepath.Join(configDir, "providers"),
+		filepath.Join(configDir, "apps", "definitions"),
+		filepath.Join(configDir, "libraries", "definitions"),
+		filepath.Join(configDir, "infrastructure", "definitions"),
+		filepath.Join(homeDir, "scripts", "nested"),
+	} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := (Generator{ConfigDir: configDir, HomeDir: homeDir}).Generate(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(configDir, "apps", "definitions", "go-rest-postgres.json")); err != nil {
+		t.Fatal(err)
 	}
 }
 

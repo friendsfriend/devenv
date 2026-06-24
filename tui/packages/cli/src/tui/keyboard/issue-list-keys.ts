@@ -1,3 +1,4 @@
+import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -44,7 +45,7 @@ export async function handleIssueListKeys(
 			return true;
 		}
 
-		if (event.name === "j" || event.name === "down") {
+		if (isDownKey(event)) {
 			const max = Math.max(0, SCOPE_ITEMS.length - 1);
 			issueStore.setIssueScopePickerIndex((prev: number) =>
 				Math.min(prev + 1, max),
@@ -52,7 +53,7 @@ export async function handleIssueListKeys(
 			return true;
 		}
 
-		if (event.name === "k" || event.name === "up") {
+		if (isUpKey(event)) {
 			issueStore.setIssueScopePickerIndex((prev: number) =>
 				Math.max(prev - 1, 0),
 			);
@@ -75,13 +76,13 @@ export async function handleIssueListKeys(
 		const linkedIssues = mrStore.mrLinkedIssues();
 		const selectedIdx = mrStore.selectedMrLinkedIssueIndex();
 
-		if (event.name === "down" || event.name === "j") {
+		if (isDownKey(event)) {
 			mrStore.setSelectedMrLinkedIssueIndex(
 				Math.min(selectedIdx + 1, linkedIssues.length - 1),
 			);
 			return true;
 		}
-		if (event.name === "up" || event.name === "k") {
+		if (isUpKey(event)) {
 			mrStore.setSelectedMrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
 			return true;
 		}
@@ -118,13 +119,13 @@ export async function handleIssueListKeys(
 		const refIssues = issueStore.referencedIssues();
 		const selectedIdx = issueStore.selectedReferencedIssueIndex();
 
-		if (event.name === "down" || event.name === "j") {
+		if (isDownKey(event)) {
 			issueStore.setSelectedReferencedIssueIndex(
 				Math.min(selectedIdx + 1, refIssues.length - 1),
 			);
 			return true;
 		}
-		if (event.name === "up" || event.name === "k") {
+		if (isUpKey(event)) {
 			issueStore.setSelectedReferencedIssueIndex(Math.max(selectedIdx - 1, 0));
 			return true;
 		}
@@ -192,7 +193,7 @@ export async function handleIssueListKeys(
 		}
 
 		// Navigation
-		if (event.name === "down" || event.name === "j") {
+		if (isDownKey(event)) {
 			const nextIdx = Math.min(
 				issueStore.selectedIssueIndex() + 1,
 				issues.length - 1,
@@ -200,7 +201,7 @@ export async function handleIssueListKeys(
 			issueStore.setSelectedIssueIndex(Math.max(0, nextIdx));
 			return true;
 		}
-		if (event.name === "up" || event.name === "k") {
+		if (isUpKey(event)) {
 			const nextIdx = Math.max(issueStore.selectedIssueIndex() - 1, 0);
 			issueStore.setSelectedIssueIndex(nextIdx);
 			return true;
