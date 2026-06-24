@@ -18,14 +18,7 @@ import (
 )
 
 func resolveConfigDir() string {
-	if dir := os.Getenv("DEVENV_CONFIG_DIR"); dir != "" {
-		return dir
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "config"
-	}
-	return filepath.Join(home, ".config", "devenv")
+	return resources.ResolveConfigDir()
 }
 
 // multiAuthProvider implements git.AuthProvider and git.MultiAuthProvider,
