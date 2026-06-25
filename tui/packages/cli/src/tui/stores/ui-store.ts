@@ -5,6 +5,7 @@ import type { SshHost } from '@devenv/types';
 
 export function createUiStore() {
   let markdownModalScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
+  let helpKeybindScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
   const [showErrorDialog, setShowErrorDialog] = createSignal(false);
   const [errorDialogTitle, setErrorDialogTitle] = createSignal('Error');
   const [errorDialogMessage, setErrorDialogMessage] = createSignal('');
@@ -193,6 +194,8 @@ export function createUiStore() {
     setMarkdownModalContent,
     get markdownModalScrollBoxRef() { return markdownModalScrollBoxRef; },
     set markdownModalScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) { markdownModalScrollBoxRef = value; },
+    get helpKeybindScrollBoxRef() { return helpKeybindScrollBoxRef; },
+    set helpKeybindScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) { helpKeybindScrollBoxRef = value; },
     filteredBranches,
     showError,
   };

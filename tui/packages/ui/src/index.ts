@@ -51,6 +51,8 @@ export { BranchCreateModal } from "./components/BranchCreateModal";
 export type { BranchCreateModalProps } from "./components/BranchCreateModal";
 export { ErrorDialog } from "./components/ErrorDialog";
 export { GenericModal } from "./components/GenericModal";
+export { ModalTabs } from "./components/ModalTabs";
+export type { ModalTabsProps, ModalTabItem } from "./components/ModalTabs";
 export { ListViewModal } from "./components/ListViewModal";
 export type { ListViewModalProps } from "./components/ListViewModal";
 export { HelpText, formatHelpText } from "./components/HelpText";

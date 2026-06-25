@@ -379,27 +379,22 @@ export async function startTUI(serverUrl: string) {
 		process.env.FORCE_COLOR = "3"; // Force truecolor
 
 		const renderer = await createCliRenderer({
-			exitOnCtrlC: false, // We handle Ctrl+C manually so Kitty can disambiguate it from Ctrl+Shift+C
-			useKittyKeyboard: {}, // Enable Kitty keyboard protocol — disambiguates modifier combos like Ctrl+Shift+C
+			exitOnCtrlC: false,
+			useKittyKeyboard: {},
 			consoleOptions: {
-				// Ctrl+Shift+C copies the selected text in the built-in opentui console overlay
 				keyBindings: [
-					{
-						name: "c",
-						ctrl: true,
-						shift: true,
-						action: "copy-selection" as const,
-					},
+					// Kitty protocol may send uppercase 'C' for Ctrl+Shift+C
+					{ name: "c", ctrl: true, shift: true, action: "copy-selection" },
+					{ name: "C", ctrl: true, shift: true, action: "copy-selection" },
 				],
 				onCopySelection: (text: string) => {
 					import("@devenv/core")
-						.then(({ copyToClipboard }) => {
-							copyToClipboard(text);
-						})
+						.then(({ copyToClipboard }) => copyToClipboard(text))
 						.catch(() => {});
 				},
 			},
 		});
+
 		setExitRenderer(renderer);
 
 		const cleanup = () => {

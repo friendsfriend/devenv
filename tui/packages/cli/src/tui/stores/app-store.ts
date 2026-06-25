@@ -103,6 +103,11 @@ export function createAppStore() {
 	const [previousViewMode, setPreviousViewMode] = createSignal<ViewMode | null>(
 		"table",
 	);
+	const [helpSearchActive, setHelpSearchActive] = createSignal(false);
+	const [helpSearchQuery, setHelpSearchQuery] = createSignal("");
+	const [helpAllContexts, setHelpAllContexts] = createSignal(false);
+	const [helpActiveTab, setHelpActiveTab] = createSignal<"keybinds" | "guides">("keybinds");
+	const [helpGuideIndex, setHelpGuideIndex] = createSignal(-1);
 	const [tableSearchMode, setTableSearchMode] = createSignal(false);
 	const [tableSearchQuery, setTableSearchQuery] = createSignal("");
 	const [statusLogEntries, setStatusLogEntries] = createSignal<
@@ -248,6 +253,16 @@ export function createAppStore() {
 		setLastUpdateTime,
 		previousViewMode,
 		setPreviousViewMode,
+		helpSearchActive,
+		setHelpSearchActive,
+		helpSearchQuery,
+		setHelpSearchQuery,
+		helpAllContexts,
+		setHelpAllContexts,
+		helpActiveTab,
+		setHelpActiveTab,
+		helpGuideIndex,
+		setHelpGuideIndex,
 		tableSearchMode,
 		setTableSearchMode,
 		tableSearchQuery,

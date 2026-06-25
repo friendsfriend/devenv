@@ -263,6 +263,10 @@ export async function handleTableKeys(
 		event.sequence.length === 1 &&
 		/[a-zA-Z]/.test(event.sequence);
 	const key = isLetter ? event.sequence : event.name;
+	if (event.sequence === "?" || event.name === "?" || (event.name === "/" && event.shift)) {
+		helpActions.showHelp();
+		return true;
+	}
 
 	switch (key) {
 		case "q":

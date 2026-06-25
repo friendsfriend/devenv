@@ -18,6 +18,7 @@ import {
 	uiColors,
 	LAYOUT_CHROME_LINES,
 } from "@devenv/ui";
+import { getGuide, guides as allGuides } from "../guides";
 import type { ContentRouterProps } from "./types";
 import { StartupSplash } from "./startup-splash";
 
@@ -111,7 +112,7 @@ export function ContentRouter(props: ContentRouterProps) {
 					when={appStore.viewMode() === "table"}
 					fallback={
 						<Show
-							when={appStore.viewMode() === "help"}
+							when={false}
 							fallback={
 								<Show
 									when={appStore.viewMode() === "issues"}
@@ -380,11 +381,50 @@ export function ContentRouter(props: ContentRouterProps) {
 						>
 							{(() => {
 								const helpData = helpActions.getHelpContent();
+								// Recompute sections when scope toggle changes
+								const sections = () =>
+									appStore.helpAllContexts()
+										? helpActions.getHelpContent(true).sections
+										: helpData.sections;
+								const title = () =>
+									appStore.helpAllContexts()
+										? "All Contexts"
+										: helpData.title;
+								const guideEntries = () =>
+									allGuides.map((g) => ({
+										key: g.key,
+										title: g.title,
+										description: g.description,
+									}));
 								return (
 									<HelpView
-										sections={helpData.sections}
-										viewTitle={helpData.title}
+										sections={sections()}
+										viewTitle={title()}
 										onClose={helpActions.closeHelp}
+										searchActive={appStore.helpSearchActive()}
+										searchQuery={appStore.helpSearchQuery()}
+										onSearchChange={(q) => appStore.setHelpSearchQuery(q)}
+										allContexts={appStore.helpAllContexts()}
+										onScopeToggle={(v) => appStore.setHelpAllContexts(v)}
+										activeTab={appStore.helpActiveTab()}
+										onTabChange={(tab) => {
+											appStore.setHelpActiveTab(tab);
+											appStore.setHelpSearchActive(false);
+											appStore.setHelpSearchQuery("");
+											appStore.setHelpGuideIndex(tab === "guides" ? 0 : -1);
+										}}
+										selectedGuideIndex={appStore.helpGuideIndex()}
+										guides={guideEntries()}
+										onGuideSelect={async (key) => {
+											const guide = getGuide(key);
+											if (guide) {
+												const content = await guide.import();
+												helpActions.closeHelp();
+												props.stores.uiStore.setMarkdownModalTitle("");
+												props.stores.uiStore.setMarkdownModalContent(content);
+												props.stores.uiStore.setShowMarkdownModal(true);
+											}
+										}}
 									/>
 								);
 							})()}

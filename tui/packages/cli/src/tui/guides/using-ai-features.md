@@ -1,0 +1,56 @@
+# Using AI Features
+
+DevEnv integrates with AI agents for code review, log analysis, and interactive sessions.
+
+## 1. AI agent view
+
+Press `A` in the table view to open the AI agent view. This shows a list of available agents and their sessions.
+
+The agent view has two sections:
+
+- **New Session** — Start a fresh session with an agent
+- **Recent Sessions** — Resume a previous session (sorted by last updated)
+
+## 2. Starting a new session
+
+1. Press `A` to open the agent view
+2. Make sure **New Session** is selected (top of the list)
+3. Press `Enter` to launch a new session
+
+This opens the pi agent in a new terminal session.
+
+## 3. Resuming a session
+
+1. Press `A` to open the agent view
+2. Navigate to the session you want to resume using `j`/`k`
+3. Press `Enter` to resume that session
+
+Sessions are sorted by last updated time, most recent first.
+
+## 4. Searching sessions
+
+Press `/` while in the agent view to filter sessions by title or agent name. Type to narrow down, press `Enter` to select, or `Esc` to clear the filter.
+
+## 5. AI in merge request detail
+
+While viewing a merge request detail, press `Shift+A` to trigger an AI review:
+
+1. An AI backend picker opens — select the agent
+2. The review is generated and streamed into an overlay
+3. Review content can be posted as an MR comment
+4. Use `Ctrl+j`/`Ctrl+k` to scroll the review overlay
+
+## 6. AI in log viewer
+
+While viewing logs, press `Shift+A` to trigger AI analysis on the current log content:
+
+1. In normal mode: enters prompt mode — type what you want to analyze
+2. In visual mode: selects the highlighted log range for analysis
+3. Results are shown in an overlay with scroll support
+4. Type follow-up questions to refine the analysis
+
+## 7. pi agent integration
+
+DevEnv integrates with the pi coding agent for interactive development workflows. Sessions are managed through the agent view and can be started or resumed directly from the TUI.
+
+See [Using Git Integrations](using-git-integrations.md) for AI-powered code review features.

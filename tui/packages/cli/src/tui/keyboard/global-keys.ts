@@ -16,6 +16,36 @@ import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
 // Track last Ctrl+C press time for double-press exit detection
 let _lastCtrlCTime = 0;
 
+const writeOsc52 = (text: string) => {
+  const base64 = Buffer.from(text).toString('base64');
+  const osc52 = `\x1b]52;c;${base64}\x07`;
+  process.stdout.write(process.env.TMUX ? `\x1bPtmux;\x1b${osc52}\x1b\\` : osc52);
+};
+
+const getConsoleText = (renderer: KeyboardContext['renderer']): string => {
+  try {
+    const consoleWidget = renderer.console as any;
+    const selected = consoleWidget['getSelectedText']?.();
+    if (selected) return selected;
+    const lines = consoleWidget['_displayLines'] as Array<{ text: string }> | undefined;
+    return lines?.map((line) => line.text).join('\n') ?? '';
+  } catch {
+    return '';
+  }
+};
+
+const copyText = async (text: string, uiStore: KeyboardStores['uiStore']): Promise<boolean> => {
+  if (!text) return false;
+  writeOsc52(text);
+  const { copyToClipboard } = await import('@devenv/core');
+  const success = copyToClipboard(text);
+  if (success) {
+    uiStore.setCopyStatus('✓ Copied');
+    setTimeout(() => uiStore.setCopyStatus(null), 2000);
+  }
+  return success;
+};
+
 export async function handleGlobalKeys(
   event: KeyboardEvent,
   stores: KeyboardStores,
@@ -29,6 +59,20 @@ export async function handleGlobalKeys(
   // GLOBAL: Escape closes the opentui console overlay if it is visible
   if ((event.name === 'escape' || event.name === 'Escape') && renderer.console.visible) {
     renderer.console.hide();
+    return true;
+  }
+
+  // GLOBAL: Ctrl+/ toggles the opentui console overlay.
+  // Legacy terminals encode Ctrl+/ as Ctrl+_ (\x1f); Kitty can report '/'.
+  if (event.ctrl && !event.shift && !event.meta && !event.super
+    && (event.name === '/' || event.name === '_' || event.sequence === '\x1f' || event.raw === '\x1f')) {
+    renderer.console.toggle();
+    return true;
+  }
+
+  // GLOBAL: ? opens help from every view/subview. In help view it falls through to close help.
+  if (appStore.viewMode() !== 'help' && (event.name === '?' || event.sequence === '?' || (event.name === '/' && event.shift))) {
+    actions.helpActions.showHelp();
     return true;
   }
 
@@ -138,7 +182,7 @@ export async function handleGlobalKeys(
         const guide = getGuide('config-repository');
         if (guide) {
           const content = await guide.import();
-          uiStore.setMarkdownModalTitle(guide.title);
+          uiStore.setMarkdownModalTitle("");
           uiStore.setMarkdownModalContent(content);
         }
         uiStore.setShowMarkdownModal(true);
@@ -206,6 +250,9 @@ export async function handleGlobalKeys(
   // Double Ctrl+C exits the app. With Kitty protocol, plain Ctrl+C arrives as
   // lowercase 'c' (no shift), while Ctrl+Shift+C arrives as uppercase 'C' with
   // shift=true — those are handled separately below.
+  //
+  // When no TUI selection exists, let Ctrl+C fall through so the terminal
+  // emulator handles native copy (or SIGINT) instead of showing "Nothing selected".
   if (event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'c') {
     const now = Date.now();
     if (now - _lastCtrlCTime < 500) {
@@ -214,20 +261,30 @@ export async function handleGlobalKeys(
       return true;
     }
     _lastCtrlCTime = now;
-    // Single Ctrl+C copies selection (works inside tmux where shift can't be detected)
-    await utilActions.handleCopySelection();
-    return true;
+    if (ctx.renderer.console.visible) {
+      return copyText(getConsoleText(ctx.renderer), uiStore);
+    }
+    const selection = ctx.renderer.getSelection();
+    if (selection && selection.getSelectedText()) {
+      await utilActions.handleCopySelection();
+      return true;
+    }
+    // No TUI selection — let terminal handle copy natively
+    return false;
   }
 
-  // GLOBAL: Ctrl+Shift+C, Cmd+C, or Super+C — copy selection to clipboard
-  // Kitty protocol sends uppercase 'C' for Ctrl+Shift+C (codepoint 67='C', shift flag set).
-  // Ghostty on macOS sends Cmd+C with super flag. Inside tmux, Kitty protocol CSI-u
-  // sequences are lost, so this branch is only reached when Ghostty forwards the
-  // CSI-u sequence through tmux, or on macOS with Cmd+C/Super+C.
+  // GLOBAL: Ctrl+Shift+C, Cmd+C, or Super+C — copy selection to clipboard.
   if ((event.ctrl && event.shift || event.meta || event.super) && (event.name === 'c' || event.name === 'C')) {
     _lastCtrlCTime = 0;
-    await utilActions.handleCopySelection();
-    return true;
+    if (ctx.renderer.console.visible) {
+      return copyText(getConsoleText(ctx.renderer), uiStore);
+    }
+    const selection = ctx.renderer.getSelection();
+    if (selection && selection.getSelectedText()) {
+      await utilActions.handleCopySelection();
+      return true;
+    }
+    return false;
   }
 
   return false;
