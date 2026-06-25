@@ -100,6 +100,21 @@ function getKeybindsForContext(context: string): Array<{ key: string; action: st
 		.map((d) => ({ key: d.keys.join(", "), action: d.description }));
 }
 
+function filterFooterKeybinds<T extends { key: string; action: string }>(binds: T[]): T[] {
+	return binds.filter((bind) => {
+		const text = `${bind.key} ${bind.action}`.toLowerCase();
+		return !/(copy|paste|console|quit|\besc\b|escape)/.test(text);
+	});
+}
+
+function getFooterKeybindsForContext(context: string): Array<{ key: string; action: string }> {
+	return filterFooterKeybinds(
+		KEYBINDS
+			.filter((d) => d.context === context && d.category !== "Navigation")
+			.map((d) => ({ key: d.keys.join(", "), action: d.footerDescription ?? d.description })),
+	);
+}
+
 export function createHelpActions(
 	appStore: AppStore,
 	issueStore: IssueStore,
@@ -149,74 +164,74 @@ export function createHelpActions(
 	const getKeybinds = () => {
 		// Modal state overrides — these depend on runtime state, not registry
 		if (uiStore.showPassphraseModal())
-			return [
+			return filterFooterKeybinds([
 				{ key: "Enter", action: "Unlock Key" },
 				{ key: "Esc", action: "Cancel" },
-			];
-		if (appStore.viewMode() === "help") return getKeybindsForContext("help");
+			]);
+		if (appStore.viewMode() === "help") return getFooterKeybindsForContext("help");
 		if (appStore.viewMode() === "discussionsView") {
 			if (mrStore.replyMode())
-				return [
+				return filterFooterKeybinds([
 					{ key: "Ctrl+Enter", action: "Submit Reply" },
 					{ key: "Esc", action: "Cancel Reply" },
-				];
-			return getKeybindsForContext("discussionsView");
+				]);
+			return getFooterKeybindsForContext("discussionsView");
 		}
 		if (logStore.showLogModal()) {
 			if (logStore.logSearchMode())
-				return [
+				return filterFooterKeybinds([
 					{ key: "Enter", action: "Confirm Search" },
 					{ key: "Backspace", action: "Delete Char" },
 					{ key: "Esc", action: "Cancel Search" },
-				];
+				]);
 			if (logStore.logVisualModeActive())
-				return [
+				return filterFooterKeybinds([
 					{ key: "j/k", action: "Extend Selection" },
 					{ key: "c", action: "Copy Selection" },
 					{ key: "v/Esc", action: "Exit Visual" },
 					{ key: "q", action: "Quit" },
-				];
-			return getKeybindsForContext("logModal");
+				]);
+			return getFooterKeybindsForContext("logModal");
 		}
 		if (appStore.viewMode() === "issueDetail") {
 			if (issueStore.showCloseReasonModal())
-				return [
+				return filterFooterKeybinds([
 					{ key: "j/k", action: "Navigate" },
 					{ key: "Enter", action: "Select Reason" },
 					{ key: "Esc", action: "Cancel" },
-				];
+				]);
 			if (issueStore.showLabelPicker())
-				return [
+				return filterFooterKeybinds([
 					{ key: "j/k", action: "Navigate" },
 					{ key: "Enter", action: "Toggle" },
 					{ key: "Esc", action: "Confirm" },
-				];
+				]);
 			if (issueStore.showAssigneePicker())
-				return [
+				return filterFooterKeybinds([
 					{ key: "j/k", action: "Navigate" },
 					{ key: "Enter", action: "Assign/Unassign" },
 					{ key: "Esc", action: "Cancel" },
-				];
+				]);
 			if (issueStore.showCommentModal())
-				return [
+				return filterFooterKeybinds([
 					{ key: "Enter", action: "New line" },
 					{ key: "Ctrl+Enter", action: "Submit" },
 					{ key: "Esc", action: "Cancel" },
-				];
-			return getKeybindsForContext("issueDetail");
+				]);
+			return getFooterKeybindsForContext("issueDetail");
 		}
 
 		const viewMode = appStore.viewMode();
-		const binds = getKeybindsForContext(viewMode);
+		const binds = getFooterKeybindsForContext(viewMode);
 		if (binds.length > 0) return binds;
 
 		// Fallback for table with sub-modes
 		if (viewMode === "table" && appStore.tableSearchMode()) {
-			return [
+			return filterFooterKeybinds([
 				{ key: "Enter", action: "Confirm" },
 				{ key: "Backspace", action: "Delete Char" },
 				{ key: "Esc", action: "Cancel" },
-			];
+			]);
 		}
 
 		return binds;

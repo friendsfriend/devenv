@@ -1,8 +1,11 @@
 import { TextAttributes } from "@opentui/core";
 import { Show } from "solid-js";
-import { colors, uiColors } from "../colors";
+import { uiColors } from "../colors";
 import type { Issue, IssueScope } from "@devenv/types";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
+import { CenteredState } from "./CenteredState";
+import { SearchHeader } from "./SearchHeader";
+import { formatShortDate, getIssueStateColor, truncateText } from "../statusUtils";
 
 interface IssueViewProps {
 	issues: Issue[];
@@ -29,38 +32,12 @@ interface IssueViewProps {
  * - Child is purely presentational
  */
 export function IssueView(props: IssueViewProps) {
-	const hasSearch = () => (props.searchQuery ?? "").length > 0;
-
 	// Lines of fixed chrome outside the list area:
 	//   Layout header (3) + Layout footer (3)  = LAYOUT_CHROME_LINES (6)
 	//   Outer rounded border top + bottom      = 2
 	//   Table header row                       = 1
 	//                                   Total  = 9
 	const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 1;
-
-	// Format date
-	const formatDate = (dateStr: string) => {
-		const date = new Date(dateStr);
-		return date.toLocaleDateString("en-US", {
-			month: "short",
-			day: "numeric",
-			hour: "2-digit",
-			minute: "2-digit",
-		});
-	};
-
-	// Get state color
-	const getStateColor = (state: string) => {
-		switch (state.toLowerCase()) {
-			case "open":
-			case "opened":
-				return uiColors.success;
-			case "closed":
-				return uiColors.textMuted;
-			default:
-				return uiColors.textSecondary;
-		}
-	};
 
 	return (
 		<box
@@ -73,64 +50,22 @@ export function IssueView(props: IssueViewProps) {
 				flexDirection: "column",
 			}}
 		>
-			{/* Loading State */}
 			<Show when={props.loading}>
-				<box
-					style={{
-						width: "100%",
-						height: "100%",
-						justifyContent: "center",
-						alignItems: "center",
-					}}
-				>
-					<text style={{ fg: uiColors.primary }}>Loading issues...</text>
-				</box>
+				<CenteredState message="Loading issues..." color={uiColors.primary} />
 			</Show>
 
-			{/* Error State */}
 			<Show when={!props.loading && props.error}>
-				<box
-					style={{
-						width: "100%",
-						height: "100%",
-						justifyContent: "center",
-						alignItems: "center",
-					}}
-				>
-					<text style={{ fg: uiColors.error }}>{props.error}</text>
-				</box>
+				<CenteredState message={props.error!} color={uiColors.error} />
 			</Show>
 
-			{/* Empty State */}
 			<Show when={!props.loading && !props.error && props.issues.length === 0}>
-				<box
-					style={{
-						width: "100%",
-						height: "100%",
-						justifyContent: "center",
-						alignItems: "center",
-					}}
-				>
-					<text style={{ fg: uiColors.textMuted }}>No issues found</text>
-				</box>
+				<CenteredState message="No issues found" />
 			</Show>
 
 			{/* Issue Table */}
 			<Show when={!props.loading && !props.error && props.issues.length > 0}>
 				{/* Table Header */}
-				<box
-					backgroundColor={uiColors.bgSurface1}
-					style={{
-						width: "100%",
-						height: 1,
-						flexDirection: "row",
-						paddingLeft: 1,
-						paddingRight: 1,
-					}}
-				>
-					<Show
-						when={props.searchMode || hasSearch()}
-						fallback={
+				<SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery}>
 							<>
 								<box style={{ width: 8 }}>
 									<text
@@ -195,17 +130,7 @@ export function IssueView(props: IssueViewProps) {
 									</text>
 								</box>
 							</>
-						}
-					>
-						<box flexDirection="row">
-							<text fg={colors.peach}>/</text>
-							<text fg={uiColors.textPrimary}>{props.searchQuery ?? ""}</text>
-							<Show when={props.searchMode}>
-								<text fg={uiColors.primary}>█</text>
-							</Show>
-						</box>
-					</Show>
-				</box>
+					</SearchHeader>
 
 				{/* Table Body — rendered via ScrollableList */}
 				<ScrollableList<Issue>
@@ -215,7 +140,7 @@ export function IssueView(props: IssueViewProps) {
 					estimatedItemHeight={1}
 					showScrollIndicator={false}
 					renderItem={(issue, isSelected) => {
-						const stateColor = getStateColor(issue.state);
+						const stateColor = getIssueStateColor(issue.state);
 						return (
 							<box
 								backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
@@ -246,9 +171,7 @@ export function IssueView(props: IssueViewProps) {
 												: uiColors.textSecondary,
 										}}
 									>
-										{issue.title.length > 50
-											? issue.title.slice(0, 47) + "..."
-											: issue.title}
+										{truncateText(issue.title, 50)}
 									</text>
 								</box>
 								<box style={{ width: "14%" }}>
@@ -269,7 +192,7 @@ export function IssueView(props: IssueViewProps) {
 								</box>
 								<box style={{ width: "14%" }}>
 									<text style={{ fg: uiColors.textMuted }}>
-										{formatDate(issue.updated_at)}
+										{formatShortDate(issue.updated_at)}
 									</text>
 								</box>
 							</box>

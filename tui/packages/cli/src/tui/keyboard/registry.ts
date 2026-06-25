@@ -15,6 +15,8 @@ export interface KeybindDef {
 	keys: string[];
 	/** Human-readable description of what this keybind does */
 	description: string;
+	/** Short label for footer status bar; falls back to description */
+	footerDescription?: string;
 	/** View context — must match appStore.viewMode() values */
 	context: string;
 	/** Category label for grouping in help view */
@@ -45,22 +47,22 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["Tab", "1", "2", "3", "4"], description: "Switch tab (Apps/Infra/Libs/Scripts)", context: "table", category: "Navigation" },
 
 	// ========== table — Actions ==========
-	{ keys: ["l"], description: "View container logs for selected app", context: "table", category: "Actions" },
-	{ keys: ["o"], description: "View operation logs for selected app", context: "table", category: "Actions" },
-	{ keys: ["L"], description: "Toggle status log maximize", context: "table", category: "Actions" },
-	{ keys: ["m"], description: "View MR for current branch", context: "table", category: "Actions" },
-	{ keys: ["M"], description: "View all open MRs", context: "table", category: "Actions" },
-	{ keys: ["i"], description: "Open issue scope picker", context: "table", category: "Actions" },
-	{ keys: ["I"], description: "Load all issues", context: "table", category: "Actions" },
-	{ keys: ["c"], description: "View providers config", context: "table", category: "Actions" },
-	{ keys: ["e"], description: "Open app directory in $EDITOR", context: "table", category: "Actions" },
-	{ keys: ["E"], description: "Open editor picker", context: "table", category: "Actions" },
-	{ keys: ["G"], description: "Open lazygit for selected app", context: "table", category: "Actions" },
-	{ keys: ["d"], description: "Open lazydocker for selected app", context: "table", category: "Actions" },
-	{ keys: ["w"], description: "Open worktree manager", context: "table", category: "Actions" },
-	{ keys: ["+"], description: "Add app or script", context: "table", category: "Actions" },
-	{ keys: ["-"], description: "Remove selected app or script", context: "table", category: "Actions" },
-	{ keys: ["Enter"], description: "View app detail or run script", context: "table", category: "Actions" },
+	{ keys: ["l"], description: "View container logs for selected app", footerDescription: "App logs", context: "table", category: "Actions" },
+	{ keys: ["o"], description: "View operation logs for selected app", footerDescription: "Op logs", context: "table", category: "Actions" },
+	{ keys: ["L"], description: "Toggle status log maximize", footerDescription: "Max logs", context: "table", category: "Actions" },
+	{ keys: ["m"], description: "View MR for current branch", footerDescription: "MR", context: "table", category: "Actions" },
+	{ keys: ["M"], description: "View all open MRs", footerDescription: "All MRs", context: "table", category: "Actions" },
+	{ keys: ["i"], description: "Open issue scope picker", footerDescription: "Issues", context: "table", category: "Actions" },
+	{ keys: ["I"], description: "Load all issues", footerDescription: "All issues", context: "table", category: "Actions" },
+	{ keys: ["c"], description: "View providers config", footerDescription: "Providers", context: "table", category: "Actions" },
+	{ keys: ["e"], description: "Open app directory in $EDITOR", footerDescription: "Edit app", context: "table", category: "Actions" },
+	{ keys: ["E"], description: "Open editor picker", footerDescription: "Editors", context: "table", category: "Actions" },
+	{ keys: ["G"], description: "Open lazygit for selected app", footerDescription: "Lazygit", context: "table", category: "Actions" },
+	{ keys: ["d"], description: "Open lazydocker for selected app", footerDescription: "Lazydocker", context: "table", category: "Actions" },
+	{ keys: ["w"], description: "Open worktree manager", footerDescription: "Worktrees", context: "table", category: "Actions" },
+	{ keys: ["+"], description: "Add app or script", footerDescription: "Add", context: "table", category: "Actions" },
+	{ keys: ["-"], description: "Remove selected app or script", footerDescription: "Remove", context: "table", category: "Actions" },
+	{ keys: ["Enter"], description: "View app detail or run script", footerDescription: "Open", context: "table", category: "Actions" },
 	{ keys: ["/"], description: "Search/filter table", context: "table", category: "Actions" },
 
 	// ========== table — Docker ==========

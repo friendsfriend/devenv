@@ -55,6 +55,12 @@ export { ModalTabs } from "./components/ModalTabs";
 export type { ModalTabsProps, ModalTabItem } from "./components/ModalTabs";
 export { ListViewModal } from "./components/ListViewModal";
 export type { ListViewModalProps } from "./components/ListViewModal";
+export { CenteredState } from "./components/CenteredState";
+export type { CenteredStateProps } from "./components/CenteredState";
+export { SearchHeader } from "./components/SearchHeader";
+export type { SearchHeaderProps } from "./components/SearchHeader";
+export { DetailSection } from "./components/DetailSection";
+export type { DetailSectionProps } from "./components/DetailSection";
 export { HelpText, formatHelpText } from "./components/HelpText";
 export { AgentSpaceView, getSelectableRows } from "./components/AgentSpaceView";
 export type { AgentSpaceViewProps } from "./components/AgentSpaceView";
@@ -112,6 +118,10 @@ export {
 	formatStatus,
 	getGitStatusStyle,
 	formatGitStatus,
+	formatShortDate,
+	getIssueStateColor,
+	getPipelineStatusColor,
+	truncateText,
 } from "./statusUtils";
 export type { StatusStyle } from "./statusUtils";
 

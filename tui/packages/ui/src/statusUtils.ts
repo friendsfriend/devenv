@@ -100,3 +100,52 @@ export function getGitStatusStyle(gitStatus: string): StatusStyle {
 export function formatGitStatus(gitStatus: string): string {
   return gitStatus || '...';
 }
+
+export function formatShortDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function getIssueStateColor(state: string): string {
+  switch (state.toLowerCase()) {
+    case 'open':
+    case 'opened':
+      return uiColors.success;
+    case 'merged':
+      return uiColors.primary;
+    case 'closed':
+      return uiColors.textMuted;
+    default:
+      return uiColors.textSecondary;
+  }
+}
+
+export function getPipelineStatusColor(status?: string): string {
+  if (!status) return uiColors.textMuted;
+  switch (status.toLowerCase()) {
+    case 'success':
+      return uiColors.success;
+    case 'failed':
+      return uiColors.error;
+    case 'running':
+      return uiColors.primary;
+    case 'pending':
+    case 'created':
+      return uiColors.warning;
+    case 'canceled':
+    case 'skipped':
+      return uiColors.textMuted;
+    case 'manual':
+      return uiColors.borderHighlight;
+    default:
+      return uiColors.textSecondary;
+  }
+}
+
+export function truncateText(text: string, maxLength: number): string {
+  return text.length > maxLength ? text.slice(0, maxLength - 3) + '...' : text;
+}
