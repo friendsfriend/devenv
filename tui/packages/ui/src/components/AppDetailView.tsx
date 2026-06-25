@@ -2,6 +2,7 @@ import { TextAttributes } from '@opentui/core';
 import { Show, For, createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { DetailSection } from './DetailSection';
 import type { App, MergeRequest, ContainerStats } from '@devenv/types';
 
 export type AppDetailKind = 'app' | 'library' | 'infra';
@@ -188,10 +189,9 @@ export function AppDetailView(props: AppDetailViewProps) {
 
         {/* MRs Panel — app and library only */}
         <Show when={hasMRs()}>
-          <box
-            border={true}
-            borderStyle="rounded"
-            borderColor={uiColors.textMuted}
+          <DetailSection
+            title="Open Merge Requests"
+            titleColor={uiColors.borderHighlight}
             style={{
               width: '100%',
               flexGrow: 1,
@@ -200,11 +200,6 @@ export function AppDetailView(props: AppDetailViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-                Open Merge Requests
-              </text>
-            </box>
             <scrollbox
               scrollbarOptions={SCROLLBAR_OPTIONS}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
@@ -232,7 +227,7 @@ export function AppDetailView(props: AppDetailViewProps) {
                 )}
               </For>
             </scrollbox>
-          </box>
+          </DetailSection>
         </Show>
       </box>
 

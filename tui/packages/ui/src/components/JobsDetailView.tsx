@@ -1,8 +1,11 @@
 import { TextAttributes } from '@opentui/core';
 import { createMemo, For, Show } from 'solid-js';
-import { colors, uiColors } from '../colors';
+import { uiColors } from '../colors';
 import type { Job } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
+import { CenteredState } from './CenteredState';
+import { SearchHeader } from './SearchHeader';
+import { getPipelineStatusColor } from '../statusUtils';
 
 interface JobsDetailViewProps {
   jobs: Job[];
@@ -33,8 +36,6 @@ interface JobsDetailViewProps {
  * This is due to OpenTUI's limitation: only ONE useKeyboard() hook can be active.
  */
 export function JobsDetailView(props: JobsDetailViewProps) {
-
-  const hasSearch = () => (props.searchQuery ?? '').length > 0;
 
   // Organize jobs by stage
   const organizedJobs = createMemo(() => {
@@ -85,7 +86,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
   });
 
   // Lines of fixed chrome outside the list area:
-  //   Layout header (3) + Layout footer (3)  = LAYOUT_CHROME_LINES (6)
+  //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
   //   Outer rounded border top + bottom      = 2
   //   Stage tabs bar                         = 3
   //   Table header row                       = 1
@@ -103,28 +104,6 @@ export function JobsDetailView(props: JobsDetailViewProps) {
       return `${minutes}m`;
     }
     return '-';
-  };
-
-  // Get status color
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'success':
-        return uiColors.success;
-      case 'failed':
-        return uiColors.error;
-      case 'running':
-        return uiColors.primary;
-      case 'pending':
-      case 'created':
-        return uiColors.warning;
-      case 'canceled':
-      case 'skipped':
-        return uiColors.textMuted;
-      case 'manual':
-        return uiColors.borderHighlight;
-      default:
-        return uiColors.textSecondary;
-    }
   };
 
   // Get stage border color based on job statuses
@@ -178,46 +157,16 @@ export function JobsDetailView(props: JobsDetailViewProps) {
         flexDirection: 'column',
       }}
     >
-      {/* Loading State */}
       <Show when={props.loading}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.primary }}>Loading pipeline jobs...</text>
-        </box>
+        <CenteredState message="Loading pipeline jobs..." color={uiColors.primary} />
       </Show>
 
-      {/* Error State */}
       <Show when={!props.loading && props.error}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.error }}>{props.error}</text>
-        </box>
+        <CenteredState message={props.error!} color={uiColors.error} />
       </Show>
 
-      {/* Empty State */}
       <Show when={!props.loading && !props.error && props.jobs.length === 0}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.textMuted }}>No jobs found for this pipeline</text>
-        </box>
+        <CenteredState message="No jobs found for this pipeline" />
       </Show>
 
       {/* Jobs Table */}
@@ -263,19 +212,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
         </box>
 
         {/* Table Header */}
-        <box
-          backgroundColor={uiColors.bgSurface1}
-          style={{
-            width: '100%',
-            height: 1,
-            flexDirection: 'row',
-            paddingLeft: 1,
-            paddingRight: 1,
-          }}
-        >
-          <Show
-            when={props.searchMode || hasSearch()}
-            fallback={
+        <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={currentStageJobs().length}>
               <>
                 <box style={{ width: '15%' }}>
                   <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Status</text>
@@ -290,20 +227,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
                   <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>ID</text>
                 </box>
               </>
-            }
-          >
-            <box flexDirection="row">
-              <text fg={colors.peach}>/</text>
-              <text fg={uiColors.textPrimary}>{props.searchQuery ?? ''}</text>
-              <Show when={props.searchMode}>
-                <text fg={uiColors.primary}>█</text>
-              </Show>
-              <Show when={!props.searchMode && hasSearch()}>
-                <text fg={uiColors.textMuted}> ({currentStageJobs().length} results)</text>
-              </Show>
-            </box>
-          </Show>
-        </box>
+        </SearchHeader>
 
         {/* Table Body — rendered via ScrollableList */}
         <ScrollableList<Job>
@@ -325,7 +249,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
               }}
             >
               <box style={{ width: '15%' }}>
-                <text fg={getStatusColor(job.status)} attributes={TextAttributes.BOLD}>
+                <text fg={getPipelineStatusColor(job.status)} attributes={TextAttributes.BOLD}>
                   {job.status.toUpperCase()}
                 </text>
               </box>

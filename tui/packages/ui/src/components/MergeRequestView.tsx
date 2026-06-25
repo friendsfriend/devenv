@@ -1,8 +1,11 @@
 import { TextAttributes } from '@opentui/core';
 import { Show } from 'solid-js';
-import { colors, uiColors } from '../colors';
+import { uiColors } from '../colors';
 import type { MergeRequest } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
+import { CenteredState } from './CenteredState';
+import { SearchHeader } from './SearchHeader';
+import { formatShortDate, getIssueStateColor, getPipelineStatusColor } from '../statusUtils';
 
 interface MergeRequestViewProps {
   mergeRequests: MergeRequest[];
@@ -31,56 +34,12 @@ interface MergeRequestViewProps {
  * Multiple hooks don't work - only the first registered hook receives events.
  */
 export function MergeRequestView(props: MergeRequestViewProps) {
-  const hasSearch = () => (props.searchQuery ?? '').length > 0;
-
   // Lines of fixed chrome outside the list area:
-  //   Layout header (3) + Layout footer (3)  = LAYOUT_CHROME_LINES (6)
+  //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
   //   Outer rounded border top + bottom      = 2
   //   Table header row                       = 1
   //                                   Total  = 9
   const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 1;
-
-  // Format date
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  // Get status color
-  const getStatusColor = (status?: string) => {
-    if (!status) return uiColors.textMuted;
-    switch (status.toLowerCase()) {
-      case 'success':
-        return uiColors.success;
-      case 'failed':
-        return uiColors.error;
-      case 'running':
-        return uiColors.primary;
-      case 'pending':
-        return uiColors.warning;
-      default:
-        return uiColors.textMuted;
-    }
-  };
-
-  // Get state color
-  const getStateColor = (state: string) => {
-    switch (state.toLowerCase()) {
-      case 'opened':
-        return uiColors.success;
-      case 'merged':
-        return uiColors.primary;
-      case 'closed':
-        return uiColors.textMuted;
-      default:
-        return uiColors.textSecondary;
-    }
-  };
 
   // Get merge status indicator
   const getMergeStatusText = (mr: MergeRequest) => {
@@ -103,64 +62,22 @@ export function MergeRequestView(props: MergeRequestViewProps) {
         flexDirection: 'column',
       }}
     >
-      {/* Loading State */}
       <Show when={props.loading}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.primary }}>Loading merge requests...</text>
-        </box>
+        <CenteredState message="Loading merge requests..." color={uiColors.primary} />
       </Show>
 
-      {/* Error State */}
       <Show when={!props.loading && props.error}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.error }}>{props.error}</text>
-        </box>
+        <CenteredState message={props.error!} color={uiColors.error} />
       </Show>
 
-      {/* Empty State */}
       <Show when={!props.loading && !props.error && props.mergeRequests.length === 0}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.textMuted }}>No merge requests found</text>
-        </box>
+        <CenteredState message="No merge requests found" />
       </Show>
 
       {/* MR Table */}
       <Show when={!props.loading && !props.error && props.mergeRequests.length > 0}>
         {/* Table Header */}
-        <box
-          backgroundColor={uiColors.bgSurface1}
-          style={{
-            width: '100%',
-            height: 1,
-            flexDirection: 'row',
-            paddingLeft: 1,
-            paddingRight: 1,
-          }}
-        >
-          <Show
-            when={props.searchMode || hasSearch()}
-            fallback={
+        <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery}>
               <>
                 <box style={{ width: 8 }}>
                   <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
@@ -203,17 +120,7 @@ export function MergeRequestView(props: MergeRequestViewProps) {
                   </text>
                 </box>
               </>
-            }
-          >
-            <box flexDirection="row">
-              <text fg={colors.peach}>/</text>
-              <text fg={uiColors.textPrimary}>{props.searchQuery ?? ''}</text>
-              <Show when={props.searchMode}>
-                <text fg={uiColors.primary}>█</text>
-              </Show>
-            </box>
-          </Show>
-        </box>
+        </SearchHeader>
 
         {/* Table Body — rendered via ScrollableList */}
         <ScrollableList<MergeRequest>
@@ -250,15 +157,15 @@ export function MergeRequestView(props: MergeRequestViewProps) {
                   <text style={{ fg: uiColors.textSecondary }}>{mr.author.name}</text>
                 </box>
                 <box style={{ width: '10%' }}>
-                  <text style={{ fg: getStateColor(mr.state) }}>{mr.state}</text>
+                  <text style={{ fg: getIssueStateColor(mr.state) }}>{mr.state}</text>
                 </box>
                 <box style={{ width: '13%' }}>
-                  <text style={{ fg: getStatusColor(mr.head_pipeline?.status) }}>
+                  <text style={{ fg: getPipelineStatusColor(mr.head_pipeline?.status) }}>
                     {mr.head_pipeline?.status || '-'}
                   </text>
                 </box>
                 <box style={{ width: '14%' }}>
-                  <text style={{ fg: uiColors.textMuted }}>{formatDate(mr.updated_at)}</text>
+                  <text style={{ fg: uiColors.textMuted }}>{formatShortDate(mr.updated_at)}</text>
                 </box>
               </box>
             );

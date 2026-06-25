@@ -1,8 +1,10 @@
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
-import { colors, uiColors } from '../colors';
+import { uiColors } from '../colors';
 import type { TestCase, TestSuite } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
+import { CenteredState } from './CenteredState';
+import { SearchHeader } from './SearchHeader';
 
 interface TestResultsDetailViewProps {
   testSuites?: TestSuite[];
@@ -21,8 +23,6 @@ interface TestResultsDetailViewProps {
  * Navigation is handled by parent component
  */
 export function TestResultsDetailView(props: TestResultsDetailViewProps) {
-
-  const hasSearch = () => (props.searchQuery ?? '').length > 0;
 
   // Sort all tests - failed/error first, then by class name, then by test name
   const sortedTests = createMemo(() => {
@@ -67,7 +67,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
   });
 
   // Lines of fixed chrome outside the list area:
-  //   Layout header (3) + Layout footer (3)    = LAYOUT_CHROME_LINES (6)
+  //   Layout header (2) + Layout footer (3)    = LAYOUT_CHROME_LINES (5)
   //   Own paddingTop (1) + paddingBottom (1)   = 2
   //   Own header row + marginBottom            = 2
   //   Inner rounded border top + bottom        = 2
@@ -118,25 +118,16 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
         </text>
       </box>
 
-      {/* Loading State */}
       <Show when={props.loading}>
-        <box style={{ width: '100%', height: 1 }}>
-          <text fg={uiColors.warning}>Loading test results...</text>
-        </box>
+        <CenteredState message="Loading test results..." color={uiColors.warning} height={1} />
       </Show>
 
-      {/* Error State */}
       <Show when={!props.loading && props.error}>
-        <box style={{ width: '100%', height: 1 }}>
-          <text fg={uiColors.error}>Error: {props.error}</text>
-        </box>
+        <CenteredState message={`Error: ${props.error}`} color={uiColors.error} height={1} />
       </Show>
 
-      {/* Empty State */}
       <Show when={!props.loading && !props.error && (!props.testSuites || props.testSuites.length === 0)}>
-        <box style={{ width: '100%', height: 1 }}>
-          <text fg={uiColors.textMuted}>No test results available</text>
-        </box>
+        <CenteredState message="No test results available" height={1} />
       </Show>
 
       {/* Test Results Table */}
@@ -153,19 +144,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
           }}
         >
           {/* Table Header */}
-          <box
-            backgroundColor={uiColors.bgSurface1}
-            style={{
-              width: '100%',
-              height: 1,
-              flexDirection: 'row',
-              paddingLeft: 1,
-              paddingRight: 1,
-            }}
-          >
-            <Show
-              when={props.searchMode || hasSearch()}
-              fallback={
+          <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={filteredTests().length}>
                 <>
                   <box style={{ width: '65%' }}>
                     <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
@@ -183,20 +162,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
                     </text>
                   </box>
                 </>
-              }
-            >
-              <box flexDirection="row">
-                <text fg={colors.peach}>/</text>
-                <text fg={uiColors.textPrimary}>{props.searchQuery ?? ''}</text>
-                <Show when={props.searchMode}>
-                  <text fg={uiColors.primary}>█</text>
-                </Show>
-                <Show when={!props.searchMode && hasSearch()}>
-                  <text fg={uiColors.textMuted}> ({filteredTests().length} results)</text>
-                </Show>
-              </box>
-            </Show>
-          </box>
+          </SearchHeader>
 
           {/* Table Body — rendered via ScrollableList */}
           <ScrollableList<TestCase & { suiteName: string }>

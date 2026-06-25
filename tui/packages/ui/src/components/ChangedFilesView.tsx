@@ -1,8 +1,10 @@
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
-import { colors, uiColors } from '../colors';
+import { uiColors } from '../colors';
 import type { MRChange } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
+import { CenteredState } from './CenteredState';
+import { SearchHeader } from './SearchHeader';
 
 interface ChangedFilesViewProps {
   changes: MRChange[];
@@ -24,8 +26,6 @@ interface ChangedFilesViewProps {
  * - Child is purely presentational
  */
 export function ChangedFilesView(props: ChangedFilesViewProps) {
-  const hasSearch = () => (props.searchQuery ?? '').length > 0;
-
   // Get change type and color
   const getChangeType = (change: MRChange) => {
     if (change.new_file) {
@@ -61,7 +61,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   });
 
   // Lines of fixed chrome outside the list area:
-  //   Layout header (3) + Layout footer (3)  = LAYOUT_CHROME_LINES (6)
+  //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
   //   Outer rounded border top + bottom      = 2
   //   Own header rows (title + stats)        = 2
   //   Table header row                       = 1
@@ -79,36 +79,12 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
         flexDirection: 'column',
       }}
     >
-      {/* Loading State */}
       <Show when={props.loading}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            Loading changed files...
-          </text>
-        </box>
+        <CenteredState message="Loading changed files..." color={uiColors.primary} bold />
       </Show>
 
-      {/* Error State */}
       <Show when={props.error}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text fg={uiColors.error} attributes={TextAttributes.BOLD}>
-            {props.error}
-          </text>
-        </box>
+        <CenteredState message={props.error!} color={uiColors.error} bold />
       </Show>
 
       {/* Content */}
@@ -134,19 +110,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
         </box>
 
         {/* Table Header */}
-        <box
-          backgroundColor={uiColors.bgSurface1}
-          style={{
-            width: '100%',
-            height: 1,
-            flexDirection: 'row',
-            paddingLeft: 1,
-            paddingRight: 1,
-          }}
-        >
-          <Show
-            when={props.searchMode || hasSearch()}
-            fallback={
+        <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.changes.length}>
               <>
                 <box style={{ width: '5%' }}>
                   <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}></text>
@@ -161,33 +125,11 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
                   <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Changes (+/-)</text>
                 </box>
               </>
-            }
-          >
-            <box flexDirection="row">
-              <text fg={colors.peach}>/</text>
-              <text fg={uiColors.textPrimary}>{props.searchQuery ?? ''}</text>
-              <Show when={props.searchMode}>
-                <text fg={uiColors.primary}>█</text>
-              </Show>
-              <Show when={!props.searchMode && hasSearch()}>
-                <text fg={uiColors.textMuted}> ({props.changes.length} results)</text>
-              </Show>
-            </box>
-          </Show>
-        </box>
+        </SearchHeader>
 
         {/* Empty State */}
         <Show when={props.changes.length === 0}>
-          <box
-            style={{
-              width: '100%',
-              height: '100%',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <text fg={uiColors.textMuted}>No changed files</text>
-          </box>
+          <CenteredState message="No changed files" />
         </Show>
 
         {/* Table Rows — rendered via ScrollableList for correct virtual windowing */}

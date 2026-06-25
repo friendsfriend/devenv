@@ -2,6 +2,7 @@ import { TextAttributes } from '@opentui/core';
 import { Show, For } from 'solid-js';
 import { uiColors } from '../colors';
 import type { Provider } from '@devenv/types';
+import { CenteredState } from './CenteredState';
 
 interface ProvidersViewProps {
   providers: Provider[];
@@ -32,29 +33,11 @@ export function ProvidersView(props: ProvidersViewProps) {
       }}
     >
       <Show when={props.loading}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.primary }}>Loading providers...</text>
-        </box>
+        <CenteredState message="Loading providers..." color={uiColors.primary} />
       </Show>
 
       <Show when={!props.loading && props.error}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            justifyContent: 'center',
-            alignItems: 'center',
-          }}
-        >
-          <text style={{ fg: uiColors.error }}>{props.error}</text>
-        </box>
+        <CenteredState message={props.error!} color={uiColors.error} />
       </Show>
 
       <Show when={!props.loading && !props.error}>

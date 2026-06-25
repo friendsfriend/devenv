@@ -316,15 +316,13 @@ export async function handleMiscModalKeys(
       event.name === 'Q';
 
     if (isEsc) {
-      if (agentStore.sshFilterActive()) {
-        // First Esc: exit filter mode and clear query
+      if (agentStore.sshFilterActive() || agentStore.sshSearchQuery()) {
         agentStore.setSshFilterActive(false);
         agentStore.setSshSearchQuery('');
         agentStore.setSelectedSshIndex(0);
         return true;
       }
       // Close the picker
-      agentStore.setSshSearchQuery('');
       agentStore.setSelectedSshIndex(0);
       appStore.setViewMode('table');
       return true;
@@ -435,15 +433,13 @@ export async function handleMiscModalKeys(
 
     {
       if (isEsc) {
-        if (agentStore.agentFilterActive()) {
-          // First Esc: exit filter mode and clear query
+        if (agentStore.agentFilterActive() || agentStore.agentSearchQuery()) {
           agentStore.setAgentFilterActive(false);
           agentStore.setAgentSearchQuery('');
           agentStore.setSelectedAgentItemIndex(0);
           return true;
         }
         // Close the agent view
-        agentStore.setAgentSearchQuery('');
         agentStore.setSelectedAgentItemIndex(0);
         appStore.setViewMode('table');
         return true;

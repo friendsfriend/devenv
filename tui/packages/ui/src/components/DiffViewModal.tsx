@@ -75,31 +75,8 @@ export function DiffViewModal(props: DiffViewModalProps) {
     height: renderer.height,
   });
 
-  // Debug: Log discussions prop
-  createEffect(() => {
-    console.error(`[DiffViewModal] Discussions prop updated: ${props.discussions?.length || 0} discussions`);
-    console.error(`[DiffViewModal] Current file: ${props.filePath}`);
-    console.error(`[DiffViewModal] Current HEAD SHA: ${props.currentHeadSHA}`);
-    if (props.discussions && props.discussions.length > 0) {
-      const diffComments = props.discussions.filter(d => d.position);
-      console.error(`[DiffViewModal] ${diffComments.length} diff comments (with position)`);
-      diffComments.forEach((d, i) => {
-        console.error(`[DiffViewModal]   ${i+1}. file=${d.position?.new_path || d.position?.old_path}, line=${d.position?.new_line || d.position?.old_line}`);
-      });
-    }
-  });
-
   // Create reactive memo for commentMode (in case props aren't reactive)
   const isCommentMode = createMemo(() => props.commentMode);
-
-  // Debug: Log when commentMode changes
-  createEffect(() => {
-    console.error(`[DiffViewModal] commentMode: ${props.commentMode}, commentText: "${props.commentText}", selectedLine: ${props.selectedLine}`);
-    console.error(`[DiffViewModal] isCommentMode memo: ${isCommentMode()}`);
-    if (props.commentMode) {
-      console.error('[DiffViewModal] COMMENT MODE IS TRUE - BOTTOM PANEL SHOULD RENDER');
-    }
-  });
 
   // Parse unified diff into individual lines
   const parsedLines = createMemo((): DiffLine[] => {
@@ -307,18 +284,8 @@ export function DiffViewModal(props: DiffViewModalProps) {
   // Helper: Get comments for a specific line
   const getCommentsForLine = (line: DiffLine): Discussion[] => {
     if (!props.discussions || props.discussions.length === 0) {
-      console.error('[DiffViewModal] No discussions available');
       return [];
     }
-    
-    console.error(`[DiffViewModal] Checking line ${line.lineNumber} (type=${line.type}, old=${line.oldLineNum}, new=${line.newLineNum}) against ${props.discussions.length} discussions`);
-    
-    // Check for discussions with position at either discussion level OR note level
-    const diffComments = props.discussions.filter(d => 
-      (d.position !== null && d.position !== undefined) || 
-      (d.notes && d.notes.length > 0 && d.notes[0].position !== null && d.notes[0].position !== undefined)
-    );
-    console.error(`[DiffViewModal] Found ${diffComments.length} diff comments (with position) out of ${props.discussions.length} total discussions`);
     
     const matches = props.discussions.filter(discussion => {
       // Position can be at discussion level or first note level (GitLab inconsistency)
@@ -328,39 +295,25 @@ export function DiffViewModal(props: DiffViewModalProps) {
         return false; // Skip non-diff comments
       }
       
-      console.error(`[DiffViewModal] Discussion ${discussion.id}: file=${position.new_path || position.old_path}, old_line=${position.old_line}, new_line=${position.new_line}`);
-      
       // Match file path
       const matchesFile = 
         position.new_path === props.filePath || 
         position.old_path === props.filePath;
       
-      console.error(`[DiffViewModal] File match for ${props.filePath}: ${matchesFile}`);
-      
       if (!matchesFile) return false;
       
       // Match line number based on line type
       if (line.type === 'added' && line.newLineNum) {
-        const matches = position.new_line === line.newLineNum;
-        console.error(`[DiffViewModal] Added line ${line.newLineNum} matches: ${matches}`);
-        return matches;
+        return position.new_line === line.newLineNum;
       } else if (line.type === 'removed' && line.oldLineNum) {
-        const matches = position.old_line === line.oldLineNum;
-        console.error(`[DiffViewModal] Removed line ${line.oldLineNum} matches: ${matches}`);
-        return matches;
+        return position.old_line === line.oldLineNum;
       } else if (line.type === 'context') {
         // Context lines can match either old or new line
-        const matches = position.new_line === line.newLineNum || position.old_line === line.oldLineNum;
-        console.error(`[DiffViewModal] Context line (old=${line.oldLineNum}, new=${line.newLineNum}) matches: ${matches}`);
-        return matches;
+        return position.new_line === line.newLineNum || position.old_line === line.oldLineNum;
       }
       
       return false;
     });
-    
-    if (matches.length > 0) {
-      console.error(`[DiffViewModal] Found ${matches.length} comments for line ${line.lineNumber}`);
-    }
     
     return matches;
   };

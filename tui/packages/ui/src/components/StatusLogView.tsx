@@ -2,6 +2,7 @@ import { For, Show } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import type { StatusLogEntry } from '@devenv/types';
 import { uiColors } from '../colors';
+import { CenteredState } from './CenteredState';
 
 export interface StatusLogViewProps {
   entries: StatusLogEntry[];
@@ -179,21 +180,12 @@ export function StatusLogView(props: StatusLogViewProps) {
       <Show
         when={visibleEntries().length > 0}
         fallback={
-          <box
-            style={{
-              width: '100%',
-              flexGrow: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <text 
-              fg={uiColors.textMuted}
-              attributes={TextAttributes.ITALIC}
-            >
-              No status updates yet... [L to maximize]
-            </text>
-          </box>
+          <CenteredState
+            message="No status updates yet... [L to maximize]"
+            italic
+            height="auto"
+            style={{ flexGrow: 1 }}
+          />
         }
       >
         <box

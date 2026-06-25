@@ -1,62 +1,88 @@
-import { type JSX } from '@opentui/solid';
 import { TextAttributes } from '@opentui/core';
-import { uiColors } from '../colors';
+import { useTerminalDimensions } from '@opentui/solid';
+import { colors, uiColors } from '../colors';
+
+export type HeaderDetail = Record<string, string | number | undefined | null>;
 
 export interface HeaderProps {
   title: string;
-  subtitle?: string;
+  context?: string;
+  detail?: string;
+  details?: HeaderDetail[];
+  right?: string;
+  severity?: 'normal' | 'success' | 'warning' | 'error';
 }
 
-/**
- * Application header with title, centered subtitle, and branding
- */
+const LOGO_WIDTH = 6;
+const TITLE_WIDTH = 0;
+const RIGHT_WIDTH = 24;
+
+const colorForSeverity = (severity: HeaderProps['severity']) => {
+  if (severity === 'success') return uiColors.success;
+  if (severity === 'warning') return uiColors.warning;
+  if (severity === 'error') return uiColors.error;
+  return uiColors.primary;
+};
+
+const formatDetail = (detail: HeaderDetail | undefined, fallback?: string) => {
+  if (!detail) return fallback ?? '';
+  const [key, value] = Object.entries(detail)[0] ?? [];
+  if (!key || value === undefined || value === null || value === '') return fallback ?? '';
+  return `${key}: ${value}`;
+};
+
+const truncate = (value: string | undefined, max: number) => {
+  const text = value ?? '';
+  if (max <= 0) return '';
+  return text.length > max ? `${text.slice(0, Math.max(0, max - 1))}…` : text;
+};
+
+const rightAlign = (value: string | undefined, width: number) =>
+  truncate(value, width).padStart(width);
+
 export function Header(props: HeaderProps) {
+  const dimensions = useTerminalDimensions();
+  const accent = () => colorForSeverity(props.severity);
+  const primaryDetail = () => formatDetail(props.details?.[0], props.context);
+  const secondaryDetail = () => formatDetail(props.details?.[1], props.detail);
+  const rightWidth = () => Math.min(RIGHT_WIDTH, Math.max(0, dimensions().width - LOGO_WIDTH - TITLE_WIDTH - 8));
+  const middleWidth = () => Math.max(0, dimensions().width - LOGO_WIDTH - TITLE_WIDTH - rightWidth() - 4);
+
   return (
     <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.borderHighlight}
+      backgroundColor={uiColors.bgMantle}
       style={{
         width: '100%',
-        height: 3,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingLeft: 2,
-        paddingRight: 2,
+        height: 2,
+        flexDirection: 'column',
+        paddingLeft: 1,
+        paddingRight: 1,
       }}
     >
-      {/* Left: App branding - natural width */}
-      <text
-        fg={uiColors.primary}
-        attributes={TextAttributes.BOLD}
-      >
-        DevEnv CLI
-      </text>
-
-      {/* Left spacer - takes equal space */}
-      <box style={{ flexGrow: 1 }} />
-
-      {/* Center: Current screen title */}
-      {props.subtitle && (
-        <text
-          fg={uiColors.primary}
-          attributes={TextAttributes.BOLD}
-        >
-          {props.subtitle}
-        </text>
-      )}
-
-      {/* Right spacer - takes equal space */}
-      <box style={{ flexGrow: 1 }} />
-
-      {/* Right: Environment/mode - natural width */}
-      <text
-        style={{
-          fg: uiColors.textSecondary,
-        }}
-      >
-        {props.title}
-      </text>
+      <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
+        <box style={{ width: LOGO_WIDTH }}>
+          <text fg={colors.mauve} attributes={TextAttributes.BOLD}>DΞV</text>
+        </box>
+        <box style={{ width: middleWidth() }}>
+          <text fg={uiColors.textSecondary}>{truncate(primaryDetail(), middleWidth())}</text>
+        </box>
+        <box style={{ flexGrow: 1 }} />
+        <box style={{ width: rightWidth() }}>
+          <text fg={accent()}>{rightAlign(props.right, rightWidth())}</text>
+        </box>
+      </box>
+      <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
+        <box style={{ width: LOGO_WIDTH }}>
+          <text fg={colors.peach} attributes={TextAttributes.BOLD}>ΞNV</text>
+        </box>
+        <box style={{ width: middleWidth() }}>
+          <text fg={uiColors.textMuted}>{truncate(secondaryDetail(), middleWidth())}</text>
+        </box>
+        <box style={{ flexGrow: 1 }} />
+        <box style={{ width: rightWidth() }}>
+          <text fg={uiColors.textMuted}>{rightAlign('? help', rightWidth())}</text>
+        </box>
+      </box>
     </box>
   );
 }

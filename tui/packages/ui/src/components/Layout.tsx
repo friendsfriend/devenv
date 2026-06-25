@@ -22,7 +22,7 @@ export function Layout(props: LayoutProps) {
       <box
         style={{
           width: '100%',
-          height: 3,
+          height: 2,
           flexDirection: 'row',
         }}
       >

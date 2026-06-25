@@ -224,7 +224,21 @@ export async function handleIssueListKeys(
 			}
 			return true;
 		}
-		if (event.name === "escape" || event.name === "q") {
+		if (event.name === "escape") {
+			if (issueStore.issueSearchQuery() || issueStore.issueSearchTerm()) {
+				issueStore.setIssueSearchMode(false);
+				issueStore.setIssueSearchQuery("");
+				issueStore.setIssueSearchTerm("");
+				issueStore.setSelectedIssueIndex(0);
+				void issueActions.loadAllIssues(issueStore.issueScope(), 1);
+				return true;
+			}
+			appStore.setViewMode("table");
+			issueStore.setIssues([]);
+			issueStore.setIssueError("");
+			return true;
+		}
+		if (event.name === "q") {
 			appStore.setViewMode("table");
 			issueStore.setIssues([]);
 			issueStore.setIssueError("");

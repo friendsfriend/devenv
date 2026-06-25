@@ -112,7 +112,7 @@ export function ContentRouter(props: ContentRouterProps) {
 					when={appStore.viewMode() === "table"}
 					fallback={
 						<Show
-							when={false}
+							when={appStore.viewMode() === "help"}
 							fallback={
 								<Show
 									when={appStore.viewMode() === "issues"}

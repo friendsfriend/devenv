@@ -1,4 +1,5 @@
 import { TextAttributes, RGBA } from "@opentui/core";
+import { useTerminalDimensions } from "@opentui/solid";
 import { uiColors } from "@devenv/ui";
 import type { AppStore, ProviderStore } from "../stores";
 
@@ -6,6 +7,8 @@ export function FirstStepsView(props: {
 	appStore: AppStore;
 	providerStore: ProviderStore;
 }) {
+	const dimensions = useTerminalDimensions();
+	const dialogWidth = () => Math.min(86, Math.max(40, dimensions().width - 4));
 	const hasProvider = () => props.providerStore.providers().length > 0;
 	const hasWorkspaceResource = () => props.appStore.apps().length > 0 || props.appStore.infraServices().length > 0 || props.appStore.scriptVisibleRows().length > 0;
 	const selected = (idx: number) => props.appStore.firstStepsSelectedIndex() === idx;
@@ -28,7 +31,7 @@ export function FirstStepsView(props: {
 				borderColor={uiColors.primary}
 				backgroundColor={uiColors.bgMantle}
 				style={{
-					width: 86,
+					width: dialogWidth(),
 					flexDirection: "column",
 					paddingLeft: 4,
 					paddingRight: 4,

@@ -13,7 +13,7 @@ import { calculateVisibleItems } from '../utils/virtualScroll';
  *
  * @see packages/ui/src/components/Layout.tsx
  */
-export const LAYOUT_CHROME_LINES = 6;
+export const LAYOUT_CHROME_LINES = 5;
 
 // ─── Internal constants ───────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ export interface ScrollableListProps<T> {
    * | Tab bar (if present)            |   3   |
    * | Table / column header row       |   1   |
    *
-   * Use the exported `LAYOUT_CHROME_LINES` (= 6) constant for the Layout pair.
+   * Use the exported `LAYOUT_CHROME_LINES` (= 5) constant for the Layout pair.
    *
    * The component automatically reserves additional lines for its **own**
    * internal chrome (filter bar, scroll indicator) — do NOT include those here.
@@ -70,7 +70,7 @@ export interface ScrollableListProps<T> {
    *
    * @example
    * // Full-screen view inside Layout with rounded border, 2-row title, and 1-row table header:
-   * reservedLines={LAYOUT_CHROME_LINES + 2 + 2 + 1}  // = 11
+   * reservedLines={LAYOUT_CHROME_LINES + 2 + 2 + 1}  // = 10
    */
   reservedLines?: number;
 
@@ -187,7 +187,7 @@ export interface ScrollableListProps<T> {
  *   items={files}
  *   selectedIndex={selectedIndex()}
  *   renderItem={(file, isSelected) => <FileRow file={file} selected={isSelected()} />}
- *   reservedLines={LAYOUT_CHROME_LINES + 2 + 2 + 1}  // layout(6) + border(2) + title(2) + tableHeader(1)
+ *   reservedLines={LAYOUT_CHROME_LINES + 2 + 2 + 1}  // layout(5) + border(2) + title(2) + tableHeader(1)
  *   scrollIndicatorLabel="files"
  * />
  * ```
