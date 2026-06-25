@@ -25,10 +25,12 @@ import {
 	CommentModal,
 	LabelPickerModal,
 	AssigneePickerModal,
+	HelpView,
 	uiColors,
 } from "@devenv/ui";
 import type { ModalOverlaysProps } from "./types";
 import { FirstStepsView } from "./first-steps-view";
+import { getGuide, guides as allGuides } from "../guides";
 
 export function ModalOverlays(props: ModalOverlaysProps) {
 	const {
@@ -40,7 +42,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 		uiStore,
 		agentStore,
 	} = props.stores;
-	const { dockerActions, mrActions, logActions, issueActions } = props.actions;
+	const { dockerActions, mrActions, logActions, issueActions, helpActions } = props.actions;
 
 	return (
 		<>
@@ -51,8 +53,61 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				<MarkdownModal
 					title={uiStore.markdownModalTitle()}
 					content={uiStore.markdownModalContent()}
+					hideTitle={uiStore.markdownModalTitle() === ""}
 					onScrollBoxReady={(scrollBox) => { uiStore.markdownModalScrollBoxRef = scrollBox; }}
 				/>
+			</Show>
+
+			<Show when={appStore.viewMode() === "help"}>
+				{(() => {
+					const helpData = helpActions.getHelpContent();
+					const sections = () =>
+						appStore.helpAllContexts()
+							? helpActions.getHelpContent(true).sections
+							: helpData.sections;
+					const title = () =>
+						appStore.helpAllContexts()
+							? "All Contexts"
+							: helpData.title;
+					const guideEntries = () =>
+						allGuides.map((g) => ({
+							key: g.key,
+							title: g.title,
+							description: g.description,
+						}));
+					return (
+						<HelpView
+							sections={sections()}
+							viewTitle={title()}
+							onClose={helpActions.closeHelp}
+							searchActive={appStore.helpSearchActive()}
+							searchQuery={appStore.helpSearchQuery()}
+							onSearchChange={(q) => appStore.setHelpSearchQuery(q)}
+							allContexts={appStore.helpAllContexts()}
+							onScopeToggle={(v) => appStore.setHelpAllContexts(v)}
+							activeTab={appStore.helpActiveTab()}
+							onTabChange={(tab) => {
+								appStore.setHelpActiveTab(tab);
+								appStore.setHelpSearchActive(false);
+								appStore.setHelpSearchQuery("");
+								appStore.setHelpGuideIndex(tab === "guides" ? 0 : -1);
+							}}
+							selectedGuideIndex={appStore.helpGuideIndex()}
+							guides={guideEntries()}
+							onKeybindScrollBoxReady={(scrollBox) => { uiStore.helpKeybindScrollBoxRef = scrollBox; }}
+							onGuideSelect={async (key) => {
+								const guide = getGuide(key);
+								if (guide) {
+									const content = await guide.import();
+									helpActions.closeHelp();
+									uiStore.setMarkdownModalTitle("");
+									uiStore.setMarkdownModalContent(content);
+									uiStore.setShowMarkdownModal(true);
+								}
+							}}
+						/>
+					);
+				})()}
 			</Show>
 
 			<Show when={appStore.viewMode() === "issueScopePicker"}>

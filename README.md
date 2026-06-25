@@ -69,7 +69,18 @@ bun run build:single
 
 ### Guides
 
-- [Configuration Repository Guide](tui/packages/cli/src/tui/guides/config-repository.md) - step-by-step guide on setting up a shared config repository
+Task-focused guides are available from the TUI Help view (`?`) and linked below:
+
+- [Configuration Repository](tui/packages/cli/src/tui/guides/config-repository.md) — Share DevEnv config across machines or with a team
+- [Adding an App](tui/packages/cli/src/tui/guides/adding-apps.md) — App definitions, Dockerfiles, Compose config, and infra linking
+- [Adding a Script](tui/packages/cli/src/tui/guides/adding-scripts.md) — Script discovery, --devenv-metadata convention, parameter types
+- [Adding Infrastructure](tui/packages/cli/src/tui/guides/adding-infrastructure.md) — Infra definitions, Compose placement, sharing between apps
+- [Adding Libraries](tui/packages/cli/src/tui/guides/adding-libraries.md) — Library definitions, appType: LIB, build and test Dockerfiles
+- [Using Worktrees](tui/packages/cli/src/tui/guides/using-worktrees.md) — Single checkout vs worktrees, worktrunk, IDE setup
+- [Using AI Features](tui/packages/cli/src/tui/guides/using-ai-features.md) — AI agent view, sessions, pi agent integration
+- [Using Git Integrations](tui/packages/cli/src/tui/guides/using-git-integrations.md) — Providers, MR/PR browsing, diff, discussions, approvals, AI review, pipelines, test results
+- [Using the Log Viewer](tui/packages/cli/src/tui/guides/using-log-viewer.md) — Container logs, operation logs, search, visual mode, keyboard shortcuts
+- [Finding Logs](tui/packages/cli/src/tui/guides/finding-logs.md) — Log directory structure, status log format, per-app logs, server log
 
 ### Run
 

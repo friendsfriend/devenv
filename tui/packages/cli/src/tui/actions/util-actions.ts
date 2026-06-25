@@ -597,8 +597,8 @@ export function createUtilActions(
   const handleCopySelection = async () => {
     const selectedText = renderer.getSelection()?.getSelectedText();
     if (!selectedText) {
-      uiStore.setCopyStatus('Nothing selected');
-      setTimeout(() => uiStore.setCopyStatus(null), 1500);
+      // Don't show status — caller should check selection first and let terminal
+      // handle native copy when there's no TUI selection.
       return;
     }
     const { copyToClipboard } = await import('@devenv/core');

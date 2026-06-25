@@ -64,7 +64,7 @@ EOF
 ```bash
 git add .
 git commit -m "Add DevEnv configuration"
-git remote add origin <your-config-repo-url>
+git remote add origin YOUR_CONFIG_REPO_URL
 git push -u origin main
 ```
 
@@ -74,7 +74,7 @@ Move any existing local config aside, then clone the repository:
 
 ```bash
 mv ~/.config/devenv ~/.config/devenv.backup.$(date +%Y%m%d%H%M%S)
-git clone <your-config-repo-url> ~/.config/devenv
+git clone YOUR_CONFIG_REPO_URL ~/.config/devenv
 ```
 
 Create a local `.env` file if needed:

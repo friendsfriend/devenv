@@ -1,5 +1,6 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 import { EDITOR_OPTIONS } from '@devenv/ui';
+import { guides as allGuides } from '../guides';
 
 import { isDownKey, isUpKey } from './nav-keys';
 /**
@@ -552,6 +553,132 @@ export async function handleMiscModalKeys(
     }
     // Note: providers view doesn't return true for unhandled keys — falls through
     // to the generic ESC handler below
+  }
+
+  // ── Help view ────────────────────────────────────────────────────
+  if (appStore.viewMode() === 'help') {
+    const isEsc =
+      event.name === 'escape' ||
+      event.name === 'Escape' ||
+      event.name === 'esc' ||
+      event.sequence === '\x1b' ||
+      event.raw === '\x1b';
+
+    // Esc: clear search first, then close help
+    if (isEsc) {
+      if (appStore.helpSearchActive() || appStore.helpSearchQuery()) {
+        appStore.setHelpSearchQuery('');
+        appStore.setHelpSearchActive(false);
+      } else {
+        uiStore.helpKeybindScrollBoxRef = undefined;
+        actions.helpActions.closeHelp();
+      }
+      return true;
+    }
+
+    // q or ?: close help (same key toggles it from the table)
+    if (event.name === 'q' || event.name === 'Q' || event.name === '?' || event.sequence === '?') {
+      uiStore.helpKeybindScrollBoxRef = undefined;
+      actions.helpActions.closeHelp();
+      return true;
+    }
+
+    // Tab: switch between keybindings and guides
+    if (event.name === 'tab' || event.name === 'Tab' || event.sequence === '\t') {
+      const nextTab = appStore.helpActiveTab() === 'keybinds' ? 'guides' : 'keybinds';
+      appStore.setHelpSearchActive(false);
+      appStore.setHelpSearchQuery('');
+      appStore.setHelpActiveTab(nextTab);
+      appStore.setHelpGuideIndex(nextTab === 'guides' ? 0 : -1);
+      return true;
+    }
+
+    // /: search keybindings
+    if (event.sequence === '/' || event.name === '/') {
+      appStore.setHelpActiveTab('keybinds');
+      if (!appStore.helpSearchActive()) {
+        appStore.setHelpSearchQuery('');
+        appStore.setHelpSearchActive(true);
+      }
+      return true;
+    }
+
+    // s: toggle scope (all contexts vs current)
+    if (event.name === 's' || event.sequence === 's') {
+      appStore.setHelpActiveTab('keybinds');
+      appStore.setHelpAllContexts(!appStore.helpAllContexts());
+      appStore.setHelpGuideIndex(-1);
+      return true;
+    }
+
+    // j/k/up/down, d/u, g/G: scroll keybind list when keybindings tab is active and not searching
+    if (!appStore.helpSearchActive() && appStore.helpActiveTab() === 'keybinds') {
+      const sb = uiStore.helpKeybindScrollBoxRef;
+      if (isDownKey(event)) {
+        sb?.scrollBy(1);
+        return true;
+      }
+      if (isUpKey(event)) {
+        sb?.scrollBy(-1);
+        return true;
+      }
+      if (event.name === 'd' || event.sequence === 'd') {
+        const half = Math.max(1, Math.floor((sb?.viewport.height ?? 10) / 2));
+        sb?.scrollBy(half);
+        return true;
+      }
+      if (event.name === 'u' || event.sequence === 'u') {
+        const half = Math.max(1, Math.floor((sb?.viewport.height ?? 10) / 2));
+        sb?.scrollBy(-half);
+        return true;
+      }
+      if ((event.name === 'g' || event.sequence === 'g') && !event.shift) {
+        sb?.scrollTo(0);
+        return true;
+      }
+      if (event.name === 'G' || event.sequence === 'G' || (event.name === 'g' && event.shift)) {
+        sb?.scrollTo(sb?.scrollHeight ?? 0);
+        return true;
+      }
+    }
+
+    // j/k or down/up: navigate guide list when guides tab is active and not searching
+    if (!appStore.helpSearchActive() && appStore.helpActiveTab() === 'guides') {
+      const isDown =
+        event.name === 'j' || event.name === 'down' || event.name === 'Down';
+      const isUp =
+        event.name === 'k' || event.name === 'up' || event.name === 'Up';
+      if (isDown || isUp) {
+        const maxIdx = allGuides.length - 1;
+        if (maxIdx >= 0) {
+          const current = appStore.helpGuideIndex() < 0 ? 0 : appStore.helpGuideIndex();
+          appStore.setHelpGuideIndex(isDown
+            ? Math.min(current + 1, maxIdx)
+            : Math.max(current - 1, 0)
+          );
+        }
+        return true;
+      }
+      // Enter: open selected guide
+      if (event.name === 'return' || event.name === 'enter' || event.name === 'Return' || event.name === 'Enter') {
+        const idx = appStore.helpGuideIndex();
+        if (idx >= 0 && idx < allGuides.length) {
+          const guide = allGuides[idx];
+          if (guide) {
+            uiStore.helpKeybindScrollBoxRef = undefined;
+            actions.helpActions.closeHelp();
+            void guide.import().then((content) => {
+              uiStore.setMarkdownModalTitle("");
+              uiStore.setMarkdownModalContent(content);
+              uiStore.setShowMarkdownModal(true);
+            });
+          }
+          return true;
+        }
+      }
+    }
+
+    return true;
   }
 
   // For non-table views not handled above, handle ESC to go back
