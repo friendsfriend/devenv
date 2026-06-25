@@ -75,7 +75,7 @@ export function DiscussionsView(props: DiscussionsViewProps) {
   // Calculate visible items for virtual scrolling (keeps selected item in view)
   const visibleItems = createMemo(() => {
     // Lines of fixed chrome outside the list area:
-    //   Layout header (3) + Layout footer (3)  = LAYOUT_CHROME_LINES (6)
+    //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
     //   Outer rounded border top + bottom      = 2
     //   Own header rows (title + stats)        = 2
     //                                   Total  = 10

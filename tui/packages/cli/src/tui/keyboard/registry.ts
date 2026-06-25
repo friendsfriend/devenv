@@ -44,7 +44,7 @@ export const KEYBINDS: KeybindDef[] = [
 	// ========== table — Navigation ==========
 	{ keys: ["↑", "k"], description: "Move selection up", context: "table", category: "Navigation" },
 	{ keys: ["↓", "j"], description: "Move selection down", context: "table", category: "Navigation" },
-	{ keys: ["Tab", "1", "2", "3", "4"], description: "Switch tab (Apps/Infra/Libs/Scripts)", context: "table", category: "Navigation" },
+	{ keys: ["Tab", "1", "2", "3"], description: "Switch tab (Apps/Infra/Scripts)", context: "table", category: "Navigation" },
 
 	// ========== table — Actions ==========
 	{ keys: ["l"], description: "View container logs for selected app", footerDescription: "App logs", context: "table", category: "Actions" },

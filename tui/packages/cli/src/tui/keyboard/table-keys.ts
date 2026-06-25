@@ -305,8 +305,7 @@ export async function handleTableKeys(
 			// Cycle through tabs
 			appStore.setActiveTab((tab) => {
 				if (tab === "applications") return "infrastructure";
-				if (tab === "infrastructure") return "libraries";
-				if (tab === "libraries") return "scripts";
+				if (tab === "infrastructure") return "scripts";
 				return "applications";
 			});
 			appStore.setSelectedIndex(0); // Reset selection when switching tabs
@@ -327,12 +326,6 @@ export async function handleTableKeys(
 			appStore.setTableSearchMode(false);
 			break;
 		case "3":
-			appStore.setActiveTab("libraries");
-			appStore.setSelectedIndex(0);
-			appStore.setTableSearchQuery("");
-			appStore.setTableSearchMode(false);
-			break;
-		case "4":
 			appStore.setActiveTab("scripts");
 			appStore.setSelectedIndex(0);
 			appStore.setTableSearchQuery("");

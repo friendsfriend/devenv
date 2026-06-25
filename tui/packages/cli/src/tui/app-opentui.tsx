@@ -9,7 +9,7 @@ import { createCliRenderer } from "@opentui/core";
 import { setExitRenderer } from "./exit";
 import { onMount, createEffect, on, onCleanup } from "solid-js";
 import "opentui-spinner/solid";
-import { createClient, getLogger } from "@devenv/core";
+import { createClient } from "@devenv/core";
 import type { App } from "@devenv/types";
 import {
 	Header,
@@ -74,7 +74,7 @@ import {
 	ModalOverlays,
 	getTabName,
 	getTabBorderColor,
-	getHeaderSubtitle,
+	getHeaderInfo,
 } from "./views";
 import type { ViewStores, ViewActions } from "./views";
 
@@ -83,8 +83,6 @@ export interface TUIAppProps {
 }
 
 export function TUIApp(props: TUIAppProps) {
-	console.error("[TUIApp] Server URL:", props.serverUrl);
-
 	const dimensions = useTerminalDimensions();
 	const renderer = useRenderer();
 
@@ -157,7 +155,9 @@ export function TUIApp(props: TUIAppProps) {
 		agentActions.launchPi(sessionPath, renderer);
 
 	const getSelectedApp = (): App | undefined =>
-		appStore.filteredApps()[appStore.selectedIndex()];
+		(appStore.viewMode() === "table"
+			? appStore.tableFilteredApps()
+			: appStore.filteredApps())[appStore.selectedIndex()];
 
 	// --- Effects ---
 	setupLogEffects(logStore, client);
@@ -191,18 +191,6 @@ export function TUIApp(props: TUIAppProps) {
 		),
 	);
 
-	createEffect(() => {
-		const value = mrStore.showCommentModal();
-		console.error(`[APP-EFFECT] showCommentModal = ${value}`);
-		try {
-			getLogger().write("DEBUG", `[APP] showCommentModal changed to: ${value}`);
-		} catch (e) {
-			console.error("[APP-EFFECT] Logger not ready:", e);
-		}
-	});
-
-	console.error("[TUIApp] Client baseUrl:", (client as any).baseUrl);
-
 	// --- Initialization ---
 	onMount(() => {
 		void initializeApp({
@@ -216,7 +204,7 @@ export function TUIApp(props: TUIAppProps) {
 	});
 
 	// --- Columns ---
-	const columns = createColumns(spinnerFrames, appStore.spinnerFrame);
+	const columns = createColumns();
 	const scriptColumns = createScriptColumns();
 
 	// --- Keyboard dispatcher ---
@@ -302,7 +290,7 @@ export function TUIApp(props: TUIAppProps) {
 		helpActions,
 	};
 
-	const headerSubtitleDeps = {
+	const headerDeps = {
 		appStore,
 		issueStore,
 		mrStore,
@@ -320,8 +308,7 @@ export function TUIApp(props: TUIAppProps) {
 			<Layout
 				header={
 					<Header
-						title="Development Environment"
-						subtitle={getHeaderSubtitle(headerSubtitleDeps)}
+						{...getHeaderInfo(headerDeps)}
 					/>
 				}
 				content={

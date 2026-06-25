@@ -80,34 +80,10 @@ export function StatusBar(props: StatusBarProps) {
       backgroundColor={uiColors.bgMantle}
       style={{
         width: '100%',
-        height: 4,
+        height: 3,
         flexDirection: 'column',
       }}
     >
-      {/* Main status line */}
-      <box
-        style={{
-          width: '100%',
-          height: 1,
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingLeft: 1,
-          paddingRight: 1,
-        }}
-      >
-        <text style={{ fg: uiColors.textPrimary }}>
-          {props.left || ''}
-        </text>
-        <box style={{ flexGrow: 1 }} />
-        <text style={{ fg: uiColors.textMuted }}>
-          {props.center || ''}
-        </text>
-        <box style={{ flexGrow: 1 }} />
-        <text style={{ fg: uiColors.textPrimary }}>
-          {props.right || ''}
-        </text>
-      </box>
-
       {/* Keybinds line 1 */}
       {props.keybinds && keybindLines().line1.length > 0 && (
         <box

@@ -91,7 +91,7 @@ export function Table<T = string>(props: TableProps<T>) {
 	 * Lines of fixed chrome outside the table body.
 	 * Auto-computed from props so callers never need to pass a magic number:
 	 *
-	 *   Layout chrome                    = LAYOUT_CHROME_LINES (6)
+	 *   Layout chrome                    = LAYOUT_CHROME_LINES (7)
 	 *   Outer rounded border (if shown)  = 2
 	 *   Tab bar (if tabs present)        = 3
 	 *   Table column-header row          = 1
@@ -150,6 +150,7 @@ export function Table<T = string>(props: TableProps<T>) {
 									border={true}
 									borderStyle="rounded"
 									borderColor={borderColor()}
+									onMouseUp={() => props.onTabChange?.(tab.id)}
 									style={{
 										paddingLeft: 2,
 										paddingRight: 2,
@@ -221,6 +222,7 @@ export function Table<T = string>(props: TableProps<T>) {
 					renderItem={(app, isSelected, index) => (
 						<box
 							backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+							onMouseUp={() => props.onSelect?.(index)}
 							style={{
 								width: "100%",
 								height: 1,

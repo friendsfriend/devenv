@@ -217,11 +217,6 @@ export function createAppStore() {
 				label: "Infrastructure",
 				count: infraServices().length,
 			},
-			{
-				id: "libraries",
-				label: "Libraries",
-				count: allApps.filter((app) => app.appType === "LIB").length,
-			},
 			{ id: "scripts", label: "Scripts", count: scriptVisibleRows().length },
 		];
 	});

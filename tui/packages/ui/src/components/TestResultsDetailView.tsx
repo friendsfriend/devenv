@@ -67,7 +67,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
   });
 
   // Lines of fixed chrome outside the list area:
-  //   Layout header (3) + Layout footer (3)    = LAYOUT_CHROME_LINES (6)
+  //   Layout header (2) + Layout footer (3)    = LAYOUT_CHROME_LINES (5)
   //   Own paddingTop (1) + paddingBottom (1)   = 2
   //   Own header row + marginBottom            = 2
   //   Inner rounded border top + bottom        = 2

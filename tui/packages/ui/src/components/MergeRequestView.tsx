@@ -35,7 +35,7 @@ interface MergeRequestViewProps {
  */
 export function MergeRequestView(props: MergeRequestViewProps) {
   // Lines of fixed chrome outside the list area:
-  //   Layout header (3) + Layout footer (3)  = LAYOUT_CHROME_LINES (6)
+  //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
   //   Outer rounded border top + bottom      = 2
   //   Table header row                       = 1
   //                                   Total  = 9

@@ -103,7 +103,7 @@ function getKeybindsForContext(context: string): Array<{ key: string; action: st
 function filterFooterKeybinds<T extends { key: string; action: string }>(binds: T[]): T[] {
 	return binds.filter((bind) => {
 		const text = `${bind.key} ${bind.action}`.toLowerCase();
-		return !/(copy|paste|console|quit|\besc\b|escape)/.test(text);
+		return !/(copy|paste|console|quit|help|\besc\b|escape)/.test(text);
 	});
 }
 
