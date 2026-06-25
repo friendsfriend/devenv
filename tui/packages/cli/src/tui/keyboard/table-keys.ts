@@ -72,8 +72,7 @@ export async function handleTableKeys(
 			event.raw === "\x1b";
 
 		if (isEsc) {
-			if (uiStore.branchFilterActive()) {
-				// First Esc: clear the filter and exit filter mode
+			if (uiStore.branchFilterActive() || uiStore.branchFilterQuery()) {
 				uiStore.setBranchFilterActive(false);
 				uiStore.setBranchFilterQuery("");
 				uiStore.setBranchSelectorIndex(0);

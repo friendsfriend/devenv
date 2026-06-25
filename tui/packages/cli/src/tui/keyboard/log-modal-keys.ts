@@ -141,6 +141,9 @@ export async function handleLogModalKeys(
   ) {
     if (logStore.logAiVisible() && logStore.logAiFollowupText()) {
       logStore.setLogAiFollowupText('');
+    } else if (logStore.logSearchQuery()) {
+      logStore.setLogSearchQuery('');
+      logStore.setLogSearchMatchIndex(-1);
     } else if (logStore.logAiVisible() && (logStore.logAiSummary() !== null || logStore.logAiLoading() || logStore.logAiError() !== null || logStore.logAiPromptMode())) {
       logActions.dismissAiOverlay();
     } else if (logStore.logVisualModeActive()) {

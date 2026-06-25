@@ -1,8 +1,10 @@
 import { For, Show, type JSX } from "solid-js";
 import { TextAttributes } from "@opentui/core";
 import type { App } from "@devenv/types";
-import { colors, uiColors } from "../colors";
+import { uiColors } from "../colors";
+import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
+import { SearchHeader } from "./SearchHeader";
 
 export interface TableColumn {
 	key: string;
@@ -181,66 +183,30 @@ export function Table<T = string>(props: TableProps<T>) {
 			</Show>
 
 			{/* Table Header row — doubles as search input bar while searchMode is active */}
-			<box
-				backgroundColor={uiColors.bgSurface1}
-				style={{
-					width: "100%",
-					height: 1,
-					flexDirection: "row",
-					paddingLeft: 1,
-					paddingRight: 1,
-				}}
-			>
-				<Show
-					when={props.searchMode || hasSearch()}
-					fallback={
-						<For each={props.columns}>
-							{(column) => (
-								<box style={getColumnWidth(column.width)}>
-									<text
-										fg={uiColors.textPrimary}
-										attributes={TextAttributes.BOLD}
-									>
-										{column.header}
-									</text>
-								</box>
-							)}
-						</For>
-					}
-				>
-					{/* Search input / active-query display */}
-					<box flexDirection="row" alignItems="center" style={{ flexGrow: 1 }}>
-						<text fg={colors.peach}>/</text>
-						<text fg={uiColors.textPrimary}>{props.searchQuery ?? ""}</text>
-						<Show when={props.searchMode}>
-							<text fg={uiColors.primary}>█</text>
-						</Show>
-						<Show when={!props.searchMode && hasSearch()}>
-							<text fg={uiColors.textMuted}>
-								{" "}
-								({props.apps.length} results)
+			<SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.apps.length}>
+				<For each={props.columns}>
+					{(column) => (
+						<box style={getColumnWidth(column.width)}>
+							<text
+								fg={uiColors.textPrimary}
+								attributes={TextAttributes.BOLD}
+							>
+								{column.header}
 							</text>
-						</Show>
-					</box>
-				</Show>
-			</box>
+						</box>
+					)}
+				</For>
+			</SearchHeader>
 
 			{/* Table Body — virtual scroll keeps selected row always visible */}
 			<Show
 				when={props.apps.length > 0}
 				fallback={
-					<box
-						style={{
-							width: "100%",
-							flexGrow: 1,
-							justifyContent: "center",
-							alignItems: "center",
-						}}
-					>
-						<text fg={uiColors.textMuted}>
-							{hasSearch() ? "No results" : "No applications in this tab"}
-						</text>
-					</box>
+					<CenteredState
+						message={hasSearch() ? "No results" : "No applications in this tab"}
+						height="auto"
+						style={{ flexGrow: 1 }}
+					/>
 				}
 			>
 				<ScrollableList<App>
