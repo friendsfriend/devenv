@@ -86,6 +86,7 @@ export function createIssueActions(
 		issue: NonNullable<ReturnType<typeof issueStore.selectedIssue>>,
 	) => {
 		issueStore.setSelectedIssue(issue);
+		issueStore.issueDetailScrollBoxRef = undefined;
 		issueStore.setIssueDetailLoading(true);
 		issueStore.setIssueDetailError("");
 		issueStore.setIssueCommentsLoading(true);
@@ -186,6 +187,7 @@ export function createIssueActions(
 	};
 
 	const backToIssueList = () => {
+		issueStore.issueDetailScrollBoxRef = undefined;
 		issueStore.setSelectedIssue(null);
 		issueStore.setIssueSearchMode(false);
 		issueStore.setIssueSearchQuery("");

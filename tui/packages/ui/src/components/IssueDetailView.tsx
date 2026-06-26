@@ -1,7 +1,11 @@
 import { TextAttributes } from "@opentui/core";
+import type { ScrollBoxRenderable } from "@opentui/core";
 import { For, Show } from "solid-js";
 import type { Issue, IssueComment, MergeRequest } from "@devenv/types";
 import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+import { ContentFrame } from "./ContentStack";
+import { getMarkdownSyntaxStyle } from "../markdownSyntax";
+import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
 
 type RefItem =
 	| { type: "mr"; data: MergeRequest }
@@ -21,6 +25,7 @@ interface IssueDetailViewProps {
 	references?: RefItem[];
 	spinnerFrames?: string[];
 	spinnerFrame?: () => number;
+	onDetailScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
 }
 
 /**
@@ -42,19 +47,19 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 	const issue = () => props.issue;
 
 	return (
-		<box
-			style={{
-				width: "100%",
-				height: "100%",
-				flexDirection: "column",
-				gap: 0,
-			}}
-		>
+		<ContentFrame>
+			<box
+				style={{
+					width: "100%",
+					flexGrow: 1,
+					minHeight: 0,
+					flexDirection: "column",
+					gap: 0,
+				}}
+			>
 			{/* METADATA PANEL */}
 			<box
-				border={true}
-				borderStyle="rounded"
-				borderColor={uiColors.textMuted}
+				backgroundColor={uiColors.bgMantle}
 				style={{
 					width: "100%",
 					flexGrow: 1,
@@ -71,6 +76,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				</box>
 
 				<scrollbox
+					ref={(r) => props.onDetailScrollBoxReady?.(r)}
 					scrollbarOptions={SCROLLBAR_OPTIONS}
 					style={{
 						width: "100%",
@@ -191,7 +197,15 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 							</text>
 						</box>
 						<box style={{ paddingLeft: 3, paddingRight: 1 }}>
-							<text fg={uiColors.textSecondary}>{issue().description}</text>
+							<code
+								filetype="markdown"
+								content={containsHtml(issue().description!)
+									? gitlabHtmlToMarkdown(issue().description!)
+									: issue().description!}
+								syntaxStyle={getMarkdownSyntaxStyle()}
+								drawUnstyledText={true}
+								fg={uiColors.textSecondary}
+						/>
 						</box>
 					</Show>
 
@@ -212,11 +226,11 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				</scrollbox>
 			</box>
 
+			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
+
 			{/* REFERENCES — combined issues + MRs */}
 			<box
-				border={true}
-				borderStyle="rounded"
-				borderColor={uiColors.textMuted}
+				backgroundColor={uiColors.bgMantle}
 				style={{
 					width: "100%",
 					flexGrow: 0,
@@ -263,7 +277,6 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 						style={{
 							width: "100%",
 							maxHeight: 6,
-							flexDirection: "column",
 						}}
 					>
 						<For each={props.references!.slice(0, 3)}>
@@ -315,11 +328,11 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				</Show>
 			</box>
 
+			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
+
 			{/* COMMENTS PANEL */}
 			<box
-				border={true}
-				borderStyle="rounded"
-				borderColor={uiColors.textMuted}
+				backgroundColor={uiColors.bgMantle}
 				style={{
 					width: "100%",
 					flexGrow: 0,
@@ -370,7 +383,6 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 						style={{
 							width: "100%",
 							maxHeight: 3,
-							flexDirection: "column",
 						}}
 					>
 						<For each={props.comments.slice(-3)}>
@@ -402,5 +414,6 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				</Show>
 			</box>
 		</box>
+		</ContentFrame>
 	);
 }

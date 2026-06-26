@@ -6,6 +6,7 @@ import { getMarkdownSyntaxStyle } from '../markdownSyntax';
 import { gitlabHtmlToMarkdown, containsHtml } from '../utils/gitlabHtml';
 import { calculateVisibleItems } from '../utils/virtualScroll';
 import { LAYOUT_CHROME_LINES } from './ScrollableList';
+import { ContentPanel } from './ContentStack';
 import type { Discussion, MRChange } from '@devenv/types';
 
 interface DiscussionsViewProps {
@@ -310,16 +311,7 @@ export function DiscussionsView(props: DiscussionsViewProps) {
   const rightColumnWidth = () => dimensions().width - leftColumnWidth();
 
   return (
-    <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.textMuted}
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'column',
-      }}
-    >
+    <ContentPanel>
       {/* Loading State */}
       <Show when={props.loading}>
         <box
@@ -894,6 +886,6 @@ export function DiscussionsView(props: DiscussionsViewProps) {
           </box>
         </Show>
       </Show>
-    </box>
+</ContentPanel>
   );
 }

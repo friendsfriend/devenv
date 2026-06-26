@@ -169,8 +169,8 @@ export async function handleTableKeys(
 				void gitActions.performCheckout();
 				return true;
 			}
-			// l — open lazygit log for the selected branch
-			if (event.sequence === "l") {
+			// Shift+L — open lazygit log for the selected branch
+			if (event.sequence === "L" || event.name === "L" || (event.name === "l" && event.shift)) {
 				const selectedBranch =
 					uiStore.filteredBranches()[uiStore.branchSelectorIndex()];
 				if (selectedBranch)
@@ -305,7 +305,8 @@ export async function handleTableKeys(
 			// Cycle through tabs
 			appStore.setActiveTab((tab) => {
 				if (tab === "applications") return "infrastructure";
-				if (tab === "infrastructure") return "scripts";
+				if (tab === "infrastructure") return "libraries";
+				if (tab === "libraries") return "scripts";
 				return "applications";
 			});
 			appStore.setSelectedIndex(0); // Reset selection when switching tabs
@@ -326,6 +327,12 @@ export async function handleTableKeys(
 			appStore.setTableSearchMode(false);
 			break;
 		case "3":
+			appStore.setActiveTab("libraries");
+			appStore.setSelectedIndex(0);
+			appStore.setTableSearchQuery("");
+			appStore.setTableSearchMode(false);
+			break;
+		case "4":
 			appStore.setActiveTab("scripts");
 			appStore.setSelectedIndex(0);
 			appStore.setTableSearchQuery("");

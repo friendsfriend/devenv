@@ -168,9 +168,7 @@ export function StatusLogView(props: StatusLogViewProps) {
 
   return (
     <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.textMuted}
+      backgroundColor={uiColors.bgMantle}
       style={{
         width: '100%',
         height: displayHeight(),

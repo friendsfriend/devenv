@@ -1,6 +1,7 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
 import { isDownKey, isUpKey } from './nav-keys';
+import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 /**
  * Handles keyboard events for the MR list view:
  * - Search mode (type query, clear)
@@ -131,8 +132,8 @@ export async function handleMrListKeys(
     return true;
   }
 
-  // ] or l to go to next page (vim: l = right = next)
-  if (event.sequence === ']' || event.name === 'l') {
+  // ] or Shift+J to go to next page
+  if (isNextRelatedKey(event)) {
     const current = mrStore.currentPage();
     const total = mrStore.totalPages();
     // Only navigate if totalPages is unknown (>0) or we're not at the last page
@@ -142,8 +143,8 @@ export async function handleMrListKeys(
     return true;
   }
 
-  // [ or h to go to previous page (vim: h = left = previous)
-  if (event.sequence === '[' || event.name === 'h') {
+  // [ or Shift+K to go to previous page
+  if (isPreviousRelatedKey(event)) {
     if (mrStore.currentPage() > 1) {
       mrActions.prevPage();
     }

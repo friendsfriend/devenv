@@ -95,15 +95,14 @@ export function calculateVisibleItems<T>(
     return { visibleItems, startIndex: startIdx, endIndex: endIdx };
   }
 
-  // Uniform-height path
+  // Uniform-height path.
+  // Keep the rendered window stable while the selection moves inside it.
+  // Re-centering around the selected row on every keypress causes every row in
+  // MR/issue lists to churn during key repeat, making cursor movement laggy.
   const maxVisibleItems = Math.max(1, Math.floor(visibleHeight / estimatedItemHeight));
-  const halfPage = Math.floor(maxVisibleItems / 2);
-  let startIdx = Math.max(0, clampedSelected - halfPage);
-  let endIdx = Math.min(totalItems, startIdx + maxVisibleItems);
-
-  if (endIdx === totalItems) {
-    startIdx = Math.max(0, endIdx - maxVisibleItems);
-  }
+  const pageStart = Math.floor(clampedSelected / maxVisibleItems) * maxVisibleItems;
+  const startIdx = Math.max(0, Math.min(pageStart, Math.max(0, totalItems - maxVisibleItems)));
+  const endIdx = Math.min(totalItems, startIdx + maxVisibleItems);
 
   const visibleItems = allItems.slice(startIdx, endIdx).map((item, idx) => ({
     item,

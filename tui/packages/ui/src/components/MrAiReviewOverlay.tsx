@@ -2,9 +2,10 @@ import { Show } from 'solid-js';
 import 'opentui-spinner/solid';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { useRenderer } from '@opentui/solid';
-import { colors, uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { colors, uiColors } from '../colors';
 import { createFrames, createColors } from '../spinner';
 import { getMarkdownSyntaxStyle } from '../markdownSyntax';
+import { ScrollableContent } from './ScrollableContent';
 
 export interface MrAiReviewOverlayProps {
   loading: boolean;
@@ -83,10 +84,11 @@ export function MrAiReviewOverlay(props: MrAiReviewOverlayProps) {
 
       {/* Streaming / completed review */}
       <Show when={props.error === null && props.summary !== null}>
-        <scrollbox
-          ref={(r: ScrollBoxRenderable) => props.onScrollBoxReady?.(r)}
-          scrollbarOptions={SCROLLBAR_OPTIONS}
-          style={{ flexGrow: 1, flexShrink: 1, minHeight: 0, marginTop: 1 }}
+        <ScrollableContent
+          axes={['x', 'y']}
+          keyboardAxes={['x']}
+          onScrollBoxReady={props.onScrollBoxReady}
+          style={{ marginTop: 1 }}
         >
           <code
             filetype="markdown"
@@ -95,9 +97,9 @@ export function MrAiReviewOverlay(props: MrAiReviewOverlayProps) {
             drawUnstyledText={true}
             streaming={props.loading || props.streaming}
             fg={uiColors.textSecondary}
-            width={overlayWidth() - 4}
+            width={Math.max(80, overlayWidth() - 4)}
           />
-        </scrollbox>
+        </ScrollableContent>
 
         <Show when={props.loading || props.streaming}>
           <box flexDirection="row" marginTop={1} height={1} alignItems="center" gap={1}>

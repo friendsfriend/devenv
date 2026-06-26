@@ -6,8 +6,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -169,97 +167,10 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 			searchQueryParts = scopeQuery
 		}
 	}
-	if searchQueryParts != "" {
-		return ic.searchIssues(ghInfo, searchQueryParts, page, perPage, state)
-	}
-
-	// No scope filter and no search — use the standard list endpoint
-	params := url.Values{}
-	params.Set("state", state)
-	params.Set("per_page", fmt.Sprintf("%d", perPage))
-	params.Set("page", fmt.Sprintf("%d", page))
-
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues?%s",
-		ghInfo.Owner, ghInfo.Repo, params.Encode())
-
-	log.Printf("[DEBUG] GitHub GetIssues (no-filter) URL: %s", apiURL)
-
-	resp, err := ic.c.doRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
-	}
-
-	// Parse pagination from Link header.
-	// GitHub Issues uses cursor-based pagination — there's a "next" link but no "last" link.
-	// When we find "last" we know totalPages. Otherwise we don't know the total —
-	// the UI will show "Pg 1/?" and the user discovers the last page by navigating.
-	currentPage := page
-	totalPages := -1
-	hasNext := false
-	if linkHeader := resp.Header.Get("Link"); linkHeader != "" {
-		for _, link := range strings.Split(linkHeader, ",") {
-			link = strings.TrimSpace(link)
-			parts := strings.Split(link, ";")
-			if len(parts) < 2 {
-				continue
-			}
-			relPart := strings.TrimSpace(parts[1])
-			urlPart := strings.TrimSpace(parts[0])
-			if strings.Contains(relPart, `rel="last"`) {
-				pageMatch := regexp.MustCompile(`page=(\d+)`).FindStringSubmatch(urlPart)
-				if len(pageMatch) >= 2 {
-					if p, err := strconv.Atoi(pageMatch[1]); err == nil {
-						totalPages = p
-					}
-				}
-			}
-			if strings.Contains(relPart, `rel="next"`) {
-				hasNext = true
-			}
-		}
-		if hasNext && totalPages <= 0 {
-			// Cursor-based: "next" exists without "last" — total is unknowable
-			totalPages = -1
-		} else if !hasNext && totalPages <= 0 {
-			// No "next" and no "last" → this page IS the last
-			totalPages = currentPage
-		}
-		log.Printf("[DEBUG] GitHub issues Link header: %q → hasNext=%v page=%d totalPages=%d", linkHeader, hasNext, currentPage, totalPages)
-	} else {
-		// No Link header at all → single page
-		totalPages = currentPage
-	}
-
-	var ghIssues []ghIssue
-	if err := json.Unmarshal(body, &ghIssues); err != nil {
-		return nil, fmt.Errorf("failed to parse issues: %w", err)
-	}
-
-	results := make([]issues.Issue, 0, len(ghIssues))
-	for _, iss := range ghIssues {
-		// Skip pull requests (GitHub returns PRs in the issues endpoint)
-		if iss.PullRequest != nil {
-			continue
-		}
-		results = append(results, convertGHIssue(iss))
-	}
-
-	return &issues.IssueListResult{
-		Issues:      results,
-		TotalCount:  -1,
-		TotalPages:  totalPages,
-		CurrentPage: currentPage,
-		PerPage:     perPage,
-	}, nil
+	// Always use the search API so GitHub paginates over real issues only.
+	// The standard /issues endpoint includes pull requests, and filtering PRs
+	// after pagination makes pages contain a variable number of issues.
+	return ic.searchIssues(ghInfo, searchQueryParts, page, perPage, state)
 }
 
 // searchIssues searches issues via GitHub's /search/issues endpoint.

@@ -58,9 +58,6 @@ export function GenericModal(props: GenericModalProps) {
     >
       {/* Dialog box */}
       <box
-        border
-        borderStyle="rounded"
-        borderColor={uiColors.borderHighlight}
         backgroundColor={uiColors.bgMantle}
         width={dialogWidth()}
         height={dialogHeight()}

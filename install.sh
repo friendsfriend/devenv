@@ -10,11 +10,18 @@ OS="$(uname -s | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
 
 case "$ARCH" in
-x86_64) ARCH="amd64" ;;
-aarch64) ARCH="arm64" ;;
-arm64) ARCH="arm64" ;;
+x86_64 | amd64) ARCH="x64" ;;
+aarch64 | arm64) ARCH="arm64" ;;
 *)
 	echo "Unsupported architecture: $ARCH"
+	exit 1
+	;;
+esac
+
+case "$OS" in
+darwin | linux) ;;
+*)
+	echo "Unsupported OS: $OS"
 	exit 1
 	;;
 esac
@@ -22,6 +29,15 @@ esac
 PLATFORM="${OS}-${ARCH}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BINARY_PATH="${SCRIPT_DIR}/dist/tui/devenv-${PLATFORM}/bin/${BINARY_NAME}"
+
+# A single Linux build may produce both glibc and musl variants. Prefer the
+# native glibc binary, but fall back to musl if it is the only one present.
+if [ ! -f "$BINARY_PATH" ] && [ "$OS" = "linux" ]; then
+	MUSL_BINARY_PATH="${SCRIPT_DIR}/dist/tui/devenv-${PLATFORM}-musl/bin/${BINARY_NAME}"
+	if [ -f "$MUSL_BINARY_PATH" ]; then
+		BINARY_PATH="$MUSL_BINARY_PATH"
+	fi
+fi
 
 if [ ! -f "$BINARY_PATH" ]; then
 	echo "Binary not found for platform '${PLATFORM}': ${BINARY_PATH}"

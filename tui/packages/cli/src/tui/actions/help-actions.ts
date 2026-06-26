@@ -11,7 +11,8 @@ const COMMON_NAVIGATION_ITEMS: HelpSection["items"] = [
 	{ key: "u/d", description: "Page or half-page up/down where supported" },
 	{ key: "g/G", description: "Go to top/bottom where supported" },
 	{ key: "/", description: "Search/filter current list where supported" },
-	{ key: "h/l, ←/→", description: "Move left/right, switch page, file, or stage where supported" },
+	{ key: "h/l, ←/→", description: "Scroll horizontally where supported" },
+	{ key: "[/], Shift+K/J", description: "Previous/next page or file where supported" },
 ];
 
 // ponytail: context titles map, extend when new view modes are added

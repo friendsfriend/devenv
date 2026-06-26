@@ -44,7 +44,7 @@ export const KEYBINDS: KeybindDef[] = [
 	// ========== table — Navigation ==========
 	{ keys: ["↑", "k"], description: "Move selection up", context: "table", category: "Navigation" },
 	{ keys: ["↓", "j"], description: "Move selection down", context: "table", category: "Navigation" },
-	{ keys: ["Tab", "1", "2", "3"], description: "Switch tab (Apps/Infra/Scripts)", context: "table", category: "Navigation" },
+	{ keys: ["Tab", "1", "2", "3", "4"], description: "Switch tab (Apps/Infra/Libs/Scripts)", context: "table", category: "Navigation" },
 
 	// ========== table — Actions ==========
 	{ keys: ["l"], description: "View container logs for selected app", footerDescription: "App logs", context: "table", category: "Actions" },
@@ -98,8 +98,8 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["G"], description: "Go to last MR", context: "mergeRequests", category: "Navigation" },
 	{ keys: ["Enter"], description: "View selected MR detail", context: "mergeRequests", category: "Actions" },
 	{ keys: ["/"], description: "Search merge requests", context: "mergeRequests", category: "Actions" },
-	{ keys: ["[", "h"], description: "Previous page", context: "mergeRequests", category: "Actions" },
-	{ keys: ["]", "l"], description: "Next page", context: "mergeRequests", category: "Actions" },
+	{ keys: ["[", "Shift+K"], description: "Previous page", context: "mergeRequests", category: "Actions" },
+	{ keys: ["]", "Shift+J"], description: "Next page", context: "mergeRequests", category: "Actions" },
 	{ keys: ["Esc"], description: "Back to table", context: "mergeRequests", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "mergeRequests", category: "General" },
 	{ keys: ["q"], description: "Quit application", context: "mergeRequests", category: "General" },
@@ -119,9 +119,7 @@ export const KEYBINDS: KeybindDef[] = [
 
 	// ========== jobs ==========
 	{ keys: ["↑/↓", "j/k"], description: "Navigate jobs in current stage", context: "jobs", category: "Navigation" },
-	{ keys: ["←/→", "h/l"], description: "Switch between pipeline stages", context: "jobs", category: "Navigation" },
 	{ keys: ["Tab"], description: "Cycle through stages", context: "jobs", category: "Navigation" },
-	{ keys: ["1-9"], description: "Jump to stage by number", context: "jobs", category: "Navigation" },
 	{ keys: ["v"], description: "View logs for selected job", context: "jobs", category: "Actions" },
 	{ keys: ["r"], description: "Retry failed/canceled job", context: "jobs", category: "Actions" },
 	{ keys: ["c"], description: "Cancel running/pending job", context: "jobs", category: "Actions" },
@@ -184,8 +182,8 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["G"], description: "Go to bottom", context: "issues", category: "Navigation" },
 	{ keys: ["/"], description: "Search issues", context: "issues", category: "Actions" },
 	{ keys: ["Enter"], description: "View issue detail", context: "issues", category: "Actions" },
-	{ keys: ["[", "h"], description: "Previous page", context: "issues", category: "Actions" },
-	{ keys: ["]", "l"], description: "Next page", context: "issues", category: "Actions" },
+	{ keys: ["[", "Shift+K"], description: "Previous page", context: "issues", category: "Actions" },
+	{ keys: ["]", "Shift+J"], description: "Next page", context: "issues", category: "Actions" },
 	{ keys: ["Esc"], description: "Back to table", context: "issues", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "issues", category: "General" },
 	{ keys: ["q"], description: "Quit application", context: "issues", category: "General" },
@@ -194,7 +192,7 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["r"], description: "Add comment (reply)", context: "issueDetail", category: "Actions" },
 	{ keys: ["c"], description: "Close issue (with reason picker)", context: "issueDetail", category: "Actions" },
 	{ keys: ["Shift+C"], description: "Reopen issue", context: "issueDetail", category: "Actions" },
-	{ keys: ["l"], description: "Open label picker", context: "issueDetail", category: "Actions" },
+	{ keys: ["Shift+L"], description: "Open label picker", context: "issueDetail", category: "Actions" },
 	{ keys: ["a"], description: "Open assignee picker", context: "issueDetail", category: "Actions" },
 	{ keys: ["Shift+R"], description: "View references", context: "issueDetail", category: "Actions" },
 	{ keys: ["Shift+M"], description: "View linked MRs", context: "issueDetail", category: "Actions" },
@@ -217,7 +215,7 @@ export const KEYBINDS: KeybindDef[] = [
 
 	// ========== Log Modal (logStore.showLogModal) ==========
 	{ keys: ["j/k"], description: "Up/down (scroll)", context: "logModal", category: "Navigation" },
-	{ keys: ["h/l"], description: "Scroll left/right", context: "logModal", category: "Navigation" },
+	{ keys: ["h/l", "←/→"], description: "Scroll left/right", context: "logModal", category: "Navigation" },
 	{ keys: ["u/d"], description: "Page up/down", context: "logModal", category: "Navigation" },
 	{ keys: ["g/G"], description: "Go to top/bottom", context: "logModal", category: "Navigation" },
 	{ keys: ["/"], description: "Search logs", context: "logModal", category: "Actions" },
@@ -240,7 +238,7 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["Enter"], description: "Checkout branch / confirm filter", context: "branchSelector", category: "Actions" },
 	{ keys: ["/"], description: "Filter branches", context: "branchSelector", category: "Actions" },
 	{ keys: ["s"], description: "Switch/checkout selected branch", context: "branchSelector", category: "Actions" },
-	{ keys: ["l"], description: "Open lazygit branch log", context: "branchSelector", category: "Actions" },
+	{ keys: ["Shift+L"], description: "Open lazygit branch log", context: "branchSelector", category: "Actions" },
 	{ keys: ["f"], description: "Git fetch", context: "branchSelector", category: "Actions" },
 	{ keys: ["p"], description: "Git pull", context: "branchSelector", category: "Actions" },
 	{ keys: ["P"], description: "Git push", context: "branchSelector", category: "Actions" },
@@ -255,7 +253,8 @@ export const KEYBINDS: KeybindDef[] = [
 
 	// ========== Diff Modal (mrStore.showDiffModal) ==========
 	{ keys: ["j/k"], description: "Navigate diff lines", context: "diffModal", category: "Navigation" },
-	{ keys: ["h/l"], description: "Previous/next file", context: "diffModal", category: "Navigation" },
+	{ keys: ["h/l", "←/→"], description: "Scroll left/right", context: "diffModal", category: "Navigation" },
+	{ keys: ["[/]", "Shift+K/J"], description: "Previous/next file", context: "diffModal", category: "Navigation" },
 	{ keys: ["v"], description: "Toggle visual selection mode", context: "diffModal", category: "Actions" },
 	{ keys: ["c"], description: "Create comment on selected line(s)", context: "diffModal", category: "Actions" },
 	{ keys: ["r"], description: "Reply to comment at current line", context: "diffModal", category: "Actions" },

@@ -1,4 +1,5 @@
 import { isDownKey, isUpKey } from './nav-keys';
+import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -251,11 +252,11 @@ export async function handleIssueListKeys(
 			return true;
 		}
 		// Pagination
-		if (event.name === "]" || event.sequence === "]" || event.name === "l") {
+		if (isNextRelatedKey(event)) {
 			void issueActions.nextPage();
 			return true;
 		}
-		if (event.name === "[" || event.sequence === "[" || event.name === "h") {
+		if (isPreviousRelatedKey(event)) {
 			void issueActions.prevPage();
 			return true;
 		}

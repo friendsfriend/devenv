@@ -161,11 +161,32 @@ export async function handleIssueDetailKeys(
 		return true;
 	}
 
-	// j/k scrolling within the detail view
+	// Vertical scrolling within the detail/description panel
+	const detailScrollBox = issueStore.issueDetailScrollBoxRef;
 	if (isDownKey(event)) {
+		detailScrollBox?.scrollBy(1);
 		return true;
 	}
 	if (isUpKey(event)) {
+		detailScrollBox?.scrollBy(-1);
+		return true;
+	}
+	if (event.name === "d" || event.sequence === "d") {
+		const half = Math.max(1, Math.floor((detailScrollBox?.viewport.height ?? 10) / 2));
+		detailScrollBox?.scrollBy(half);
+		return true;
+	}
+	if (event.name === "u" || event.sequence === "u") {
+		const half = Math.max(1, Math.floor((detailScrollBox?.viewport.height ?? 10) / 2));
+		detailScrollBox?.scrollBy(-half);
+		return true;
+	}
+	if ((event.name === "g" || event.sequence === "g") && !event.shift) {
+		detailScrollBox?.scrollTo(0);
+		return true;
+	}
+	if (event.name === "G" || event.sequence === "G" || (event.name === "g" && event.shift)) {
+		detailScrollBox?.scrollTo(detailScrollBox?.scrollHeight ?? 0);
 		return true;
 	}
 
@@ -189,8 +210,8 @@ export async function handleIssueDetailKeys(
 		return true;
 	}
 
-	// l - Open label picker
-	if (event.name === "l" && !event.ctrl) {
+	// Shift+L - Open label picker
+	if ((event.name === "L" || event.sequence === "L" || (event.name === "l" && event.shift)) && !event.ctrl) {
 		issueActions.openLabelPicker();
 		return true;
 	}

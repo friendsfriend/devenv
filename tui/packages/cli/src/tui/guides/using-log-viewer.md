@@ -13,7 +13,7 @@ DevEnv provides a built-in log viewer for container logs and operation logs.
 | Key | Action |
 |---|---|
 | `j`/`k` | Scroll up/down |
-| `h`/`l` | Scroll left/right |
+| `h`/`l` or `←`/`→` | Scroll left/right |
 | `u`/`d` | Half page up/down |
 | `g`/`G` | Go to top/bottom |
 
@@ -61,7 +61,7 @@ Results appear in an overlay. Use `Ctrl+j`/`Ctrl+k` to scroll. Type follow-up qu
 
 All log viewer keybinds:
 
-- Navigation: `j`/`k`, `h`/`l`, `u`/`d`, `g`/`G`
+- Navigation: `j`/`k`, `h`/`l` or `←`/`→`, `u`/`d`, `g`/`G`
 - Search: `/`, `n`/`p`, `Enter`, `Esc`
 - Visual mode: `v`, `c`
 - AI: `Shift+A`

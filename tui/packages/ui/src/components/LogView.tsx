@@ -137,8 +137,7 @@ export function LogView(props: LogViewProps) {
           width: '100%',
           height: '100%',
           flexDirection: 'column',
-          borderStyle: 'rounded',
-          borderColor: uiColors.textMuted,
+          backgroundColor: uiColors.bgMantle,
           padding: 1,
         }}
       >

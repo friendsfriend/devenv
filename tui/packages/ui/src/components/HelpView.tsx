@@ -40,6 +40,8 @@ export interface HelpViewProps {
   onTabChange?: (tab: HelpTab) => void;
   /** Called when keybind scrollbox is mounted */
   onKeybindScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
+  /** Called when guide list scrollbox is mounted */
+  onGuideScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
   /** Search is active and input should be shown */
   searchActive?: boolean;
   /** Current search query */
@@ -156,6 +158,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
       >
         <box style={{ width: '100%', height: '100%', flexDirection: 'column', minHeight: 0 }}>
           <scrollbox
+            ref={(r: ScrollBoxRenderable) => props.onGuideScrollBoxReady?.(r)}
             scrollbarOptions={SCROLLBAR_OPTIONS}
             style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
           >
@@ -163,7 +166,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
               {(guide, idx) => {
                 const selected = () => props.selectedGuideIndex === idx();
                 return (
-                  <box style={{ flexDirection: 'column', marginBottom: 1 }}>
+                  <box style={{ width: '98%', flexDirection: 'column', marginBottom: 1, flexShrink: 0 }}>
                     <text
                       fg={selected() ? uiColors.primary : uiColors.textPrimary}
                       attributes={selected() ? TextAttributes.BOLD : undefined}

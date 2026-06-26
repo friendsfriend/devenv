@@ -13,9 +13,7 @@ export interface DetailSectionProps {
 export function DetailSection(props: DetailSectionProps) {
   return (
     <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={props.borderColor ?? uiColors.textMuted}
+      backgroundColor={uiColors.bgMantle}
       style={props.style ?? { width: '100%', flexDirection: 'column', paddingLeft: 1, paddingRight: 1 }}
     >
       <text fg={props.titleColor ?? uiColors.textPrimary} attributes={TextAttributes.BOLD}>{props.title}</text>

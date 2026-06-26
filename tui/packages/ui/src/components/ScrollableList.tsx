@@ -238,9 +238,34 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
     return Math.max(1, base - filterLines - indicatorLines);
   });
 
+  const maxVisibleUniformItems = createMemo(() =>
+    Math.max(1, Math.floor(listAreaLines() / (props.estimatedItemHeight ?? 1))),
+  );
+
+  const uniformWindowStart = createMemo(() => {
+    if (props.items.length === 0 || props.itemHeights) return 0;
+    const maxVisible = maxVisibleUniformItems();
+    const clampedSelected = Math.max(0, Math.min(props.selectedIndex, props.items.length - 1));
+    const pageStart = Math.floor(clampedSelected / maxVisible) * maxVisible;
+    return Math.max(0, Math.min(pageStart, Math.max(0, props.items.length - maxVisible)));
+  });
+
   /** Virtual window: only the items that fit on screen around the selection. */
   const visibleItems = createMemo(() => {
     if (props.items.length === 0) return [];
+
+    // Hot path for uniform-height lists (tables, issues, MRs): depend on the
+    // page window, not the exact selected index, so holding j/k only updates
+    // selection styling and does not recreate every visible row.
+    if (!props.itemHeights) {
+      const startIdx = uniformWindowStart();
+      const endIdx = Math.min(props.items.length, startIdx + maxVisibleUniformItems());
+      return props.items.slice(startIdx, endIdx).map((item, idx) => ({
+        item,
+        absoluteIndex: startIdx + idx,
+      }));
+    }
+
     const result = calculateVisibleItems(props.items, {
       totalItems: props.items.length,
       selectedIndex: props.selectedIndex,

@@ -95,6 +95,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 							selectedGuideIndex={appStore.helpGuideIndex()}
 							guides={guideEntries()}
 							onKeybindScrollBoxReady={(scrollBox) => { uiStore.helpKeybindScrollBoxRef = scrollBox; }}
+							onGuideScrollBoxReady={(scrollBox) => { uiStore.helpGuideScrollBoxRef = scrollBox; }}
 							onGuideSelect={async (key) => {
 								const guide = getGuide(key);
 								if (guide) {
@@ -431,6 +432,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					replyText={mrStore.replyText()}
 					collapsedThreads={mrStore.collapsedThreads()}
 					onSelectedLineChange={mrStore.setDiffModalSelectedLine}
+					onScrollBoxReady={(sb) => { mrStore.diffModalScrollBoxRef = sb; }}
 					onReplyToDiscussion={mrActions.replyToDiscussion}
 					onClose={() => {
 						mrStore.setShowDiffModal(false);
@@ -439,6 +441,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 						mrStore.setDiffModalVisualMode(false);
 						mrStore.setDiffModalVisualStart(0);
 						mrStore.setDiffModalForceSplitView(false);
+						mrStore.diffModalScrollBoxRef = undefined;
 
 						if (appStore.previousViewMode() === "discussionsView") {
 							appStore.setViewMode("discussionsView");

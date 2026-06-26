@@ -22,7 +22,7 @@ Provider credentials are stored in `~/.config/devenv/providers/NAME.json` with `
 | `j`/`k` | Navigate MR list |
 | `g`/`G` | Go to first/last MR |
 | `Enter` | Open selected MR detail |
-| `[`/`]` or `h`/`l` | Previous/next page |
+| `[`/`]` or `Shift+K`/`Shift+J` | Previous/next page |
 
 ## 3. Merge request detail
 
@@ -46,7 +46,8 @@ From the changed files view, press `Enter` on a file to open the diff modal:
 | Key | Action |
 |---|---|
 | `j`/`k` | Navigate diff lines |
-| `h`/`l` | Previous/next file |
+| `h`/`l` or `←`/`→` | Scroll diff left/right |
+| `[`/`]` or `Shift+K`/`Shift+J` | Previous/next file |
 | `v` | Toggle visual selection |
 | `c` | Create comment on selected lines |
 | `r` | Reply to a comment |
@@ -77,9 +78,7 @@ Press `J` from MR detail to view pipeline jobs:
 
 | Key | Action |
 |---|---|
-| `←`/`→` or `h`/`l` | Switch between stages |
 | `Tab` | Cycle stages |
-| `1`-`9` | Jump to stage by number |
 | `j`/`k` | Navigate jobs |
 | `v` | View job logs |
 | `r`/`c` | Retry/cancel job |

@@ -1,10 +1,11 @@
 import { RGBA, ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { useRenderer } from '@opentui/solid';
 import { createMemo, For, Show, createEffect, createSignal } from 'solid-js';
-import { uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { uiColors } from '../colors';
 import type { Discussion } from '@devenv/types';
 import { GenericModal } from './GenericModal';
 import { HelpText } from './HelpText';
+import { ScrollableContent } from './ScrollableContent';
 
 interface DiffViewModalProps {
   filePath: string;
@@ -25,6 +26,7 @@ interface DiffViewModalProps {
   onSelectedLineChange: (line: number) => void;  // Callback to update parent
   onClose: () => void;
   onNavigateFile?: (direction: 1 | -1) => void;
+  onScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
   onReplyToDiscussion?: (discussionID: string, body: string) => Promise<void>; // NEW: Reply callback
 }
 
@@ -62,7 +64,8 @@ interface SplitDiffLine {
  * 
  * Navigation (handled in parent):
  * - j/k or up/down: Navigate lines
- * - h/l: Navigate files
+ * - h/l and left/right: Scroll horizontally
+ * - [/]/Shift+K/Shift+J: Navigate files
  * - ESC: Close modal
  */
 export function DiffViewModal(props: DiffViewModalProps) {
@@ -488,7 +491,8 @@ export function DiffViewModal(props: DiffViewModalProps) {
             { key: 'r', action: 'Reply' },
             { key: 't', action: 'Toggle' },
             { key: 's', action: 'Split' },
-            { key: 'h/l', action: 'File' },
+            { key: 'h/l ←/→', action: 'Scroll' },
+            { key: '[/]', action: 'File' },
             { key: 'e', action: 'Edit' },
             { key: 'Esc', action: 'Close' }
           ]} />
@@ -515,10 +519,13 @@ export function DiffViewModal(props: DiffViewModalProps) {
       onBackdropClick={props.onClose}
     >
       {/* Scrollable wrapper for diff content - OpenCode pattern with line selection */}
-      <scrollbox
-        ref={(r: ScrollBoxRenderable) => (scrollBox = r)}
-        scrollbarOptions={SCROLLBAR_OPTIONS}  // visible scrollbar
-        style={{ flexGrow: 1, flexShrink: 1, minHeight: 0 }}
+      <ScrollableContent
+        axes={['x', 'y']}
+        keyboardAxes={['x']}
+        onScrollBoxReady={(r) => {
+          scrollBox = r;
+          props.onScrollBoxReady?.(r);
+        }}
       >
           {/* Render split view or unified view based on terminal width */}
           <Show when={useSplitView()} fallback={
@@ -827,9 +834,6 @@ export function DiffViewModal(props: DiffViewModalProps) {
                                             paddingLeft: 1,
                                           }}
                                           backgroundColor={uiColors.bgBase}
-                                          border={true}
-                                          borderStyle="single"
-                                          borderColor={uiColors.borderHighlight}
                                           paddingLeft={1}
                                           paddingRight={1}
                                         >
@@ -906,8 +910,6 @@ export function DiffViewModal(props: DiffViewModalProps) {
                         alignItems="center"
                         gap={1}
                         backgroundColor={uiColors.bgBase}
-                        borderStyle="single"
-                        borderColor={uiColors.borderHighlight}
                         paddingLeft={1}
                         paddingRight={1}
                         flexGrow={1}
@@ -1185,9 +1187,6 @@ export function DiffViewModal(props: DiffViewModalProps) {
                                           paddingLeft: 1,
                                         }}
                                         backgroundColor={uiColors.bgBase}
-                                        border={true}
-                                        borderStyle="single"
-                                        borderColor={uiColors.borderHighlight}
                                         paddingLeft={1}
                                         paddingRight={1}
                                       >
@@ -1281,7 +1280,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
           </For>
         </box>
       </Show>
-        </scrollbox>
+        </ScrollableContent>
       </GenericModal>
   );
 }
