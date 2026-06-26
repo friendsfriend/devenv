@@ -3,6 +3,7 @@ import { createMemo, For, Show } from 'solid-js';
 import { uiColors } from '../colors';
 import type { Job } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
+import { ContentPanel } from './ContentStack';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
 import { getPipelineStatusColor } from '../statusUtils';
@@ -147,16 +148,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
   };
 
   return (
-    <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.textMuted}
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'column',
-      }}
-    >
+    <ContentPanel>
       <Show when={props.loading}>
         <CenteredState message="Loading pipeline jobs..." color={uiColors.primary} />
       </Show>
@@ -268,6 +260,6 @@ export function JobsDetailView(props: JobsDetailViewProps) {
           )}
         />
       </Show>
-    </box>
+    </ContentPanel>
   );
 }

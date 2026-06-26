@@ -1,6 +1,7 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
 import { isDownKey, isUpKey } from './nav-keys';
+import { handleHorizontalScrollKey } from './horizontal-scroll';
 /**
  * Handles keyboard events for the Log modal:
  * - AI prompt mode (type prompt, submit, dismiss)
@@ -158,6 +159,7 @@ export async function handleLogModalKeys(
   if (logStore.logAiVisible() && logStore.logAiSummary() !== null && logStore.logAiScrollBoxRef) {
     const aiSb = logStore.logAiScrollBoxRef;
     const name = event.name ?? '';
+    if (handleHorizontalScrollKey(event, aiSb)) return true;
     if (event.ctrl && name === 'j') { logStore.logAiAtBottom = false; aiSb.scrollBy(1); logStore.logAiLastScrollTop = aiSb.scrollTop; return true; }
     if (event.ctrl && name === 'k') { logStore.logAiAtBottom = false; aiSb.scrollBy(-1); logStore.logAiLastScrollTop = aiSb.scrollTop; return true; }
     if (event.ctrl && name === 'd') { logStore.logAiAtBottom = false; aiSb.scrollBy(Math.floor((aiSb.viewport.height || 10) / 2)); logStore.logAiLastScrollTop = aiSb.scrollTop; return true; }
@@ -292,17 +294,7 @@ export async function handleLogModalKeys(
     return true;
   }
 
-  // h / left — scroll viewport left
-  if (event.name === 'h' || event.name === 'left' || event.name === 'Left') {
-    sb?.scrollBy({ x: -8, y: 0 });
-    return true;
-  }
-
-  // l / right — scroll viewport right
-  if (event.name === 'l' || event.name === 'right' || event.name === 'Right') {
-    sb?.scrollBy({ x: 8, y: 0 });
-    return true;
-  }
+  if (handleHorizontalScrollKey(event, sb)) return true;
 
   // / — enter search mode
   if (event.sequence === '/' || event.name === '/') {

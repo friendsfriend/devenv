@@ -5,6 +5,7 @@ import type { TestCase, TestSuite } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
+import { ContentPanel } from './ContentStack';
 
 interface TestResultsDetailViewProps {
   testSuites?: TestSuite[];
@@ -100,17 +101,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
   };
 
   return (
-    <box
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'column',
-        paddingTop: 1,
-        paddingBottom: 1,
-        paddingLeft: 2,
-        paddingRight: 2,
-      }}
-    >
+    <ContentPanel>
       {/* Header */}
       <box style={{ width: '100%', height: 1, marginBottom: 1 }}>
         <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
@@ -133,9 +124,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
       {/* Test Results Table */}
       <Show when={!props.loading && !props.error && filteredTests().length > 0}>
         <box
-          border={true}
-          borderStyle="rounded"
-          borderColor={uiColors.textMuted}
+          backgroundColor={uiColors.bgMantle}
           style={{
             width: '100%',
             flexGrow: 1,
@@ -213,6 +202,6 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
           />
         </box>
       </Show>
-    </box>
+    </ContentPanel>
   );
 }

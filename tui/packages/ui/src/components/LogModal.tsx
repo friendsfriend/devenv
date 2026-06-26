@@ -2,11 +2,12 @@ import { createMemo, For, Show } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import type { TextChunk } from '@opentui/core';
 import { useRenderer } from '@opentui/solid';
-import { colors, uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { colors, uiColors } from '../colors';
 import { ansiToStyledText, stripAnsi } from '../ansiToStyledText';
 import { GenericModal } from './GenericModal';
 import { HelpText } from './HelpText';
 import { LogAiOverlay } from './LogAiOverlay';
+import { ScrollableContent } from './ScrollableContent';
 
 export interface LogModalProps {
   /** Modal title / header label (e.g. "Container Logs: my-app (auto-refresh: 10s)") */
@@ -216,7 +217,7 @@ export function LogModal(props: LogModalProps) {
             ]
           : [
               { key: 'j/k', action: 'Up/Down' },
-              { key: 'h/l', action: 'Left/Right' },
+              { key: 'h/l ←/→', action: 'Left/Right' },
               { key: 'u/d', action: 'Page' },
               { key: 'g/G', action: 'Top/Bot' },
               { key: '/', action: 'Search' },
@@ -243,17 +244,16 @@ export function LogModal(props: LogModalProps) {
       customFooter={customFooter()}
       onBackdropClick={props.onClose}
     >
-      <scrollbox
-        ref={(r: ScrollBoxRenderable) => {
+      <ScrollableContent
+        axes={['x', 'y']}
+        keyboardAxes={['x']}
+        onScrollBoxReady={(r) => {
           scrollBox = r;
           props.onScrollBoxReady(r);
         }}
-        scrollbarOptions={SCROLLBAR_OPTIONS}
-        scrollX={true}
         viewportCulling={true}
         stickyScroll={true}
         stickyStart="bottom"
-        style={{ flexGrow: 1, flexShrink: 1, minHeight: 0 }}
       >
         <box paddingLeft={1} paddingRight={1}>
           <For each={lines()}>
@@ -321,7 +321,7 @@ export function LogModal(props: LogModalProps) {
             }}
           </For>
         </box>
-      </scrollbox>
+      </ScrollableContent>
       <Show when={props.aiVisible && (props.aiPromptMode || props.aiLoading || props.aiSummary !== null || props.aiError !== null)}>
         <LogAiOverlay
           promptMode={props.aiPromptMode}

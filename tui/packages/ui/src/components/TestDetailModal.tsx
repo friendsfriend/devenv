@@ -152,9 +152,7 @@ export function TestDetailModal(props: TestDetailModalProps) {
         {/* Stack Trace / Failure Message */}
         <Show when={isFailed() && (props.test.stack_trace || props.test.system_output)}>
           <box
-            border={true}
-            borderStyle="rounded"
-            borderColor={uiColors.error}
+            backgroundColor={uiColors.bgMantle}
             style={{
               width: '100%',
               flexDirection: 'column',
@@ -190,9 +188,7 @@ export function TestDetailModal(props: TestDetailModalProps) {
         {/* System Output (for non-failure cases) */}
         <Show when={!isFailed() && props.test.system_output}>
           <box
-            border={true}
-            borderStyle="rounded"
-            borderColor={uiColors.textMuted}
+            backgroundColor={uiColors.bgMantle}
             style={{
               width: '100%',
               flexDirection: 'column',

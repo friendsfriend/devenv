@@ -130,6 +130,7 @@ export function Table<T = string>(props: TableProps<T>) {
 			{/* Optional Tabs */}
 			<Show when={props.tabs && props.tabs.length > 0}>
 				<box
+					backgroundColor={uiColors.bgBase}
 					style={{
 						width: "100%",
 						flexDirection: "row",
@@ -139,43 +140,25 @@ export function Table<T = string>(props: TableProps<T>) {
 					<For each={props.tabs}>
 						{(tab) => {
 							const isActive = () => props.activeTab === tab.id;
-							const borderColor = () => {
-								if (isActive()) return uiColors.primary;
-								return props.getTabBorderColor
-									? props.getTabBorderColor(tab.id)
-									: uiColors.textMuted;
-							};
 							return (
 								<box
-									border={true}
-									borderStyle="rounded"
-									borderColor={borderColor()}
+									backgroundColor={isActive() ? uiColors.bgSurface0 : uiColors.bgMantle}
 									onMouseUp={() => props.onTabChange?.(tab.id)}
 									style={{
 										paddingLeft: 2,
 										paddingRight: 2,
 										height: 3,
 										alignItems: "center",
+										justifyContent: "center",
 									}}
 								>
-									<box
-										backgroundColor={
-											isActive() ? uiColors.bgSurface0 : undefined
-										}
-										style={{
-											flexGrow: 1,
-											alignItems: "center",
-											justifyContent: "center",
-										}}
+									<text
+										fg={isActive() ? uiColors.primary : uiColors.textMuted}
+										attributes={isActive() ? TextAttributes.BOLD : undefined}
 									>
-										<text
-											fg={isActive() ? uiColors.primary : uiColors.textMuted}
-											attributes={isActive() ? TextAttributes.BOLD : undefined}
-										>
-											{tab.label}
-											{tab.count !== undefined ? ` (${tab.count})` : ""}
-										</text>
-									</box>
+										{tab.label}
+										{tab.count !== undefined ? ` (${tab.count})` : ""}
+									</text>
 								</box>
 							);
 						}}
@@ -278,9 +261,7 @@ export function Table<T = string>(props: TableProps<T>) {
 		tableContent()
 	) : (
 		<box
-			border={true}
-			borderStyle="rounded"
-			borderColor={uiColors.textMuted}
+			backgroundColor={uiColors.bgMantle}
 			style={{
 				width: "100%",
 				flexGrow: 1,

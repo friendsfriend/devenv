@@ -35,6 +35,7 @@ export function createIssueStore() {
 	// Detail state
 	const [issueDetailLoading, setIssueDetailLoading] = createSignal(false);
 	const [issueDetailError, setIssueDetailError] = createSignal("");
+	let issueDetailScrollBoxRef: import("@opentui/core").ScrollBoxRenderable | undefined;
 
 	// Comments
 	const [issueComments, setIssueComments] = createSignal<IssueComment[]>([]);
@@ -120,6 +121,12 @@ export function createIssueStore() {
 		setIssueDetailLoading,
 		issueDetailError,
 		setIssueDetailError,
+		get issueDetailScrollBoxRef() {
+			return issueDetailScrollBoxRef;
+		},
+		set issueDetailScrollBoxRef(value: import("@opentui/core").ScrollBoxRenderable | undefined) {
+			issueDetailScrollBoxRef = value;
+		},
 		issueComments,
 		setIssueComments,
 		issueCommentsLoading,

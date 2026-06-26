@@ -100,6 +100,7 @@ export function createMrStore() {
 	const [mrAiCommentsPosted, setMrAiCommentsPosted] = createSignal(false);
 
 	let mrAiScrollBoxRef: import("@opentui/core").ScrollBoxRenderable | undefined;
+	let diffModalScrollBoxRef: import("@opentui/core").ScrollBoxRenderable | undefined;
 	let mrAiAtBottom = true;
 	let mrAiLastScrollTop = 0;
 
@@ -276,6 +277,14 @@ export function createMrStore() {
 			| import("@opentui/core").ScrollBoxRenderable
 			| undefined) {
 			mrAiScrollBoxRef = v;
+		},
+		get diffModalScrollBoxRef() {
+			return diffModalScrollBoxRef;
+		},
+		set diffModalScrollBoxRef(v:
+			| import("@opentui/core").ScrollBoxRenderable
+			| undefined) {
+			diffModalScrollBoxRef = v;
 		},
 		get mrAiAtBottom() {
 			return mrAiAtBottom;

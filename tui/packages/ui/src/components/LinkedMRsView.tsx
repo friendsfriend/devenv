@@ -2,6 +2,7 @@ import { TextAttributes } from "@opentui/core";
 import { For, Show } from "solid-js";
 import type { MergeRequest } from "@devenv/types";
 import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 
 interface LinkedMRsViewProps {
@@ -43,16 +44,7 @@ export function LinkedMRsView(props: LinkedMRsViewProps) {
 	};
 
 	return (
-		<box
-			border={true}
-			borderStyle="rounded"
-			borderColor={uiColors.textMuted}
-			style={{
-				width: "100%",
-				height: "100%",
-				flexDirection: "column",
-			}}
-		>
+		<ContentPanel>
 			{/* Loading */}
 			<Show when={props.loading}>
 				<box
@@ -201,6 +193,6 @@ export function LinkedMRsView(props: LinkedMRsViewProps) {
 					)}
 				/>
 			</Show>
-		</box>
+</ContentPanel>
 	);
 }

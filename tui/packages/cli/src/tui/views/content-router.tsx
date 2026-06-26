@@ -17,6 +17,7 @@ import {
 	AppDetailView,
 	uiColors,
 	LAYOUT_CHROME_LINES,
+	ContentStack,
 } from "@devenv/ui";
 import { getGuide, guides as allGuides } from "../guides";
 import type { ContentRouterProps } from "./types";
@@ -29,11 +30,12 @@ export function ContentRouter(props: ContentRouterProps) {
 		props.actions;
 
 	// Table shares content area with StatusLogView (6 lines below it).
-	// Compute exact vertical budget so ScrollableList doesn't overflow.
+	// Include three 1-line gutters: header-tabs, table-log, log-footer.
 	const STATUS_LOG_HEIGHT = 6;
+	const TABLE_VIEW_GUTTERS = 3;
 	const availableTableLines = Math.max(
 		1,
-		props.dimensions.height - LAYOUT_CHROME_LINES - STATUS_LOG_HEIGHT,
+		props.dimensions.height - LAYOUT_CHROME_LINES - STATUS_LOG_HEIGHT - TABLE_VIEW_GUTTERS,
 	);
 	const tableColumns = () =>
 		appStore.activeTab() === "scripts"
@@ -355,6 +357,9 @@ export function ContentRouter(props: ContentRouterProps) {
 												references={issueStore.references()}
 												spinnerFrames={props.spinnerFrames}
 												spinnerFrame={appStore.spinnerFrame}
+												onDetailScrollBoxReady={(scrollBox) => {
+													issueStore.issueDetailScrollBoxRef = scrollBox;
+												}}
 											/>
 										</Show>
 									}
@@ -442,51 +447,41 @@ export function ContentRouter(props: ContentRouterProps) {
 							/>
 						}
 					>
-						<box
-							style={{
-								width: "100%",
-								flexGrow: 1,
-								flexDirection: "column",
-								minHeight: 0,
-								overflow: "hidden",
-							}}
-						>
-							<box
-								style={{
-									flexGrow: 1,
-									minHeight: 0,
-									flexDirection: "column",
-									overflow: "hidden",
-								}}
-							>
-								<Table
-									apps={appStore.tableFilteredApps()}
-									columns={tableColumns()}
-									selectedIndex={appStore.selectedIndex()}
-									onSelect={appStore.setSelectedIndex}
-									showBorder={true}
-									availableLines={availableTableLines}
-									tabs={appStore.tableTabs()}
-									activeTab={appStore.activeTab()}
-									onTabChange={appStore.setActiveTab}
-									getTabBorderColor={props.getTabBorderColor}
-									searchMode={appStore.tableSearchMode()}
-									searchQuery={appStore.tableSearchQuery()}
-								/>
-							</box>
-							<box
-								style={{
-									flexShrink: 0,
-								}}
-							>
-								<StatusLogView
-									entries={appStore.statusLogEntries()}
-									height={6}
-									width={props.dimensions.width}
-									isMaximized={false}
-								/>
-							</box>
-						</box>
+						<ContentStack
+							items={[
+								<box
+									style={{
+										flexGrow: 1,
+										minHeight: 0,
+										flexDirection: "column",
+										overflow: "hidden",
+									}}
+								>
+									<Table
+										apps={appStore.tableFilteredApps()}
+										columns={tableColumns()}
+										selectedIndex={appStore.selectedIndex()}
+										onSelect={appStore.setSelectedIndex}
+										showBorder={true}
+										availableLines={availableTableLines}
+										tabs={appStore.tableTabs()}
+										activeTab={appStore.activeTab()}
+										onTabChange={appStore.setActiveTab}
+										getTabBorderColor={props.getTabBorderColor}
+										searchMode={appStore.tableSearchMode()}
+										searchQuery={appStore.tableSearchQuery()}
+									/>
+								</box>,
+								<box style={{ flexShrink: 0 }}>
+									<StatusLogView
+										entries={appStore.statusLogEntries()}
+										height={6}
+										width={props.dimensions.width}
+										isMaximized={false}
+									/>
+								</box>,
+							]}
+						/>
 					</Show>
 				</Show>
 			)}

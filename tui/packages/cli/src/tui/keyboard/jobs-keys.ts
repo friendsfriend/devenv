@@ -6,7 +6,7 @@ import { isDownKey, isUpKey } from './nav-keys';
  * - Search mode (type query, clear)
  * - q to quit, / to search, ESC to go back
  * - v to view job logs, r to retry, c to cancel
- * - Tab/number keys for stage selection
+ * - Tab for stage selection
  * - j/k for navigation
  */
 export async function handleJobsKeys(
@@ -118,17 +118,6 @@ export async function handleJobsKeys(
       return prev >= organizedJobs.length - 1 ? 0 : prev + 1;
     });
     mrStore.setSelectedJobIndex(0);
-    return true;
-  }
-
-  // Number keys (1-9) for direct stage selection
-  const numMatch = event.name?.match(/^[1-9]$/);
-  if (numMatch) {
-    const stageNum = parseInt(numMatch[0], 10) - 1;
-    if (stageNum >= 0 && stageNum < organizedJobs.length) {
-      mrStore.setSelectedJobStageIndex(stageNum);
-      mrStore.setSelectedJobIndex(0);
-    }
     return true;
   }
 

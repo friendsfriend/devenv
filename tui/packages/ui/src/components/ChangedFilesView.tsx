@@ -2,6 +2,7 @@ import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
 import { uiColors } from '../colors';
 import type { MRChange } from '@devenv/types';
+import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
@@ -69,16 +70,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 2 + 1;
 
   return (
-    <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.textMuted}
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'column',
-      }}
-    >
+    <ContentPanel>
       <Show when={props.loading}>
         <CenteredState message="Loading changed files..." color={uiColors.primary} bold />
       </Show>
@@ -190,6 +182,6 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
           }}
         />
       </Show>
-    </box>
+</ContentPanel>
   );
 }

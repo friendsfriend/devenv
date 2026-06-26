@@ -2,6 +2,7 @@ import { TextAttributes } from '@opentui/core';
 import { Show, For, createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { ContentFrame } from './ContentStack';
 import { DetailSection } from './DetailSection';
 import type { App, MergeRequest, ContainerStats } from '@devenv/types';
 
@@ -82,28 +83,27 @@ export function AppDetailView(props: AppDetailViewProps) {
   };
 
   return (
-    <box
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'row',
-        gap: 0,
-      }}
-    >
-      {/* LEFT COLUMN */}
+    <ContentFrame>
       <box
+        backgroundColor={uiColors.bgBase}
         style={{
-          width: leftWidth(),
-          height: '100%',
-          flexDirection: 'column',
-          gap: 0,
+          width: '100%',
+          flexGrow: 1,
+          minHeight: 0,
+          flexDirection: 'row',
         }}
       >
+        <box
+          backgroundColor={uiColors.bgBase}
+          style={{
+            width: leftWidth(),
+            height: '100%',
+            flexDirection: 'column',
+          }}
+        >
         {/* Info Panel */}
         <box
-          border={true}
-          borderStyle="rounded"
-          borderColor={uiColors.textMuted}
+          backgroundColor={uiColors.bgMantle}
           style={{
             width: '100%',
             flexGrow: 1,
@@ -119,6 +119,7 @@ export function AppDetailView(props: AppDetailViewProps) {
           </box>
           <scrollbox
             scrollbarOptions={SCROLLBAR_OPTIONS}
+					scrollX={true}
             style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
           >
             <Show when={props.kind !== 'infra'}>
@@ -187,6 +188,8 @@ export function AppDetailView(props: AppDetailViewProps) {
           </scrollbox>
         </box>
 
+        <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
+
         {/* MRs Panel — app and library only */}
         <Show when={hasMRs()}>
           <DetailSection
@@ -202,6 +205,7 @@ export function AppDetailView(props: AppDetailViewProps) {
           >
             <scrollbox
               scrollbarOptions={SCROLLBAR_OPTIONS}
+					scrollX={true}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show when={props.mrsLoading}>
@@ -229,23 +233,22 @@ export function AppDetailView(props: AppDetailViewProps) {
             </scrollbox>
           </DetailSection>
         </Show>
-      </box>
+        </box>
 
       {/* RIGHT COLUMN — docker only (app and infra) */}
       <Show when={hasDocker()}>
+        <box style={{ width: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
         <box
+          backgroundColor={uiColors.bgBase}
           style={{
             width: rightWidth(),
             height: '100%',
             flexDirection: 'column',
-            gap: 0,
           }}
         >
           {/* Stats Panel */}
           <box
-            border={true}
-            borderStyle="rounded"
-            borderColor={uiColors.textMuted}
+            backgroundColor={uiColors.bgMantle}
             style={{
               width: '100%',
               height: 9,
@@ -261,6 +264,7 @@ export function AppDetailView(props: AppDetailViewProps) {
             </box>
             <scrollbox
               scrollbarOptions={SCROLLBAR_OPTIONS}
+					scrollX={true}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show
@@ -316,11 +320,11 @@ export function AppDetailView(props: AppDetailViewProps) {
             </scrollbox>
           </box>
 
+          <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
+
           {/* Logs Panel */}
           <box
-            border={true}
-            borderStyle="rounded"
-            borderColor={uiColors.textMuted}
+            backgroundColor={uiColors.bgMantle}
             style={{
               width: '100%',
               flexGrow: 1,
@@ -336,6 +340,7 @@ export function AppDetailView(props: AppDetailViewProps) {
             </box>
             <scrollbox
               scrollbarOptions={SCROLLBAR_OPTIONS}
+					scrollX={true}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show
@@ -359,5 +364,6 @@ export function AppDetailView(props: AppDetailViewProps) {
         </box>
       </Show>
     </box>
+    </ContentFrame>
   );
 }

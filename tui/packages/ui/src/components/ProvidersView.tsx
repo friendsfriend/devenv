@@ -2,6 +2,7 @@ import { TextAttributes } from '@opentui/core';
 import { Show, For } from 'solid-js';
 import { uiColors } from '../colors';
 import type { Provider } from '@devenv/types';
+import { ContentPanel } from './ContentStack';
 import { CenteredState } from './CenteredState';
 
 interface ProvidersViewProps {
@@ -22,16 +23,7 @@ export function ProvidersView(props: ProvidersViewProps) {
   };
 
   return (
-    <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.textMuted}
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'column',
-      }}
-    >
+    <ContentPanel>
       <Show when={props.loading}>
         <CenteredState message="Loading providers..." color={uiColors.primary} />
       </Show>
@@ -98,6 +90,6 @@ export function ProvidersView(props: ProvidersViewProps) {
           </For>
         </box>
       </Show>
-    </box>
+</ContentPanel>
   );
 }

@@ -2,6 +2,7 @@ import { TextAttributes } from "@opentui/core";
 import { For, Show } from "solid-js";
 import type { Issue, MergeRequest } from "@devenv/types";
 import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 
 type RefItem =
@@ -47,16 +48,7 @@ export function ReferencesView(props: ReferencesViewProps) {
 	};
 
 	return (
-		<box
-			border={true}
-			borderStyle="rounded"
-			borderColor={uiColors.textMuted}
-			style={{
-				width: "100%",
-				height: "100%",
-				flexDirection: "column",
-			}}
-		>
+		<ContentPanel>
 			<Show when={props.loading}>
 				<box
 					style={{
@@ -210,6 +202,6 @@ export function ReferencesView(props: ReferencesViewProps) {
 					)}
 				/>
 			</Show>
-		</box>
+</ContentPanel>
 	);
 }

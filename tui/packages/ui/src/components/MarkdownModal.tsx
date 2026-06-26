@@ -1,9 +1,10 @@
 import { ScrollBoxRenderable } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
-import { uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { uiColors } from '../colors';
 import { getMarkdownSyntaxStyle } from '../markdownSyntax';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
+import { ScrollableContent } from './ScrollableContent';
 
 export interface MarkdownModalProps {
   title: string;
@@ -14,7 +15,7 @@ export interface MarkdownModalProps {
 
 export function MarkdownModal(props: MarkdownModalProps) {
   const dimensions = useTerminalDimensions();
-  const contentWidth = () => Math.max(40, Math.floor(dimensions().width * 0.7) - 4);
+  const contentWidth = () => Math.max(40, Math.floor(dimensions().width * 0.7) - 8);
 
   return (
     <GenericModal
@@ -24,10 +25,9 @@ export function MarkdownModal(props: MarkdownModalProps) {
       heightPercent={0.75}
       customHeader={props.hideTitle ? <box style={{ height: 0 }} /> : undefined}
     >
-      <scrollbox
-        ref={(r: ScrollBoxRenderable) => props.onScrollBoxReady?.(r)}
-        scrollbarOptions={SCROLLBAR_OPTIONS}
-        style={{ flexGrow: 1, flexShrink: 1, minHeight: 0 }}
+      <ScrollableContent
+        axes={['y']}
+        onScrollBoxReady={props.onScrollBoxReady}
       >
         <code
           filetype="markdown"
@@ -37,7 +37,7 @@ export function MarkdownModal(props: MarkdownModalProps) {
           fg={uiColors.textSecondary}
           width={contentWidth()}
         />
-      </scrollbox>
+      </ScrollableContent>
     </GenericModal>
   );
 }

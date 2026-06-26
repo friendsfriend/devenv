@@ -1,6 +1,9 @@
 import { TextAttributes } from "@opentui/core";
 import { Show, For, createMemo } from "solid-js";
 import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+import { ContentFrame } from "./ContentStack";
+import { getMarkdownSyntaxStyle } from "../markdownSyntax";
+import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
 import type {
 	Issue,
 	MergeRequest,
@@ -132,28 +135,27 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 	const mr = () => props.mergeRequest;
 
 	return (
-		<box
-			style={{
-				width: "100%",
-				height: "100%",
-				flexDirection: "row",
-				gap: 0,
-			}}
-		>
-			{/* LEFT COLUMN: Metadata + Status + Changed Files */}
+		<ContentFrame>
 			<box
+				backgroundColor={uiColors.bgBase}
 				style={{
-					width: "60%",
-					height: "100%",
-					flexDirection: "column",
-					gap: 0,
+					width: "100%",
+					flexGrow: 1,
+					minHeight: 0,
+					flexDirection: "row",
 				}}
 			>
+				<box
+					backgroundColor={uiColors.bgBase}
+					style={{
+						width: "60%",
+						height: "100%",
+						flexDirection: "column",
+					}}
+				>
 				{/* METADATA PANEL */}
 				<box
-					border={true}
-					borderStyle="rounded"
-					borderColor={uiColors.textMuted}
+					backgroundColor={uiColors.bgMantle}
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -286,7 +288,15 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 								</text>
 							</box>
 							<box style={{ paddingLeft: 3, paddingRight: 1 }}>
-								<text fg={uiColors.textSecondary}>{mr().description}</text>
+								<code
+									filetype="markdown"
+									content={containsHtml(mr().description!)
+										? gitlabHtmlToMarkdown(mr().description!)
+										: mr().description!}
+									syntaxStyle={getMarkdownSyntaxStyle()}
+								drawUnstyledText={true}
+								fg={uiColors.textSecondary}
+						/>
 							</box>
 						</Show>
 
@@ -374,11 +384,11 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 					</scrollbox>
 				</box>
 
+				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
+
 				{/* STATUS PANEL */}
 				<box
-					border={true}
-					borderStyle="rounded"
-					borderColor={uiColors.textMuted}
+					backgroundColor={uiColors.bgMantle}
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -588,11 +598,11 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 					</scrollbox>
 				</box>
 
+				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
+
 				{/* CHANGED FILES PANEL */}
 				<box
-					border={true}
-					borderStyle="rounded"
-					borderColor={uiColors.textMuted}
+					backgroundColor={uiColors.bgMantle}
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -705,19 +715,18 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 			</box>
 
 			{/* RIGHT COLUMN: Pipeline Jobs + Test Results */}
+			<box style={{ width: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 			<box
+				backgroundColor={uiColors.bgBase}
 				style={{
 					width: "40%",
 					height: "100%",
 					flexDirection: "column",
-					gap: 0,
 				}}
 			>
 				{/* PIPELINE JOBS PANEL */}
 				<box
-					border={true}
-					borderStyle="rounded"
-					borderColor={uiColors.textMuted}
+					backgroundColor={uiColors.bgMantle}
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -834,11 +843,11 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 					</Show>
 				</box>
 
+				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
+
 				{/* DISCUSSIONS PANEL - Fixed height summary */}
 				<box
-					border={true}
-					borderStyle="rounded"
-					borderColor={uiColors.textMuted}
+					backgroundColor={uiColors.bgMantle}
 					style={{
 						width: "100%",
 						height: 6,
@@ -958,11 +967,11 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 					</box>
 				</box>
 
+				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
+
 				{/* TEST RESULTS PANEL - Fixed height summary */}
 				<box
-					border={true}
-					borderStyle="rounded"
-					borderColor={uiColors.textMuted}
+					backgroundColor={uiColors.bgMantle}
 					style={{
 						width: "100%",
 						height: 8,
@@ -1102,5 +1111,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 				</box>
 			</box>
 		</box>
+	</ContentFrame>
 	);
 }
+

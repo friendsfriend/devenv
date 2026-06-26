@@ -1,11 +1,12 @@
-import { TextAttributes } from '@opentui/core';
 import { Show } from 'solid-js';
 import { uiColors } from '../colors';
 import type { MergeRequest } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
-import { formatShortDate, getIssueStateColor, getPipelineStatusColor } from '../statusUtils';
+import { formatShortDate, getIssueStateColor, getPipelineStatusColor, truncateText } from '../statusUtils';
+import { WorkItemCard } from './WorkItemCard';
+import { ContentPanel } from './ContentStack';
 
 interface MergeRequestViewProps {
   mergeRequests: MergeRequest[];
@@ -21,47 +22,35 @@ interface MergeRequestViewProps {
 }
 
 /**
- * MergeRequestView Component - Displays merge requests in table format
- * Matches the styling of the Table component
- * Port of tui/mergeRequestView.go
- * 
+ * MergeRequestView Component - Displays merge requests as compact cards.
+ *
  * PATTERN: Parent-controlled navigation (OpenTUI limitation)
  * - Parent manages selectedIndex state
  * - Parent handles ALL keyboard events via single useKeyboard hook
  * - Child is purely presentational
- * 
- * Note: OpenTUI only allows ONE useKeyboard hook to be active.
- * Multiple hooks don't work - only the first registered hook receives events.
  */
 export function MergeRequestView(props: MergeRequestViewProps) {
   // Lines of fixed chrome outside the list area:
   //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
-  //   Outer rounded border top + bottom      = 2
-  //   Table header row                       = 1
-  //                                   Total  = 9
-  const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 1;
+  //   Top/bottom spacers + summary header    = 3
+  const RESERVED_LINES = LAYOUT_CHROME_LINES + 3;
 
-  // Get merge status indicator
   const getMergeStatusText = (mr: MergeRequest) => {
     if (mr.has_conflicts) return { text: '✗', fg: uiColors.error };
-    if (mr.merge_status === 'can_be_merged')
-      return { text: '✓', fg: uiColors.success };
-    if (mr.draft || mr.work_in_progress)
-      return { text: '○', fg: uiColors.warning };
+    if (mr.merge_status === 'can_be_merged') return { text: '✓', fg: uiColors.success };
+    if (mr.draft || mr.work_in_progress) return { text: '○', fg: uiColors.warning };
     return { text: '○', fg: uiColors.textMuted };
   };
 
+  const summary = () => {
+    const cp = props.currentPage ?? 1;
+    const tp = props.totalPages;
+    const loaded = props.mergeRequests.length;
+    return tp && tp > 0 ? `[Pg ${cp}/${tp}] [${loaded} loaded]` : `[Pg ${cp}] [${loaded} loaded]`;
+  };
+
   return (
-    <box
-      border={true}
-      borderStyle="rounded"
-      borderColor={uiColors.textMuted}
-      style={{
-        width: '100%',
-        height: '100%',
-        flexDirection: 'column',
-      }}
-    >
+    <ContentPanel>
       <Show when={props.loading}>
         <CenteredState message="Loading merge requests..." color={uiColors.primary} />
       </Show>
@@ -74,104 +63,42 @@ export function MergeRequestView(props: MergeRequestViewProps) {
         <CenteredState message="No merge requests found" />
       </Show>
 
-      {/* MR Table */}
       <Show when={!props.loading && !props.error && props.mergeRequests.length > 0}>
-        {/* Table Header */}
         <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery}>
-              <>
-                <box style={{ width: 8 }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                    !ID
-                  </text>
-                </box>
-                <box style={{ width: '30%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                    Title
-                  </text>
-                </box>
-                <box style={{ width: '14%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                    Author
-                  </text>
-                </box>
-                <box style={{ width: '10%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                    State
-                  </text>
-                </box>
-                <box style={{ width: '13%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                    Pipeline
-                  </text>
-                </box>
-                <box style={{ width: '14%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                    Updated
-                  </text>
-                </box>
-                <box style={{ width: 'auto', marginLeft: 'auto' }}>
-                  <text fg={uiColors.textMuted}>
-                    {(() => {
-                      const cp = props.currentPage ?? 1;
-                      const tp = props.totalPages;
-                      if (tp && tp > 0) return `[Pg ${cp}/${tp}]`;
-                      return `[Pg ${cp}]`;
-                    })()}
-                  </text>
-                </box>
-              </>
+          <box style={{ width: '100%', flexDirection: 'row' }}>
+            <text fg={uiColors.textPrimary}>Merge requests</text>
+            <box style={{ width: 'auto', marginLeft: 'auto' }}>
+              <text fg={uiColors.textMuted}>{summary()}</text>
+            </box>
+          </box>
         </SearchHeader>
 
-        {/* Table Body — rendered via ScrollableList */}
         <ScrollableList<MergeRequest>
           items={props.mergeRequests}
           selectedIndex={props.selectedIndex}
           reservedLines={RESERVED_LINES}
-          estimatedItemHeight={1}
+          estimatedItemHeight={4}
           showScrollIndicator={false}
           renderItem={(mr, isSelected) => {
             const mergeStatus = getMergeStatusText(mr);
+            const pipeline = mr.head_pipeline?.status || '-';
             return (
-              <box
-                backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
-                style={{
-                  width: '100%',
-                  height: 1,
-                  flexDirection: 'row',
-                  paddingLeft: 1,
-                  paddingRight: 1,
-                }}
-              >
-                <box style={{ width: 8 }}>
-                  <text style={{ fg: isSelected() ? uiColors.primary : uiColors.textSecondary }}>
-                    !{mr.iid}
-                  </text>
-                </box>
-                <box style={{ width: '30%', flexDirection: 'row' }}>
-                  <text style={{ fg: mergeStatus.fg }}>{mergeStatus.text}{' '}</text>
-                  <text style={{ fg: isSelected() ? uiColors.textPrimary : uiColors.textSecondary }}>
-                    {mr.title}
-                  </text>
-                </box>
-                <box style={{ width: '14%' }}>
-                  <text style={{ fg: uiColors.textSecondary }}>{mr.author.name}</text>
-                </box>
-                <box style={{ width: '10%' }}>
-                  <text style={{ fg: getIssueStateColor(mr.state) }}>{mr.state}</text>
-                </box>
-                <box style={{ width: '13%' }}>
-                  <text style={{ fg: getPipelineStatusColor(mr.head_pipeline?.status) }}>
-                    {mr.head_pipeline?.status || '-'}
-                  </text>
-                </box>
-                <box style={{ width: '14%' }}>
-                  <text style={{ fg: uiColors.textMuted }}>{formatShortDate(mr.updated_at)}</text>
-                </box>
-              </box>
+              <WorkItemCard
+                marker={`!${mr.iid}`}
+                prefix={`${mergeStatus.text} `}
+                prefixColor={mergeStatus.fg}
+                title={truncateText(mr.title, 80)}
+                statusText={mr.state}
+                statusColor={getIssueStateColor(mr.state)}
+                statusSuffixText={` • pipeline ${pipeline}`}
+                statusSuffixColor={getPipelineStatusColor(mr.head_pipeline?.status)}
+                metadata={`@${mr.author.name} • updated ${formatShortDate(mr.updated_at)}`}
+                selected={isSelected()}
+              />
             );
           }}
         />
       </Show>
-    </box>
+    </ContentPanel>
   );
 }

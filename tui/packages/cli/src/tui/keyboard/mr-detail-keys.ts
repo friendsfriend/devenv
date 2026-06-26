@@ -5,6 +5,7 @@ import type {
 	KeyboardActions,
 	KeyboardContext,
 } from "./types";
+import { handleHorizontalScrollKey } from "./horizontal-scroll";
 
 /**
  * Handles keyboard events for the MR detail view.
@@ -46,6 +47,7 @@ export async function handleMrDetailKeys(
 		// Scroll when review is visible
 		if (mrStore.mrAiSummary() !== null && mrStore.mrAiScrollBoxRef) {
 			const sb = mrStore.mrAiScrollBoxRef;
+			if (handleHorizontalScrollKey(event, sb)) return true;
 			if (event.ctrl && name === "j") {
 				mrStore.mrAiAtBottom = false;
 				sb.scrollBy(1);

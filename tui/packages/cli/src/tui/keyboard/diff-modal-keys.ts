@@ -2,6 +2,7 @@ import { getLogger } from '@devenv/core';
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
 import { isDownKey, isUpKey } from './nav-keys';
+import { handleHorizontalScrollKey, isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 /**
  * Handles keyboard events for the Diff modal:
  * - Comment modal (on top of diff)
@@ -270,8 +271,10 @@ export async function handleDiffModalKeys(
     return true;
   }
 
-  // h or Left to go to previous file
-  if (event.name === 'h' || event.name === 'left' || event.name === 'Left') {
+  if (handleHorizontalScrollKey(event, mrStore.diffModalScrollBoxRef)) return true;
+
+  // [ or Shift+K to go to previous file
+  if (isPreviousRelatedKey(event)) {
     const newIndex = Math.max(mrStore.selectedChangedFileIndex() - 1, 0);
     if (newIndex !== mrStore.selectedChangedFileIndex()) {
       mrStore.setSelectedChangedFileIndex(newIndex);
@@ -286,8 +289,8 @@ export async function handleDiffModalKeys(
     return true;
   }
 
-  // l or Right to go to next file
-  if (event.name === 'l' || event.name === 'right' || event.name === 'Right') {
+  // ] or Shift+J to go to next file
+  if (isNextRelatedKey(event)) {
     const newIndex = Math.min(mrStore.selectedChangedFileIndex() + 1, changes.length - 1);
     if (newIndex !== mrStore.selectedChangedFileIndex()) {
       mrStore.setSelectedChangedFileIndex(newIndex);

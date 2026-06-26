@@ -567,6 +567,7 @@ export async function handleMiscModalKeys(
         appStore.setHelpSearchActive(false);
       } else {
         uiStore.helpKeybindScrollBoxRef = undefined;
+        uiStore.helpGuideScrollBoxRef = undefined;
         actions.helpActions.closeHelp();
       }
       return true;
@@ -575,6 +576,7 @@ export async function handleMiscModalKeys(
     // q or ?: close help (same key toggles it from the table)
     if (event.name === 'q' || event.name === 'Q' || event.name === '?' || event.sequence === '?') {
       uiStore.helpKeybindScrollBoxRef = undefined;
+      uiStore.helpGuideScrollBoxRef = undefined;
       actions.helpActions.closeHelp();
       return true;
     }
@@ -586,6 +588,8 @@ export async function handleMiscModalKeys(
       appStore.setHelpSearchQuery('');
       appStore.setHelpActiveTab(nextTab);
       appStore.setHelpGuideIndex(nextTab === 'guides' ? 0 : -1);
+      uiStore.helpKeybindScrollBoxRef = undefined;
+      uiStore.helpGuideScrollBoxRef = undefined;
       return true;
     }
 
@@ -638,12 +642,38 @@ export async function handleMiscModalKeys(
       }
     }
 
-    // j/k or down/up: navigate guide list when guides tab is active and not searching
+    // Guides tab: j/k move selection; arrows and page/top/bottom keys scroll vertically.
     if (!appStore.helpSearchActive() && appStore.helpActiveTab() === 'guides') {
-      const isDown =
-        event.name === 'j' || event.name === 'down' || event.name === 'Down';
-      const isUp =
-        event.name === 'k' || event.name === 'up' || event.name === 'Up';
+      const sb = uiStore.helpGuideScrollBoxRef;
+      if (event.name === 'down' || event.name === 'Down') {
+        sb?.scrollBy(1);
+        return true;
+      }
+      if (event.name === 'up' || event.name === 'Up') {
+        sb?.scrollBy(-1);
+        return true;
+      }
+      if (event.name === 'd' || event.sequence === 'd') {
+        const half = Math.max(1, Math.floor((sb?.viewport.height ?? 10) / 2));
+        sb?.scrollBy(half);
+        return true;
+      }
+      if (event.name === 'u' || event.sequence === 'u') {
+        const half = Math.max(1, Math.floor((sb?.viewport.height ?? 10) / 2));
+        sb?.scrollBy(-half);
+        return true;
+      }
+      if ((event.name === 'g' || event.sequence === 'g') && !event.shift) {
+        sb?.scrollTo(0);
+        return true;
+      }
+      if (event.name === 'G' || event.sequence === 'G' || (event.name === 'g' && event.shift)) {
+        sb?.scrollTo(sb?.scrollHeight ?? 0);
+        return true;
+      }
+
+      const isDown = event.name === 'j';
+      const isUp = event.name === 'k';
       if (isDown || isUp) {
         const maxIdx = allGuides.length - 1;
         if (maxIdx >= 0) {
@@ -662,6 +692,8 @@ export async function handleMiscModalKeys(
           const guide = allGuides[idx];
           if (guide) {
             uiStore.helpKeybindScrollBoxRef = undefined;
+            uiStore.helpGuideScrollBoxRef = undefined;
+            uiStore.markdownModalScrollBoxRef = undefined;
             actions.helpActions.closeHelp();
             void guide.import().then((content) => {
               uiStore.setMarkdownModalTitle("");

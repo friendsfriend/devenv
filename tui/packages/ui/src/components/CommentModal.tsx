@@ -36,8 +36,7 @@ export function CommentModal(props: CommentModalProps) {
 					Comment body (Enter for newline, Ctrl+Enter to submit):
 				</text>
 				<box
-					borderStyle="single"
-					borderColor={uiColors.borderHighlight}
+					backgroundColor={uiColors.bgMantle}
 					style={{
 						width: "100%",
 						flexGrow: 1,
