@@ -10,6 +10,7 @@ import {
 	MergeRequestDetailView,
 	ChangedFilesView,
 	DiscussionsView,
+	TimelineView,
 	TestResultsDetailView,
 	JobsDetailView,
 	ProvidersView,
@@ -120,10 +121,7 @@ export function ContentRouter(props: ContentRouterProps) {
 									when={appStore.viewMode() === "issues"}
 									fallback={
 										<Show
-											when={
-												appStore.viewMode() === "issueDetail" &&
-												issueStore.selectedIssue()
-											}
+											when={appStore.viewMode() === "issueDetail" && issueStore.selectedIssue() || appStore.viewMode() === "issueTimeline"}
 											fallback={
 												<Show
 													when={appStore.viewMode() === "mergeRequests"}
@@ -339,10 +337,12 @@ export function ContentRouter(props: ContentRouterProps) {
 														searchQuery={mrStore.mrSearchQuery()}
 														currentPage={mrStore.currentPage()}
 														totalPages={mrStore.totalPages()}
+														state={mrStore.mrState()}
 													/>
 												</Show>
 											}
 										>
+											<Show when={appStore.viewMode() === "issueDetail"}>
 											<IssueDetailView
 												issue={issueStore.selectedIssue()!}
 												comments={issueStore.issueComments()}
@@ -361,6 +361,21 @@ export function ContentRouter(props: ContentRouterProps) {
 													issueStore.issueDetailScrollBoxRef = scrollBox;
 												}}
 											/>
+											</Show>
+											<Show when={appStore.viewMode() === "issueTimeline"}>
+												<TimelineView
+													items={issueStore.issueComments().map(function(c: any) { return { id: 'ic-' + c.id, notes: [{ id: c.id, type: 'DiscussionNote', body: c.body, author: c.author, created_at: c.created_at, updated_at: c.updated_at, system: c.system }] }; })}
+													selectedIndex={issueStore.selectedTimelineIndex()}
+													isIssueTimeline={true}
+													title={"Timeline (" + issueStore.issueComments().length + ")"}
+													loading={issueStore.issueCommentsLoading()}
+													error={issueStore.issueCommentsError()}
+													onClose={() => {
+														issueStore.setSelectedTimelineIndex(0);
+														appStore.setViewMode("issueDetail");
+													}}
+												/>
+											</Show>
 										</Show>
 									}
 								>
@@ -373,6 +388,7 @@ export function ContentRouter(props: ContentRouterProps) {
 										totalPages={issueStore.totalPages()}
 										totalCount={issueStore.totalCount()}
 										scope={issueStore.issueScope()}
+										state={issueStore.issueState()}
 										searchMode={issueStore.issueSearchMode()}
 										searchQuery={issueStore.issueSearchQuery()}
 										onClose={() => {

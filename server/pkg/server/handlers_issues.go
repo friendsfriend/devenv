@@ -62,6 +62,7 @@ func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 	appIdent := r.URL.Query().Get("appIdent")
 	scope := r.URL.Query().Get("scope")
 	search := r.URL.Query().Get("search")
+	state := r.URL.Query().Get("state")
 	pageStr := r.URL.Query().Get("page")
 	perPageStr := r.URL.Query().Get("perPage")
 
@@ -93,20 +94,24 @@ func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if state == "" {
+		state = "open"
+	}
+
 	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] handleGitHubIssues: appIdent=%q scope=%q search=%q page=%d perPage=%d", appIdent, scope, search, page, perPage)
+	log.Printf("[DEBUG] handleGitHubIssues: appIdent=%q scope=%q state=%q search=%q page=%d perPage=%d", appIdent, scope, state, search, page, perPage)
 
 	result, err := issuesClient.GetIssues(nil, &issues.IssueListOptions{
 		Scope:   scope,
 		Search:  search,
 		Page:    page,
 		PerPage: perPage,
-		State:   "open",
+		State:   state,
 	})
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch issues: %v", err), http.StatusInternalServerError)
@@ -215,6 +220,7 @@ func (s *Server) handleGitLabIssues(w http.ResponseWriter, r *http.Request) {
 	appIdent := r.URL.Query().Get("appIdent")
 	scope := r.URL.Query().Get("scope")
 	search := r.URL.Query().Get("search")
+	state := r.URL.Query().Get("state")
 	pageStr := r.URL.Query().Get("page")
 	perPageStr := r.URL.Query().Get("perPage")
 
@@ -246,6 +252,10 @@ func (s *Server) handleGitLabIssues(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if state == "" {
+		state = "opened"
+	}
+
 	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
@@ -257,7 +267,7 @@ func (s *Server) handleGitLabIssues(w http.ResponseWriter, r *http.Request) {
 		Search:  search,
 		Page:    page,
 		PerPage: perPage,
-		State:   "opened",
+		State:   state,
 	})
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch issues: %v", err), http.StatusInternalServerError)

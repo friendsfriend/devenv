@@ -292,6 +292,7 @@ export class DevEnvClient {
 		page: number = 1,
 		perPage: number = 50,
 		search?: string,
+		state?: string,
 	): Promise<import("@devenv/types").IssueListResult> {
 		return getIssues(
 			this.deps,
@@ -301,6 +302,7 @@ export class DevEnvClient {
 			page,
 			perPage,
 			search,
+			state,
 		);
 	}
 	getIssue(

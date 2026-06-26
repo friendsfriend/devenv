@@ -98,6 +98,7 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["G"], description: "Go to last MR", context: "mergeRequests", category: "Navigation" },
 	{ keys: ["Enter"], description: "View selected MR detail", context: "mergeRequests", category: "Actions" },
 	{ keys: ["/"], description: "Search merge requests", context: "mergeRequests", category: "Actions" },
+	{ keys: ["s"], description: "Toggle MR state filter: opened/closed/all", context: "mergeRequests", category: "Actions" },
 	{ keys: ["[", "Shift+K"], description: "Previous page", context: "mergeRequests", category: "Actions" },
 	{ keys: ["]", "Shift+J"], description: "Next page", context: "mergeRequests", category: "Actions" },
 	{ keys: ["Esc"], description: "Back to table", context: "mergeRequests", category: "General" },
@@ -181,6 +182,7 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["g"], description: "Go to top", context: "issues", category: "Navigation" },
 	{ keys: ["G"], description: "Go to bottom", context: "issues", category: "Navigation" },
 	{ keys: ["/"], description: "Search issues", context: "issues", category: "Actions" },
+	{ keys: ["s"], description: "Toggle issue state filter: open/closed/all", context: "issues", category: "Actions" },
 	{ keys: ["Enter"], description: "View issue detail", context: "issues", category: "Actions" },
 	{ keys: ["[", "Shift+K"], description: "Previous page", context: "issues", category: "Actions" },
 	{ keys: ["]", "Shift+J"], description: "Next page", context: "issues", category: "Actions" },
@@ -197,6 +199,7 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["Shift+R"], description: "View references", context: "issueDetail", category: "Actions" },
 	{ keys: ["Shift+M"], description: "View linked MRs", context: "issueDetail", category: "Actions" },
 	{ keys: ["Shift+I"], description: "View referenced issues", context: "issueDetail", category: "Actions" },
+	{ keys: ["t"], description: "Open full timeline view", context: "issueDetail", category: "Actions" },
 	{ keys: ["Esc", "q"], description: "Back to issue list", context: "issueDetail", category: "General" },
 
 	// ========== agentView ==========
@@ -303,6 +306,12 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["j/k", "↑/↓"], description: "Navigate editors", context: "editorPicker", category: "Navigation" },
 	{ keys: ["Enter"], description: "Open with selected editor", context: "editorPicker", category: "Actions" },
 	{ keys: ["Esc"], description: "Cancel", context: "editorPicker", category: "General" },
+
+	// ========== issueTimeline ==========
+	{ keys: ["j/k", "↑/↓"], description: "Navigate timeline entries", context: "issueTimeline", category: "Navigation" },
+	{ keys: ["g"], description: "Go to top", context: "issueTimeline", category: "Navigation" },
+	{ keys: ["G"], description: "Go to bottom", context: "issueTimeline", category: "Navigation" },
+	{ keys: ["Esc", "q"], description: "Back to issue detail", context: "issueTimeline", category: "General" },
 
 	// ========== Issue scope picker ==========
 	{ keys: ["j/k", "↑/↓"], description: "Navigate scopes", context: "issueScopePicker", category: "Navigation" },

@@ -106,6 +106,18 @@ export async function handleMrListKeys(
     return true;
   }
 
+  // s to toggle MR state — works even when list is empty (lets user switch filter)
+  if (event.name === 's' && !event.shift && !event.ctrl) {
+    const current = mrStore.mrState();
+    const next =
+      current === 'opened' ? 'closed' :
+      current === 'closed' ? 'all' :
+      'opened';
+    mrStore.setMrState(next);
+    void mrActions.loadAllMergeRequests(1, undefined, next);
+    return true;
+  }
+
   if (mrs.length === 0) return true;
 
   // j or Down to move down

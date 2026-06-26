@@ -66,6 +66,7 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 
 	appIdent := r.URL.Query().Get("appIdent")
 	allBranches := r.URL.Query().Get("allBranches")
+	state := r.URL.Query().Get("state")
 	pageStr := r.URL.Query().Get("page")
 	perPageStr := r.URL.Query().Get("perPage")
 	search := r.URL.Query().Get("search")
@@ -128,9 +129,13 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 	// but keep backward compat when no page params (for detail views)
 	skipDetails := pageStr != "" || perPageStr != ""
 
+	if state == "" {
+		state = "opened"
+	}
+
 	result, err := ghClient.GetMRs(repoInfo.ToMR(), &mr.MRListOptions{
 		SourceBranch: sourceBranchFilter,
-		State:        "opened",
+		State:        state,
 		Page:         page,
 		PerPage:      perPage,
 		Search:       search,
