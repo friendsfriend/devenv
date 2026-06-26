@@ -672,13 +672,11 @@ export async function handleMiscModalKeys(
         return true;
       }
 
-      const isDown = event.name === 'j';
-      const isUp = event.name === 'k';
-      if (isDown || isUp) {
+      if (isDownKey(event) || isUpKey(event)) {
         const maxIdx = allGuides.length - 1;
         if (maxIdx >= 0) {
           const current = appStore.helpGuideIndex() < 0 ? 0 : appStore.helpGuideIndex();
-          appStore.setHelpGuideIndex(isDown
+          appStore.setHelpGuideIndex(isDownKey(event)
             ? Math.min(current + 1, maxIdx)
             : Math.max(current - 1, 0)
           );

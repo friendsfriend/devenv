@@ -88,11 +88,10 @@ export function JobsDetailView(props: JobsDetailViewProps) {
 
   // Lines of fixed chrome outside the list area:
   //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
-  //   Outer rounded border top + bottom      = 2
   //   Stage tabs bar                         = 3
   //   Table header row                       = 1
-  //                                   Total  = 12
-  const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 3 + 1;
+  //                                   Total  = 9
+  const RESERVED_LINES = LAYOUT_CHROME_LINES + 3 + 1;
 
   // Format duration
   const formatDuration = (job: Job): string => {
@@ -105,46 +104,6 @@ export function JobsDetailView(props: JobsDetailViewProps) {
       return `${minutes}m`;
     }
     return '-';
-  };
-
-  // Get stage border color based on job statuses
-  // Priority: failed > warning/pending/running > success > default
-  const getStageBorderColor = (jobs: Job[]): string => {
-    let hasFailed = false;
-    let hasWarning = false;
-    let hasSuccess = false;
-
-    for (const job of jobs) {
-      const status = job.status.toLowerCase();
-      
-      // Check for failures (highest priority)
-      if (status === 'failed') {
-        hasFailed = true;
-        break; // No need to check further, failure takes precedence
-      }
-      
-      // Check for warnings/pending/running
-      if (status === 'pending' || status === 'created' || status === 'running') {
-        hasWarning = true;
-      }
-      
-      // Check for success
-      if (status === 'success') {
-        hasSuccess = true;
-      }
-    }
-
-    // Return color based on priority
-    if (hasFailed) {
-      return uiColors.error; // Red border for failed jobs
-    }
-    if (hasWarning) {
-      return uiColors.warning; // Yellow border for pending/running jobs
-    }
-    if (hasSuccess) {
-      return uiColors.success; // Green border for all successful
-    }
-    return uiColors.textMuted; // Gray border for other cases (canceled, skipped, etc.)
   };
 
   return (
@@ -165,6 +124,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
       <Show when={!props.loading && !props.error && props.jobs.length > 0}>
         {/* Stage Tabs */}
         <box
+          backgroundColor={uiColors.bgBase}
           style={{
             width: '100%',
             flexDirection: 'row',
@@ -176,27 +136,21 @@ export function JobsDetailView(props: JobsDetailViewProps) {
               const isActive = () => props.selectedStageIndex === index();
               return (
                 <box
-                  border={true}
-                  borderStyle="rounded"
-                  borderColor={isActive() ? uiColors.primary : getStageBorderColor(stage.jobs)}
+                  backgroundColor={isActive() ? uiColors.bgSurface0 : uiColors.bgMantle}
                   style={{
                     paddingLeft: 2,
                     paddingRight: 2,
                     height: 3,
                     alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  <box
-                    backgroundColor={isActive() ? uiColors.bgSurface0 : undefined}
-                    style={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}
+                  <text
+                    fg={isActive() ? uiColors.primary : uiColors.textMuted}
+                    attributes={isActive() ? TextAttributes.BOLD : undefined}
                   >
-                    <text
-                      fg={isActive() ? uiColors.primary : uiColors.textMuted}
-                      attributes={isActive() ? TextAttributes.BOLD : undefined}
-                    >
-                      {stage.name} ({stage.jobs.length})
-                    </text>
-                  </box>
+                    {stage.name} ({stage.jobs.length})
+                  </text>
                 </box>
               );
             }}
