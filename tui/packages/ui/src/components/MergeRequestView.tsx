@@ -1,4 +1,5 @@
-import { Show } from 'solid-js';
+import { TextAttributes } from '@opentui/core';
+import { Show, createMemo } from 'solid-js';
 import { uiColors } from '../colors';
 import type { MergeRequest } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
@@ -19,6 +20,7 @@ interface MergeRequestViewProps {
   searchQuery?: string;
   currentPage?: number;
   totalPages?: number;
+  state?: string;
 }
 
 /**
@@ -42,12 +44,21 @@ export function MergeRequestView(props: MergeRequestViewProps) {
     return { text: '○', fg: uiColors.textMuted };
   };
 
-  const summary = () => {
+  const stateColor = createMemo(() => {
+    const s = props.state ?? 'opened';
+    if (s === 'opened') return uiColors.success;
+    if (s === 'closed') return uiColors.error;
+    return uiColors.warning; // "all"
+  });
+
+  const summary = createMemo(() => {
     const cp = props.currentPage ?? 1;
     const tp = props.totalPages;
     const loaded = props.mergeRequests.length;
-    return tp && tp > 0 ? `[Pg ${cp}/${tp}] [${loaded} loaded]` : `[Pg ${cp}] [${loaded} loaded]`;
-  };
+    return tp && tp > 0
+      ? `[Pg ${cp}/${tp}] [${loaded} loaded]`
+      : `[Pg ${cp}] [${loaded} loaded]`;
+  });
 
   return (
     <ContentPanel>
@@ -59,45 +70,50 @@ export function MergeRequestView(props: MergeRequestViewProps) {
         <CenteredState message={props.error!} color={uiColors.error} />
       </Show>
 
-      <Show when={!props.loading && !props.error && props.mergeRequests.length === 0}>
-        <CenteredState message="No merge requests found" />
-      </Show>
-
-      <Show when={!props.loading && !props.error && props.mergeRequests.length > 0}>
+      <Show when={!props.loading && !props.error}>
         <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery}>
           <box style={{ width: '100%', flexDirection: 'row' }}>
             <text fg={uiColors.textPrimary}>Merge requests</text>
+            <box style={{ width: 'auto', flexDirection: 'row', gap: 1 }}>
+              <text fg={stateColor()} attributes={TextAttributes.BOLD}>{`[${props.state ?? 'opened'}]`}</text>
+            </box>
             <box style={{ width: 'auto', marginLeft: 'auto' }}>
               <text fg={uiColors.textMuted}>{summary()}</text>
             </box>
           </box>
         </SearchHeader>
 
-        <ScrollableList<MergeRequest>
-          items={props.mergeRequests}
-          selectedIndex={props.selectedIndex}
-          reservedLines={RESERVED_LINES}
-          estimatedItemHeight={4}
-          showScrollIndicator={false}
-          renderItem={(mr, isSelected) => {
-            const mergeStatus = getMergeStatusText(mr);
-            const pipeline = mr.head_pipeline?.status || '-';
-            return (
-              <WorkItemCard
-                marker={`!${mr.iid}`}
-                prefix={`${mergeStatus.text} `}
-                prefixColor={mergeStatus.fg}
-                title={truncateText(mr.title, 80)}
-                statusText={mr.state}
-                statusColor={getIssueStateColor(mr.state)}
-                statusSuffixText={` • pipeline ${pipeline}`}
-                statusSuffixColor={getPipelineStatusColor(mr.head_pipeline?.status)}
-                metadata={`@${mr.author.name} • updated ${formatShortDate(mr.updated_at)}`}
-                selected={isSelected()}
-              />
-            );
-          }}
-        />
+        <Show when={props.mergeRequests.length === 0}
+          fallback={
+            <ScrollableList<MergeRequest>
+              items={props.mergeRequests}
+              selectedIndex={props.selectedIndex}
+              reservedLines={RESERVED_LINES}
+              estimatedItemHeight={4}
+              showScrollIndicator={false}
+              renderItem={(mr, isSelected) => {
+                const mergeStatus = getMergeStatusText(mr);
+                const pipeline = mr.head_pipeline?.status || '-';
+                return (
+                  <WorkItemCard
+                    marker={`!${mr.iid}`}
+                    prefix={`${mergeStatus.text} `}
+                    prefixColor={mergeStatus.fg}
+                    title={truncateText(mr.title, 80)}
+                    statusText={mr.state}
+                    statusColor={getIssueStateColor(mr.state)}
+                    statusSuffixText={` • pipeline ${pipeline}`}
+                    statusSuffixColor={getPipelineStatusColor(mr.head_pipeline?.status)}
+                    metadata={`@${mr.author.name} • updated ${formatShortDate(mr.updated_at)}`}
+                    selected={isSelected()}
+                  />
+                );
+              }}
+            />
+          }
+        >
+          <CenteredState message="No merge requests found" />
+        </Show>
       </Show>
     </ContentPanel>
   );

@@ -97,7 +97,7 @@ export function createMrActions(
 		}
 	};
 
-	const loadAllMergeRequests = async (page?: number, search?: string) => {
+	const loadAllMergeRequests = async (page?: number, search?: string, state?: string) => {
 		if (appStore.operationInProgressForApp())
 			return showError(
 				"Operation In Progress",
@@ -106,6 +106,8 @@ export function createMrActions(
 		const app = getSelectedApp();
 		if (!app) return;
 		const p = page ?? mrStore.currentPage();
+		const s = state ?? mrStore.mrState();
+		mrStore.setMrState(s);
 		mrStore.setMrLoading(true);
 		mrStore.setMrError("");
 		mrStore.setSelectedMRIndex(0);
@@ -113,7 +115,7 @@ export function createMrActions(
 		try {
 			const result = await client.getMergeRequests(
 				app.ident,
-				"opened",
+				s,
 				"all",
 				app.sourceType,
 				p,
@@ -361,7 +363,7 @@ export function createMrActions(
 			await client.toggleMRApproval(app.ident, mr.iid, app.sourceType);
 			const fetched = await client.getMergeRequests(
 				app.ident,
-				"opened",
+				mrStore.mrState(),
 				"all",
 				app.sourceType,
 				mrStore.currentPage(),
@@ -393,7 +395,7 @@ export function createMrActions(
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			const fetched = await client.getMergeRequests(
 				app.ident,
-				"opened",
+				mrStore.mrState(),
 				"all",
 				app.sourceType,
 				mrStore.currentPage(),

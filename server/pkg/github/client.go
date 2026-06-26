@@ -190,6 +190,39 @@ type ghPRReviewComment struct {
 	PullRequestReviewID int       `json:"pull_request_review_id"`
 }
 
+// ghTimelineEvent represents an item from the GitHub Issue/PR Timeline API.
+// The timeline returns a mixed array: issue comments (event="commented") and
+// issue events (labeled, assigned, renamed, milestoned, etc.).
+// We use json.RawMessage for sub-objects so we can switch on event type.
+type ghTimelineEvent struct {
+	ID        int              `json:"id"`
+	Event     string           `json:"event"` // "commented", "labeled", "assigned", "renamed", etc.
+	Actor     ghUser           `json:"actor"`
+	CreatedAt time.Time        `json:"created_at"`
+	Body      string           `json:"body,omitempty"` // only for "commented" events
+	Label     *struct {
+		Name string `json:"name"`
+	} `json:"label,omitempty"`
+	Assignee *ghUser `json:"assignee,omitempty"`
+	Rename   *struct {
+		From string `json:"from"`
+		To   string `json:"to"`
+	} `json:"rename,omitempty"`
+	Milestone *struct {
+		Title string `json:"title"`
+	} `json:"milestone,omitempty"`
+	RequestedReviewer *ghUser `json:"requested_reviewer,omitempty"`
+	Source *struct {
+		Type string `json:"type"`
+		Issue *struct {
+			Number int    `json:"number"`
+			Title  string `json:"title"`
+			HTMLURL string `json:"html_url"`
+		} `json:"issue,omitempty"`
+	} `json:"source,omitempty"`
+	PerformedViaGithubApp *json.RawMessage `json:"performed_via_github_app,omitempty"`
+}
+
 // --- Canonical types (matching what the server returns to the TUI) ---
 
 // MergeRequest is the canonical merge/pull request shape returned by the server.
@@ -512,6 +545,7 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 	sourceBranch := ""
 	targetBranch := ""
 	search := ""
+	state := "open"
 	if options != nil {
 		if options.Page > 0 {
 			page = options.Page
@@ -522,16 +556,36 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 		sourceBranch = options.SourceBranch
 		targetBranch = options.TargetBranch
 		search = options.Search
+		if options.State != "" {
+			state = options.State
+		}
 	}
+
+	skipDetails := options != nil && options.SkipDetails
 
 	// When search is provided, use the GitHub search/issues endpoint
 	// since the pulls list endpoint doesn't support search.
 	if search != "" {
-		return c.searchMRs(ghInfo, search, page, perPage, options)
+		return c.searchMRs(ghInfo, search, page, perPage, state, skipDetails)
+	}
+
+	// GitHub API doesn't have a native "merged" state. Merged PRs have state=closed + merged=true.
+	// Map our state values to GitHub API values:
+	//   "opened" → "open"
+	//   "closed" → "closed" (GitHub returns all closed PRs — merged ones are filtered in prStateToMRState)
+	//   "all"    → "all"
+	apiState := state
+	switch state {
+	case "closed":
+		apiState = "closed"
+	case "opened":
+		apiState = "open"
+	default:
+		apiState = state
 	}
 
 	params := url.Values{}
-	params.Set("state", "open")
+	params.Set("state", apiState)
 	params.Set("per_page", fmt.Sprintf("%d", perPage))
 	params.Set("page", fmt.Sprintf("%d", page))
 	if sourceBranch != "" {
@@ -567,8 +621,6 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 		return nil, fmt.Errorf("failed to parse pull requests: %w", err)
 	}
 
-	skipDetails := options != nil && options.SkipDetails
-
 	results := make([]mr.MergeRequest, 0, len(prs))
 	for _, pr := range prs {
 		var approvals *MRApprovals
@@ -585,6 +637,7 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 				log.Printf("[WARN] Failed to fetch workflow run for PR #%d (SHA %s): %v", pr.Number, pr.Head.SHA, err)
 			}
 		}
+
 		mrResult := convertPRToMR(pr, approvals, latestRun)
 		results = append(results, mrResult)
 	}
@@ -603,9 +656,10 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 // in the search query filters out regular issues, returning PRs only.
 // This is the documented GitHub API approach — the pulls list endpoint
 // (/repos/{owner}/{repo}/pulls) does not support free-text search.
-func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, options *mr.MRListOptions) (*mr.MRListResult, error) {
-	// Qualifiers: repo, type:pr (pull requests only), state:open, plus free text
-	searchQuery := fmt.Sprintf("repo:%s/%s type:pr state:open %s", ghInfo.Owner, ghInfo.Repo, query)
+func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, state string, skipDetails bool) (*mr.MRListResult, error) {
+	// Build search query with state qualifier.
+	// GitHub search API values: state:open, state:closed, state:all
+	searchQuery := strings.TrimSpace(fmt.Sprintf("repo:%s/%s type:pr state:%s %s", ghInfo.Owner, ghInfo.Repo, state, query))
 
 	params := url.Values{}
 	params.Set("q", searchQuery)
@@ -653,8 +707,6 @@ func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, op
 	// Parse pagination from Link header
 	linkHeader := resp.Header.Get("Link")
 	_, totalPages := parseLinkHeaderForPagination(linkHeader, page)
-
-	skipDetails := options != nil && options.SkipDetails
 
 	results := make([]mr.MergeRequest, 0, len(searchResp.Items))
 	for _, item := range searchResp.Items {
@@ -898,6 +950,151 @@ func (c *client) GetMRChanges(info *mr.RepoInfo, mrNumber int) ([]mr.MRChange, e
 	return changes, nil
 }
 
+// fetchPRTimelineEvents fetches timeline events for a PR from GitHub's Issue Timeline API.
+// The timeline includes both comments (event="commented") and events (labeled, assigned, etc.).
+// We paginate up to maxPages (3 pages × 100 = 300 items, enough for most PRs).
+func (c *client) fetchPRTimelineEvents(info *RepoInfo, prNumber int) ([]ghTimelineEvent, error) {
+	var allEvents []ghTimelineEvent
+	maxPages := 3
+
+	for page := 1; page <= maxPages; page++ {
+		apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/timeline?per_page=100&page=%d",
+			info.Owner, info.Repo, prNumber, page)
+
+		resp, err := c.doRequest("GET", apiURL, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch timeline events: %w", err)
+		}
+
+		body, err := readBody(resp)
+		if err != nil {
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("GitHub API error fetching timeline (status %d): %s", resp.StatusCode, string(body))
+		}
+
+		var pageEvents []ghTimelineEvent
+		if err := json.Unmarshal(body, &pageEvents); err != nil {
+			return nil, fmt.Errorf("failed to parse timeline events: %w", err)
+		}
+
+		allEvents = append(allEvents, pageEvents...)
+
+		// If response has fewer items than per_page, we're on the last page
+		if len(pageEvents) < 100 {
+			break
+		}
+	}
+
+	return allEvents, nil
+}
+
+// timelineEventToBody converts a GitHub timeline event into a human-readable system note body,
+// matching the style of GitLab system notes so the TUI DiscussionsView renders them uniformly.
+func timelineEventToBody(event *ghTimelineEvent) string {
+	switch event.Event {
+	case "labeled":
+		if event.Label != nil {
+			return fmt.Sprintf("added ~%s label", event.Label.Name)
+		}
+		return "added label"
+	case "unlabeled":
+		if event.Label != nil {
+			return fmt.Sprintf("removed ~%s label", event.Label.Name)
+		}
+		return "removed label"
+	case "assigned":
+		if event.Assignee != nil {
+			return fmt.Sprintf("assigned to @%s", event.Assignee.Login)
+		}
+		return "assigned"
+	case "unassigned":
+		if event.Assignee != nil {
+			return fmt.Sprintf("unassigned @%s", event.Assignee.Login)
+		}
+		return "unassigned"
+	case "milestoned":
+		if event.Milestone != nil {
+			return fmt.Sprintf("added to milestone **%s**", event.Milestone.Title)
+		}
+		return "added to milestone"
+	case "demilestoned":
+		if event.Milestone != nil {
+			return fmt.Sprintf("removed from milestone **%s**", event.Milestone.Title)
+		}
+		return "removed from milestone"
+	case "renamed":
+		if event.Rename != nil {
+			return fmt.Sprintf("changed title from **%s** to **%s**", event.Rename.From, event.Rename.To)
+		}
+		return "changed title"
+	case "locked":
+		return "locked the conversation"
+	case "unlocked":
+		return "unlocked the conversation"
+	case "review_requested":
+		if event.RequestedReviewer != nil {
+			return fmt.Sprintf("requested review from @%s", event.RequestedReviewer.Login)
+		}
+		return "requested review"
+	case "review_request_removed":
+		if event.RequestedReviewer != nil {
+			return fmt.Sprintf("removed review request from @%s", event.RequestedReviewer.Login)
+		}
+		return "removed review request"
+	case "ready_for_review":
+		return "marked as ready for review"
+	case "merged":
+		return "merged the commit"
+	case "closed":
+		return "closed"
+	case "reopened":
+		return "reopened"
+	case "head_ref_deleted":
+		return "deleted the head branch"
+	case "head_ref_restored":
+		return "restored the head branch"
+	case "cross-referenced":
+		if event.Source != nil && event.Source.Issue != nil {
+			return fmt.Sprintf("mentioned in #%d %s", event.Source.Issue.Number, event.Source.Issue.Title)
+		}
+		return "mentioned in another issue"
+	case "base_ref_changed":
+		return "changed the base branch"
+	case "reviewed":
+		return "submitted a review"
+	case "committed":
+		return "added a commit"
+	case "comment_removed":
+		return "removed a comment"
+	case "marked_as_duplicate":
+		return "marked as duplicate"
+	case "unmarked_as_duplicate":
+		return "unmarked as duplicate"
+	case "converted_note_to_issue":
+		return "converted to issue"
+	case "transferred":
+		return "transferred"
+	case "subscribed":
+		return "subscribed"
+	case "unsubscribed":
+		return "unsubscribed"
+	case "pinned":
+		return "pinned"
+	case "unpinned":
+		return "unpinned"
+	case "automatic_base_change_failed":
+		return "automatic base change failed"
+	case "automatic_base_change_succeeded":
+		return "automatic base change succeeded"
+	default:
+		// For unknown events, include the raw event name so it's visible
+		return event.Event
+	}
+}
+
 // GetDiscussions implements mr.Client.GetDiscussions.
 func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussion, error) {
 	ghInfo, err := FromMR(info)
@@ -915,8 +1112,22 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 		return nil, err
 	}
 
+	timelineEvents, err := c.fetchPRTimelineEvents(ghInfo, mrNumber)
+	if err != nil {
+		// Timeline is a nice-to-have; log the error, don't fail the whole request
+		log.Printf("[WARN] Failed to fetch timeline events for PR #%d: %v", mrNumber, err)
+		timelineEvents = nil
+	}
+
+	// Build a set of issue comment IDs so we skip "commented" events that duplicate them
+	issueCommentIDs := make(map[int]bool)
+	for _, ic := range issueComments {
+		issueCommentIDs[ic.ID] = true
+	}
+
 	var discussions []mr.Discussion
 
+	// 1. Build discussion threads from review comments (inline code review)
 	rootByID := make(map[int]*mr.Discussion)
 	var orderedRoots []int
 
@@ -948,6 +1159,7 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 
 	_ = orderedRoots
 
+	// 2. Add issue comments (general PR comments)
 	for i := range issueComments {
 		ic := &issueComments[i]
 		d := mr.Discussion{
@@ -972,7 +1184,38 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 		discussions = append(discussions, d)
 	}
 
-	log.Printf("[DEBUG] Fetched %d discussions for PR #%d", len(discussions), mrNumber)
+	// 3. Add timeline events as system notes (skip "commented" events already covered by issue comments)
+	for i := range timelineEvents {
+		e := &timelineEvents[i]
+		// Skip comment-type events — already in issueComments
+		if e.Event == "commented" && issueCommentIDs[e.ID] {
+			continue
+		}
+
+		body := timelineEventToBody(e)
+		d := mr.Discussion{
+			ID:             fmt.Sprintf("timeline-%d", e.ID),
+			IndividualNote: true,
+			Notes: []mr.Note{
+				{
+					ID:        e.ID,
+					Type:      "TimelineEvent",
+					Body:      body,
+					System:    true,
+					CreatedAt: e.CreatedAt,
+					UpdatedAt: e.CreatedAt,
+					Author: mr.NoteAuthor{
+						Username: e.Actor.Login,
+						Name:     e.Actor.Login,
+					},
+				},
+			},
+		}
+		discussions = append(discussions, d)
+	}
+
+	log.Printf("[DEBUG] Fetched %d discussions (incl. %d timeline events) for PR #%d",
+		len(discussions), len(timelineEvents), mrNumber)
 	return discussions, nil
 }
 

@@ -19,6 +19,7 @@ export { handleMrDetailKeys } from "./mr-detail-keys";
 export { handleChangedFilesKeys } from "./changed-files-keys";
 export { handleTestResultsKeys } from "./test-results-keys";
 export { handleDiscussionsKeys } from "./discussions-keys";
+export { handleIssueTimelineKeys } from "./issue-timeline-keys";
 export { handleMiscModalKeys } from "./misc-modal-keys";
 export { handleWorktreeManagerKeys } from "./worktree-manager-keys";
 export { handleTableKeys } from "./table-keys";

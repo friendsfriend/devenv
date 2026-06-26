@@ -23,6 +23,7 @@ export type ViewMode =
 	| "appDetail"
 	| "issues"
 	| "issueDetail"
+	| "issueTimeline"
 	| "issueScopePicker"
 	| "linkedMRs"
 	| "referencedIssues"

@@ -44,7 +44,203 @@ type ghIssue struct {
 
 // ghIssueComment is defined in client.go — using that type here
 
-// --- Conversion helpers ---
+
+
+// timelineEventToComment converts a timeline event to an IssueComment with system=true.
+func timelineEventToComment(e *ghTimelineEvent) issues.IssueComment {
+	var body string
+	switch e.Event {
+	case "labeled":
+		if e.Label != nil {
+			body = fmt.Sprintf("added ~%s label", e.Label.Name)
+		} else {
+			body = "added label"
+		}
+	case "unlabeled":
+		if e.Label != nil {
+			body = fmt.Sprintf("removed ~%s label", e.Label.Name)
+		} else {
+			body = "removed label"
+		}
+	case "assigned":
+		if e.Assignee != nil {
+			body = fmt.Sprintf("assigned to @%s", e.Assignee.Login)
+		} else {
+			body = "assigned"
+		}
+	case "unassigned":
+		if e.Assignee != nil {
+			body = fmt.Sprintf("unassigned @%s", e.Assignee.Login)
+		} else {
+			body = "unassigned"
+		}
+	case "milestoned":
+		if e.Milestone != nil {
+			body = fmt.Sprintf("added to milestone **%s**", e.Milestone.Title)
+		} else {
+			body = "added to milestone"
+		}
+	case "demilestoned":
+		if e.Milestone != nil {
+			body = fmt.Sprintf("removed from milestone **%s**", e.Milestone.Title)
+		} else {
+			body = "removed from milestone"
+		}
+	case "renamed":
+		if e.Rename != nil {
+			body = fmt.Sprintf("changed title from **%s** to **%s**", e.Rename.From, e.Rename.To)
+		} else {
+			body = "changed title"
+		}
+	case "locked":
+		body = "locked the conversation"
+	case "unlocked":
+		body = "unlocked the conversation"
+	case "closed":
+		body = "closed"
+	case "reopened":
+		body = "reopened"
+	case "cross-referenced":
+		if e.Source != nil && e.Source.Issue != nil {
+			body = fmt.Sprintf("mentioned in #%d %s", e.Source.Issue.Number, e.Source.Issue.Title)
+		} else {
+			body = "mentioned in another issue"
+		}
+	case "review_requested":
+		if e.RequestedReviewer != nil {
+			body = fmt.Sprintf("requested review from @%s", e.RequestedReviewer.Login)
+		} else {
+			body = "requested review"
+		}
+	case "review_request_removed":
+		if e.RequestedReviewer != nil {
+			body = fmt.Sprintf("removed review request from @%s", e.RequestedReviewer.Login)
+		} else {
+			body = "removed review request"
+		}
+	case "ready_for_review":
+		body = "marked as ready for review"
+	case "head_ref_deleted":
+		body = "deleted the head branch"
+	case "head_ref_restored":
+		body = "restored the head branch"
+	case "base_ref_changed":
+		body = "changed the base branch"
+	case "committed":
+		body = "added a commit"
+	case "subscribed":
+		body = "subscribed"
+	case "unsubscribed":
+		body = "unsubscribed"
+	case "pinned":
+		body = "pinned"
+	case "unpinned":
+		body = "unpinned"
+	case "marked_as_duplicate":
+		body = "marked as duplicate"
+	case "unmarked_as_duplicate":
+		body = "unmarked as duplicate"
+	default:
+		body = e.Event
+	}
+	authorName := e.Actor.Login
+	if authorName == "" {
+		authorName = "unknown"
+	}
+	return issues.IssueComment{
+		ID:   e.ID,
+		Body: body,
+		Author: struct {
+			Name     string `json:"name"`
+			Username string `json:"username"`
+		}{
+			Name:     authorName,
+			Username: authorName,
+		},
+		CreatedAt: e.CreatedAt,
+		UpdatedAt: e.CreatedAt,
+		System:    true,
+	}
+}
+
+// GetIssueComments returns both regular comments AND timeline events for GitHub issues.
+// GitHub's issue comments endpoint only returns user comments; timeline events
+// (label changes, assignments, etc.) are fetched from the Timeline API separately
+// and merged in as system notes — matching GitLab's behavior where system notes
+// are included in the comments response.
+func (ic *IssuesClient) GetIssueComments(info *issues.RepoInfo, number int) (*issues.IssueCommentListResult, error) {
+	ghInfo := ic.info
+	if info != nil {
+		if info.Owner != "" && info.Repo != "" {
+			ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
+		}
+	}
+
+	// Fetch regular comments
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments?per_page=100",
+		ghInfo.Owner, ghInfo.Repo, number)
+
+	resp, err := ic.c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var ghComments []ghIssueComment
+	if err := json.Unmarshal(body, &ghComments); err != nil {
+		return nil, fmt.Errorf("failed to parse issue comments: %w", err)
+	}
+
+	// Build results from regular comments (system=false)
+	results := make([]issues.IssueComment, 0, len(ghComments))
+	for _, c := range ghComments {
+		results = append(results, convertGHIssueComment(c))
+	}
+
+	// Also fetch timeline events (label changes, assignments, etc.)
+	// GitHub's timeline API returns both comments AND events.
+	// We only process events here (comments are already handled above).
+	timeline := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/timeline?per_page=100",
+		ghInfo.Owner, ghInfo.Repo, number)
+	tlResp, tlErr := ic.c.doRequest("GET", timeline, nil)
+	if tlErr == nil && tlResp.StatusCode == http.StatusOK {
+		tlBody, _ := readBody(tlResp)
+		var events []ghTimelineEvent
+		if json.Unmarshal(tlBody, &events) == nil {
+			for i := range events {
+				e := &events[i]
+				// Skip "commented" events — those are regular comments already fetched
+				if e.Event == "commented" {
+					continue
+				}
+				// Skip non-event types that have no event label
+				if e.Event == "" {
+					continue
+				}
+				results = append(results, timelineEventToComment(e))
+			}
+		}
+	}
+
+	linkHeader := resp.Header.Get("Link")
+	_, totalPages := parseLinkHeaderForPagination(linkHeader, 1)
+
+	return &issues.IssueCommentListResult{
+		Comments:    results,
+		TotalCount:  -1,
+		TotalPages:  totalPages,
+		CurrentPage: 1,
+		PerPage:     100,
+	}, nil
+}
 
 func convertGHIssue(issue ghIssue) issues.Issue {
 	result := issues.Issue{
@@ -146,6 +342,14 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 		}
 	}
 
+	// GitHub search API only supports `state:open` and `state:closed` qualifiers.
+	// `state:all` is not valid and would return 0 results.
+	// For "all", use the list endpoint which supports `state=all` natively,
+	// then filter out PRs from the response.
+	if state == "all" {
+		return ic.listAllIssues(ghInfo, scope, search, page, perPage)
+	}
+
 	// Build search query: combine explicit search with scope filter.
 	// We use the search API for scope filtering because GitHub's `filter`
 	// parameter doesn't work with fine-grained PATs. The search API
@@ -175,7 +379,7 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 
 // searchIssues searches issues via GitHub's /search/issues endpoint.
 func (ic *IssuesClient) searchIssues(ghInfo *RepoInfo, query string, page, perPage int, state string) (*issues.IssueListResult, error) {
-	searchQuery := fmt.Sprintf("repo:%s/%s type:issue state:%s %s", ghInfo.Owner, ghInfo.Repo, state, query)
+	searchQuery := strings.TrimSpace(fmt.Sprintf("repo:%s/%s type:issue state:%s %s", ghInfo.Owner, ghInfo.Repo, state, query))
 
 	params := url.Values{}
 	params.Set("q", searchQuery)
@@ -231,6 +435,82 @@ func (ic *IssuesClient) searchIssues(ghInfo *RepoInfo, query string, page, perPa
 	}, nil
 }
 
+// listAllIssues uses the list endpoint (not search) to fetch issues in ALL states.
+// GitHub's search API doesn't support `state:all`, so we fall back to the list endpoint
+// which supports `state=all` natively. PRs are filtered out post-fetch.
+func (ic *IssuesClient) listAllIssues(ghInfo *RepoInfo, scope, search string, page, perPage int) (*issues.IssueListResult, error) {
+	params := url.Values{}
+	params.Set("state", "all")
+	params.Set("page", fmt.Sprintf("%d", page))
+	params.Set("per_page", fmt.Sprintf("%d", perPage))
+	params.Set("sort", "updated")
+	params.Set("direction", "desc")
+
+	// Map scope to GitHub's filter parameter when available
+	// Note: `filter` doesn't work with fine-grained PATs, but for "all" state we
+	// use the list endpoint anyway. Scope-based filtering is best-effort here.
+	switch scope {
+	case "assigned-to-me":
+		params.Set("filter", "assigned")
+	case "created-by-me":
+		params.Set("filter", "created")
+	case "no-assignee":
+		// No direct filter for unassigned — we skip scope filtering
+	}
+
+	if search != "" {
+		// The list endpoint doesn't support free-text search, but it does support
+		// basic issue number search via the issue number itself.
+		// For actual text search, users should use the search API with state:open or state:closed.
+		params.Set("q", search)
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues?%s",
+		ghInfo.Owner, ghInfo.Repo, params.Encode())
+
+	resp, err := ic.c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list issues: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error listing issues (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	// Parse pagination headers
+	linkHeader := resp.Header.Get("Link")
+	currentPage, totalPages := parseLinkHeaderForPagination(linkHeader, page)
+
+	var items []struct {
+		ghIssue
+		PullRequest *json.RawMessage `json:"pull_request,omitempty"`
+	}
+	if err := json.Unmarshal(body, &items); err != nil {
+		return nil, fmt.Errorf("failed to parse issues: %w", err)
+	}
+
+	results := make([]issues.Issue, 0, len(items))
+	for _, item := range items {
+		if item.PullRequest != nil {
+			continue
+		}
+		results = append(results, convertGHIssue(item.ghIssue))
+	}
+
+	return &issues.IssueListResult{
+		Issues:      results,
+		TotalCount:  -1,
+		TotalPages:  totalPages,
+		CurrentPage: currentPage,
+		PerPage:     perPage,
+	}, nil
+}
+
 // GetIssue implements issues.Client.GetIssue.
 func (ic *IssuesClient) GetIssue(info *issues.RepoInfo, number int) (*issues.Issue, error) {
 	ghInfo := ic.info
@@ -267,52 +547,6 @@ func (ic *IssuesClient) GetIssue(info *issues.RepoInfo, number int) (*issues.Iss
 }
 
 // GetIssueComments implements issues.Client.GetIssueComments.
-func (ic *IssuesClient) GetIssueComments(info *issues.RepoInfo, number int) (*issues.IssueCommentListResult, error) {
-	ghInfo := ic.info
-	if info != nil {
-		if info.Owner != "" && info.Repo != "" {
-			ghInfo = &RepoInfo{Owner: info.Owner, Repo: info.Repo}
-		}
-	}
-
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/issues/%d/comments?per_page=100",
-		ghInfo.Owner, ghInfo.Repo, number)
-
-	resp, err := ic.c.doRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to execute request: %w", err)
-	}
-
-	body, err := readBody(resp)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
-	}
-
-	var ghComments []ghIssueComment
-	if err := json.Unmarshal(body, &ghComments); err != nil {
-		return nil, fmt.Errorf("failed to parse issue comments: %w", err)
-	}
-
-	results := make([]issues.IssueComment, 0, len(ghComments))
-	for _, c := range ghComments {
-		results = append(results, convertGHIssueComment(c))
-	}
-
-	linkHeader := resp.Header.Get("Link")
-	_, totalPages := parseLinkHeaderForPagination(linkHeader, 1)
-
-	return &issues.IssueCommentListResult{
-		Comments:    results,
-		TotalCount:  -1,
-		TotalPages:  totalPages,
-		CurrentPage: 1,
-		PerPage:     100,
-	}, nil
-}
 
 // --- Mutation implementations ---
 

@@ -19,11 +19,14 @@ export async function getIssues(
 	page: number = 1,
 	perPage: number = 50,
 	search?: string,
+	state?: string,
 ): Promise<IssueListResult> {
 	const params = new URLSearchParams({
 		appIdent,
 		scope,
 	});
+	// Always send state param so server knows the filter (default: "open" for GitHub, "opened" for GitLab)
+	params.append("state", state || (sourceType === "github" ? "open" : "opened"));
 	if (search) {
 		params.append("search", search);
 	}

@@ -19,6 +19,9 @@ export function createMrStore() {
 	const [totalPages, setTotalPages] = createSignal(0);
 	const [totalCount, setTotalCount] = createSignal(0);
 	const [perPage, setPerPage] = createSignal(50);
+
+	// State filter: "opened", "merged", "closed", "all"
+	const [mrState, setMrState] = createSignal<string>("opened");
 	// Active server-side search term (set when user presses Enter in search mode)
 	const [searchTerm, setSearchTerm] = createSignal("");
 	const [selectedMR, setSelectedMR] = createSignal<MergeRequest | null>(null);
@@ -150,6 +153,8 @@ export function createMrStore() {
 		setPerPage,
 		searchTerm,
 		setSearchTerm,
+		mrState,
+		setMrState,
 		selectedMR,
 		setSelectedMR,
 		selectedMRIndex,

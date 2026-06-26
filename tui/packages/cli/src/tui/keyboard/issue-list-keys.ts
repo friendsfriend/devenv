@@ -245,6 +245,18 @@ export async function handleIssueListKeys(
 			issueStore.setIssueError("");
 			return true;
 		}
+		// State toggle: s cycles open → closed → all → open
+		if (event.name === "s" && !event.shift && !event.ctrl) {
+			const current = issueStore.issueState();
+			const next =
+				current === "open" ? "closed" :
+				current === "closed" ? "all" :
+				"open";
+			issueStore.setIssueState(next);
+			void issueActions.loadAllIssues(issueStore.issueScope(), 1, undefined, next);
+			return true;
+		}
+
 		// Search
 		if (event.name === "/" || event.sequence === "/") {
 			issueStore.setIssueSearchMode(true);

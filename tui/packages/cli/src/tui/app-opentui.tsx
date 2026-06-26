@@ -57,6 +57,7 @@ import {
 	handleChangedFilesKeys,
 	handleTestResultsKeys,
 	handleDiscussionsKeys,
+	handleIssueTimelineKeys,
 	handleMiscModalKeys,
 	handleWorktreeManagerKeys,
 	handleIssueListKeys,
@@ -252,6 +253,7 @@ export function TUIApp(props: TUIAppProps) {
 		if (await handleMrDetailKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleIssueTimelineKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleLinkedMRsKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleReferencesKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleChangedFilesKeys(event, kbStores, kbActions, kbCtx)) return;

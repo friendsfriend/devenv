@@ -32,6 +32,9 @@ export function createIssueStore() {
 	const [issueScope, setIssueScope] = createSignal<IssueScope>("all");
 	const [issueScopePickerIndex, setIssueScopePickerIndex] = createSignal(0);
 
+	// State filter: "open", "closed", "all"
+	const [issueState, setIssueState] = createSignal<string>("open");
+
 	// Detail state
 	const [issueDetailLoading, setIssueDetailLoading] = createSignal(false);
 	const [issueDetailError, setIssueDetailError] = createSignal("");
@@ -67,6 +70,9 @@ export function createIssueStore() {
 	const [referencedIssuesError, setReferencedIssuesError] = createSignal("");
 	const [selectedReferencedIssueIndex, setSelectedReferencedIssueIndex] =
 		createSignal(0);
+
+	// Timeline view state
+	const [selectedTimelineIndex, setSelectedTimelineIndex] = createSignal(0);
 
 	// Comment modal
 	const [showCommentModal, setShowCommentModal] = createSignal(false);
@@ -117,6 +123,8 @@ export function createIssueStore() {
 		setIssueScope,
 		issueScopePickerIndex,
 		setIssueScopePickerIndex,
+		issueState,
+		setIssueState,
 		issueDetailLoading,
 		setIssueDetailLoading,
 		issueDetailError,
@@ -158,6 +166,10 @@ export function createIssueStore() {
 		showAssigneePicker,
 		setShowAssigneePicker,
 		issuesFiltered,
+
+		// Timeline
+		selectedTimelineIndex,
+		setSelectedTimelineIndex,
 
 		// Linked MRs
 		linkedMRs,

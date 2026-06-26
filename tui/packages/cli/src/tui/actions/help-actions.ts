@@ -29,6 +29,7 @@ const CONTEXT_TITLES: Record<string, string> = {
 	providers: "Providers",
 	issues: "Issues",
 	issueDetail: "Issue Detail",
+	issueTimeline: "Issue Timeline",
 	issueScopePicker: "Issue Scope Picker",
 	linkedMRs: "Linked Merge Requests",
 	referencedIssues: "Referenced Issues",

@@ -1,3 +1,4 @@
+import { TextAttributes } from '@opentui/core';
 import { Show } from "solid-js";
 import { uiColors } from "../colors";
 import type { Issue, IssueScope } from "@devenv/types";
@@ -21,6 +22,7 @@ interface IssueViewProps {
 	totalPages?: number;
 	totalCount?: number;
 	scope?: IssueScope;
+	state?: string;
 }
 
 /**
@@ -37,30 +39,25 @@ export function IssueView(props: IssueViewProps) {
 	//   Top/bottom spacers + summary header    = 3
 	const RESERVED_LINES = LAYOUT_CHROME_LINES + 3;
 
+	const stateColor = () => {
+		const s = props.state || "open";
+		if (s === "open" || s === "opened") return uiColors.success;
+		if (s === "closed") return uiColors.error;
+		return uiColors.primary; // "all"
+	};
+
 	const summary = () => {
 		const cp = props.currentPage ?? 1;
 		const tp = props.totalPages;
 		const scopeLabel = props.scope && props.scope !== "all" ? props.scope : "";
+		const stateLabel = props.state || "open";
 		const pageLabel = tp && tp > 0 ? `Pg ${cp}/${tp}` : `Pg ${cp}/?`;
 		const loadedLabel = `${props.issues.length} loaded`;
-		return scopeLabel
-			? `[${scopeLabel}] [${pageLabel}] [${loadedLabel}]`
-			: `[${pageLabel}] [${loadedLabel}]`;
+		return `${pageLabel}  ${loadedLabel}`;
 	};
 
 	return (
 		<ContentPanel>
-			<Show when={props.loading || (!props.error && props.issues.length > 0)}>
-				<SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery}>
-					<box style={{ width: "100%", flexDirection: "row" }}>
-						<text fg={uiColors.textPrimary}>Issues</text>
-						<box style={{ width: "auto", marginLeft: "auto" }}>
-							<text fg={uiColors.textMuted}>{summary()}</text>
-						</box>
-					</box>
-				</SearchHeader>
-			</Show>
-
 			<Show when={props.loading}>
 				<CenteredState message="Loading issues..." color={uiColors.primary} />
 			</Show>
@@ -69,34 +66,51 @@ export function IssueView(props: IssueViewProps) {
 				<CenteredState message={props.error!} color={uiColors.error} />
 			</Show>
 
-			<Show when={!props.loading && !props.error && props.issues.length === 0}>
-				<CenteredState message="No issues found" />
-			</Show>
+			<Show when={!props.loading && !props.error}>
+				<SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery}>
+					<box style={{ width: "100%", flexDirection: "row" }}>
+						<text fg={uiColors.textPrimary}>Issues</text>
+						<box style={{ width: "auto", flexDirection: "row", gap: 1 }}>
+							<Show when={props.scope && props.scope !== "all"}>
+								<text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>{`[${props.scope}]`}</text>
+							</Show>
+							<text fg={stateColor()} attributes={TextAttributes.BOLD}>{`[${props.state ?? "open"}]`}</text>
+						</box>
+						<box style={{ width: "auto", marginLeft: "auto" }}>
+							<text fg={uiColors.textMuted}>{summary()}</text>
+						</box>
+					</box>
+				</SearchHeader>
 
-			<Show when={!props.loading && !props.error && props.issues.length > 0}>
-				<ScrollableList<Issue>
-					items={props.issues}
-					selectedIndex={props.selectedIndex}
-					reservedLines={RESERVED_LINES}
-					estimatedItemHeight={4}
-					showScrollIndicator={false}
-					renderItem={(issue, isSelected) => {
-						const labels = issue.labels ?? [];
-						const labelText = labels.length > 0
-							? labels.slice(0, 3).join(", ") + (labels.length > 3 ? "…" : "")
-							: "no labels";
-						return (
-							<WorkItemCard
-								marker={`#${issue.iid}`}
-								title={truncateText(issue.title, 80)}
-								statusText={issue.state}
-								statusColor={getIssueStateColor(issue.state)}
-								metadata={`@${issue.author.name} • ${labelText} • updated ${formatShortDate(issue.updated_at)}`}
-								selected={isSelected()}
-							/>
-						);
-					}}
-				/>
+				<Show when={props.issues.length === 0}
+					fallback={
+						<ScrollableList<Issue>
+							items={props.issues}
+							selectedIndex={props.selectedIndex}
+							reservedLines={RESERVED_LINES}
+							estimatedItemHeight={4}
+							showScrollIndicator={false}
+							renderItem={(issue, isSelected) => {
+								const labels = issue.labels ?? [];
+								const labelText = labels.length > 0
+									? labels.slice(0, 3).join(", ") + (labels.length > 3 ? "…" : "")
+									: "no labels";
+								return (
+									<WorkItemCard
+										marker={`#${issue.iid}`}
+										title={truncateText(issue.title, 80)}
+										statusText={issue.state}
+										statusColor={getIssueStateColor(issue.state)}
+										metadata={`@${issue.author.name} • ${labelText} • updated ${formatShortDate(issue.updated_at)}`}
+										selected={isSelected()}
+									/>
+								);
+							}}
+						/>
+					}
+				>
+					<CenteredState message="No issues found" />
+				</Show>
 			</Show>
 		</ContentPanel>
 	);

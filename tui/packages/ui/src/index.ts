@@ -29,6 +29,7 @@ export { ChangedFilesView } from "./components/ChangedFilesView";
 export { LinkedMRsView } from "./components/LinkedMRsView";
 export { ReferencesView } from "./components/ReferencesView";
 export { DiscussionsView } from "./components/DiscussionsView";
+export { TimelineView, toTimelineItems, commentToItem } from "./components/TimelineView";
 export { DiffViewModal } from "./components/DiffViewModal";
 export { TestDetailModal } from "./components/TestDetailModal";
 export { ProvidersView } from "./components/ProvidersView";

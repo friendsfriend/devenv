@@ -31,6 +31,7 @@ export function createIssueActions(
 		scope: IssueScope = issueStore.issueScope(),
 		page?: number,
 		search?: string,
+		state?: string,
 	) => {
 		if (appStore.operationInProgressForApp()) {
 			return showError(
@@ -42,6 +43,8 @@ export function createIssueActions(
 		if (!app) return;
 
 		const p = page ?? issueStore.currentPage();
+		const s = state ?? issueStore.issueState();
+		issueStore.setIssueState(s);
 		issueStore.setIssueLoading(true);
 		issueStore.setIssueError("");
 		issueStore.setSelectedIssueIndex(0);
@@ -57,6 +60,7 @@ export function createIssueActions(
 				p,
 				issueStore.perPage(),
 				search,
+				s,
 			);
 			issueStore.setIssues(result.items);
 			// Derive totalPages from totalCount/perPage when server doesn't provide it.

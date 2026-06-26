@@ -229,6 +229,13 @@ export async function handleIssueDetailKeys(
 		return true;
 	}
 
+	// t — Open full timeline view
+	if (event.name === "t" && !event.ctrl && !event.shift) {
+		appStore.setViewMode("issueTimeline");
+		issueStore.setSelectedTimelineIndex(0);
+		return true;
+	}
+
 	// r — Add comment (reply)
 	if (event.name === "r" && !event.ctrl && !event.shift) {
 		issueActions.openCommentModal();
