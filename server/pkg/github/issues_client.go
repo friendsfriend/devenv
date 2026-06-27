@@ -44,8 +44,6 @@ type ghIssue struct {
 
 // ghIssueComment is defined in client.go — using that type here
 
-
-
 // timelineEventToComment converts a timeline event to an IssueComment with system=true.
 func timelineEventToComment(e *ghTimelineEvent) issues.IssueComment {
 	var body string
@@ -315,6 +313,15 @@ func (ic *IssuesClient) issueToMR() *issues.RepoInfo {
 }
 
 // GetIssues implements issues.Client.GetIssues.
+func normalizeGithubIssueSort(sortBy string) string {
+	switch sortBy {
+	case "created", "updated", "comments":
+		return sortBy
+	default:
+		return "updated"
+	}
+}
+
 func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueListOptions) (*issues.IssueListResult, error) {
 	ghInfo := ic.info
 	if info != nil {
@@ -328,6 +335,9 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 	scope := ""
 	search := ""
 	state := "open"
+	sortBy := "updated"
+	order := "desc"
+	labels := []string(nil)
 	if options != nil {
 		if options.Page > 0 {
 			page = options.Page
@@ -340,6 +350,13 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 		if options.State != "" {
 			state = options.State
 		}
+		if options.SortBy != "" {
+			sortBy = options.SortBy
+		}
+		if options.SortDirection == "asc" || options.SortDirection == "desc" {
+			order = options.SortDirection
+		}
+		labels = options.Labels
 	}
 
 	// GitHub search API only supports `state:open` and `state:closed` qualifiers.
@@ -347,7 +364,7 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 	// For "all", use the list endpoint which supports `state=all` natively,
 	// then filter out PRs from the response.
 	if state == "all" {
-		return ic.listAllIssues(ghInfo, scope, search, page, perPage)
+		return ic.listAllIssues(ghInfo, scope, search, page, perPage, sortBy, order, labels)
 	}
 
 	// Build search query: combine explicit search with scope filter.
@@ -374,19 +391,23 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 	// Always use the search API so GitHub paginates over real issues only.
 	// The standard /issues endpoint includes pull requests, and filtering PRs
 	// after pagination makes pages contain a variable number of issues.
-	return ic.searchIssues(ghInfo, searchQueryParts, page, perPage, state)
+	return ic.searchIssues(ghInfo, searchQueryParts, page, perPage, state, sortBy, order, labels)
 }
 
 // searchIssues searches issues via GitHub's /search/issues endpoint.
-func (ic *IssuesClient) searchIssues(ghInfo *RepoInfo, query string, page, perPage int, state string) (*issues.IssueListResult, error) {
-	searchQuery := strings.TrimSpace(fmt.Sprintf("repo:%s/%s type:issue state:%s %s", ghInfo.Owner, ghInfo.Repo, state, query))
+func (ic *IssuesClient) searchIssues(ghInfo *RepoInfo, query string, page, perPage int, state, sortBy, order string, labels []string) (*issues.IssueListResult, error) {
+	labelQuery := ""
+	for _, label := range labels {
+		labelQuery += fmt.Sprintf(" label:%q", label)
+	}
+	searchQuery := strings.TrimSpace(fmt.Sprintf("repo:%s/%s type:issue state:%s %s %s", ghInfo.Owner, ghInfo.Repo, state, query, labelQuery))
 
 	params := url.Values{}
 	params.Set("q", searchQuery)
 	params.Set("per_page", fmt.Sprintf("%d", perPage))
 	params.Set("page", fmt.Sprintf("%d", page))
-	params.Set("sort", "updated")
-	params.Set("order", "desc")
+	params.Set("sort", normalizeGithubIssueSort(sortBy))
+	params.Set("order", order)
 
 	apiURL := fmt.Sprintf("https://api.github.com/search/issues?%s", params.Encode())
 
@@ -438,13 +459,13 @@ func (ic *IssuesClient) searchIssues(ghInfo *RepoInfo, query string, page, perPa
 // listAllIssues uses the list endpoint (not search) to fetch issues in ALL states.
 // GitHub's search API doesn't support `state:all`, so we fall back to the list endpoint
 // which supports `state=all` natively. PRs are filtered out post-fetch.
-func (ic *IssuesClient) listAllIssues(ghInfo *RepoInfo, scope, search string, page, perPage int) (*issues.IssueListResult, error) {
+func (ic *IssuesClient) listAllIssues(ghInfo *RepoInfo, scope, search string, page, perPage int, sortBy, order string, labels []string) (*issues.IssueListResult, error) {
 	params := url.Values{}
 	params.Set("state", "all")
 	params.Set("page", fmt.Sprintf("%d", page))
 	params.Set("per_page", fmt.Sprintf("%d", perPage))
-	params.Set("sort", "updated")
-	params.Set("direction", "desc")
+	params.Set("sort", normalizeGithubIssueSort(sortBy))
+	params.Set("direction", order)
 
 	// Map scope to GitHub's filter parameter when available
 	// Note: `filter` doesn't work with fine-grained PATs, but for "all" state we
@@ -458,6 +479,9 @@ func (ic *IssuesClient) listAllIssues(ghInfo *RepoInfo, scope, search string, pa
 		// No direct filter for unassigned — we skip scope filtering
 	}
 
+	if len(labels) > 0 {
+		params.Set("labels", strings.Join(labels, ","))
+	}
 	if search != "" {
 		// The list endpoint doesn't support free-text search, but it does support
 		// basic issue number search via the issue number itself.

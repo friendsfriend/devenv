@@ -45,6 +45,9 @@ func (s *Server) handleGitLabMergeRequests(w http.ResponseWriter, r *http.Reques
 	pageStr := r.URL.Query().Get("page")
 	perPageStr := r.URL.Query().Get("perPage")
 	search := r.URL.Query().Get("search")
+	sortBy := r.URL.Query().Get("sort")
+	sortDirection := r.URL.Query().Get("direction")
+	labels := splitCSV(r.URL.Query().Get("labels"))
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -121,13 +124,16 @@ func (s *Server) handleGitLabMergeRequests(w http.ResponseWriter, r *http.Reques
 	// Get merge requests with pagination options via the mr.Client adapter
 	mrClient := gitlab.NewMRClient(gitlabClient)
 	result, err := mrClient.GetMRs(projectInfo.ToMR(), &mr.MRListOptions{
-		SourceBranch: sourceBranchFilter,
-		TargetBranch: "develop",
-		State:        state,
-		Page:         page,
-		PerPage:      perPage,
-		Search:       search,
-		SkipDetails:  skipDetails,
+		SourceBranch:  sourceBranchFilter,
+		TargetBranch:  "develop",
+		State:         state,
+		Page:          page,
+		PerPage:       perPage,
+		Search:        search,
+		Labels:        labels,
+		SortBy:        sortBy,
+		SortDirection: sortDirection,
+		SkipDetails:   skipDetails,
 	})
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch merge requests: %v", err), http.StatusInternalServerError)

@@ -130,6 +130,23 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				})()}
 			</Show>
 
+			<Show when={mrStore.showListFilterModal()}>
+				<FilterModal
+					parameters={mrStore.listFilterParameters()}
+					selectedParameterIndex={mrStore.listFilterParameterIndex()}
+					selectedValueIndex={mrStore.listFilterValueIndex()}
+					focusedPane={mrStore.listFilterFocusedPane()}
+					activeFilters={mrStore.currentListFilters()}
+				/>
+			</Show>
+
+			<Show when={mrStore.showListSortModal()}>
+				<SortModal
+					parameters={mrStore.currentListSortRules()}
+					selectedIndex={mrStore.listSortSelectedIndex()}
+				/>
+			</Show>
+
 			<Show when={appStore.viewMode() === "issueScopePicker"}>
 				<IssueScopeModal
 					selectedIndex={issueStore.issueScopePickerIndex()}

@@ -9,6 +9,13 @@ import type {
 	TestSummary,
 } from "@devenv/types";
 
+type ListControlTarget = "changedFiles" | "jobs" | "tests";
+type SortDirection = "asc" | "desc" | "none";
+interface SortRule { key: string; label: string; direction: SortDirection }
+
+const dirtyChangeType = (change: MRChange) =>
+	change.deleted_file ? "deleted" : change.renamed_file ? "renamed" : change.new_file ? "added" : "modified";
+
 export function createMrStore() {
 	const [mergeRequests, setMergeRequests] = createSignal<MergeRequest[]>([]);
 	const [mrLoading, setMrLoading] = createSignal(false);
@@ -91,6 +98,19 @@ export function createMrStore() {
 	const [testSearchQuery, setTestSearchQuery] = createSignal("");
 	const [jobsSearchMode, setJobsSearchMode] = createSignal(false);
 	const [jobsSearchQuery, setJobsSearchQuery] = createSignal("");
+	const [listControlTarget, setListControlTarget] = createSignal<ListControlTarget | null>(null);
+	const [showListFilterModal, setShowListFilterModal] = createSignal(false);
+	const [showListSortModal, setShowListSortModal] = createSignal(false);
+	const [listFilterParameterIndex, setListFilterParameterIndex] = createSignal(0);
+	const [listFilterValueIndex, setListFilterValueIndex] = createSignal(0);
+	const [listFilterFocusedPane, setListFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
+	const [listFilters, setListFilters] = createSignal<Record<ListControlTarget, Record<string, string[]>>>({ changedFiles: {}, jobs: {}, tests: {} });
+	const [listSortSelectedIndex, setListSortSelectedIndex] = createSignal(0);
+	const [listSortRules, setListSortRules] = createSignal<Record<ListControlTarget, SortRule[]>>({
+		changedFiles: [{ key: "type", label: "Type", direction: "asc" }, { key: "path", label: "Path", direction: "none" }, { key: "size", label: "Size", direction: "none" }],
+		jobs: [{ key: "status", label: "Status", direction: "asc" }, { key: "stage", label: "Stage", direction: "none" }, { key: "name", label: "Name", direction: "none" }],
+		tests: [{ key: "status", label: "Status", direction: "asc" }, { key: "class", label: "Class", direction: "none" }, { key: "name", label: "Name", direction: "none" }],
+	});
 
 	// MR AI review overlay state
 	const [mrAiVisible, setMrAiVisible] = createSignal(false);
@@ -107,12 +127,55 @@ export function createMrStore() {
 	let mrAiAtBottom = true;
 	let mrAiLastScrollTop = 0;
 
+	const currentListFilters = createMemo(() => listFilters()[listControlTarget() ?? "changedFiles"]);
+	const currentListSortRules = createMemo(() => listSortRules()[listControlTarget() ?? "changedFiles"]);
+	const setCurrentListFilters = (value: Record<string, string[]> | ((filters: Record<string, string[]>) => Record<string, string[]>)) => {
+		const target = listControlTarget();
+		if (!target) return;
+		setListFilters((all) => ({ ...all, [target]: typeof value === "function" ? value(all[target]) : value }));
+	};
+	const setCurrentListSortRules = (value: SortRule[] | ((rules: SortRule[]) => SortRule[])) => {
+		const target = listControlTarget();
+		if (!target) return;
+		setListSortRules((all) => ({ ...all, [target]: typeof value === "function" ? value(all[target]) : value }));
+	};
+	const applyFilters = <T,>(items: T[], target: ListControlTarget, valueFor: (item: T, key: string) => string) => {
+		const filters = listFilters()[target];
+		return items.filter((item) => Object.entries(filters).every(([key, values]) => values.length === 0 || values.includes(valueFor(item, key))));
+	};
+	const applySort = <T,>(items: T[], target: ListControlTarget, compare: (a: T, b: T, key: string) => number) => {
+		const rules = listSortRules()[target].filter((r) => r.direction !== "none");
+		return items.map((item, index) => ({ item, index })).sort((a, b) => {
+			for (const rule of rules) {
+				const result = compare(a.item, b.item, rule.key);
+				if (result !== 0) return rule.direction === "desc" ? -result : result;
+			}
+			return a.index - b.index;
+		}).map(({ item }) => item);
+	};
+
+	const changedFileValue = (c: MRChange, key: string) => key === "type" ? dirtyChangeType(c) : key === "path" ? c.new_path || c.old_path : String((c.lines_added ?? 0) + (c.lines_deleted ?? 0));
 	const changedFilesFiltered = createMemo(() => {
 		const q = changedFilesSearchQuery().toLowerCase();
-		if (!q) return mrChanges();
-		return mrChanges().filter((c) =>
-			[c.new_path, c.old_path].some((v) => v && v.toLowerCase().includes(q)),
-		);
+		const searched = q ? mrChanges().filter((c) => [c.new_path, c.old_path].some((v) => v && v.toLowerCase().includes(q))) : mrChanges();
+		return applySort(applyFilters(searched, "changedFiles", changedFileValue), "changedFiles", (a, b, key) => key === "size" ? ((a.lines_added ?? 0) + (a.lines_deleted ?? 0)) - ((b.lines_added ?? 0) + (b.lines_deleted ?? 0)) : changedFileValue(a, key).localeCompare(changedFileValue(b, key)));
+	});
+
+	const testValue = (t: TestCase & { suiteName?: string }, key: string) => key === "status" ? t.status : key === "class" ? t.classname : t.name;
+	const jobsValue = (j: Job, key: string) => key === "status" ? j.status : key === "stage" ? j.stage : j.name;
+	const listFilterParameters = createMemo(() => {
+		const target = listControlTarget();
+		if (!target) return [];
+		const source = target === "changedFiles" ? changedFilesFiltered() : target === "jobs" ? jobs() : (mrTestSummary()?.test_suites ?? []).flatMap((s) => s.test_cases.map((t) => ({ ...t, suiteName: s.name })));
+		const rules = listSortRules()[target];
+		return rules.map((rule) => {
+			const counts = new Map<string, number>();
+			for (const item of source as any[]) {
+				const value = target === "changedFiles" ? changedFileValue(item, rule.key) : target === "jobs" ? jobsValue(item, rule.key) : testValue(item, rule.key);
+				counts.set(value, (counts.get(value) ?? 0) + 1);
+			}
+			return { key: rule.key, label: rule.label, values: Array.from(counts.entries()).map(([value, count]) => ({ value, label: value, count })) };
+		});
 	});
 
 	const selectedTestForDetail = createMemo(() => {
@@ -255,6 +318,25 @@ export function createMrStore() {
 		setJobsSearchMode,
 		jobsSearchQuery,
 		setJobsSearchQuery,
+		listControlTarget,
+		setListControlTarget,
+		showListFilterModal,
+		setShowListFilterModal,
+		showListSortModal,
+		setShowListSortModal,
+		listFilterParameterIndex,
+		setListFilterParameterIndex,
+		listFilterValueIndex,
+		setListFilterValueIndex,
+		listFilterFocusedPane,
+		setListFilterFocusedPane,
+		currentListFilters,
+		setCurrentListFilters,
+		listFilterParameters,
+		listSortSelectedIndex,
+		setListSortSelectedIndex,
+		currentListSortRules,
+		setCurrentListSortRules,
 		changedFilesFiltered,
 		selectedTestForDetail,
 

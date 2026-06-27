@@ -22,6 +22,72 @@ export async function handleChangedFilesKeys(
 
   if (appStore.viewMode() !== 'changedFiles') return false;
 
+  if (mrStore.showListFilterModal() && mrStore.listControlTarget() === 'changedFiles') {
+    const params = mrStore.listFilterParameters();
+    const param = params[mrStore.listFilterParameterIndex()];
+    const values = param?.values ?? [];
+    if (event.name === 'escape' || event.name === 'esc' || event.sequence === '\x1b' || event.name === 'return' || event.name === 'enter') {
+      mrStore.setShowListFilterModal(false);
+      mrStore.setSelectedChangedFileIndex(0);
+      return true;
+    }
+    if (isDownKey(event)) {
+      if (mrStore.listFilterFocusedPane() === 'parameter') {
+        mrStore.setListFilterParameterIndex(i => Math.min(params.length - 1, i + 1));
+        mrStore.setListFilterValueIndex(0);
+      } else mrStore.setListFilterValueIndex(i => Math.min(values.length - 1, i + 1));
+      return true;
+    }
+    if (isUpKey(event)) {
+      if (mrStore.listFilterFocusedPane() === 'parameter') {
+        mrStore.setListFilterParameterIndex(i => Math.max(0, i - 1));
+        mrStore.setListFilterValueIndex(0);
+      } else mrStore.setListFilterValueIndex(i => Math.max(0, i - 1));
+      return true;
+    }
+    if (event.name === 'right' || event.sequence === 'l') { mrStore.setListFilterFocusedPane('value'); return true; }
+    if (event.name === 'left' || event.sequence === 'h') { mrStore.setListFilterFocusedPane('parameter'); return true; }
+    if (event.sequence === ' ' && param && values[mrStore.listFilterValueIndex()]) {
+      const value = values[mrStore.listFilterValueIndex()].value;
+      mrStore.setCurrentListFilters(filters => {
+        const current = filters[param.key] ?? [];
+        return { ...filters, [param.key]: current.includes(value) ? current.filter(v => v !== value) : [...current, value] };
+      });
+      mrStore.setSelectedChangedFileIndex(0);
+      return true;
+    }
+    return true;
+  }
+
+  if (mrStore.showListSortModal() && mrStore.listControlTarget() === 'changedFiles') {
+    const rules = mrStore.currentListSortRules();
+    const selected = mrStore.listSortSelectedIndex();
+    if (event.name === 'escape' || event.name === 'esc' || event.sequence === '\x1b' || event.name === 'return' || event.name === 'enter') {
+      mrStore.setShowListSortModal(false);
+      mrStore.setSelectedChangedFileIndex(0);
+      return true;
+    }
+    if (isDownKey(event)) { mrStore.setListSortSelectedIndex(i => Math.min(rules.length - 1, i + 1)); return true; }
+    if (isUpKey(event)) { mrStore.setListSortSelectedIndex(i => Math.max(0, i - 1)); return true; }
+    if (event.sequence === ' ') {
+      const order = ['asc', 'desc', 'none'] as const;
+      mrStore.setCurrentListSortRules(current => current.map((rule, index) => index === selected ? { ...rule, direction: order[(order.indexOf(rule.direction) + 1) % order.length] } : rule));
+      mrStore.setSelectedChangedFileIndex(0);
+      return true;
+    }
+    if (event.sequence === 'K' && selected > 0) {
+      mrStore.setCurrentListSortRules(current => { const next = [...current]; [next[selected - 1], next[selected]] = [next[selected], next[selected - 1]]; return next; });
+      mrStore.setListSortSelectedIndex(selected - 1);
+      return true;
+    }
+    if (event.sequence === 'J' && selected < rules.length - 1) {
+      mrStore.setCurrentListSortRules(current => { const next = [...current]; [next[selected], next[selected + 1]] = [next[selected + 1], next[selected]]; return next; });
+      mrStore.setListSortSelectedIndex(selected + 1);
+      return true;
+    }
+    return true;
+  }
+
   // Changed files search mode — capture all keys while user is typing
   if (mrStore.changedFilesSearchMode()) {
     if (
@@ -55,6 +121,22 @@ export async function handleChangedFilesKeys(
   // q to quit
   if (event.name === 'q' || event.name === 'Q') {
     appActions.exitApp();
+    return true;
+  }
+
+  if (event.sequence === 'F') {
+    mrStore.setListControlTarget('changedFiles');
+    mrStore.setListFilterParameterIndex(0);
+    mrStore.setListFilterValueIndex(0);
+    mrStore.setListFilterFocusedPane('parameter');
+    mrStore.setShowListFilterModal(true);
+    return true;
+  }
+
+  if (event.sequence === 'O') {
+    mrStore.setListControlTarget('changedFiles');
+    mrStore.setListSortSelectedIndex(0);
+    mrStore.setShowListSortModal(true);
     return true;
   }
 

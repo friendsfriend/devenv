@@ -286,6 +286,8 @@ Custom reusable components live in `tui/packages/ui/src/components` and are expo
 - `Table` — app table with columns, optional tabs, search header, and `ScrollableList` body. Use for app/library/script-style tabular lists.
 - `ListViewModal<T>` — `GenericModal` + `ScrollableList`; use for picker/list modals before writing modal-specific scrolling code.
 - `SearchHeader` — 1-line header that switches between column/header content and `/query` search display.
+- `FilterModal` — standard list filtering modal. Use `F` to open; model filters as parameter → values (e.g. status → running/exited). Keep filter state per list/tab where applicable.
+- `SortModal` — standard list ordering modal. Use `O` to open; each parameter has `asc`/`desc`/`none`, and parameter order defines sort priority.
 
 ### Modal/dialog helpers
 
@@ -312,8 +314,9 @@ Before editing OpenTUI UI code:
 
 1. Reuse existing component/style/keymap patterns in this repo.
 2. Use `Box`, `Text`, `ScrollBox`, `Input`, etc. before custom renderables.
-3. Keep scrollbox rules: no `flexDirection`; width = usable viewport for wrapped content.
-4. Keep sorting/filtering/search server-side when paging data.
-5. Use standard help-menu keybinds.
-6. Clean up listeners/timers/renderers.
-7. Run relevant tests; full suite when finishing feature.
+3. List views must implement standard controls where applicable: `/` search, `F` filter, `O` order/sort. If one does not apply, note why in code or docs.
+4. Keep scrollbox rules: no `flexDirection`; width = usable viewport for wrapped content.
+5. Backend-driven list endpoints must expose search/filter/sort parameters where applicable, and keep sorting/filtering/search server-side when paging data.
+6. Use standard help-menu keybinds.
+7. Clean up listeners/timers/renderers.
+8. Run relevant tests; full suite when finishing feature.

@@ -15,6 +15,9 @@ export async function getMergeRequests(
   page: number = 1,
   perPage: number = 50,
   search?: string,
+  sort?: string,
+  direction?: 'asc' | 'desc',
+  labels?: string[],
 ): Promise<MRListResult> {
   const params = new URLSearchParams({
     appIdent,
@@ -26,6 +29,9 @@ export async function getMergeRequests(
   if (search) {
     params.append('search', search);
   }
+  if (sort) params.append('sort', sort);
+  if (direction) params.append('direction', direction);
+  if (labels?.length) params.append('labels', labels.join(','));
   params.append('page', String(page));
   params.append('perPage', String(perPage));
   const endpoint = sourceType === 'github' ? 'github/pull-requests' : 'gitlab/merge-requests';

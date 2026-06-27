@@ -41,8 +41,14 @@ type MRListOptions struct {
 	Page int
 	// PerPage is the page size. 0 means provider default (50).
 	PerPage int
-	// Search is a free-text search query (GitLab only).
+	// Search is a free-text search query.
 	Search string
+	// Labels filters by labels where provider supports it.
+	Labels []string
+	// SortBy is provider-normalized sort field (updated, created, title, etc.).
+	SortBy string
+	// SortDirection is asc or desc.
+	SortDirection string
 	// SkipDetails skips per-MR detail/approval/pipeline fetches when true.
 	// When true, only the list data is returned (much faster).
 	SkipDetails bool

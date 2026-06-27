@@ -147,6 +147,8 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["g"], description: "Go to first file", context: "changedFiles", category: "Navigation" },
 	{ keys: ["G"], description: "Go to last file", context: "changedFiles", category: "Navigation" },
 	{ keys: ["/"], description: "Search files", context: "changedFiles", category: "Actions" },
+	{ keys: ["F"], description: "Filter files", context: "changedFiles", category: "Actions" },
+	{ keys: ["O"], description: "Order/sort files", context: "changedFiles", category: "Actions" },
 	{ keys: ["Enter"], description: "View diff modal", context: "changedFiles", category: "Actions" },
 	{ keys: ["D"], description: "Switch to discussions view", context: "changedFiles", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to MR detail", context: "changedFiles", category: "General" },

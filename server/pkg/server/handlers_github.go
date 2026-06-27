@@ -70,6 +70,9 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 	pageStr := r.URL.Query().Get("page")
 	perPageStr := r.URL.Query().Get("perPage")
 	search := r.URL.Query().Get("search")
+	sortBy := r.URL.Query().Get("sort")
+	sortDirection := r.URL.Query().Get("direction")
+	labels := splitCSV(r.URL.Query().Get("labels"))
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -134,12 +137,15 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 	}
 
 	result, err := ghClient.GetMRs(repoInfo.ToMR(), &mr.MRListOptions{
-		SourceBranch: sourceBranchFilter,
-		State:        state,
-		Page:         page,
-		PerPage:      perPage,
-		Search:       search,
-		SkipDetails:  skipDetails,
+		SourceBranch:  sourceBranchFilter,
+		State:         state,
+		Page:          page,
+		PerPage:       perPage,
+		Search:        search,
+		Labels:        labels,
+		SortBy:        sortBy,
+		SortDirection: sortDirection,
+		SkipDetails:   skipDetails,
 	})
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch pull requests: %v", err), http.StatusInternalServerError)

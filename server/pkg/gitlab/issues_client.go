@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/issues"
@@ -150,6 +151,19 @@ func (ic *IssuesClient) doGetWithHeaders(url string) ([]byte, int, http.Header, 
 }
 
 // GetIssues implements issues.Client.GetIssues.
+func normalizeGitLabIssueSort(sortBy string) string {
+	switch sortBy {
+	case "created", "created_at":
+		return "created_at"
+	case "updated", "updated_at":
+		return "updated_at"
+	case "title", "priority", "due_date", "relative_position", "label_priority", "milestone_due", "popularity":
+		return sortBy
+	default:
+		return "updated_at"
+	}
+}
+
 func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueListOptions) (*issues.IssueListResult, error) {
 	proj := ic.project
 	if info != nil && info.Namespace != "" && info.Project != "" {
@@ -167,6 +181,9 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 	scope := ""
 	search := ""
 	state := "opened"
+	sortBy := "updated_at"
+	sortDirection := "desc"
+	labels := []string(nil)
 	if options != nil {
 		if options.Page > 0 {
 			page = options.Page
@@ -179,14 +196,21 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 		if options.State != "" {
 			state = options.State
 		}
+		if options.SortBy != "" {
+			sortBy = normalizeGitLabIssueSort(options.SortBy)
+		}
+		if options.SortDirection == "asc" || options.SortDirection == "desc" {
+			sortDirection = options.SortDirection
+		}
+		labels = options.Labels
 	}
 
 	params := url.Values{}
 	params.Set("state", state)
 	params.Set("page", fmt.Sprintf("%d", page))
 	params.Set("per_page", fmt.Sprintf("%d", perPage))
-	params.Set("order_by", "updated_at")
-	params.Set("sort", "desc")
+	params.Set("order_by", sortBy)
+	params.Set("sort", sortDirection)
 
 	// Map scope to GitLab API params.
 	// GitLab uses underscore-separated values for the scope parameter.
@@ -201,6 +225,9 @@ func (ic *IssuesClient) GetIssues(info *issues.RepoInfo, options *issues.IssueLi
 		params.Set("assignee_id", "None")
 	}
 
+	if len(labels) > 0 {
+		params.Set("labels", strings.Join(labels, ","))
+	}
 	if search != "" {
 		params.Set("search", search)
 	}

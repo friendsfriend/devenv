@@ -20,6 +20,9 @@ export async function getIssues(
 	perPage: number = 50,
 	search?: string,
 	state?: string,
+	sort?: string,
+	direction?: "asc" | "desc",
+	labels?: string[],
 ): Promise<IssueListResult> {
 	const params = new URLSearchParams({
 		appIdent,
@@ -30,6 +33,9 @@ export async function getIssues(
 	if (search) {
 		params.append("search", search);
 	}
+	if (sort) params.append("sort", sort);
+	if (direction) params.append("direction", direction);
+	if (labels?.length) params.append("labels", labels.join(","));
 	params.append("page", String(page));
 	params.append("perPage", String(perPage));
 
