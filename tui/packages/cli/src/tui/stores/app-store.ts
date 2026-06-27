@@ -36,6 +36,14 @@ export type TabType =
 	| "libraries"
 	| "scripts";
 
+export type TableSortKey = "status" | "git" | "name";
+export type TableSortDirection = "asc" | "desc" | "none";
+export interface TableSortRule {
+	key: TableSortKey;
+	label: string;
+	direction: TableSortDirection;
+}
+
 export type StartupPhase =
 	| "connecting"
 	| "server-ready"
@@ -91,6 +99,40 @@ function folderPaths(nodes: ScriptNode[]): string[] {
 	return paths;
 }
 
+function appStatusRank(app: App): number {
+	if (app.operationStatus?.status === "active") return 0;
+	const status = app.dockerInfo?.Status?.toLowerCase() || "";
+	if (status.includes("up") || status.includes("running") || status.includes("healthy")) return 0;
+	return 1;
+}
+
+function appGitRank(app: App): number {
+	const status = app.gitStatus?.trim() || "";
+	return status.includes("+") || status.includes("~") || status.includes("-") || status.includes("*") ? 0 : 1;
+}
+
+function compareByRule(a: App, b: App, rule: TableSortRule): number {
+	let result = 0;
+	if (rule.key === "status") result = appStatusRank(a) - appStatusRank(b);
+	if (rule.key === "git") result = appGitRank(a) - appGitRank(b);
+	if (rule.key === "name") result = a.displayName.localeCompare(b.displayName);
+	return rule.direction === "desc" ? -result : result;
+}
+
+function sortApps(items: App[], rules: TableSortRule[]): App[] {
+	const activeRules = rules.filter((rule) => rule.direction !== "none");
+	return items
+		.map((app, index) => ({ app, index }))
+		.sort((a, b) => {
+			for (const rule of activeRules) {
+				const result = compareByRule(a.app, b.app, rule);
+				if (result !== 0) return result;
+			}
+			return a.index - b.index;
+		})
+		.map(({ app }) => app);
+}
+
 export function createAppStore() {
 	const [apps, setApps] = createSignal<App[]>([]);
 	const [infraServices, setInfraServices] = createSignal<InfraService[]>([]);
@@ -111,6 +153,26 @@ export function createAppStore() {
 	const [helpGuideIndex, setHelpGuideIndex] = createSignal(-1);
 	const [tableSearchMode, setTableSearchMode] = createSignal(false);
 	const [tableSearchQuery, setTableSearchQuery] = createSignal("");
+	const [showTableFilterModal, setShowTableFilterModal] = createSignal(false);
+	const [tableFilterParameterIndex, setTableFilterParameterIndex] = createSignal(0);
+	const [tableFilterValueIndex, setTableFilterValueIndex] = createSignal(0);
+	const [tableFilterFocusedPane, setTableFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
+	const [tableFiltersByTab, setTableFiltersByTab] = createSignal<Record<TabType, Record<string, string[]>>>(
+		{ applications: {}, infrastructure: {}, libraries: {}, scripts: {} },
+	);
+	const [showTableSortModal, setShowTableSortModal] = createSignal(false);
+	const [tableSortSelectedIndex, setTableSortSelectedIndex] = createSignal(0);
+	const defaultSortRules = (): TableSortRule[] => [
+		{ key: "status", label: "Status", direction: "asc" },
+		{ key: "git", label: "Git", direction: "asc" },
+		{ key: "name", label: "Name", direction: "none" },
+	];
+	const [tableSortRulesByTab, setTableSortRulesByTab] = createSignal<Record<TabType, TableSortRule[]>>({
+		applications: defaultSortRules(),
+		infrastructure: defaultSortRules(),
+		libraries: defaultSortRules(),
+		scripts: defaultSortRules(),
+	});
 	const [statusLogEntries, setStatusLogEntries] = createSignal<
 		StatusLogEntry[]
 	>([]);
@@ -164,13 +226,49 @@ export function createAppStore() {
 		),
 	);
 
-	const filteredApps = createMemo(() => {
+	const appFilterValue = (app: App, key: string) => {
+		if (key === "status") {
+			const status = app.dockerInfo?.Status?.toLowerCase() || "not found";
+			if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "running";
+			if (status.includes("exit") || status.includes("stop")) return "exited";
+			return status;
+		}
+		if (key === "git") return appGitRank(app) === 0 ? "dirty" : app.gitStatus === "✓" ? "clean" : "unknown";
+		if (key === "provider") return app.provider || app.sourceType || "unknown";
+		return "";
+	};
+
+	const tableFilters = createMemo(() => tableFiltersByTab()[activeTab()]);
+	const setTableFilters = (value: Record<string, string[]> | ((filters: Record<string, string[]>) => Record<string, string[]>)) => {
+		const tab = activeTab();
+		setTableFiltersByTab((byTab) => ({
+			...byTab,
+			[tab]: typeof value === "function" ? value(byTab[tab]) : value,
+		}));
+	};
+	const tableSortRules = createMemo(() => tableSortRulesByTab()[activeTab()]);
+	const setTableSortRules = (value: TableSortRule[] | ((rules: TableSortRule[]) => TableSortRule[])) => {
+		const tab = activeTab();
+		setTableSortRulesByTab((byTab) => ({
+			...byTab,
+			[tab]: typeof value === "function" ? value(byTab[tab]) : value,
+		}));
+	};
+
+	const applyTableFilters = (items: App[]) => {
+		const filters = tableFilters();
+		return items.filter((app) =>
+			Object.entries(filters).every(([key, values]) =>
+				values.length === 0 || values.includes(appFilterValue(app, key)),
+			),
+		);
+	};
+
+	const filteredAppsUnsorted = createMemo(() => {
 		const allApps = apps();
 		const tab = activeTab();
-		if (tab === "applications")
-			return allApps.filter((app) => app.appType === "APP");
-		if (tab === "libraries")
-			return allApps.filter((app) => app.appType === "LIB");
+		if (tab === "applications") return allApps.filter((app) => app.appType === "APP");
+		if (tab === "libraries") return allApps.filter((app) => app.appType === "LIB");
 		if (tab === "scripts") return scriptRowsAsApps();
 		if (tab === "infrastructure") {
 			return infraServices().map((svc) => ({
@@ -182,19 +280,44 @@ export function createAppStore() {
 				appType: "LIB" as const,
 				containerBaseName: svc.containerBaseName,
 				dockerInfo: svc.dockerInfo,
+				operationStatus: svc.operationStatus,
 			})) as App[];
 		}
 		return allApps;
 	});
 
+	const tableFilterParameters = createMemo(() => {
+		const base = filteredAppsUnsorted();
+		const params = [
+			{ key: "status", label: "Status" },
+			{ key: "git", label: "Git" },
+			{ key: "provider", label: "Provider" },
+		];
+		return params.map((param) => {
+			const counts = new Map<string, number>();
+			for (const app of base) {
+				const value = appFilterValue(app, param.key);
+				counts.set(value, (counts.get(value) ?? 0) + 1);
+			}
+			return {
+				...param,
+				values: Array.from(counts.entries()).map(([value, count]) => ({ value, label: value, count })),
+			};
+		});
+	});
+
+	const filteredApps = createMemo(() => sortApps(applyTableFilters(filteredAppsUnsorted()), tableSortRules()));
+
 	const tableFilteredApps = createMemo(() => {
 		const q = tableSearchQuery().toLowerCase();
-		if (!q) return filteredApps();
-		return filteredApps().filter((app) =>
-			Object.values(app).some(
-				(v) => v != null && String(v).toLowerCase().includes(q),
-			),
-		);
+		const items = q
+			? filteredApps().filter((app) =>
+				Object.values(app).some(
+					(v) => v != null && String(v).toLowerCase().includes(q),
+				),
+			)
+			: filteredApps();
+		return sortApps(items, tableSortRules());
 	});
 
 	const showFirstSteps = createMemo(() =>
@@ -268,6 +391,23 @@ export function createAppStore() {
 		setTableSearchMode,
 		tableSearchQuery,
 		setTableSearchQuery,
+		showTableFilterModal,
+		setShowTableFilterModal,
+		tableFilterParameterIndex,
+		setTableFilterParameterIndex,
+		tableFilterValueIndex,
+		setTableFilterValueIndex,
+		tableFilterFocusedPane,
+		setTableFilterFocusedPane,
+		tableFilters,
+		setTableFilters,
+		tableFilterParameters,
+		showTableSortModal,
+		setShowTableSortModal,
+		tableSortSelectedIndex,
+		setTableSortSelectedIndex,
+		tableSortRules,
+		setTableSortRules,
 		statusLogEntries,
 		setStatusLogEntries,
 		statusLogMaximized,

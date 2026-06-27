@@ -73,6 +73,14 @@ export function Table<T = string>(props: TableProps<T>) {
 	const activeTabLabel = () =>
 		props.tabs?.find((tab) => tab.id === props.activeTab)?.label ?? "Applications";
 
+	const isRunning = (app: App) => {
+		if (app.operationStatus?.status === "active") return true;
+		const status = app.dockerInfo?.Status?.toLowerCase() || "";
+		return status.includes("up") || status.includes("running") || status.includes("healthy");
+	};
+
+	const runningSummary = () => `${props.apps.filter(isRunning).length}/${props.apps.length} running`;
+
 	const appKind = (app: App) => {
 		if (app.resourceType === "script-folder") return "Folder";
 		if (app.resourceType === "script-file") return "Script";
@@ -235,7 +243,8 @@ export function Table<T = string>(props: TableProps<T>) {
 			<SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.apps.length}>
 				<box style={{ width: "100%", flexDirection: "row" }}>
 					<text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>{activeTabLabel()}</text>
-					<box style={{ width: "auto", marginLeft: "auto" }}>
+					<box style={{ width: "auto", marginLeft: "auto", flexDirection: "row", gap: 2 }}>
+						<text fg={uiColors.success} attributes={TextAttributes.BOLD}>{runningSummary()}</text>
 						<text fg={uiColors.textMuted}>{`${props.apps.length} loaded`}</text>
 					</box>
 				</box>

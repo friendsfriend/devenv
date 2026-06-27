@@ -25,6 +25,8 @@ import {
 	CommentModal,
 	LabelPickerModal,
 	AssigneePickerModal,
+	FilterModal,
+	SortModal,
 	HelpView,
 	uiColors,
 } from "@devenv/ui";
@@ -55,6 +57,23 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					content={uiStore.markdownModalContent()}
 					hideTitle={uiStore.markdownModalTitle() === ""}
 					onScrollBoxReady={(scrollBox) => { uiStore.markdownModalScrollBoxRef = scrollBox; }}
+				/>
+			</Show>
+
+			<Show when={appStore.showTableFilterModal()}>
+				<FilterModal
+					parameters={appStore.tableFilterParameters()}
+					selectedParameterIndex={appStore.tableFilterParameterIndex()}
+					selectedValueIndex={appStore.tableFilterValueIndex()}
+					focusedPane={appStore.tableFilterFocusedPane()}
+					activeFilters={appStore.tableFilters()}
+				/>
+			</Show>
+
+			<Show when={appStore.showTableSortModal()}>
+				<SortModal
+					parameters={appStore.tableSortRules()}
+					selectedIndex={appStore.tableSortSelectedIndex()}
 				/>
 			</Show>
 

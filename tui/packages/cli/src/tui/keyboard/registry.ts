@@ -63,7 +63,9 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["+"], description: "Add app or script", footerDescription: "Add", context: "table", category: "Actions" },
 	{ keys: ["-"], description: "Remove selected app or script", footerDescription: "Remove", context: "table", category: "Actions" },
 	{ keys: ["Enter"], description: "View app detail or run script", footerDescription: "Open", context: "table", category: "Actions" },
-	{ keys: ["/"], description: "Search/filter table", context: "table", category: "Actions" },
+	{ keys: ["/"], description: "Search table", context: "table", category: "Actions" },
+	{ keys: ["F"], description: "Filter table", context: "table", category: "Actions" },
+	{ keys: ["O"], description: "Order/sort table", context: "table", category: "Actions" },
 
 	// ========== table — Docker ==========
 	{ keys: ["s"], description: "Start container (with profile picker)", context: "table", category: "Docker" },
