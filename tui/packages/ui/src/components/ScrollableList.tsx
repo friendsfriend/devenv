@@ -3,6 +3,7 @@ import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { calculateVisibleItems } from '../utils/virtualScroll';
+import { focusSoon } from '../utils/focusSoon';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
@@ -342,7 +343,7 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
             <text fg={uiColors.textMuted}>{'/ '}</text>
             <input
               ref={(el: any) => {
-                if (el) setTimeout(() => el.focus(), 0);
+                focusSoon(el);
               }}
               onInput={(val: string) => props.onFilterChange?.(val)}
               placeholder={props.filterPlaceholder}

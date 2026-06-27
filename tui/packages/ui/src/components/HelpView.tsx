@@ -1,8 +1,10 @@
 import { createMemo, For, Show, type JSX } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
-import { SCROLLBAR_OPTIONS, uiColors } from '../colors';
+import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { ModalTabs } from './ModalTabs';
+import { focusSoon } from '../utils/focusSoon';
+import { ScrollableContent } from './ScrollableContent';
 
 export interface HelpSection {
   title: string;
@@ -106,7 +108,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                 <text fg={uiColors.textMuted}>{'/ '}</text>
                 <input
                   ref={(el: any) => {
-                    if (el) setTimeout(() => el.focus(), 0);
+                    focusSoon(el);
                   }}
                   onInput={(val: string) => props.onSearchChange?.(val)}
                   placeholder="Search keybinds..."
@@ -117,10 +119,9 @@ export function HelpView(props: HelpViewProps): JSX.Element {
               </box>
             </Show>
 
-            <scrollbox
-              ref={(r: ScrollBoxRenderable) => props.onKeybindScrollBoxReady?.(r)}
-              scrollbarOptions={SCROLLBAR_OPTIONS}
-              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+            <ScrollableContent
+              onScrollBoxReady={(r: ScrollBoxRenderable) => props.onKeybindScrollBoxReady?.(r)}
+                            style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show
                 when={hasMatches()}
@@ -152,15 +153,14 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                   )}
                 </For>
               </Show>
-            </scrollbox>
+            </ScrollableContent>
           </box>
         }
       >
         <box style={{ width: '100%', height: '100%', flexDirection: 'column', minHeight: 0 }}>
-          <scrollbox
-            ref={(r: ScrollBoxRenderable) => props.onGuideScrollBoxReady?.(r)}
-            scrollbarOptions={SCROLLBAR_OPTIONS}
-            style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+          <ScrollableContent
+            onScrollBoxReady={(r: ScrollBoxRenderable) => props.onGuideScrollBoxReady?.(r)}
+                        style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
           >
             <For each={props.guides ?? []}>
               {(guide, idx) => {
@@ -178,7 +178,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                 );
               }}
             </For>
-          </scrollbox>
+          </ScrollableContent>
         </box>
       </Show>
     </GenericModal>

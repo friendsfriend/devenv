@@ -2,6 +2,7 @@ import { onMount } from 'solid-js';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
+import { focusSoon } from '../utils/focusSoon';
 
 export interface BranchCreateModalProps {
   /** Current value of the branch name input */
@@ -20,7 +21,7 @@ export function BranchCreateModal(props: BranchCreateModalProps) {
 
   onMount(() => {
     if (inputRef) {
-      setTimeout(() => inputRef.focus(), 1);
+      focusSoon(inputRef);
     }
   });
 

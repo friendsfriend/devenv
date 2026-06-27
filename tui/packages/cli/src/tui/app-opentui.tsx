@@ -386,14 +386,26 @@ export async function startTUI(serverUrl: string) {
 
 		setExitRenderer(renderer);
 
+		let destroyed = false;
 		const cleanup = () => {
+			if (destroyed) return;
+			destroyed = true;
+			process.off("SIGINT", cleanup);
+			process.off("SIGTERM", cleanup);
+			process.off("SIGHUP", cleanup);
 			renderer.destroy();
 		};
 		process.on("SIGINT", cleanup);
 		process.on("SIGTERM", cleanup);
 		process.on("SIGHUP", cleanup);
 
-		await render(() => <TUIApp serverUrl={serverUrl} />, renderer);
+		try {
+			await render(() => <TUIApp serverUrl={serverUrl} />, renderer);
+		} finally {
+			process.off("SIGINT", cleanup);
+			process.off("SIGTERM", cleanup);
+			process.off("SIGHUP", cleanup);
+		}
 	} catch (error) {
 		console.error("Fatal error in TUI:", error);
 		throw error;

@@ -1,7 +1,8 @@
-import { uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 import type { ScriptParameter } from '@devenv/types';
+import { ScrollableContent } from './ScrollableContent';
 
 export interface ScriptArgsModalProps {
   scriptName: string;
@@ -50,9 +51,8 @@ export function ScriptArgsModal(props: ScriptArgsModalProps) {
         <text fg={uiColors.textSecondary}>{props.historyTotal === 0 ? 'none' : `${props.historyIndex + 1}/${props.historyTotal}`}</text>
       </box>
 
-      <scrollbox
-        scrollbarOptions={SCROLLBAR_OPTIONS}
-        style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+      <ScrollableContent
+                style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
       >
         {props.parameters.length === 0 ? (
           <text fg={uiColors.textMuted}>No parameter metadata found for this script.</text>
@@ -93,7 +93,7 @@ export function ScriptArgsModal(props: ScriptArgsModalProps) {
             );
           })
         )}
-      </scrollbox>
+      </ScrollableContent>
 
       {props.error && (
         <box style={{ width: '100%', height: 1, flexShrink: 0, marginTop: 1 }}>

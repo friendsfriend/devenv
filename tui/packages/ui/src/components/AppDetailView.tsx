@@ -1,10 +1,11 @@
 import { TextAttributes } from '@opentui/core';
 import { Show, For, createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
-import { uiColors, SCROLLBAR_OPTIONS } from '../colors';
+import { uiColors } from '../colors';
 import { ContentFrame } from './ContentStack';
 import { DetailSection } from './DetailSection';
 import type { App, MergeRequest, ContainerStats } from '@devenv/types';
+import { ScrollableContent } from './ScrollableContent';
 
 export type AppDetailKind = 'app' | 'library' | 'infra';
 
@@ -117,9 +118,8 @@ export function AppDetailView(props: AppDetailViewProps) {
               {props.app.displayName}
             </text>
           </box>
-          <scrollbox
-            scrollbarOptions={SCROLLBAR_OPTIONS}
-					scrollX={true}
+          <ScrollableContent
+            axes={["x", "y"]}
             style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
           >
             <Show when={props.kind !== 'infra'}>
@@ -185,7 +185,7 @@ export function AppDetailView(props: AppDetailViewProps) {
                 <text fg={uiColors.textMuted}>No container — library only</text>
               </box>
             </Show>
-          </scrollbox>
+          </ScrollableContent>
         </box>
 
         <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
@@ -203,9 +203,8 @@ export function AppDetailView(props: AppDetailViewProps) {
               overflow: 'hidden',
             }}
           >
-            <scrollbox
-              scrollbarOptions={SCROLLBAR_OPTIONS}
-					scrollX={true}
+            <ScrollableContent
+            axes={["x", "y"]}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show when={props.mrsLoading}>
@@ -230,7 +229,7 @@ export function AppDetailView(props: AppDetailViewProps) {
                   </>
                 )}
               </For>
-            </scrollbox>
+            </ScrollableContent>
           </DetailSection>
         </Show>
         </box>
@@ -262,9 +261,8 @@ export function AppDetailView(props: AppDetailViewProps) {
                 Container Stats
               </text>
             </box>
-            <scrollbox
-              scrollbarOptions={SCROLLBAR_OPTIONS}
-					scrollX={true}
+            <ScrollableContent
+            axes={["x", "y"]}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show
@@ -317,7 +315,7 @@ export function AppDetailView(props: AppDetailViewProps) {
                   );
                 }}
               </Show>
-            </scrollbox>
+            </ScrollableContent>
           </box>
 
           <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
@@ -338,9 +336,8 @@ export function AppDetailView(props: AppDetailViewProps) {
                 Container Logs
               </text>
             </box>
-            <scrollbox
-              scrollbarOptions={SCROLLBAR_OPTIONS}
-					scrollX={true}
+            <ScrollableContent
+            axes={["x", "y"]}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show
@@ -359,7 +356,7 @@ export function AppDetailView(props: AppDetailViewProps) {
                   )}
                 </For>
               </Show>
-            </scrollbox>
+            </ScrollableContent>
           </box>
         </box>
       </Show>

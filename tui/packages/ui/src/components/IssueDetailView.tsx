@@ -2,10 +2,11 @@ import { TextAttributes } from "@opentui/core";
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { For, Show } from "solid-js";
 import type { Issue, IssueComment, MergeRequest } from "@devenv/types";
-import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+import { uiColors } from "../colors";
 import { ContentFrame } from "./ContentStack";
 import { getMarkdownSyntaxStyle } from "../markdownSyntax";
 import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
+import { ScrollableContent } from './ScrollableContent';
 
 type RefItem =
 	| { type: "mr"; data: MergeRequest }
@@ -75,10 +76,9 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					</text>
 				</box>
 
-				<scrollbox
-					ref={(r) => props.onDetailScrollBoxReady?.(r)}
-					scrollbarOptions={SCROLLBAR_OPTIONS}
-					style={{
+				<ScrollableContent
+					onScrollBoxReady={(r) => props.onDetailScrollBoxReady?.(r)}
+										style={{
 						width: "100%",
 						flexGrow: 1,
 						minHeight: 0,
@@ -223,7 +223,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 						</text>
 						<text fg={uiColors.primary}>{issue().web_url}</text>
 					</box>
-				</scrollbox>
+				</ScrollableContent>
 			</box>
 
 			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
@@ -272,9 +272,8 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				</Show>
 
 				<Show when={props.references && props.references.length > 0}>
-					<scrollbox
-						scrollbarOptions={SCROLLBAR_OPTIONS}
-						style={{
+					<ScrollableContent
+												style={{
 							width: "100%",
 							maxHeight: 6,
 						}}
@@ -324,7 +323,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 								</text>
 							</box>
 						</Show>
-					</scrollbox>
+					</ScrollableContent>
 				</Show>
 			</box>
 
@@ -378,9 +377,8 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				</Show>
 
 				<Show when={!props.issueCommentsLoading && props.comments.length > 0}>
-					<scrollbox
-						scrollbarOptions={SCROLLBAR_OPTIONS}
-						style={{
+					<ScrollableContent
+												style={{
 							width: "100%",
 							maxHeight: 3,
 						}}
@@ -410,7 +408,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 								</box>
 							)}
 						</For>
-					</scrollbox>
+					</ScrollableContent>
 				</Show>
 			</box>
 		</box>
