@@ -36,7 +36,7 @@ export type TabType =
 	| "libraries"
 	| "scripts";
 
-export type TableSortKey = "status" | "git" | "name";
+export type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
 export type TableSortDirection = "asc" | "desc" | "none";
 export interface TableSortRule {
 	key: TableSortKey;
@@ -116,6 +116,9 @@ function compareByRule(a: App, b: App, rule: TableSortRule): number {
 	if (rule.key === "status") result = appStatusRank(a) - appStatusRank(b);
 	if (rule.key === "git") result = appGitRank(a) - appGitRank(b);
 	if (rule.key === "name") result = a.displayName.localeCompare(b.displayName);
+	if (rule.key === "interpreter") result = (a.interpreter || "").localeCompare(b.interpreter || "");
+	if (rule.key === "path") result = (a.scriptRelativePath || a.localDirectoryPath || "").localeCompare(b.scriptRelativePath || b.localDirectoryPath || "");
+	if (rule.key === "params") result = (a.scriptParameters?.length ?? 0) - (b.scriptParameters?.length ?? 0);
 	return rule.direction === "desc" ? -result : result;
 }
 
@@ -162,16 +165,22 @@ export function createAppStore() {
 	);
 	const [showTableSortModal, setShowTableSortModal] = createSignal(false);
 	const [tableSortSelectedIndex, setTableSortSelectedIndex] = createSignal(0);
-	const defaultSortRules = (): TableSortRule[] => [
+	const appSortRules = (): TableSortRule[] => [
 		{ key: "status", label: "Status", direction: "asc" },
 		{ key: "git", label: "Git", direction: "asc" },
 		{ key: "name", label: "Name", direction: "none" },
 	];
+	const scriptSortRules = (): TableSortRule[] => [
+		{ key: "name", label: "Name", direction: "asc" },
+		{ key: "interpreter", label: "Interpreter", direction: "none" },
+		{ key: "params", label: "Parameters", direction: "none" },
+		{ key: "path", label: "Path", direction: "none" },
+	];
 	const [tableSortRulesByTab, setTableSortRulesByTab] = createSignal<Record<TabType, TableSortRule[]>>({
-		applications: defaultSortRules(),
-		infrastructure: defaultSortRules(),
-		libraries: defaultSortRules(),
-		scripts: defaultSortRules(),
+		applications: appSortRules(),
+		infrastructure: appSortRules(),
+		libraries: appSortRules(),
+		scripts: scriptSortRules(),
 	});
 	const [statusLogEntries, setStatusLogEntries] = createSignal<
 		StatusLogEntry[]
@@ -235,6 +244,13 @@ export function createAppStore() {
 		}
 		if (key === "git") return appGitRank(app) === 0 ? "dirty" : app.gitStatus === "✓" ? "clean" : "unknown";
 		if (key === "provider") return app.provider || app.sourceType || "unknown";
+		if (key === "interpreter") return app.interpreter || (app.resourceType === "script-folder" ? "folder" : "unknown");
+		if (key === "params") {
+			const count = app.scriptParameters?.length ?? 0;
+			if (count === 0) return "none";
+			if (count === 1) return "1 parameter";
+			return "2+ parameters";
+		}
 		return "";
 	};
 
@@ -288,11 +304,16 @@ export function createAppStore() {
 
 	const tableFilterParameters = createMemo(() => {
 		const base = filteredAppsUnsorted();
-		const params = [
-			{ key: "status", label: "Status" },
-			{ key: "git", label: "Git" },
-			{ key: "provider", label: "Provider" },
-		];
+		const params = activeTab() === "scripts"
+			? [
+				{ key: "interpreter", label: "Interpreter" },
+				{ key: "params", label: "Parameters" },
+			]
+			: [
+				{ key: "status", label: "Status" },
+				{ key: "git", label: "Git" },
+				{ key: "provider", label: "Provider" },
+			];
 		return params.map((param) => {
 			const counts = new Map<string, number>();
 			for (const app of base) {

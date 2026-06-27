@@ -91,7 +91,7 @@ export interface InfraService {
 	operationStatus?: OperationStatus;
 }
 
-export type ScriptParameterType = "string" | "int" | "bool" | "enum";
+export type ScriptParameterType = "string" | "int" | "decimal" | "number" | "bool" | "enum";
 
 export interface ScriptParameter {
 	name: string;

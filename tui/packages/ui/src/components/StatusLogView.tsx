@@ -3,12 +3,15 @@ import { TextAttributes } from '@opentui/core';
 import type { StatusLogEntry } from '@devenv/types';
 import { uiColors } from '../colors';
 import { CenteredState } from './CenteredState';
+import { RunningText } from './RunningText';
 
 export interface StatusLogViewProps {
   entries: StatusLogEntry[];
   height?: number; // in rows/lines
   width?: number; // in columns
   isMaximized?: boolean;
+  runningTextEnabled?: boolean;
+  runningTextOffset?: number;
 }
 
 /**
@@ -93,19 +96,6 @@ export function StatusLogView(props: StatusLogViewProps) {
   };
 
   /**
-   * Truncate string to max length with ellipsis
-   */
-  const truncate = (str: string, maxLength: number): string => {
-    if (str.length <= maxLength) {
-      return str;
-    }
-    if (maxLength <= 3) {
-      return str.substring(0, maxLength);
-    }
-    return str.substring(0, maxLength - 3) + '...';
-  };
-
-  /**
    * Format a single log entry with column widths
    * Dynamically calculates message width based on available space
    */
@@ -114,7 +104,6 @@ export function StatusLogView(props: StatusLogViewProps) {
     appName: string;
     operation: string;
     symbol: string;
-    message: string;
     color: string;
   } => {
     const timestamp = formatTimestamp(entry.Timestamp);
@@ -131,17 +120,11 @@ export function StatusLogView(props: StatusLogViewProps) {
     const symbolWidth = 1; // Status symbol
     const borderPaddingWidth = 4; // Left padding (1) + right padding (1) + borders (2)
     
-    // Calculate available width for message
-    const availableWidth = displayWidth();
-    const fixedWidth = timestampWidth + appNameWidth + operationWidth + separatorsWidth + symbolWidth + borderPaddingWidth;
-    const messageWidth = Math.max(20, availableWidth - fixedWidth); // At least 20 chars
-    
     return {
       timestamp,
-      appName: truncate(displayName, appNameWidth).padEnd(appNameWidth),
-      operation: truncate(operation, operationWidth).padEnd(operationWidth),
+      appName: displayName,
+      operation,
       symbol: getStatusSymbol(entry.Status),
-      message: truncate(entry.Message, messageWidth),
       color: getStatusColor(entry.Status),
     };
   };
@@ -211,27 +194,42 @@ export function StatusLogView(props: StatusLogViewProps) {
                     {formatted.timestamp}
                   </text>
                   <text fg={uiColors.textMuted}> | </text>
-                  <text 
-                    fg={uiColors.primary}
-                    attributes={TextAttributes.BOLD}
-                  >
-                    {formatted.appName}
-                  </text>
+                  <box style={{ width: 25 }}>
+                    <RunningText
+                      text={formatted.appName}
+                      width={25}
+                      fg={uiColors.primary}
+                      attributes={TextAttributes.BOLD}
+                      enabled={props.runningTextEnabled}
+                      active={props.isMaximized}
+                      offset={props.runningTextOffset}
+                    />
+                  </box>
                   <text fg={uiColors.textMuted}> | </text>
-                  <text 
-                    fg={uiColors.textPrimary}
-                    attributes={TextAttributes.BOLD}
-                  >
-                    {formatted.operation}
-                  </text>
+                  <box style={{ width: 10 }}>
+                    <RunningText
+                      text={formatted.operation}
+                      width={10}
+                      fg={uiColors.textPrimary}
+                      attributes={TextAttributes.BOLD}
+                      enabled={props.runningTextEnabled}
+                      active={props.isMaximized}
+                      offset={props.runningTextOffset}
+                    />
+                  </box>
                   <text fg={uiColors.textMuted}> </text>
                   <text fg={formatted.color}>
                     {formatted.symbol}
                   </text>
                   <text fg={uiColors.textMuted}> </text>
-                  <text fg={formatted.color}>
-                    {formatted.message}
-                  </text>
+                  <RunningText
+                    text={entry.Message}
+                    width={Math.max(1, displayWidth() - 19 - 25 - 10 - 8 - 1 - 4)}
+                    fg={formatted.color}
+                    enabled={props.runningTextEnabled}
+                    active={props.isMaximized}
+                    offset={props.runningTextOffset}
+                  />
                 </box>
               );
             }}

@@ -1,10 +1,12 @@
 import { TextAttributes } from "@opentui/core";
+import { useTerminalDimensions } from '@opentui/solid';
 import { Show, For, createMemo } from "solid-js";
 import { uiColors } from "../colors";
 import { ContentFrame } from "./ContentStack";
 import { getMarkdownSyntaxStyle } from "../markdownSyntax";
 import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
 import { ScrollableContent } from './ScrollableContent';
+import { RunningText } from './RunningText';
 import type {
 	Issue,
 	MergeRequest,
@@ -30,6 +32,8 @@ interface MergeRequestDetailViewProps {
 	linkedIssues?: Issue[];
 	linkedIssuesLoading?: boolean;
 	linkedIssuesError?: string;
+	runningTextEnabled?: boolean;
+	runningTextOffset?: number;
 	onClose: () => void;
 }
 
@@ -133,7 +137,10 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 		return { total, resolved, open };
 	});
 
+	const dimensions = useTerminalDimensions();
 	const mr = () => props.mergeRequest;
+	const lineWidth = () => Math.max(1, Math.floor(dimensions().width * 0.6) - 4);
+	const linkedIssueTitleWidth = () => Math.max(1, lineWidth() - 8);
 
 	return (
 		<ContentFrame>
@@ -167,12 +174,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 				>
 					{/* Title - Fixed header outside scrollbox */}
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-						<text
-							fg={uiColors.borderHighlight}
-							attributes={TextAttributes.BOLD}
-						>
-							{mr().title}
-						</text>
+						<RunningText text={mr().title} width={lineWidth()} fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
 					</box>
 
 					{/* Scrollable content */}
@@ -312,7 +314,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 								URL:{" "}
 							</text>
-							<text fg={uiColors.primary}>{mr().web_url}</text>
+							<RunningText text={mr().web_url} width={lineWidth()} fg={uiColors.primary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
 						</box>
 
 						{/* Linked Issues */}
@@ -375,9 +377,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 											? " ○ "
 											: " ◌ "}
 									</text>
-									<text fg={uiColors.textSecondary}>
-										{iss.title.slice(0, 80)}
-									</text>
+									<RunningText text={iss.title} width={linkedIssueTitleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
 								</box>
 							)}
 						</For>

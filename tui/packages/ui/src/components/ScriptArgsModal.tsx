@@ -1,21 +1,27 @@
+import { For } from 'solid-js';
+import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 import type { ScriptParameter } from '@devenv/types';
-import { ScrollableContent } from './ScrollableContent';
 
 export interface ScriptArgsModalProps {
   scriptName: string;
   parameters: ScriptParameter[];
   values: Record<string, string>;
   selectedIndex: number;
+  selectedValueIndex: number;
+  focusedPane: 'parameter' | 'value';
+  editing: boolean;
   historyIndex: number;
   historyTotal: number;
   error: string | null;
 }
 
 export function ScriptArgsModal(props: ScriptArgsModalProps) {
-  const normalizedSelectedIndex = () => Math.max(0, Math.min(props.selectedIndex, Math.max(0, props.parameters.length - 1)));
+  const selectedParameterIndex = () => Math.max(0, Math.min(props.selectedIndex, Math.max(0, props.parameters.length - 1)));
+  const selectedParameter = () => props.parameters[selectedParameterIndex()];
+  const selectionBg = (pane: 'parameter' | 'value') => props.focusedPane === pane ? uiColors.bgSurface2 : uiColors.bgMantle;
 
   const valueFor = (param: ScriptParameter) => {
     const raw = props.values[param.name] ?? param.defaultValue ?? '';
@@ -23,23 +29,29 @@ export function ScriptArgsModal(props: ScriptArgsModalProps) {
     return raw;
   };
 
-  const metaFor = (param: ScriptParameter) => {
+  const valueOptionsFor = (param?: ScriptParameter) => {
+    if (!param) return [];
+    if (param.type === 'bool') return ['false', 'true'];
+    if (param.type === 'enum' && param.choices?.length) return param.choices;
+    return [valueFor(param)];
+  };
+
+  const metaFor = (param?: ScriptParameter) => {
+    if (!param) return '';
     const required = param.required ? 'required' : 'optional';
-    const choices = param.choices?.length ? ` choices:${param.choices.join('|')}` : '';
-    return `${param.type} • ${required}${choices}`;
+    const flag = param.flag ? ` • ${param.flag}` : '';
+    return `${param.type} • ${required}${flag}`;
   };
 
   return (
     <GenericModal
       title="Run Script"
       helpText={formatHelpText([
-        { key: 'Enter', action: 'Run' },
-        { key: 'j/k', action: 'Select' },
-        { key: '↑/↓', action: 'History' },
-        { key: 'Type/Bksp', action: 'Edit Text' },
-        { key: '←/→', action: 'Select Enum Value' },
-        { key: 'Space', action: 'Toggle Bool' },
-        { key: 'Esc', action: 'Cancel' },
+        { key: 'h/l', action: 'Focus' },
+        { key: 'j/k', action: 'Move' },
+        { key: 'i/Space', action: 'Edit/Select' },
+        { key: 'Enter', action: props.editing ? 'Save Edit' : 'Run' },
+        { key: 'Esc', action: props.editing ? 'Cancel Edit' : 'Cancel' },
       ])}
       widthPercent={0.82}
       heightPercent={0.85}
@@ -51,49 +63,52 @@ export function ScriptArgsModal(props: ScriptArgsModalProps) {
         <text fg={uiColors.textSecondary}>{props.historyTotal === 0 ? 'none' : `${props.historyIndex + 1}/${props.historyTotal}`}</text>
       </box>
 
-      <ScrollableContent
-                style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
-      >
-        {props.parameters.length === 0 ? (
-          <text fg={uiColors.textMuted}>No parameter metadata found for this script.</text>
-        ) : (
-          props.parameters.map((param, idx) => {
-            const selected = idx === normalizedSelectedIndex();
-            const value = valueFor(param);
-            const hasValue = value.trim().length > 0;
+      {props.parameters.length === 0 ? (
+        <text fg={uiColors.textMuted}>No parameter metadata found for this script.</text>
+      ) : (
+        <box style={{ width: '100%', flexGrow: 1, minHeight: 0, flexDirection: 'row', gap: 2 }}>
+          <box style={{ width: '35%', flexDirection: 'column' }}>
+            <text fg={props.focusedPane === 'parameter' ? uiColors.primary : uiColors.textPrimary} attributes={TextAttributes.BOLD}>Parameter</text>
+            <For each={props.parameters}>
+              {(param, index) => {
+                const selected = () => index() === selectedParameterIndex();
+                const value = () => valueFor(param);
+                return (
+                  <box backgroundColor={selected() ? selectionBg('parameter') : undefined} style={{ height: 2, paddingLeft: 1, flexDirection: 'column', flexShrink: 0 }}>
+                    <text fg={selected() ? uiColors.primary : uiColors.textSecondary}>{param.name}</text>
+                    <text fg={uiColors.textMuted}>{value() || '<empty>'}</text>
+                  </box>
+                );
+              }}
+            </For>
+          </box>
 
-            return (
-              <box
-                style={{
-                  width: '100%',
-                  height: 3,
-                  flexDirection: 'column',
-                  flexShrink: 0,
-                  marginBottom: 1,
-                  paddingLeft: 1,
-                }}
-                backgroundColor={selected ? uiColors.bgSurface0 : undefined}
-              >
-                <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
-                  <text fg={selected ? uiColors.primary : uiColors.textMuted}>{selected ? '▶ ' : '  '}</text>
-                  <text fg={uiColors.textPrimary}>{param.name}</text>
-                  <text fg={uiColors.textMuted}>  ({metaFor(param)})</text>
-                  {param.flag && <text fg={uiColors.textSecondary}>{`  ${param.flag}`}</text>}
-                </box>
-
-                <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
-                  <text fg={uiColors.textMuted}>    value </text>
-                  <text fg={hasValue ? uiColors.textPrimary : uiColors.textMuted}>{hasValue ? value : '<empty>'}</text>
-                </box>
-
-                <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
-                  <text fg={uiColors.textTertiary}>    {param.description || ' '}</text>
-                </box>
-              </box>
-            );
-          })
-        )}
-      </ScrollableContent>
+          <box style={{ width: '65%', flexDirection: 'column' }}>
+            <text fg={props.focusedPane === 'value' ? uiColors.primary : uiColors.textPrimary} attributes={TextAttributes.BOLD}>{selectedParameter()?.name ?? 'Value'}</text>
+            <text fg={uiColors.textMuted}>{metaFor(selectedParameter())}</text>
+            <text fg={uiColors.textTertiary}>{selectedParameter()?.description || ' '}</text>
+            <box style={{ height: 1 }} />
+            <For each={valueOptionsFor(selectedParameter())}>
+              {(option, index) => {
+                const param = () => selectedParameter();
+                const selected = () => index() === props.selectedValueIndex;
+                const active = () => param() ? valueFor(param()!) === option : false;
+                const editableScalar = () => param()?.type !== 'bool' && param()?.type !== 'enum';
+                const label = () => {
+                  const display = option || '<empty>';
+                  return props.editing && editableScalar() ? `${display}▌` : display;
+                };
+                return (
+                  <box backgroundColor={selected() ? selectionBg('value') : undefined} style={{ height: 1, paddingLeft: 1, flexDirection: 'row' }}>
+                    <text fg={active() ? uiColors.success : uiColors.textMuted}>{active() ? '● ' : '○ '}</text>
+                    <text fg={selected() ? uiColors.textPrimary : uiColors.textSecondary}>{label()}</text>
+                  </box>
+                );
+              }}
+            </For>
+          </box>
+        </box>
+      )}
 
       {props.error && (
         <box style={{ width: '100%', height: 1, flexShrink: 0, marginTop: 1 }}>

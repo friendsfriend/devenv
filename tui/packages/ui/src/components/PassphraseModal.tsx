@@ -1,8 +1,10 @@
 import { Show } from 'solid-js';
+import { useTerminalDimensions } from '@opentui/solid';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
+import { RunningText } from './RunningText';
 
 export interface PassphraseModalProps {
   /** Path to the identity file that needs unlocking */
@@ -11,19 +13,16 @@ export interface PassphraseModalProps {
   passphraseText: string;
   /** Error message if the last attempt failed, null otherwise */
   error: string | null;
+  runningTextEnabled?: boolean;
+  runningTextOffset?: number;
 }
 
 export function PassphraseModal(props: PassphraseModalProps) {
+  const dimensions = useTerminalDimensions();
   const masked = () => '*'.repeat(props.passphraseText.length);
   const hasInput = () => props.passphraseText.length > 0;
 
-  // Shorten the identity file path for display (show basename + parent dir at most)
-  const displayPath = () => {
-    const parts = props.identityFile.replace(/^~\//, '').split('/');
-    if (parts.length <= 2) return props.identityFile;
-    // Show last two segments: e.g. ".ssh/id_rsa"
-    return `.../${parts.slice(-2).join('/')}`;
-  };
+  const pathWidth = () => Math.max(1, Math.floor(dimensions().width * 0.4) - 8);
 
   const helpText = formatHelpText([
     { key: 'Enter', action: 'Unlock' },
@@ -48,7 +47,14 @@ export function PassphraseModal(props: PassphraseModalProps) {
         }}
       >
         <text fg={uiColors.textMuted}>{'Key: '}</text>
-        <text fg={uiColors.textSecondary}>{displayPath()}</text>
+        <RunningText
+          text={props.identityFile}
+          width={pathWidth()}
+          fg={uiColors.textSecondary}
+          enabled={props.runningTextEnabled}
+          active
+          offset={props.runningTextOffset}
+        />
       </box>
 
       {/* Passphrase input row */}

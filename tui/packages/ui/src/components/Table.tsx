@@ -6,7 +6,7 @@ import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { SearchHeader } from "./SearchHeader";
 import { WorkItemCard } from "./WorkItemCard";
-import { formatStatus, getGitStatusStyle, getStatusStyle, truncateText } from "../statusUtils";
+import { formatStatus, getGitStatusStyle, getStatusStyle } from "../statusUtils";
 
 export interface TableColumn {
 	key: string;
@@ -50,6 +50,8 @@ export interface TableProps<T = string> {
 	availableLines?: number;
 	spinnerFrames?: string[];
 	spinnerFrame?: () => number;
+	runningTextEnabled?: boolean;
+	runningTextOffset?: number;
 }
 
 /**
@@ -275,14 +277,16 @@ export function Table<T = string>(props: TableProps<T>) {
 							marker={appMarker(app)}
 							prefix={`[${appKind(app)}] `}
 							prefixColor={app.appType === "APP" ? uiColors.primary : uiColors.textSecondary}
-							title={truncateText(app.displayName, 80)}
+							title={app.displayName}
 							statusText={appStatus(app)}
 							statusColor={appStatusColor(app)}
 							statusAttributes={TextAttributes.BOLD}
 							statusSuffixText={appStatusSuffix(app)}
 							statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
-							metadata={truncateText(appMetadata(app), 120)}
+							metadata={appMetadata(app)}
 							selected={isSelected()}
+							runningTextEnabled={props.runningTextEnabled}
+							runningTextOffset={props.runningTextOffset}
 							onMouseUp={() => props.onSelect?.(index)}
 						/>
 					)}

@@ -243,6 +243,8 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					identityFile={uiStore.pendingSshHost()!.identityFile!}
 					passphraseText={uiStore.passphraseText()}
 					error={uiStore.passphraseError()}
+					runningTextEnabled={uiStore.runningTextEnabled()}
+					runningTextOffset={uiStore.runningTextOffset()}
 				/>
 			</Show>
 
@@ -394,6 +396,9 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					parameters={uiStore.scriptArgsParameters()}
 					values={uiStore.scriptArgValues()}
 					selectedIndex={uiStore.scriptArgsSelectedIndex()}
+					selectedValueIndex={uiStore.scriptArgsSelectedValueIndex()}
+					focusedPane={uiStore.scriptArgsFocusedPane()}
+					editing={uiStore.scriptArgsEditing()}
 					historyIndex={uiStore.scriptArgsHistoryCursor()}
 					historyTotal={uiStore.scriptArgsHistoryForCurrent().length}
 					error={uiStore.scriptArgsError()}

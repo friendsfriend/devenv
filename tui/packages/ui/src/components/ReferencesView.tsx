@@ -5,7 +5,7 @@ import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { CenteredState } from "./CenteredState";
 import { WorkItemCard } from "./WorkItemCard";
-import { formatShortDate, getIssueStateColor, truncateText } from "../statusUtils";
+import { formatShortDate, getIssueStateColor } from "../statusUtils";
 
 type RefItem =
 	| { type: "mr"; data: MergeRequest }
@@ -17,6 +17,8 @@ interface ReferencesViewProps {
 	loading: boolean;
 	error: string;
 	onClose: () => void;
+	runningTextEnabled?: boolean;
+	runningTextOffset?: number;
 }
 
 /**
@@ -70,11 +72,13 @@ export function ReferencesView(props: ReferencesViewProps) {
 									marker={`${ref.type === "mr" ? "!" : "#"}${ref.data.iid}`}
 									prefix={`[${typeLabel(ref)}] `}
 									prefixColor={typeColor(ref)}
-									title={truncateText(ref.data.title, 80)}
+									title={ref.data.title}
 									statusText={ref.data.state}
 									statusColor={getIssueStateColor(ref.data.state)}
 									metadata={`@${ref.data.author.name} • updated ${formatShortDate(ref.data.updated_at)}`}
 									selected={isSelected()}
+									runningTextEnabled={props.runningTextEnabled}
+									runningTextOffset={props.runningTextOffset}
 								/>
 							)}
 						/>

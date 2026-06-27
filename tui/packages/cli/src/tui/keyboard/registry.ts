@@ -27,6 +27,7 @@ export const KEYBINDS: KeybindDef[] = [
 	// ========== global ==========
 	{ keys: ["?"], description: "Show help", context: "global", category: "General" },
 	{ keys: ["Ctrl+/"], description: "Toggle OpenTUI console", context: "global", category: "General" },
+	{ keys: ["Ctrl+R"], description: "Toggle running text for overflowing focused fields", footerDescription: "Run text", context: "global", category: "General" },
 	{ keys: ["Esc"], description: "Close OpenTUI console when visible", context: "global", category: "General" },
 	{ keys: ["Ctrl+C"], description: "Copy selection; press twice to quit", context: "global", category: "General" },
 	{ keys: ["Ctrl+Shift+C", "Cmd+C"], description: "Copy selection", context: "global", category: "General" },

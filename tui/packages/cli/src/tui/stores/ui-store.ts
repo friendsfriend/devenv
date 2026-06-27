@@ -55,6 +55,10 @@ export function createUiStore() {
   const [scriptAddError, setScriptAddError] = createSignal<string | null>(null);
   const [scriptArgsError, setScriptArgsError] = createSignal<string | null>(null);
   const [scriptArgsSelectedIndex, setScriptArgsSelectedIndex] = createSignal(0);
+  const [scriptArgsSelectedValueIndex, setScriptArgsSelectedValueIndex] = createSignal(0);
+  const [scriptArgsFocusedPane, setScriptArgsFocusedPane] = createSignal<'parameter' | 'value'>('parameter');
+  const [scriptArgsEditing, setScriptArgsEditing] = createSignal(false);
+  const [scriptArgsEditOriginalValue, setScriptArgsEditOriginalValue] = createSignal('');
   const [scriptArgsTargetScript, setScriptArgsTargetScript] = createSignal<string | null>(null);
   const [scriptArgValues, setScriptArgValues] = createSignal<Record<string, string>>({});
   const [scriptArgsHistory, setScriptArgsHistory] = createSignal<Record<string, Record<string, string>[]>>({});
@@ -63,6 +67,8 @@ export function createUiStore() {
   const [showMarkdownModal, setShowMarkdownModal] = createSignal(false);
   const [markdownModalTitle, setMarkdownModalTitle] = createSignal('');
   const [markdownModalContent, setMarkdownModalContent] = createSignal('');
+  const [runningTextEnabled, setRunningTextEnabled] = createSignal(true);
+  const [runningTextOffset, setRunningTextOffset] = createSignal(0);
 
   const filteredBranches = createMemo(() => {
     const query = branchFilterQuery().toLowerCase();
@@ -176,6 +182,14 @@ export function createUiStore() {
     setScriptArgsError,
     scriptArgsSelectedIndex,
     setScriptArgsSelectedIndex,
+    scriptArgsSelectedValueIndex,
+    setScriptArgsSelectedValueIndex,
+    scriptArgsFocusedPane,
+    setScriptArgsFocusedPane,
+    scriptArgsEditing,
+    setScriptArgsEditing,
+    scriptArgsEditOriginalValue,
+    setScriptArgsEditOriginalValue,
     scriptArgsTargetScript,
     setScriptArgsTargetScript,
     scriptArgValues,
@@ -193,6 +207,10 @@ export function createUiStore() {
     setMarkdownModalTitle,
     markdownModalContent,
     setMarkdownModalContent,
+    runningTextEnabled,
+    setRunningTextEnabled,
+    runningTextOffset,
+    setRunningTextOffset,
     get markdownModalScrollBoxRef() { return markdownModalScrollBoxRef; },
     set markdownModalScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) { markdownModalScrollBoxRef = value; },
     get helpKeybindScrollBoxRef() { return helpKeybindScrollBoxRef; },

@@ -1,4 +1,6 @@
 export { Header } from "./components/Header";
+export { RunningText, runningTextFrame } from "./components/RunningText";
+export type { RunningTextProps } from "./components/RunningText";
 export { StatusBar } from "./components/StatusBar";
 export { Layout } from "./components/Layout";
 export { ContentFrame, ContentStack, ContentPanel, GridLayout } from "./components/ContentStack";
