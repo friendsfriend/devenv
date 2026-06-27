@@ -28,6 +28,7 @@ export function createAppActions(
             ...app,
             dockerInfo: status.dockerInfo,
             branch: status.branch || app.branch,
+            gitStatus: status.gitStatus,
             operationStatus: status.operationStatus,
           };
           if (status.activeWorktree) updated.activeWorktree = status.activeWorktree;
@@ -51,12 +52,13 @@ export function createAppActions(
         }
 
         if (event.type === 'status.updated') {
-          const { ident, dockerInfo, branch, operationStatus, activeWorktree } = event.properties;
+          const { ident, dockerInfo, branch, gitStatus, operationStatus, activeWorktree } = event.properties;
           appStore.setLastUpdateTime(new Date());
           appStore.setApps((prevApps) =>
             prevApps.map((app) => {
               if (app.ident !== ident) return app;
               const updated: typeof app = { ...app, dockerInfo: dockerInfo ?? app.dockerInfo, branch: branch || app.branch };
+              if ('gitStatus' in event.properties) updated.gitStatus = gitStatus;
               if ('activeWorktree' in event.properties) {
                 if (activeWorktree == null) delete updated.activeWorktree;
                 else updated.activeWorktree = activeWorktree;

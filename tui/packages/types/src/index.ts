@@ -35,6 +35,7 @@ export interface App {
 	activeWorktree?: string;
 	mainWorktreeBranch?: string;
 	dockerInfo?: DockerInfo;
+	gitStatus?: string;
 	operationStatus?: OperationStatus;
 	resourceType?: "app" | "script-folder" | "script-file";
 	scriptPath?: string;

@@ -1,3 +1,4 @@
+import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 
 export interface WorkItemCardProps {
@@ -11,12 +12,15 @@ export interface WorkItemCardProps {
   prefixColor?: string;
   statusSuffixText?: string;
   statusSuffixColor?: string;
+  statusAttributes?: any;
+  onMouseUp?: () => void;
 }
 
 export function WorkItemCard(props: WorkItemCardProps) {
   return (
     <box
       backgroundColor={props.selected ? uiColors.bgSurface2 : uiColors.bgMantle}
+      onMouseUp={props.onMouseUp}
       style={{
         width: '100%',
         height: 3,
@@ -32,7 +36,7 @@ export function WorkItemCard(props: WorkItemCardProps) {
         <text fg={uiColors.textSecondary}>{props.title}</text>
       </box>
       <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
-        <text fg={props.statusColor}>{props.statusText}</text>
+        <text fg={props.statusColor} attributes={props.statusAttributes}>{props.statusText}</text>
         <text fg={props.statusSuffixColor ?? props.statusColor}>{props.statusSuffixText ?? ''}</text>
       </box>
       <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>

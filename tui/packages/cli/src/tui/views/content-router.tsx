@@ -486,6 +486,8 @@ export function ContentRouter(props: ContentRouterProps) {
 										getTabBorderColor={props.getTabBorderColor}
 										searchMode={appStore.tableSearchMode()}
 										searchQuery={appStore.tableSearchQuery()}
+										spinnerFrames={props.spinnerFrames}
+										spinnerFrame={appStore.spinnerFrame}
 									/>
 								</box>,
 								<box style={{ flexShrink: 0 }}>

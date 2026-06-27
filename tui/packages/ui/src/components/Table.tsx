@@ -5,6 +5,8 @@ import { uiColors } from "../colors";
 import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { SearchHeader } from "./SearchHeader";
+import { WorkItemCard } from "./WorkItemCard";
+import { formatStatus, getGitStatusStyle, getStatusStyle, truncateText } from "../statusUtils";
 
 export interface TableColumn {
 	key: string;
@@ -46,6 +48,8 @@ export interface TableProps<T = string> {
 	 *  minus the Table's own chrome.  Used when the Table shares the content area with other elements
 	 *  (e.g. StatusLogView) so the caller can communicate the exact height budget. */
 	availableLines?: number;
+	spinnerFrames?: string[];
+	spinnerFrame?: () => number;
 }
 
 /**
@@ -60,32 +64,93 @@ export interface TableProps<T = string> {
  * - / search: filters rows (no highlighting)
  */
 export function Table<T = string>(props: TableProps<T>) {
-	const getColumnWidth = (width: number | string): any => {
-		if (typeof width === "string" && width.endsWith("%")) {
-			return { width };
-		}
-		return { width };
+	const providerIcon = (app: App) => {
+		if (app.sourceType === "github") return "";
+		if (app.sourceType === "gitlab") return "";
+		return "?";
 	};
 
-	const getCellValue = (app: App, column: TableColumn): string => {
-		if (column.render) {
-			return column.render(app);
-		}
-		return String((app as any)[column.key] || "");
+	const activeTabLabel = () =>
+		props.tabs?.find((tab) => tab.id === props.activeTab)?.label ?? "Applications";
+
+	const appKind = (app: App) => {
+		if (app.resourceType === "script-folder") return "Folder";
+		if (app.resourceType === "script-file") return "Script";
+		if (!app.localDirectoryPath && app.containerBaseName) return "Infra";
+		return app.appType === "APP" ? "App" : "Lib";
 	};
 
-	const getCellColor = (
-		app: App,
-		column: TableColumn,
-		isSelected: boolean,
-	): string => {
-		if (column.color) {
-			return column.color(app);
-		}
-		return isSelected ? uiColors.textPrimary : uiColors.textSecondary;
+	const appMarker = (app: App) => {
+		if (app.resourceType === "script-folder") return app.scriptExpanded ? "▾" : "▸";
+		if (app.resourceType === "script-file") return "󱆃";
+		if (!app.localDirectoryPath && app.containerBaseName) return "▣";
+		return app.appType === "APP" ? "◆" : "◇";
 	};
 
-	const isSelected = (index: number) => index === props.selectedIndex;
+	const appStatus = (app: App) => {
+		if (app.operationStatus?.status && app.operationStatus.message) {
+			if (app.operationStatus.status === "active" && props.spinnerFrames && props.spinnerFrame) {
+				return `${props.spinnerFrames[props.spinnerFrame()]} ${app.operationStatus.message}`;
+			}
+			return app.operationStatus.message;
+		}
+		if (app.resourceType === "script-folder") return "folder";
+		if (app.resourceType === "script-file") return app.scriptExecutable ? "executable" : "script";
+		return formatStatus(app.dockerInfo?.Status || "not found");
+	};
+
+	const gitStatus = (app: App) => app.gitStatus?.trim() || "...";
+
+	const gitStatusText = (app: App) => {
+		const status = gitStatus(app);
+		if (status === "✓") return "git clean";
+		if (status === "x") return "git unavailable";
+		if (status === "error") return "git error";
+		if (status === "...") return "git unknown";
+		return `git ${status}`;
+	};
+
+	const appStatusSuffix = (app: App) => {
+		if (app.resourceType === "script-folder" || app.resourceType === "script-file") {
+			return app.interpreter ? ` • ${app.interpreter}` : "";
+		}
+		const details = [gitStatusText(app), app.branch ? `branch ${app.branch}` : undefined, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
+		return details ? ` • ${details}` : "";
+	};
+
+	const appStatusColor = (app: App) => {
+		if (app.operationStatus?.status) {
+			switch (app.operationStatus.status) {
+				case "active": return uiColors.primary;
+				case "completed": return uiColors.success;
+				case "failed": return uiColors.error;
+				case "pending": return uiColors.warning;
+				default: return uiColors.textPrimary;
+			}
+		}
+		if (app.resourceType === "script-folder" || app.resourceType === "script-file") return uiColors.textSecondary;
+		return getStatusStyle(app.dockerInfo?.Status || "not found").color;
+	};
+
+	const appMetadata = (app: App) => {
+		if (app.resourceType === "script-folder") return app.scriptRelativePath || app.localDirectoryPath;
+		if (app.resourceType === "script-file") {
+			const params = app.scriptParameters?.length ?? 0;
+			return `${app.scriptRelativePath || app.localDirectoryPath}${params ? ` • ${params} params` : ""}`;
+		}
+		if (!app.localDirectoryPath && app.containerBaseName) {
+			return [app.containerBaseName, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
+		}
+
+		const isLinkedWorktree = app.activeWorktree && app.activeWorktree !== app.mainWorktreeBranch;
+		return [
+			`${providerIcon(app)} ${app.provider || app.sourceType || "repo"}`,
+			gitStatusText(app),
+			isLinkedWorktree ? `worktree ${app.activeWorktree}` : undefined,
+			app.dockerInfo?.Ports,
+			app.repositoryPath,
+		].filter(Boolean).join(" • ");
+	};
 
 	/**
 	 * Lines of fixed chrome outside the table body.
@@ -104,7 +169,7 @@ export function Table<T = string>(props: TableProps<T>) {
 		let lines = props.availableLines;
 		if (props.showBorder !== false) lines -= 2;
 		if (props.tabs && props.tabs.length > 0) lines -= 3;
-		lines -= 1; // column header
+		lines -= 1; // list header
 		return Math.max(1, lines);
 	};
 
@@ -166,20 +231,14 @@ export function Table<T = string>(props: TableProps<T>) {
 				</box>
 			</Show>
 
-			{/* Table Header row — doubles as search input bar while searchMode is active */}
+			{/* Header row — doubles as search input bar while searchMode is active */}
 			<SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.apps.length}>
-				<For each={props.columns}>
-					{(column) => (
-						<box style={getColumnWidth(column.width)}>
-							<text
-								fg={uiColors.textPrimary}
-								attributes={TextAttributes.BOLD}
-							>
-								{column.header}
-							</text>
-						</box>
-					)}
-				</For>
+				<box style={{ width: "100%", flexDirection: "row" }}>
+					<text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>{activeTabLabel()}</text>
+					<box style={{ width: "auto", marginLeft: "auto" }}>
+						<text fg={uiColors.textMuted}>{`${props.apps.length} loaded`}</text>
+					</box>
+				</box>
 			</SearchHeader>
 
 			{/* Table Body — virtual scroll keeps selected row always visible */}
@@ -200,56 +259,23 @@ export function Table<T = string>(props: TableProps<T>) {
 					reservedLines={
 						props.availableLines === undefined ? reservedLines() : undefined
 					}
-					estimatedItemHeight={1}
+					estimatedItemHeight={4}
 					showScrollIndicator={false}
 					renderItem={(app, isSelected, index) => (
-						<box
-							backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+						<WorkItemCard
+							marker={appMarker(app)}
+							prefix={`[${appKind(app)}] `}
+							prefixColor={app.appType === "APP" ? uiColors.primary : uiColors.textSecondary}
+							title={truncateText(app.displayName, 80)}
+							statusText={appStatus(app)}
+							statusColor={appStatusColor(app)}
+							statusAttributes={TextAttributes.BOLD}
+							statusSuffixText={appStatusSuffix(app)}
+							statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
+							metadata={truncateText(appMetadata(app), 120)}
+							selected={isSelected()}
 							onMouseUp={() => props.onSelect?.(index)}
-							style={{
-								width: "100%",
-								height: 1,
-								flexDirection: "row",
-								paddingLeft: 1,
-								paddingRight: 1,
-							}}
-						>
-							<For each={props.columns}>
-								{(column) => (
-									<box style={getColumnWidth(column.width)}>
-										<Show
-											when={column.renderParts}
-											fallback={
-												<text
-													style={{
-														fg: getCellColor(app, column, isSelected()),
-													}}
-												>
-													{getCellValue(app, column)}
-												</text>
-											}
-										>
-											<box style={{ flexDirection: "row" }}>
-												<For
-													each={column.renderParts?.(app, isSelected()) ?? []}
-												>
-													{(part) => (
-														<text
-															fg={
-																part.color ??
-																getCellColor(app, column, isSelected())
-															}
-														>
-															{part.text}
-														</text>
-													)}
-												</For>
-											</box>
-										</Show>
-									</box>
-								)}
-							</For>
-						</box>
+						/>
 					)}
 				/>
 			</Show>

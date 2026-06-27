@@ -82,14 +82,12 @@ export function formatStatus(status: string): string {
  * Matches styleGitStatus from tui/styles.go
  */
 export function getGitStatusStyle(gitStatus: string): StatusStyle {
-  if (gitStatus.includes('*')) {
+  const status = gitStatus?.trim() || '...';
+  if (status === '✓') return { color: uiColors.success, icon: '' };
+  if (status === '...' || status === 'x') return { color: uiColors.textMuted, icon: '' };
+  if (status === 'error') return { color: uiColors.error, icon: '' };
+  if (status.includes('*') || status.includes('+') || status.includes('~') || status.includes('-')) {
     return { color: uiColors.warning, icon: '' };
-  }
-  if (gitStatus === '✓') {
-    return { color: uiColors.success, icon: '' };
-  }
-  if (gitStatus === '...') {
-    return { color: uiColors.textMuted, icon: '' };
   }
   return { color: uiColors.textPrimary, icon: '' };
 }
