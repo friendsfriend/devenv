@@ -120,7 +120,7 @@ export function ContentRouter(props: ContentRouterProps) {
 				</box>
 			) : (
 				<Show
-					when={appStore.viewMode() === "table"}
+					when={appStore.viewMode() === "table" || appStore.viewMode() === "help"}
 					fallback={
 						<Show
 							when={appStore.viewMode() === "help"}
@@ -455,6 +455,7 @@ export function ContentRouter(props: ContentRouterProps) {
 											if (guide) {
 												const content = await guide.import();
 												helpActions.closeHelp();
+												props.stores.uiStore.setMarkdownModalReturnToHelp(true);
 												props.stores.uiStore.setMarkdownModalTitle("");
 												props.stores.uiStore.setMarkdownModalContent(content);
 												props.stores.uiStore.setShowMarkdownModal(true);

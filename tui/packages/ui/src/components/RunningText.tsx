@@ -14,21 +14,26 @@ export interface RunningTextProps {
 
 export function runningTextFrame(text: string, width: number, enabled: boolean, active: boolean, offset: number, delayTicks = 13, endHoldTicks = 13): string {
   if (width <= 0) return '';
-  if (text.length <= width) return text;
 
-  const initial = width <= 1 ? text.slice(0, width) : `${text.slice(0, width - 1)}…`;
-  if (!enabled || !active) return initial;
+  const textWidth = Math.max(0, width - 1);
+  const withTrailingSpace = (value: string) => `${value.slice(0, textWidth)} `;
 
-  const maxScroll = Math.max(0, text.length - width);
+  if (textWidth === 0) return ' ';
+  if (text.length <= textWidth) return withTrailingSpace(text);
+
+  const initial = textWidth <= 1 ? text.slice(0, textWidth) : `${text.slice(0, textWidth - 1)}…`;
+  if (!enabled || !active) return withTrailingSpace(initial);
+
+  const maxScroll = Math.max(0, text.length - textWidth);
   const cycleTicks = delayTicks + maxScroll + endHoldTicks;
   const phase = cycleTicks > 0 ? offset % cycleTicks : 0;
 
-  if (phase < delayTicks) return initial;
+  if (phase < delayTicks) return withTrailingSpace(initial);
 
   const scrollOffset = phase - delayTicks;
-  if (scrollOffset >= maxScroll) return text.slice(text.length - width);
+  if (scrollOffset >= maxScroll) return withTrailingSpace(text.slice(text.length - textWidth));
 
-  return text.slice(scrollOffset, scrollOffset + width);
+  return withTrailingSpace(text.slice(scrollOffset, scrollOffset + textWidth));
 }
 
 export function RunningText(props: RunningTextProps) {

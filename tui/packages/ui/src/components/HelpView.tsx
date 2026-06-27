@@ -1,10 +1,12 @@
 import { createMemo, For, Show, type JSX } from 'solid-js';
+import { useTerminalDimensions } from '@opentui/solid';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { ModalTabs } from './ModalTabs';
 import { focusSoon } from '../utils/focusSoon';
 import { ScrollableContent } from './ScrollableContent';
+import { RunningText } from './RunningText';
 
 export interface HelpSection {
   title: string;
@@ -50,10 +52,16 @@ export interface HelpViewProps {
   searchQuery?: string;
   /** Called when user types in search */
   onSearchChange?: (query: string) => void;
+  /** Whether long help text should scroll horizontally */
+  runningTextEnabled?: boolean;
+  /** Global running text tick offset */
+  runningTextOffset?: number;
 }
 
 export function HelpView(props: HelpViewProps): JSX.Element {
   const activeTab = () => props.activeTab ?? 'keybinds';
+  const dimensions = useTerminalDimensions();
+  const descriptionWidth = createMemo(() => Math.max(10, Math.floor(dimensions().width * 0.72) - 24));
 
   const filteredSections = createMemo(() => {
     const q = (props.searchQuery ?? '').toLowerCase().trim();
@@ -145,7 +153,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                             <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
                               {item.key.padEnd(18).slice(0, 18)}
                             </text>
-                            <text fg={uiColors.textPrimary}>{item.description}</text>
+                            <RunningText text={item.description} width={descriptionWidth()} fg={uiColors.textPrimary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
                           </box>
                         )}
                       </For>
@@ -173,7 +181,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                     >
                       {`${selected() ? '› ' : '  '}${guide.title}`}
                     </text>
-                    <text fg={uiColors.textSecondary}>{`  ${guide.description}`}</text>
+                    <RunningText text={`  ${guide.description}`} width={descriptionWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active={selected()} offset={props.runningTextOffset} />
                   </box>
                 );
               }}

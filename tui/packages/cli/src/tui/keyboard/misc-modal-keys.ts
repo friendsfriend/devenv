@@ -689,6 +689,7 @@ export async function handleMiscModalKeys(
             uiStore.helpGuideScrollBoxRef = undefined;
             uiStore.markdownModalScrollBoxRef = undefined;
             actions.helpActions.closeHelp();
+            uiStore.setMarkdownModalReturnToHelp(true);
             void guide.import().then((content) => {
               uiStore.setMarkdownModalTitle("");
               uiStore.setMarkdownModalContent(content);

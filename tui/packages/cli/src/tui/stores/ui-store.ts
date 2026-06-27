@@ -65,6 +65,7 @@ export function createUiStore() {
   const [scriptArgsHistoryCursor, setScriptArgsHistoryCursor] = createSignal(-1);
   const [scriptArgsParameters, setScriptArgsParameters] = createSignal<import('@devenv/types').ScriptParameter[]>([]);
   const [showMarkdownModal, setShowMarkdownModal] = createSignal(false);
+  const [markdownModalReturnToHelp, setMarkdownModalReturnToHelp] = createSignal(false);
   const [markdownModalTitle, setMarkdownModalTitle] = createSignal('');
   const [markdownModalContent, setMarkdownModalContent] = createSignal('');
   const [runningTextEnabled, setRunningTextEnabled] = createSignal(true);
@@ -203,6 +204,8 @@ export function createUiStore() {
     setScriptArgsParameters,
     showMarkdownModal,
     setShowMarkdownModal,
+    markdownModalReturnToHelp,
+    setMarkdownModalReturnToHelp,
     markdownModalTitle,
     setMarkdownModalTitle,
     markdownModalContent,

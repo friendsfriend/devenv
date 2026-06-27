@@ -111,6 +111,10 @@ export async function handleGlobalKeys(
     if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
       uiStore.setShowMarkdownModal(false);
       uiStore.markdownModalScrollBoxRef = undefined;
+      if (uiStore.markdownModalReturnToHelp()) {
+        uiStore.setMarkdownModalReturnToHelp(false);
+        actions.helpActions.showHelp();
+      }
       return true;
     }
     const sb = uiStore.markdownModalScrollBoxRef;
@@ -195,6 +199,7 @@ export async function handleGlobalKeys(
           uiStore.setMarkdownModalTitle("");
           uiStore.setMarkdownModalContent(content);
         }
+        uiStore.setMarkdownModalReturnToHelp(false);
         uiStore.setShowMarkdownModal(true);
       }
       if (idx === 4) actions.helpActions.showHelp();

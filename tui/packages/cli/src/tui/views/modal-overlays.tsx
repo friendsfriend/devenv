@@ -102,6 +102,8 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 							searchActive={appStore.helpSearchActive()}
 							searchQuery={appStore.helpSearchQuery()}
 							onSearchChange={(q) => appStore.setHelpSearchQuery(q)}
+							runningTextEnabled={uiStore.runningTextEnabled()}
+							runningTextOffset={uiStore.runningTextOffset()}
 							allContexts={appStore.helpAllContexts()}
 							onScopeToggle={(v) => appStore.setHelpAllContexts(v)}
 							activeTab={appStore.helpActiveTab()}
@@ -120,6 +122,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 								if (guide) {
 									const content = await guide.import();
 									helpActions.closeHelp();
+									uiStore.setMarkdownModalReturnToHelp(true);
 									uiStore.setMarkdownModalTitle("");
 									uiStore.setMarkdownModalContent(content);
 									uiStore.setShowMarkdownModal(true);
