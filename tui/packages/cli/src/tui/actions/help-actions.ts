@@ -10,7 +10,9 @@ const COMMON_NAVIGATION_ITEMS: HelpSection["items"] = [
 	{ key: "j/k, ↑/↓", description: "Move selection or scroll one line" },
 	{ key: "u/d", description: "Page or half-page up/down where supported" },
 	{ key: "g/G", description: "Go to top/bottom where supported" },
-	{ key: "/", description: "Search/filter current list where supported" },
+	{ key: "/", description: "Search current list where supported" },
+	{ key: "F", description: "Filter current list where supported" },
+	{ key: "O", description: "Order/sort current list where supported" },
 	{ key: "h/l, ←/→", description: "Scroll horizontally where supported" },
 	{ key: "[/], Shift+K/J", description: "Previous/next page or file where supported" },
 ];

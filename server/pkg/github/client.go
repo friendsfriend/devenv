@@ -195,11 +195,11 @@ type ghPRReviewComment struct {
 // issue events (labeled, assigned, renamed, milestoned, etc.).
 // We use json.RawMessage for sub-objects so we can switch on event type.
 type ghTimelineEvent struct {
-	ID        int              `json:"id"`
-	Event     string           `json:"event"` // "commented", "labeled", "assigned", "renamed", etc.
-	Actor     ghUser           `json:"actor"`
-	CreatedAt time.Time        `json:"created_at"`
-	Body      string           `json:"body,omitempty"` // only for "commented" events
+	ID        int       `json:"id"`
+	Event     string    `json:"event"` // "commented", "labeled", "assigned", "renamed", etc.
+	Actor     ghUser    `json:"actor"`
+	CreatedAt time.Time `json:"created_at"`
+	Body      string    `json:"body,omitempty"` // only for "commented" events
 	Label     *struct {
 		Name string `json:"name"`
 	} `json:"label,omitempty"`
@@ -212,11 +212,11 @@ type ghTimelineEvent struct {
 		Title string `json:"title"`
 	} `json:"milestone,omitempty"`
 	RequestedReviewer *ghUser `json:"requested_reviewer,omitempty"`
-	Source *struct {
-		Type string `json:"type"`
+	Source            *struct {
+		Type  string `json:"type"`
 		Issue *struct {
-			Number int    `json:"number"`
-			Title  string `json:"title"`
+			Number  int    `json:"number"`
+			Title   string `json:"title"`
 			HTMLURL string `json:"html_url"`
 		} `json:"issue,omitempty"`
 	} `json:"source,omitempty"`
@@ -534,6 +534,15 @@ func (c *client) Search(info *mr.RepoInfo, query string, limit int) ([]mr.Search
 }
 
 // GetMRs implements mr.Client.GetMRs.
+func normalizeGithubPRSort(sortBy string) string {
+	switch sortBy {
+	case "created", "updated", "popularity", "long-running":
+		return sortBy
+	default:
+		return "updated"
+	}
+}
+
 func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRListResult, error) {
 	ghInfo, err := FromMR(info)
 	if err != nil {
@@ -546,6 +555,9 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 	targetBranch := ""
 	search := ""
 	state := "open"
+	sortBy := "updated"
+	order := "desc"
+	labels := []string(nil)
 	if options != nil {
 		if options.Page > 0 {
 			page = options.Page
@@ -556,8 +568,15 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 		sourceBranch = options.SourceBranch
 		targetBranch = options.TargetBranch
 		search = options.Search
+		labels = options.Labels
 		if options.State != "" {
 			state = options.State
+		}
+		if options.SortBy != "" {
+			sortBy = options.SortBy
+		}
+		if options.SortDirection == "asc" || options.SortDirection == "desc" {
+			order = options.SortDirection
 		}
 	}
 
@@ -565,8 +584,8 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 
 	// When search is provided, use the GitHub search/issues endpoint
 	// since the pulls list endpoint doesn't support search.
-	if search != "" {
-		return c.searchMRs(ghInfo, search, page, perPage, state, skipDetails)
+	if search != "" || len(labels) > 0 {
+		return c.searchMRs(ghInfo, search, page, perPage, state, skipDetails, sortBy, order, labels)
 	}
 
 	// GitHub API doesn't have a native "merged" state. Merged PRs have state=closed + merged=true.
@@ -588,6 +607,8 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 	params.Set("state", apiState)
 	params.Set("per_page", fmt.Sprintf("%d", perPage))
 	params.Set("page", fmt.Sprintf("%d", page))
+	params.Set("sort", normalizeGithubPRSort(sortBy))
+	params.Set("direction", order)
 	if sourceBranch != "" {
 		params.Set("head", fmt.Sprintf("%s:%s", ghInfo.Owner, sourceBranch))
 	}
@@ -656,17 +677,21 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 // in the search query filters out regular issues, returning PRs only.
 // This is the documented GitHub API approach — the pulls list endpoint
 // (/repos/{owner}/{repo}/pulls) does not support free-text search.
-func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, state string, skipDetails bool) (*mr.MRListResult, error) {
+func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, state string, skipDetails bool, sortBy, order string, labels []string) (*mr.MRListResult, error) {
 	// Build search query with state qualifier.
 	// GitHub search API values: state:open, state:closed, state:all
-	searchQuery := strings.TrimSpace(fmt.Sprintf("repo:%s/%s type:pr state:%s %s", ghInfo.Owner, ghInfo.Repo, state, query))
+	labelQuery := ""
+	for _, label := range labels {
+		labelQuery += fmt.Sprintf(" label:%q", label)
+	}
+	searchQuery := strings.TrimSpace(fmt.Sprintf("repo:%s/%s type:pr state:%s %s %s", ghInfo.Owner, ghInfo.Repo, state, query, labelQuery))
 
 	params := url.Values{}
 	params.Set("q", searchQuery)
 	params.Set("per_page", fmt.Sprintf("%d", perPage))
 	params.Set("page", fmt.Sprintf("%d", page))
-	params.Set("sort", "updated")
-	params.Set("order", "desc")
+	params.Set("sort", normalizeGithubIssueSort(sortBy))
+	params.Set("order", order)
 
 	apiURL := fmt.Sprintf("https://api.github.com/search/issues?%s", params.Encode())
 

@@ -61,11 +61,15 @@ export function ContentRouter(props: ContentRouterProps) {
 						issueStore.linkedMRsError() || issueStore.referencedIssuesError()
 					}
 					onClose={() => issueActions.backToIssueDetailFromReferences()}
+				runningTextEnabled={props.runningTextEnabled}
+				runningTextOffset={props.runningTextOffset}
 				/>
 			) : appStore.viewMode() === "mrLinkedIssues" ? (
 				<IssueView
 					issues={mrStore.mrLinkedIssues()}
 					selectedIndex={mrStore.selectedMrLinkedIssueIndex()}
+					runningTextEnabled={props.runningTextEnabled}
+					runningTextOffset={props.runningTextOffset}
 					loading={mrStore.mrLinkedIssuesLoading()}
 					error={mrStore.mrLinkedIssuesError()}
 					currentPage={1}
@@ -81,6 +85,8 @@ export function ContentRouter(props: ContentRouterProps) {
 				<IssueView
 					issues={issueStore.referencedIssues()}
 					selectedIndex={issueStore.selectedReferencedIssueIndex()}
+					runningTextEnabled={props.runningTextEnabled}
+					runningTextOffset={props.runningTextOffset}
 					loading={issueStore.referencedIssuesLoading()}
 					error={issueStore.referencedIssuesError()}
 					currentPage={1}
@@ -96,6 +102,8 @@ export function ContentRouter(props: ContentRouterProps) {
 					loading={issueStore.linkedMRsLoading()}
 					error={issueStore.linkedMRsError()}
 					onClose={() => {}}
+					runningTextEnabled={props.runningTextEnabled}
+					runningTextOffset={props.runningTextOffset}
 				/>
 			) : appStore.loading() ? (
 				<StartupSplash appStore={appStore} />
@@ -112,7 +120,7 @@ export function ContentRouter(props: ContentRouterProps) {
 				</box>
 			) : (
 				<Show
-					when={appStore.viewMode() === "table"}
+					when={appStore.viewMode() === "table" || appStore.viewMode() === "help"}
 					fallback={
 						<Show
 							when={appStore.viewMode() === "help"}
@@ -315,6 +323,8 @@ export function ContentRouter(props: ContentRouterProps) {
 																linkedIssues={mrStore.mrLinkedIssues()}
 																linkedIssuesLoading={mrStore.mrLinkedIssuesLoading()}
 																linkedIssuesError={mrStore.mrLinkedIssuesError()}
+																runningTextEnabled={props.runningTextEnabled}
+																runningTextOffset={props.runningTextOffset}
 																onClose={mrActions.backToMRList}
 															/>
 														</Show>
@@ -338,6 +348,8 @@ export function ContentRouter(props: ContentRouterProps) {
 														currentPage={mrStore.currentPage()}
 														totalPages={mrStore.totalPages()}
 														state={mrStore.mrState()}
+													runningTextEnabled={props.runningTextEnabled}
+													runningTextOffset={props.runningTextOffset}
 													/>
 												</Show>
 											}
@@ -391,6 +403,8 @@ export function ContentRouter(props: ContentRouterProps) {
 										state={issueStore.issueState()}
 										searchMode={issueStore.issueSearchMode()}
 										searchQuery={issueStore.issueSearchQuery()}
+										runningTextEnabled={props.runningTextEnabled}
+										runningTextOffset={props.runningTextOffset}
 										onClose={() => {
 											appStore.setViewMode("table");
 											issueStore.setIssues([]);
@@ -441,6 +455,7 @@ export function ContentRouter(props: ContentRouterProps) {
 											if (guide) {
 												const content = await guide.import();
 												helpActions.closeHelp();
+												props.stores.uiStore.setMarkdownModalReturnToHelp(true);
 												props.stores.uiStore.setMarkdownModalTitle("");
 												props.stores.uiStore.setMarkdownModalContent(content);
 												props.stores.uiStore.setShowMarkdownModal(true);
@@ -460,6 +475,8 @@ export function ContentRouter(props: ContentRouterProps) {
 								height={30}
 								width={props.dimensions.width}
 								isMaximized={true}
+								runningTextEnabled={props.runningTextEnabled}
+								runningTextOffset={props.runningTextOffset}
 							/>
 						}
 					>
@@ -486,6 +503,10 @@ export function ContentRouter(props: ContentRouterProps) {
 										getTabBorderColor={props.getTabBorderColor}
 										searchMode={appStore.tableSearchMode()}
 										searchQuery={appStore.tableSearchQuery()}
+										spinnerFrames={props.spinnerFrames}
+										spinnerFrame={appStore.spinnerFrame}
+									runningTextEnabled={props.runningTextEnabled}
+									runningTextOffset={props.runningTextOffset}
 									/>
 								</box>,
 								<box style={{ flexShrink: 0 }}>
@@ -494,6 +515,8 @@ export function ContentRouter(props: ContentRouterProps) {
 										height={6}
 										width={props.dimensions.width}
 										isMaximized={false}
+									runningTextEnabled={props.runningTextEnabled}
+									runningTextOffset={props.runningTextOffset}
 									/>
 								</box>,
 							]}

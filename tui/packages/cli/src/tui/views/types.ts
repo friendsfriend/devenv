@@ -55,6 +55,8 @@ export interface ContentRouterProps {
 	scriptColumns: TableColumn[];
 	spinnerFrames: string[];
 	dimensions: { width: number; height: number };
+	runningTextEnabled?: boolean;
+	runningTextOffset?: number;
 	getTabBorderColor: (
 		tab: "applications" | "infrastructure" | "libraries" | "scripts",
 	) => string;

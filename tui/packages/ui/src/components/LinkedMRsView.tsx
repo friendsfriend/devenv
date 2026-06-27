@@ -1,9 +1,11 @@
 import { TextAttributes } from "@opentui/core";
-import { For, Show } from "solid-js";
+import { Show } from "solid-js";
+import { useTerminalDimensions } from '@opentui/solid';
 import type { MergeRequest } from "@devenv/types";
-import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+import { uiColors } from "../colors";
 import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
+import { RunningText } from './RunningText';
 
 interface LinkedMRsViewProps {
 	mergeRequests: MergeRequest[];
@@ -11,6 +13,8 @@ interface LinkedMRsViewProps {
 	loading: boolean;
 	error: string;
 	onClose: () => void;
+	runningTextEnabled?: boolean;
+	runningTextOffset?: number;
 }
 
 /**
@@ -19,6 +23,8 @@ interface LinkedMRsViewProps {
  */
 export function LinkedMRsView(props: LinkedMRsViewProps) {
 	const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 1;
+	const dimensions = useTerminalDimensions();
+	const titleWidth = () => Math.max(1, Math.floor(dimensions().width * 0.3) - 2);
 
 	const formatDate = (dateStr: string) => {
 		const date = new Date(dateStr);
@@ -166,15 +172,14 @@ export function LinkedMRsView(props: LinkedMRsViewProps) {
 								</text>
 							</box>
 							<box style={{ width: "30%" }}>
-								<text
-									style={{
-										fg: isSelected()
-											? uiColors.textPrimary
-											: uiColors.textSecondary,
-									}}
-								>
-									{mr.title}
-								</text>
+								<RunningText
+									text={mr.title}
+									width={titleWidth()}
+									fg={isSelected() ? uiColors.textPrimary : uiColors.textSecondary}
+									enabled={props.runningTextEnabled}
+									active={isSelected()}
+									offset={props.runningTextOffset}
+								/>
 							</box>
 							<box style={{ width: "14%" }}>
 								<text style={{ fg: uiColors.textSecondary }}>

@@ -1,4 +1,6 @@
 export { Header } from "./components/Header";
+export { RunningText, runningTextFrame } from "./components/RunningText";
+export type { RunningTextProps } from "./components/RunningText";
 export { StatusBar } from "./components/StatusBar";
 export { Layout } from "./components/Layout";
 export { ContentFrame, ContentStack, ContentPanel, GridLayout } from "./components/ContentStack";
@@ -55,6 +57,10 @@ export { ErrorDialog } from "./components/ErrorDialog";
 export { GenericModal } from "./components/GenericModal";
 export { ModalTabs } from "./components/ModalTabs";
 export type { ModalTabsProps, ModalTabItem } from "./components/ModalTabs";
+export { FilterModal } from "./components/FilterModal";
+export type { FilterModalProps, FilterParameterOption, FilterValueOption } from "./components/FilterModal";
+export { SortModal } from "./components/SortModal";
+export type { SortModalProps, SortParameterOption, SortDirection } from "./components/SortModal";
 export { ListViewModal } from "./components/ListViewModal";
 export type { ListViewModalProps } from "./components/ListViewModal";
 export { CenteredState } from "./components/CenteredState";

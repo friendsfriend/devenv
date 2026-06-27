@@ -27,6 +27,7 @@ export const KEYBINDS: KeybindDef[] = [
 	// ========== global ==========
 	{ keys: ["?"], description: "Show help", context: "global", category: "General" },
 	{ keys: ["Ctrl+/"], description: "Toggle OpenTUI console", context: "global", category: "General" },
+	{ keys: ["Ctrl+R"], description: "Toggle running text for overflowing focused fields", footerDescription: "Run text", context: "global", category: "General" },
 	{ keys: ["Esc"], description: "Close OpenTUI console when visible", context: "global", category: "General" },
 	{ keys: ["Ctrl+C"], description: "Copy selection; press twice to quit", context: "global", category: "General" },
 	{ keys: ["Ctrl+Shift+C", "Cmd+C"], description: "Copy selection", context: "global", category: "General" },
@@ -63,7 +64,9 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["+"], description: "Add app or script", footerDescription: "Add", context: "table", category: "Actions" },
 	{ keys: ["-"], description: "Remove selected app or script", footerDescription: "Remove", context: "table", category: "Actions" },
 	{ keys: ["Enter"], description: "View app detail or run script", footerDescription: "Open", context: "table", category: "Actions" },
-	{ keys: ["/"], description: "Search/filter table", context: "table", category: "Actions" },
+	{ keys: ["/"], description: "Search table", context: "table", category: "Actions" },
+	{ keys: ["F"], description: "Filter table", context: "table", category: "Actions" },
+	{ keys: ["O"], description: "Order/sort table", context: "table", category: "Actions" },
 
 	// ========== table — Docker ==========
 	{ keys: ["s"], description: "Start container (with profile picker)", context: "table", category: "Docker" },
@@ -145,6 +148,8 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["g"], description: "Go to first file", context: "changedFiles", category: "Navigation" },
 	{ keys: ["G"], description: "Go to last file", context: "changedFiles", category: "Navigation" },
 	{ keys: ["/"], description: "Search files", context: "changedFiles", category: "Actions" },
+	{ keys: ["F"], description: "Filter files", context: "changedFiles", category: "Actions" },
+	{ keys: ["O"], description: "Order/sort files", context: "changedFiles", category: "Actions" },
 	{ keys: ["Enter"], description: "View diff modal", context: "changedFiles", category: "Actions" },
 	{ keys: ["D"], description: "Switch to discussions view", context: "changedFiles", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to MR detail", context: "changedFiles", category: "General" },

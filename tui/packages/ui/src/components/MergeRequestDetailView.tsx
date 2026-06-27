@@ -1,9 +1,12 @@
 import { TextAttributes } from "@opentui/core";
+import { useTerminalDimensions } from '@opentui/solid';
 import { Show, For, createMemo } from "solid-js";
-import { uiColors, SCROLLBAR_OPTIONS } from "../colors";
+import { uiColors } from "../colors";
 import { ContentFrame } from "./ContentStack";
 import { getMarkdownSyntaxStyle } from "../markdownSyntax";
 import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
+import { ScrollableContent } from './ScrollableContent';
+import { RunningText } from './RunningText';
 import type {
 	Issue,
 	MergeRequest,
@@ -29,6 +32,8 @@ interface MergeRequestDetailViewProps {
 	linkedIssues?: Issue[];
 	linkedIssuesLoading?: boolean;
 	linkedIssuesError?: string;
+	runningTextEnabled?: boolean;
+	runningTextOffset?: number;
 	onClose: () => void;
 }
 
@@ -132,7 +137,10 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 		return { total, resolved, open };
 	});
 
+	const dimensions = useTerminalDimensions();
 	const mr = () => props.mergeRequest;
+	const lineWidth = () => Math.max(1, Math.floor(dimensions().width * 0.6) - 4);
+	const linkedIssueTitleWidth = () => Math.max(1, lineWidth() - 8);
 
 	return (
 		<ContentFrame>
@@ -166,18 +174,12 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 				>
 					{/* Title - Fixed header outside scrollbox */}
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-						<text
-							fg={uiColors.borderHighlight}
-							attributes={TextAttributes.BOLD}
-						>
-							{mr().title}
-						</text>
+						<RunningText text={mr().title} width={lineWidth()} fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
 					</box>
 
 					{/* Scrollable content */}
-					<scrollbox
-						scrollbarOptions={SCROLLBAR_OPTIONS}
-						style={{
+					<ScrollableContent
+												style={{
 							width: "100%",
 							flexGrow: 1,
 							minHeight: 0,
@@ -312,7 +314,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
 								URL:{" "}
 							</text>
-							<text fg={uiColors.primary}>{mr().web_url}</text>
+							<RunningText text={mr().web_url} width={lineWidth()} fg={uiColors.primary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
 						</box>
 
 						{/* Linked Issues */}
@@ -375,13 +377,11 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 											? " ○ "
 											: " ◌ "}
 									</text>
-									<text fg={uiColors.textSecondary}>
-										{iss.title.slice(0, 80)}
-									</text>
+									<RunningText text={iss.title} width={linkedIssueTitleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
 								</box>
 							)}
 						</For>
-					</scrollbox>
+					</ScrollableContent>
 				</box>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
@@ -397,9 +397,8 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 						overflow: "hidden",
 					}}
 				>
-					<scrollbox
-						scrollbarOptions={SCROLLBAR_OPTIONS}
-						style={{
+					<ScrollableContent
+												style={{
 							width: "100%",
 							flexGrow: 1,
 							minHeight: 0,
@@ -595,7 +594,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 								<text fg={uiColors.warning}>In progress...</text>
 							</box>
 						</Show>
-					</scrollbox>
+					</ScrollableContent>
 				</box>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
@@ -677,9 +676,8 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 							props.changes.length > 0
 						}
 					>
-						<scrollbox
-							scrollbarOptions={SCROLLBAR_OPTIONS}
-							style={{ flexGrow: 1, minHeight: 0 }}
+						<ScrollableContent
+														style={{ flexGrow: 1, minHeight: 0 }}
 						>
 							<For each={props.changes}>
 								{(change) => {
@@ -709,7 +707,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 									);
 								}}
 							</For>
-						</scrollbox>
+						</ScrollableContent>
 					</Show>
 				</box>
 			</box>
@@ -796,9 +794,8 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 					<Show
 						when={!props.jobsLoading && props.jobs && props.jobs.length > 0}
 					>
-						<scrollbox
-							scrollbarOptions={SCROLLBAR_OPTIONS}
-							style={{ flexGrow: 1, minHeight: 0 }}
+						<ScrollableContent
+														style={{ flexGrow: 1, minHeight: 0 }}
 						>
 							<For each={Array.from(jobsByStage().entries())}>
 								{([stage, jobs]) => (
@@ -839,7 +836,7 @@ export function MergeRequestDetailView(props: MergeRequestDetailViewProps) {
 									</>
 								)}
 							</For>
-						</scrollbox>
+						</ScrollableContent>
 					</Show>
 				</box>
 

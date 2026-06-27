@@ -1,6 +1,7 @@
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
+import { RunningText } from './RunningText';
 
 export type HeaderDetail = Record<string, string | number | undefined | null>;
 
@@ -11,6 +12,8 @@ export interface HeaderProps {
   details?: HeaderDetail[];
   right?: string;
   severity?: 'normal' | 'success' | 'warning' | 'error';
+  runningTextEnabled?: boolean;
+  runningTextOffset?: number;
 }
 
 const LOGO_WIDTH = 6;
@@ -30,15 +33,6 @@ const formatDetail = (detail: HeaderDetail | undefined, fallback?: string) => {
   if (!key || value === undefined || value === null || value === '') return fallback ?? '';
   return `${key}: ${value}`;
 };
-
-const truncate = (value: string | undefined, max: number) => {
-  const text = value ?? '';
-  if (max <= 0) return '';
-  return text.length > max ? `${text.slice(0, Math.max(0, max - 1))}…` : text;
-};
-
-const rightAlign = (value: string | undefined, width: number) =>
-  truncate(value, width).padStart(width);
 
 export function Header(props: HeaderProps) {
   const dimensions = useTerminalDimensions();
@@ -64,11 +58,11 @@ export function Header(props: HeaderProps) {
           <text fg={colors.mauve} attributes={TextAttributes.BOLD}>DΞV</text>
         </box>
         <box style={{ width: middleWidth() }}>
-          <text fg={uiColors.textSecondary}>{truncate(primaryDetail(), middleWidth())}</text>
+          <RunningText text={primaryDetail()} width={middleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
         <box style={{ flexGrow: 1 }} />
         <box style={{ width: rightWidth() }}>
-          <text fg={accent()}>{rightAlign(props.right, rightWidth())}</text>
+          <RunningText text={props.right ?? ''} width={rightWidth()} fg={accent()} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
       </box>
       <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
@@ -76,11 +70,11 @@ export function Header(props: HeaderProps) {
           <text fg={colors.peach} attributes={TextAttributes.BOLD}>ΞNV</text>
         </box>
         <box style={{ width: middleWidth() }}>
-          <text fg={uiColors.textMuted}>{truncate(secondaryDetail(), middleWidth())}</text>
+          <RunningText text={secondaryDetail()} width={middleWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
         <box style={{ flexGrow: 1 }} />
         <box style={{ width: rightWidth() }}>
-          <text fg={uiColors.textMuted}>{rightAlign('? help', rightWidth())}</text>
+          <RunningText text="? help" width={rightWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
       </box>
     </box>

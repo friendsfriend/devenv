@@ -5,7 +5,7 @@ import type { Issue, IssueScope } from "@devenv/types";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { CenteredState } from "./CenteredState";
 import { SearchHeader } from "./SearchHeader";
-import { formatShortDate, getIssueStateColor, truncateText } from "../statusUtils";
+import { formatShortDate, getIssueStateColor } from "../statusUtils";
 import { WorkItemCard } from "./WorkItemCard";
 import { ContentPanel } from "./ContentStack";
 
@@ -23,6 +23,8 @@ interface IssueViewProps {
 	totalCount?: number;
 	scope?: IssueScope;
 	state?: string;
+	runningTextEnabled?: boolean;
+	runningTextOffset?: number;
 }
 
 /**
@@ -93,16 +95,18 @@ export function IssueView(props: IssueViewProps) {
 							renderItem={(issue, isSelected) => {
 								const labels = issue.labels ?? [];
 								const labelText = labels.length > 0
-									? labels.slice(0, 3).join(", ") + (labels.length > 3 ? "…" : "")
+									? labels.join(", ")
 									: "no labels";
 								return (
 									<WorkItemCard
 										marker={`#${issue.iid}`}
-										title={truncateText(issue.title, 80)}
+										title={issue.title}
 										statusText={issue.state}
 										statusColor={getIssueStateColor(issue.state)}
 										metadata={`@${issue.author.name} • ${labelText} • updated ${formatShortDate(issue.updated_at)}`}
 										selected={isSelected()}
+										runningTextEnabled={props.runningTextEnabled}
+										runningTextOffset={props.runningTextOffset}
 									/>
 								);
 							}}

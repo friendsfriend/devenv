@@ -174,7 +174,13 @@ export function TUIApp(props: TUIAppProps) {
 	const spinnerInterval = setInterval(() => {
 		appStore.setSpinnerFrame((prev) => (prev + 1) % spinnerFrames.length);
 	}, 40);
-	onCleanup(() => clearInterval(spinnerInterval));
+	const runningTextInterval = setInterval(() => {
+		if (uiStore.runningTextEnabled()) uiStore.setRunningTextOffset((prev) => prev + 1);
+	}, 160);
+	onCleanup(() => {
+		clearInterval(spinnerInterval);
+		clearInterval(runningTextInterval);
+	});
 
 	createEffect(
 		on(
@@ -311,6 +317,8 @@ export function TUIApp(props: TUIAppProps) {
 				header={
 					<Header
 						{...getHeaderInfo(headerDeps)}
+						runningTextEnabled={uiStore.runningTextEnabled()}
+						runningTextOffset={uiStore.runningTextOffset()}
 					/>
 				}
 				content={
@@ -321,6 +329,8 @@ export function TUIApp(props: TUIAppProps) {
 						scriptColumns={scriptColumns}
 						spinnerFrames={spinnerFrames}
 						dimensions={dimensions()}
+						runningTextEnabled={uiStore.runningTextEnabled()}
+						runningTextOffset={uiStore.runningTextOffset()}
 						getTabBorderColor={(tab) => getTabBorderColor(tab, appStore)}
 					/>
 				}
@@ -348,6 +358,8 @@ export function TUIApp(props: TUIAppProps) {
 								: ""
 						}
 						keybinds={helpActions.getKeybinds()}
+						runningTextEnabled={uiStore.runningTextEnabled()}
+						runningTextOffset={uiStore.runningTextOffset()}
 					/>
 				}
 			/>
@@ -386,14 +398,26 @@ export async function startTUI(serverUrl: string) {
 
 		setExitRenderer(renderer);
 
+		let destroyed = false;
 		const cleanup = () => {
+			if (destroyed) return;
+			destroyed = true;
+			process.off("SIGINT", cleanup);
+			process.off("SIGTERM", cleanup);
+			process.off("SIGHUP", cleanup);
 			renderer.destroy();
 		};
 		process.on("SIGINT", cleanup);
 		process.on("SIGTERM", cleanup);
 		process.on("SIGHUP", cleanup);
 
-		await render(() => <TUIApp serverUrl={serverUrl} />, renderer);
+		try {
+			await render(() => <TUIApp serverUrl={serverUrl} />, renderer);
+		} finally {
+			process.off("SIGINT", cleanup);
+			process.off("SIGTERM", cleanup);
+			process.off("SIGHUP", cleanup);
+		}
 	} catch (error) {
 		console.error("Fatal error in TUI:", error);
 		throw error;

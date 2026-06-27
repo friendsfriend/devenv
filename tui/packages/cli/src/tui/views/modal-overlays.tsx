@@ -25,6 +25,8 @@ import {
 	CommentModal,
 	LabelPickerModal,
 	AssigneePickerModal,
+	FilterModal,
+	SortModal,
 	HelpView,
 	uiColors,
 } from "@devenv/ui";
@@ -58,6 +60,23 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
+			<Show when={appStore.showTableFilterModal()}>
+				<FilterModal
+					parameters={appStore.tableFilterParameters()}
+					selectedParameterIndex={appStore.tableFilterParameterIndex()}
+					selectedValueIndex={appStore.tableFilterValueIndex()}
+					focusedPane={appStore.tableFilterFocusedPane()}
+					activeFilters={appStore.tableFilters()}
+				/>
+			</Show>
+
+			<Show when={appStore.showTableSortModal()}>
+				<SortModal
+					parameters={appStore.tableSortRules()}
+					selectedIndex={appStore.tableSortSelectedIndex()}
+				/>
+			</Show>
+
 			<Show when={appStore.viewMode() === "help"}>
 				{(() => {
 					const helpData = helpActions.getHelpContent();
@@ -83,6 +102,8 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 							searchActive={appStore.helpSearchActive()}
 							searchQuery={appStore.helpSearchQuery()}
 							onSearchChange={(q) => appStore.setHelpSearchQuery(q)}
+							runningTextEnabled={uiStore.runningTextEnabled()}
+							runningTextOffset={uiStore.runningTextOffset()}
 							allContexts={appStore.helpAllContexts()}
 							onScopeToggle={(v) => appStore.setHelpAllContexts(v)}
 							activeTab={appStore.helpActiveTab()}
@@ -101,6 +122,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 								if (guide) {
 									const content = await guide.import();
 									helpActions.closeHelp();
+									uiStore.setMarkdownModalReturnToHelp(true);
 									uiStore.setMarkdownModalTitle("");
 									uiStore.setMarkdownModalContent(content);
 									uiStore.setShowMarkdownModal(true);
@@ -109,6 +131,23 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 						/>
 					);
 				})()}
+			</Show>
+
+			<Show when={mrStore.showListFilterModal()}>
+				<FilterModal
+					parameters={mrStore.listFilterParameters()}
+					selectedParameterIndex={mrStore.listFilterParameterIndex()}
+					selectedValueIndex={mrStore.listFilterValueIndex()}
+					focusedPane={mrStore.listFilterFocusedPane()}
+					activeFilters={mrStore.currentListFilters()}
+				/>
+			</Show>
+
+			<Show when={mrStore.showListSortModal()}>
+				<SortModal
+					parameters={mrStore.currentListSortRules()}
+					selectedIndex={mrStore.listSortSelectedIndex()}
+				/>
 			</Show>
 
 			<Show when={appStore.viewMode() === "issueScopePicker"}>
@@ -207,6 +246,8 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					identityFile={uiStore.pendingSshHost()!.identityFile!}
 					passphraseText={uiStore.passphraseText()}
 					error={uiStore.passphraseError()}
+					runningTextEnabled={uiStore.runningTextEnabled()}
+					runningTextOffset={uiStore.runningTextOffset()}
 				/>
 			</Show>
 
@@ -358,6 +399,9 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					parameters={uiStore.scriptArgsParameters()}
 					values={uiStore.scriptArgValues()}
 					selectedIndex={uiStore.scriptArgsSelectedIndex()}
+					selectedValueIndex={uiStore.scriptArgsSelectedValueIndex()}
+					focusedPane={uiStore.scriptArgsFocusedPane()}
+					editing={uiStore.scriptArgsEditing()}
 					historyIndex={uiStore.scriptArgsHistoryCursor()}
 					historyTotal={uiStore.scriptArgsHistoryForCurrent().length}
 					error={uiStore.scriptArgsError()}

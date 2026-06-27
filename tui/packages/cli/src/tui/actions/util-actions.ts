@@ -311,6 +311,10 @@ export function createUtilActions(
         throw new Error(`Parameter ${param.name} must be an integer`);
       }
 
+      if ((param.type === 'decimal' || param.type === 'number') && !/^-?(?:\d+\.?\d*|\.\d+)$/.test(raw)) {
+        throw new Error(`Parameter ${param.name} must be a decimal number`);
+      }
+
       if (param.type === 'enum' && param.choices && param.choices.length > 0 && !param.choices.includes(raw)) {
         throw new Error(`Parameter ${param.name} must be one of: ${param.choices.join(', ')}`);
       }
@@ -358,6 +362,10 @@ export function createUtilActions(
     uiStore.setScriptArgsTargetScript(app.scriptRelativePath);
     uiStore.setScriptArgValues(initialValues);
     uiStore.setScriptArgsSelectedIndex(0);
+    uiStore.setScriptArgsSelectedValueIndex(0);
+    uiStore.setScriptArgsFocusedPane('parameter');
+    uiStore.setScriptArgsEditing(false);
+    uiStore.setScriptArgsEditOriginalValue('');
     uiStore.setScriptArgsHistoryCursor(-1);
     uiStore.setScriptArgsError(null);
 

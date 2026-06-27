@@ -1100,6 +1100,19 @@ func (c *client) GetMergeRequests(projectInfo *ProjectInfo, sourceBranch, target
 }
 
 // GetMergeRequestsWithOptions fetches merge requests with pagination and filter options.
+func normalizeGitLabMRSort(sortBy string) string {
+	switch sortBy {
+	case "created", "created_at":
+		return "created_at"
+	case "updated", "updated_at":
+		return "updated_at"
+	case "title":
+		return "title"
+	default:
+		return "updated_at"
+	}
+}
+
 func (c *client) GetMergeRequestsWithOptions(projectInfo *ProjectInfo, opts *mr.MRListOptions) (*mr.MRListResult, error) {
 	if projectInfo == nil {
 		return nil, fmt.Errorf("project info is nil")
@@ -1133,6 +1146,22 @@ func (c *client) GetMergeRequestsWithOptions(projectInfo *ProjectInfo, opts *mr.
 		if opts.Search != "" {
 			params.Set("search", opts.Search)
 		}
+		if len(opts.Labels) > 0 {
+			params.Set("labels", strings.Join(opts.Labels, ","))
+		}
+		if opts.SortBy != "" {
+			params.Set("order_by", normalizeGitLabMRSort(opts.SortBy))
+		}
+		if opts.SortDirection == "asc" || opts.SortDirection == "desc" {
+			params.Set("sort", opts.SortDirection)
+		}
+	}
+
+	if params.Get("order_by") == "" {
+		params.Set("order_by", "updated_at")
+	}
+	if params.Get("sort") == "" {
+		params.Set("sort", "desc")
 	}
 
 	params.Set("state", state)

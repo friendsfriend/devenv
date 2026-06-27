@@ -5,7 +5,7 @@ import type { MergeRequest } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
-import { formatShortDate, getIssueStateColor, getPipelineStatusColor, truncateText } from '../statusUtils';
+import { formatShortDate, getIssueStateColor, getPipelineStatusColor } from '../statusUtils';
 import { WorkItemCard } from './WorkItemCard';
 import { ContentPanel } from './ContentStack';
 
@@ -21,6 +21,8 @@ interface MergeRequestViewProps {
   currentPage?: number;
   totalPages?: number;
   state?: string;
+  runningTextEnabled?: boolean;
+  runningTextOffset?: number;
 }
 
 /**
@@ -99,13 +101,15 @@ export function MergeRequestView(props: MergeRequestViewProps) {
                     marker={`!${mr.iid}`}
                     prefix={`${mergeStatus.text} `}
                     prefixColor={mergeStatus.fg}
-                    title={truncateText(mr.title, 80)}
+                    title={mr.title}
                     statusText={mr.state}
                     statusColor={getIssueStateColor(mr.state)}
                     statusSuffixText={` • pipeline ${pipeline}`}
                     statusSuffixColor={getPipelineStatusColor(mr.head_pipeline?.status)}
                     metadata={`@${mr.author.name} • updated ${formatShortDate(mr.updated_at)}`}
                     selected={isSelected()}
+                    runningTextEnabled={props.runningTextEnabled}
+                    runningTextOffset={props.runningTextOffset}
                   />
                 );
               }}

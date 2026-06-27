@@ -35,6 +35,7 @@ export interface App {
 	activeWorktree?: string;
 	mainWorktreeBranch?: string;
 	dockerInfo?: DockerInfo;
+	gitStatus?: string;
 	operationStatus?: OperationStatus;
 	resourceType?: "app" | "script-folder" | "script-file";
 	scriptPath?: string;
@@ -90,7 +91,7 @@ export interface InfraService {
 	operationStatus?: OperationStatus;
 }
 
-export type ScriptParameterType = "string" | "int" | "bool" | "enum";
+export type ScriptParameterType = "string" | "int" | "decimal" | "number" | "bool" | "enum";
 
 export interface ScriptParameter {
 	name: string;

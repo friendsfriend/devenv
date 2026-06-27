@@ -224,6 +224,107 @@ export async function handleTableKeys(
 	// Only handle table mode from here
 	if (appStore.viewMode() !== "table") return false;
 
+	const isLetter =
+		event.sequence &&
+		event.sequence.length === 1 &&
+		/[a-zA-Z]/.test(event.sequence);
+	const key = isLetter ? event.sequence : event.name;
+
+	if (appStore.showTableFilterModal()) {
+		const params = appStore.tableFilterParameters();
+		const param = params[appStore.tableFilterParameterIndex()];
+		const values = param?.values ?? [];
+		if (key === "escape" || key === "esc" || event.sequence === "\x1b" || key === "return" || key === "enter") {
+			appStore.setShowTableFilterModal(false);
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		if (key === "j" || key === "down") {
+			if (appStore.tableFilterFocusedPane() === "parameter") {
+				appStore.setTableFilterParameterIndex((i) => Math.min(params.length - 1, i + 1));
+				appStore.setTableFilterValueIndex(0);
+			} else {
+				appStore.setTableFilterValueIndex((i) => Math.min(values.length - 1, i + 1));
+			}
+			return true;
+		}
+		if (key === "k" || key === "up") {
+			if (appStore.tableFilterFocusedPane() === "parameter") {
+				appStore.setTableFilterParameterIndex((i) => Math.max(0, i - 1));
+				appStore.setTableFilterValueIndex(0);
+			} else {
+				appStore.setTableFilterValueIndex((i) => Math.max(0, i - 1));
+			}
+			return true;
+		}
+		if (key === "l" || key === "right") {
+			appStore.setTableFilterFocusedPane("value");
+			return true;
+		}
+		if (key === "h" || key === "left") {
+			appStore.setTableFilterFocusedPane("parameter");
+			return true;
+		}
+		if (event.sequence === " " && param && values[appStore.tableFilterValueIndex()]) {
+			const value = values[appStore.tableFilterValueIndex()].value;
+			appStore.setTableFilters((filters) => {
+				const current = filters[param.key] ?? [];
+				const next = current.includes(value) ? current.filter((v) => v !== value) : [...current, value];
+				return { ...filters, [param.key]: next };
+			});
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		return true;
+	}
+
+	if (appStore.showTableSortModal()) {
+		const rules = appStore.tableSortRules();
+		const selected = appStore.tableSortSelectedIndex();
+		if (key === "escape" || key === "esc" || event.sequence === "\x1b" || key === "return" || key === "enter") {
+			appStore.setShowTableSortModal(false);
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		if (key === "j" || key === "down") {
+			appStore.setTableSortSelectedIndex((i) => Math.min(rules.length - 1, i + 1));
+			return true;
+		}
+		if (key === "k" || key === "up") {
+			appStore.setTableSortSelectedIndex((i) => Math.max(0, i - 1));
+			return true;
+		}
+		if (event.sequence === " ") {
+			const order = ["asc", "desc", "none"] as const;
+			appStore.setTableSortRules((current) => current.map((rule, index) =>
+				index === selected ? { ...rule, direction: order[(order.indexOf(rule.direction) + 1) % order.length] } : rule,
+			));
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		if (event.sequence === "K" && selected > 0) {
+			appStore.setTableSortRules((current) => {
+				const next = [...current];
+				[next[selected - 1], next[selected]] = [next[selected], next[selected - 1]];
+				return next;
+			});
+			appStore.setTableSortSelectedIndex(selected - 1);
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		if (event.sequence === "J" && selected < rules.length - 1) {
+			appStore.setTableSortRules((current) => {
+				const next = [...current];
+				[next[selected], next[selected + 1]] = [next[selected + 1], next[selected]];
+				return next;
+			});
+			appStore.setTableSortSelectedIndex(selected + 1);
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		return true;
+	}
+
 	// Table search mode — capture all keys while user is typing
 	if (appStore.tableSearchMode()) {
 		if (
@@ -257,11 +358,6 @@ export async function handleTableKeys(
 	}
 
 	const appList = appStore.tableFilteredApps();
-	const isLetter =
-		event.sequence &&
-		event.sequence.length === 1 &&
-		/[a-zA-Z]/.test(event.sequence);
-	const key = isLetter ? event.sequence : event.name;
 	if (event.sequence === "?" || event.name === "?" || (event.name === "/" && event.shift)) {
 		helpActions.showHelp();
 		return true;
@@ -276,6 +372,12 @@ export async function handleTableKeys(
 			appStore.setTableSearchMode(true);
 			appStore.setTableSearchQuery("");
 			appStore.setSelectedIndex(0);
+			break;
+		case "F":
+			appStore.setShowTableFilterModal(true);
+			break;
+		case "O":
+			appStore.setShowTableSortModal(true);
 			break;
 		case "return":
 		case "enter":

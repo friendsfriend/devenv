@@ -1,8 +1,12 @@
 import { createMemo, For, Show, type JSX } from 'solid-js';
+import { useTerminalDimensions } from '@opentui/solid';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
-import { SCROLLBAR_OPTIONS, uiColors } from '../colors';
+import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { ModalTabs } from './ModalTabs';
+import { focusSoon } from '../utils/focusSoon';
+import { ScrollableContent } from './ScrollableContent';
+import { RunningText } from './RunningText';
 
 export interface HelpSection {
   title: string;
@@ -48,10 +52,16 @@ export interface HelpViewProps {
   searchQuery?: string;
   /** Called when user types in search */
   onSearchChange?: (query: string) => void;
+  /** Whether long help text should scroll horizontally */
+  runningTextEnabled?: boolean;
+  /** Global running text tick offset */
+  runningTextOffset?: number;
 }
 
 export function HelpView(props: HelpViewProps): JSX.Element {
   const activeTab = () => props.activeTab ?? 'keybinds';
+  const dimensions = useTerminalDimensions();
+  const descriptionWidth = createMemo(() => Math.max(10, Math.floor(dimensions().width * 0.72) - 24));
 
   const filteredSections = createMemo(() => {
     const q = (props.searchQuery ?? '').toLowerCase().trim();
@@ -106,7 +116,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                 <text fg={uiColors.textMuted}>{'/ '}</text>
                 <input
                   ref={(el: any) => {
-                    if (el) setTimeout(() => el.focus(), 0);
+                    focusSoon(el);
                   }}
                   onInput={(val: string) => props.onSearchChange?.(val)}
                   placeholder="Search keybinds..."
@@ -117,10 +127,9 @@ export function HelpView(props: HelpViewProps): JSX.Element {
               </box>
             </Show>
 
-            <scrollbox
-              ref={(r: ScrollBoxRenderable) => props.onKeybindScrollBoxReady?.(r)}
-              scrollbarOptions={SCROLLBAR_OPTIONS}
-              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+            <ScrollableContent
+              onScrollBoxReady={(r: ScrollBoxRenderable) => props.onKeybindScrollBoxReady?.(r)}
+                            style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
               <Show
                 when={hasMatches()}
@@ -144,7 +153,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                             <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
                               {item.key.padEnd(18).slice(0, 18)}
                             </text>
-                            <text fg={uiColors.textPrimary}>{item.description}</text>
+                            <RunningText text={item.description} width={descriptionWidth()} fg={uiColors.textPrimary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
                           </box>
                         )}
                       </For>
@@ -152,15 +161,14 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                   )}
                 </For>
               </Show>
-            </scrollbox>
+            </ScrollableContent>
           </box>
         }
       >
         <box style={{ width: '100%', height: '100%', flexDirection: 'column', minHeight: 0 }}>
-          <scrollbox
-            ref={(r: ScrollBoxRenderable) => props.onGuideScrollBoxReady?.(r)}
-            scrollbarOptions={SCROLLBAR_OPTIONS}
-            style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+          <ScrollableContent
+            onScrollBoxReady={(r: ScrollBoxRenderable) => props.onGuideScrollBoxReady?.(r)}
+                        style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
           >
             <For each={props.guides ?? []}>
               {(guide, idx) => {
@@ -173,12 +181,12 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                     >
                       {`${selected() ? '› ' : '  '}${guide.title}`}
                     </text>
-                    <text fg={uiColors.textSecondary}>{`  ${guide.description}`}</text>
+                    <RunningText text={`  ${guide.description}`} width={descriptionWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active={selected()} offset={props.runningTextOffset} />
                   </box>
                 );
               }}
             </For>
-          </scrollbox>
+          </ScrollableContent>
         </box>
       </Show>
     </GenericModal>

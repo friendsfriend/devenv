@@ -8,6 +8,8 @@ export interface StatusBarProps {
   center?: string;
   right?: string;
   keybinds?: Array<{ key: string; action: string }>;
+  runningTextEnabled?: boolean;
+  runningTextOffset?: number;
 }
 
 /**

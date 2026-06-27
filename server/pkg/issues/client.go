@@ -6,11 +6,14 @@ import "github.com/friendsfriend/devenv/pkg/mr"
 
 // IssueListOptions holds pagination and filter options for listing issues.
 type IssueListOptions struct {
-	Scope   string
-	State   string
-	Search  string
-	Page    int
-	PerPage int
+	Scope         string
+	State         string
+	Search        string
+	Labels        []string
+	SortBy        string
+	SortDirection string
+	Page          int
+	PerPage       int
 }
 
 // RepoInfo holds repository identification for a Git provider.

@@ -183,6 +183,9 @@ func (s *Server) handleListScripts(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, err)
 		return
 	}
+	for i := range scripts {
+		scripts[i].Parameters = s.fetchScriptMetadata(scripts[i].AbsolutePath)
+	}
 
 	respondJSON(w, map[string]interface{}{
 		"scripts": buildScriptTree(scripts),
@@ -273,6 +276,13 @@ func (s *Server) fetchScriptMetadata(scriptPath string) []resources.ScriptParame
 			params = []resources.ScriptParameter{}
 		}
 		return params
+	}
+
+	var wrapped struct {
+		Parameters []resources.ScriptParameter `json:"parameters"`
+	}
+	if err := json.Unmarshal(output, &wrapped); err == nil && wrapped.Parameters != nil {
+		return wrapped.Parameters
 	}
 
 	// Try single object (legacy)

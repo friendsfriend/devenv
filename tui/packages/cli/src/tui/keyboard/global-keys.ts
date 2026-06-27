@@ -70,6 +70,16 @@ export async function handleGlobalKeys(
     return true;
   }
 
+  // GLOBAL: Ctrl+R toggles running text for focused/overflowing UI fields.
+  if (event.ctrl && !event.shift && !event.meta && !event.super && (event.name === 'r' || event.name === 'R')) {
+    const next = !uiStore.runningTextEnabled();
+    uiStore.setRunningTextEnabled(next);
+    uiStore.setRunningTextOffset(0);
+    uiStore.setCopyStatus(next ? '✓ Running text on' : '✗ Running text off');
+    setTimeout(() => uiStore.setCopyStatus(null), 2000);
+    return true;
+  }
+
   // GLOBAL: ? opens help from every view/subview. In help view it falls through to close help.
   if (appStore.viewMode() !== 'help' && (event.name === '?' || event.sequence === '?' || (event.name === '/' && event.shift))) {
     actions.helpActions.showHelp();
@@ -101,6 +111,10 @@ export async function handleGlobalKeys(
     if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
       uiStore.setShowMarkdownModal(false);
       uiStore.markdownModalScrollBoxRef = undefined;
+      if (uiStore.markdownModalReturnToHelp()) {
+        uiStore.setMarkdownModalReturnToHelp(false);
+        actions.helpActions.showHelp();
+      }
       return true;
     }
     const sb = uiStore.markdownModalScrollBoxRef;
@@ -185,6 +199,7 @@ export async function handleGlobalKeys(
           uiStore.setMarkdownModalTitle("");
           uiStore.setMarkdownModalContent(content);
         }
+        uiStore.setMarkdownModalReturnToHelp(false);
         uiStore.setShowMarkdownModal(true);
       }
       if (idx === 4) actions.helpActions.showHelp();

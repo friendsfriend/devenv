@@ -134,124 +134,120 @@ export async function handleMiscModalKeys(
 
   // Script args modal keyboard handler
   if (uiStore.showScriptArgsModal()) {
-    // Parameters are fetched from server via getScriptMetadata and stored in uiStore
     const params = uiStore.scriptArgsParameters();
+    const selectedParam = params[Math.max(0, Math.min(uiStore.scriptArgsSelectedIndex(), Math.max(0, params.length - 1)))];
+    const isEsc = event.name === 'escape' || event.name === 'Escape' || event.name === 'esc' || event.sequence === '\x1b' || event.raw === '\x1b';
+    const isEnter = event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter';
+    const isLeft = event.name === 'left' || event.name === 'Left' || event.name === 'h';
+    const isRight = event.name === 'right' || event.name === 'Right' || event.name === 'l' || event.name === 'tab';
+    const isEditTrigger = event.name === 'i' || event.sequence === ' ';
 
-    const loadHistoryAt = (index: number) => {
-      const history = uiStore.scriptArgsHistoryForCurrent();
-      if (index < 0 || index >= history.length) return;
-      uiStore.setScriptArgValues({ ...history[index] });
-      uiStore.setScriptArgsHistoryCursor(index);
-      uiStore.setScriptArgsError(null);
+    const valuesFor = () => {
+      if (!selectedParam) return [] as string[];
+      if (selectedParam.type === 'bool') return ['false', 'true'];
+      if (selectedParam.type === 'enum' && selectedParam.choices?.length) return selectedParam.choices;
+      return [uiStore.scriptArgValues()[selectedParam.name] ?? selectedParam.defaultValue ?? ''];
+    };
+    const isValidFreeTextValue = (param: typeof selectedParam, value: string) => {
+      if (!param) return false;
+      if (param.type === 'int') return /^-?\d*$/.test(value) || value === '-';
+      if (param.type === 'decimal' || param.type === 'number') return /^-?(?:\d+\.?\d*|\.\d*)?$/.test(value) || value === '-';
+      return true;
+    };
+    const isCompleteFreeTextValue = (param: typeof selectedParam, value: string) => {
+      const raw = value.trim();
+      if (!param || raw === '') return !param?.required;
+      if (param.type === 'int') return /^-?\d+$/.test(raw);
+      if (param.type === 'decimal' || param.type === 'number') return /^-?(?:\d+\.?\d*|\.\d+)$/.test(raw);
+      return true;
     };
 
-    if (
-      event.name === 'escape' ||
-      event.name === 'Escape' ||
-      event.name === 'esc' ||
-      event.sequence === '\x1b' ||
-      event.raw === '\x1b'
-    ) {
+    if (uiStore.scriptArgsEditing()) {
+      if (isEnter) {
+        if (!isCompleteFreeTextValue(selectedParam, selectedParam ? uiStore.scriptArgValues()[selectedParam.name] || '' : '')) {
+          uiStore.setScriptArgsError(selectedParam?.type === 'int' ? `Parameter ${selectedParam.name} must be an integer` : selectedParam ? `Parameter ${selectedParam.name} must be a decimal number` : 'Invalid script argument');
+          return true;
+        }
+        uiStore.setScriptArgsEditing(false);
+        uiStore.setScriptArgsEditOriginalValue('');
+        uiStore.setScriptArgsError(null);
+        return true;
+      }
+      if (isEsc) {
+        if (selectedParam) uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: uiStore.scriptArgsEditOriginalValue() }));
+        uiStore.setScriptArgsEditing(false);
+        uiStore.setScriptArgsEditOriginalValue('');
+        return true;
+      }
+      if (selectedParam && selectedParam.type !== 'bool' && selectedParam.type !== 'enum') {
+        if (event.name === 'backspace' || event.name === 'Backspace' || event.name === 'delete') {
+          uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: (prev[selectedParam.name] || '').slice(0, -1) }));
+          uiStore.setScriptArgsError(null);
+          return true;
+        }
+        if (event.sequence && event.sequence.length === 1 && event.sequence >= ' ' && !event.ctrl && !event.meta) {
+          const next = (uiStore.scriptArgValues()[selectedParam.name] || '') + event.sequence;
+          if (isValidFreeTextValue(selectedParam, next)) {
+            uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: next }));
+            uiStore.setScriptArgsError(null);
+          }
+          return true;
+        }
+      }
+      return true;
+    }
+
+    if (isEsc) {
       uiStore.setShowScriptArgsModal(false);
       uiStore.setScriptArgsError(null);
       return true;
     }
 
-    if (isUpKey(event)) {
-      const history = uiStore.scriptArgsHistoryForCurrent();
-      if (history.length > 0) {
-        const current = uiStore.scriptArgsHistoryCursor();
-        const next = current < 0 ? 0 : Math.min(current + 1, history.length - 1);
-        loadHistoryAt(next);
-      }
+    if (isLeft) {
+      uiStore.setScriptArgsFocusedPane('parameter');
+      return true;
+    }
+    if (isRight) {
+      uiStore.setScriptArgsFocusedPane('value');
       return true;
     }
 
     if (isDownKey(event)) {
-      const history = uiStore.scriptArgsHistoryForCurrent();
-      if (history.length > 0) {
-        const current = uiStore.scriptArgsHistoryCursor();
-        if (current <= 0) {
-          uiStore.setScriptArgsHistoryCursor(-1);
-        } else {
-          loadHistoryAt(current - 1);
-        }
+      if (uiStore.scriptArgsFocusedPane() === 'parameter') {
+        if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.min(prev + 1, params.length - 1));
+        uiStore.setScriptArgsSelectedValueIndex(0);
+      } else {
+        uiStore.setScriptArgsSelectedValueIndex((prev) => Math.min(prev + 1, Math.max(0, valuesFor().length - 1)));
       }
       return true;
     }
 
-    if (isDownKey(event)) {
-      if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.min(prev + 1, params.length - 1));
-      return true;
-    }
-
     if (isUpKey(event)) {
-      if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.max(prev - 1, 0));
+      if (uiStore.scriptArgsFocusedPane() === 'parameter') {
+        if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.max(prev - 1, 0));
+        uiStore.setScriptArgsSelectedValueIndex(0);
+      } else {
+        uiStore.setScriptArgsSelectedValueIndex((prev) => Math.max(prev - 1, 0));
+      }
       return true;
     }
 
-    if (
-      event.name === 'return' ||
-      event.name === 'Return' ||
-      event.name === 'enter' ||
-      event.name === 'Enter'
-    ) {
+    if (isEnter) {
       void utilActions.submitScriptArgsAndRun();
       return true;
     }
 
-    const selectedParam = params[Math.max(0, Math.min(uiStore.scriptArgsSelectedIndex(), Math.max(0, params.length - 1)))];
-
-    if (selectedParam) {
-      if (selectedParam.type === 'bool') {
-        const isToggle = event.sequence === ' ';
-        const isLeft = event.name === 'left' || event.name === 'Left' || event.name === 'h';
-        const isRight = event.name === 'right' || event.name === 'Right' || event.name === 'l' || event.name === 'tab';
-
-        if (isToggle || isLeft || isRight) {
-          uiStore.setScriptArgValues((prev) => {
-            const current = prev[selectedParam.name] === 'true';
-            const next = isLeft ? false : isRight ? true : !current;
-            return { ...prev, [selectedParam.name]: next ? 'true' : 'false' };
-          });
-          uiStore.setScriptArgsError(null);
-          return true;
-        }
+    if (selectedParam && uiStore.scriptArgsFocusedPane() === 'value' && isEditTrigger) {
+      const values = valuesFor();
+      if (selectedParam.type === 'bool' || selectedParam.type === 'enum') {
+        const next = values[Math.max(0, Math.min(uiStore.scriptArgsSelectedValueIndex(), values.length - 1))];
+        if (next !== undefined) uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: next }));
+        uiStore.setScriptArgsError(null);
+      } else {
+        uiStore.setScriptArgsEditOriginalValue(uiStore.scriptArgValues()[selectedParam.name] || '');
+        uiStore.setScriptArgsEditing(true);
       }
-
-      if (selectedParam.type === 'enum' && selectedParam.choices && selectedParam.choices.length > 0) {
-        const choices = selectedParam.choices;
-        const current = uiStore.scriptArgValues()[selectedParam.name] || choices[0];
-        const currentIndex = Math.max(0, choices.indexOf(current));
-
-        const isPrev = event.name === 'left' || event.name === 'Left' || event.name === 'h';
-        const isNext = event.name === 'right' || event.name === 'Right' || event.name === 'l' || event.name === 'tab';
-
-        if (isPrev || isNext) {
-          const nextIndex = isPrev
-            ? (currentIndex - 1 + choices.length) % choices.length
-            : (currentIndex + 1) % choices.length;
-          uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: choices[nextIndex] }));
-          uiStore.setScriptArgsError(null);
-          return true;
-        }
-      }
-
-      if (event.name === 'backspace' || event.name === 'Backspace' || event.name === 'delete') {
-        if (selectedParam.type !== 'bool' && selectedParam.type !== 'enum') {
-          uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: (prev[selectedParam.name] || '').slice(0, -1) }));
-          uiStore.setScriptArgsError(null);
-        }
-        return true;
-      }
-
-      if (event.sequence && event.sequence.length === 1 && event.sequence >= ' ' && !event.ctrl && !event.meta) {
-        if (selectedParam.type !== 'bool' && selectedParam.type !== 'enum') {
-          uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: (prev[selectedParam.name] || '') + event.sequence }));
-          uiStore.setScriptArgsError(null);
-        }
-        return true;
-      }
+      return true;
     }
 
     return true;
@@ -693,6 +689,7 @@ export async function handleMiscModalKeys(
             uiStore.helpGuideScrollBoxRef = undefined;
             uiStore.markdownModalScrollBoxRef = undefined;
             actions.helpActions.closeHelp();
+            uiStore.setMarkdownModalReturnToHelp(true);
             void guide.import().then((content) => {
               uiStore.setMarkdownModalTitle("");
               uiStore.setMarkdownModalContent(content);

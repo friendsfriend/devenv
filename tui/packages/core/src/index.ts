@@ -273,6 +273,9 @@ export class DevEnvClient {
 		page: number = 1,
 		perPage: number = 50,
 		search?: string,
+		sort?: string,
+		direction?: "asc" | "desc",
+		labels?: string[],
 	): Promise<import("@devenv/types").MRListResult> {
 		return getMergeRequests(
 			this.deps,
@@ -283,6 +286,9 @@ export class DevEnvClient {
 			page,
 			perPage,
 			search,
+			sort,
+			direction,
+			labels,
 		);
 	}
 	getIssues(
@@ -293,6 +299,9 @@ export class DevEnvClient {
 		perPage: number = 50,
 		search?: string,
 		state?: string,
+		sort?: string,
+		direction?: "asc" | "desc",
+		labels?: string[],
 	): Promise<import("@devenv/types").IssueListResult> {
 		return getIssues(
 			this.deps,
@@ -303,6 +312,9 @@ export class DevEnvClient {
 			perPage,
 			search,
 			state,
+			sort,
+			direction,
+			labels,
 		);
 	}
 	getIssue(

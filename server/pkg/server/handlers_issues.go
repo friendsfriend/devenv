@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/github"
@@ -52,6 +53,20 @@ func (s *Server) resolveGitLabIssueClient(targetApp *app.App) (issues.Client, *g
 	return issuesClient, projectInfo, nil
 }
 
+func splitCSV(value string) []string {
+	if value == "" {
+		return nil
+	}
+	parts := strings.Split(value, ",")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			out = append(out, trimmed)
+		}
+	}
+	return out
+}
+
 // handleGitHubIssues — GET /api/github/issues
 func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -63,6 +78,9 @@ func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 	scope := r.URL.Query().Get("scope")
 	search := r.URL.Query().Get("search")
 	state := r.URL.Query().Get("state")
+	sortBy := r.URL.Query().Get("sort")
+	sortDirection := r.URL.Query().Get("direction")
+	labels := splitCSV(r.URL.Query().Get("labels"))
 	pageStr := r.URL.Query().Get("page")
 	perPageStr := r.URL.Query().Get("perPage")
 
@@ -107,11 +125,14 @@ func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[DEBUG] handleGitHubIssues: appIdent=%q scope=%q state=%q search=%q page=%d perPage=%d", appIdent, scope, state, search, page, perPage)
 
 	result, err := issuesClient.GetIssues(nil, &issues.IssueListOptions{
-		Scope:   scope,
-		Search:  search,
-		Page:    page,
-		PerPage: perPage,
-		State:   state,
+		Scope:         scope,
+		Search:        search,
+		Labels:        labels,
+		SortBy:        sortBy,
+		SortDirection: sortDirection,
+		Page:          page,
+		PerPage:       perPage,
+		State:         state,
 	})
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch issues: %v", err), http.StatusInternalServerError)
@@ -221,6 +242,9 @@ func (s *Server) handleGitLabIssues(w http.ResponseWriter, r *http.Request) {
 	scope := r.URL.Query().Get("scope")
 	search := r.URL.Query().Get("search")
 	state := r.URL.Query().Get("state")
+	sortBy := r.URL.Query().Get("sort")
+	sortDirection := r.URL.Query().Get("direction")
+	labels := splitCSV(r.URL.Query().Get("labels"))
 	pageStr := r.URL.Query().Get("page")
 	perPageStr := r.URL.Query().Get("perPage")
 
@@ -263,11 +287,14 @@ func (s *Server) handleGitLabIssues(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := issuesClient.GetIssues(nil, &issues.IssueListOptions{
-		Scope:   scope,
-		Search:  search,
-		Page:    page,
-		PerPage: perPage,
-		State:   state,
+		Scope:         scope,
+		Search:        search,
+		Labels:        labels,
+		SortBy:        sortBy,
+		SortDirection: sortDirection,
+		Page:          page,
+		PerPage:       perPage,
+		State:         state,
 	})
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch issues: %v", err), http.StatusInternalServerError)

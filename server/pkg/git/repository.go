@@ -576,18 +576,37 @@ func (gr *gitRepository) GetStatus(app App) string {
 		return "error"
 	}
 
-	changedFiles := 0
+	added, changed, removed := 0, 0, 0
 	for _, fileStatus := range wtStatus {
-		if fileStatus.Staging != git.Unmodified ||
-			(fileStatus.Worktree != git.Unmodified && fileStatus.Worktree != git.Untracked) {
-			changedFiles++
+		isAdded := fileStatus.Staging == git.Added || fileStatus.Worktree == git.Untracked
+		isRemoved := fileStatus.Staging == git.Deleted || fileStatus.Worktree == git.Deleted
+		isChanged := fileStatus.Staging == git.Modified || fileStatus.Staging == git.Renamed || fileStatus.Staging == git.Copied ||
+			fileStatus.Worktree == git.Modified || fileStatus.Worktree == git.Renamed || fileStatus.Worktree == git.Copied
+
+		switch {
+		case isRemoved:
+			removed++
+		case isAdded:
+			added++
+		case isChanged:
+			changed++
 		}
 	}
 
-	if changedFiles > 0 {
-		return fmt.Sprintf("*%d", changedFiles)
+	parts := []string{}
+	if added > 0 {
+		parts = append(parts, fmt.Sprintf("+%d", added))
 	}
-	return ""
+	if changed > 0 {
+		parts = append(parts, fmt.Sprintf("~%d", changed))
+	}
+	if removed > 0 {
+		parts = append(parts, fmt.Sprintf("-%d", removed))
+	}
+	if len(parts) > 0 {
+		return strings.Join(parts, " ")
+	}
+	return "✓"
 }
 
 func (gr *gitRepository) Push(app App) error {
