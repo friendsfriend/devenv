@@ -17,6 +17,7 @@ import {
 	StatusBar,
 	Layout,
 	getSelectableRows,
+	setGlobalSelectionMouseUpHandler,
 	uiColors,
 } from "@devenv/ui";
 import { createFrames } from "./spinner";
@@ -157,6 +158,11 @@ export function TUIApp(props: TUIAppProps) {
 		mrStore,
 		uiStore,
 	);
+
+	const clearGlobalSelectionMouseUpHandler = setGlobalSelectionMouseUpHandler(
+		utilActions.handleCopySelection,
+	);
+	onCleanup(clearGlobalSelectionMouseUpHandler);
 
 	const launchPi = (sessionPath: string | null) =>
 		agentActions.launchPi(sessionPath, renderer);

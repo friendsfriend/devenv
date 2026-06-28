@@ -57,6 +57,8 @@ export { BranchCreateModal } from "./components/BranchCreateModal";
 export type { BranchCreateModalProps } from "./components/BranchCreateModal";
 export { ErrorDialog } from "./components/ErrorDialog";
 export { GenericModal } from "./components/GenericModal";
+export { setGlobalSelectionMouseUpHandler } from "./selectionCopy";
+export type { SelectionMouseUpHandler } from "./selectionCopy";
 export { ModalTabs } from "./components/ModalTabs";
 export type { ModalTabsProps, ModalTabItem } from "./components/ModalTabs";
 export { FilterModal } from "./components/FilterModal";

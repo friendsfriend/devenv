@@ -3,6 +3,7 @@ import { RGBA } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { TextAttributes } from '@opentui/core';
+import { invokeGlobalSelectionMouseUpHandler } from '../selectionCopy';
 
 export interface GenericModalProps {
   /** Modal title displayed in header */
@@ -66,7 +67,10 @@ export function GenericModal(props: GenericModalProps) {
         paddingBottom={1}
         paddingLeft={2}
         paddingRight={2}
-        onMouseUp={(e: any) => e.stopPropagation()}
+        onMouseUp={(e: any) => {
+          invokeGlobalSelectionMouseUpHandler();
+          e.stopPropagation();
+        }}
       >
         {/* HEADER */}
         {props.customHeader ? (

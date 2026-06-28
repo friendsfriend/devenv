@@ -1,4 +1,5 @@
 import { RGBA, ScrollBoxRenderable, TextAttributes } from '@opentui/core';
+import { isDiffFileAddedOrDeleted } from '@devenv/core';
 import { useRenderer } from '@opentui/solid';
 import { createMemo, For, Show, createEffect, createSignal } from 'solid-js';
 import { uiColors } from '../colors';
@@ -16,6 +17,8 @@ interface DiffViewModalProps {
   visualModeActive: boolean;  // Is visual selection mode active (v key)
   visualModeStart: number;  // Starting line of visual selection
   forceSplitView?: boolean | null;  // null = auto (based on width), true = force split, false = force unified
+  isNewFile?: boolean;
+  isDeletedFile?: boolean;
   commentMode: boolean;  // Is comment input mode active
   commentText: string;  // Current comment text being typed
   discussions?: Discussion[];  // NEW: Comment threads to display inline
@@ -163,13 +166,9 @@ export function DiffViewModal(props: DiffViewModalProps) {
     return lines;
   });
 
-  // Detect if file is entirely new or deleted (added/deleted files should always use unified view)
+  // Detect truly new/deleted files. Addition-only/deletion-only hunks in existing files still support split view.
   const isFileAddedOrDeleted = createMemo(() => {
-    const lines = parsedLines();
-    const hasAddedLines = lines.some(l => l.type === 'added');
-    const hasRemovedLines = lines.some(l => l.type === 'removed');
-    // File is considered added/deleted if it has only one type of change (not both)
-    return (hasAddedLines && !hasRemovedLines) || (!hasAddedLines && hasRemovedLines);
+    return props.isNewFile === true || props.isDeletedFile === true || isDiffFileAddedOrDeleted(props.diff);
   });
 
   // Determine if we should use split view based on terminal width or forced override

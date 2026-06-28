@@ -291,7 +291,7 @@ Custom reusable components live in `tui/packages/ui/src/components` and are expo
 
 ### Modal/dialog helpers
 
-- `GenericModal` — centered overlay shell with title/header, content area, footer/help, configurable width/height, and backdrop click.
+- `GenericModal` — centered overlay shell with title/header, content area, footer/help, configurable width/height, and backdrop click. Dialog mouse-up stops backdrop bubbling but invokes the global selection-copy handler registered via `setGlobalSelectionMouseUpHandler`; keep this so mouse-drag copy works inside all modal views.
 - `ConfirmDialog` — small warning confirm/cancel modal built on `GenericModal`.
 - `ErrorDialog` — small error modal with copy/close help.
 - `ModalTabs` — compact tab row for modal sections, with optional badges.

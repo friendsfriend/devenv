@@ -143,7 +143,7 @@ export async function handleDiscussionsKeys(
             mrStore.setCurrentDiffFile(change);
             mrStore.setDiffModalSelectedLine(0);
             mrStore.setDiffModalVisualMode(false);
-            mrStore.setDiffModalForceSplitView(computeInitialSplitView(change.diff ?? '', ctx.renderer.width));
+            mrStore.setDiffModalForceSplitView(computeInitialSplitView(change.diff ?? '', ctx.renderer.width, change.new_file || change.deleted_file));
             mrStore.setShowDiffModal(true);
             appStore.setPreviousViewMode('discussionsView'); // Remember to return to discussions view
             getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Diff modal should be open now`);
