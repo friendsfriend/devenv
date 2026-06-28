@@ -1,9 +1,39 @@
-import { JSX } from 'solid-js';
+import { For, JSX, createMemo } from 'solid-js';
 import { RGBA } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { TextAttributes } from '@opentui/core';
 import { invokeGlobalSelectionMouseUpHandler } from '../selectionCopy';
+
+function wrapHelpText(text: string, maxWidth: number): string[] {
+  if (!text) return [''];
+  if (maxWidth <= 0) return [text];
+
+  const sourceLines = text.split('\n');
+  const lines: string[] = [];
+
+  for (const sourceLine of sourceLines) {
+    const chunks = sourceLine.includes('•')
+      ? sourceLine.split(/\s+•\s+/).map((chunk) => chunk.trim()).filter(Boolean)
+      : sourceLine.split(/\s+/).filter(Boolean);
+    const separator = sourceLine.includes('•') ? '  •  ' : ' ';
+    let current = '';
+
+    for (const chunk of chunks) {
+      const candidate = current ? `${current}${separator}${chunk}` : chunk;
+      if (current && candidate.length > maxWidth) {
+        lines.push(current);
+        current = chunk;
+      } else {
+        current = candidate;
+      }
+    }
+
+    lines.push(current);
+  }
+
+  return lines.length ? lines : [''];
+}
 
 export interface GenericModalProps {
   /** Modal title displayed in header */
@@ -43,6 +73,7 @@ export function GenericModal(props: GenericModalProps) {
 
   const dialogWidth = () => Math.floor(dimensions().width * (props.widthPercent ?? 0.5));
   const dialogHeight = () => Math.floor(dimensions().height * (props.heightPercent ?? 0.7));
+  const helpLines = createMemo(() => wrapHelpText(props.helpText, Math.max(1, dialogWidth() - 4)));
 
   return (
     <box
@@ -112,13 +143,15 @@ export function GenericModal(props: GenericModalProps) {
           <box
             style={{
               width: '100%',
-              height: 1,
+              height: helpLines().length,
               justifyContent: 'flex-start',
-              flexDirection: 'row',
+              flexDirection: 'column',
               flexShrink: 0,
             }}
           >
-            <text style={{ fg: uiColors.textSecondary }}>{props.helpText}</text>
+            <For each={helpLines()}>
+              {(line) => <text style={{ fg: uiColors.textSecondary }}>{line}</text>}
+            </For>
           </box>
         )}
       </box>

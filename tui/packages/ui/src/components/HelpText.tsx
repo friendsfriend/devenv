@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
@@ -84,4 +85,25 @@ export function formatHelpText(entries: HelpEntry[], separator: string = '  • 
   return entries
     .map(entry => `${entry.key} ${entry.action}`)
     .join(separator);
+}
+
+export function formatHelpTextLines(entries: HelpEntry[], maxWidth: number, separator: string = '  •  '): string[] {
+  if (maxWidth <= 0) return [''];
+
+  const chunks = entries.map(entry => `${entry.key} ${entry.action}`);
+  const lines: string[] = [];
+  let current = '';
+
+  for (const chunk of chunks) {
+    const candidate = current ? `${current}${separator}${chunk}` : chunk;
+    if (current && candidate.length > maxWidth) {
+      lines.push(current);
+      current = chunk;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current) lines.push(current);
+  return lines.length ? lines : [''];
 }

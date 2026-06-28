@@ -102,7 +102,7 @@ export function BranchSelectorView(props: BranchSelectorProps) {
       selectedIndex={effectiveSelectedIndex()}
       loading={props.loading}
       loadingText="Loading branches..."
-      reservedHeight={5}
+      reservedHeight={2}
       scrollIndicatorLabel={filterQuery() ? `branches (filtered from ${props.branches.length})` : 'branches'}
       filterPlaceholder="filter branches..."
       filterQuery={filterQuery()}

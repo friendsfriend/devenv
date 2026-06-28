@@ -73,7 +73,7 @@ export { SearchHeader } from "./components/SearchHeader";
 export type { SearchHeaderProps } from "./components/SearchHeader";
 export { DetailSection } from "./components/DetailSection";
 export type { DetailSectionProps } from "./components/DetailSection";
-export { HelpText, formatHelpText } from "./components/HelpText";
+export { HelpText, formatHelpText, formatHelpTextLines } from "./components/HelpText";
 export { ScrollableContent, allowsKeyboardAxis } from "./components/ScrollableContent";
 export type { ScrollableContentProps, ScrollAxis } from "./components/ScrollableContent";
 export { AgentSpaceView, getSelectableRows } from "./components/AgentSpaceView";
