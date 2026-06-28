@@ -1,9 +1,8 @@
-import { Show } from 'solid-js';
-import 'opentui-spinner/solid';
+import { Show, createSignal, onMount, onCleanup } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
-import { useRenderer } from '@opentui/solid';
+import { useTerminalDimensions } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
-import { createFrames, createColors } from '../spinner';
+import { createFrames } from '../spinner';
 import { getMarkdownSyntaxStyle } from '../markdownSyntax';
 import { ScrollableContent } from './ScrollableContent';
 
@@ -20,18 +19,26 @@ export interface LogAiOverlayProps {
 }
 
 const knightRiderFrames = createFrames({ color: uiColors.primary, style: 'blocks', width: 6, inactiveFactor: 0.6, minAlpha: 0.3 });
-const knightRiderColor = createColors({ color: uiColors.primary, style: 'blocks', width: 6, inactiveFactor: 0.6, minAlpha: 0.3 });
-const Spinner = 'spinner' as unknown as (props: { frames: string[]; color: unknown; interval: number }) => any;
+const SPINNER_INTERVAL = 40;
+
 
 export function LogAiOverlay(props: LogAiOverlayProps) {
-  const renderer = useRenderer();
+  const dimensions = useTerminalDimensions();
+  const [frameIndex, setFrameIndex] = createSignal(0);
 
-  const overlayWidth = () => Math.floor(renderer.width * 0.88);
+  onMount(() => {
+    const id = setInterval(() => {
+      setFrameIndex((prev) => (prev + 1) % knightRiderFrames.length);
+    }, SPINNER_INTERVAL);
+    onCleanup(() => clearInterval(id));
+  });
+
+  const overlayWidth = () => Math.floor(dimensions().width * 0.88);
 
   const boxHeight = () => {
     if (props.promptMode) return 5;
     if (props.error) return 5;
-    if (props.summary !== null) return Math.max(10, renderer.height - 10);
+    if (props.summary !== null) return Math.max(10, dimensions().height - 10);
     if (props.loading || props.streaming) return 5;
     return 4;
   };
@@ -40,7 +47,7 @@ export function LogAiOverlay(props: LogAiOverlayProps) {
     <box
       position="absolute"
       top={2}
-      left={Math.floor((renderer.width - overlayWidth()) / 2)}
+      left={Math.floor((dimensions().width - overlayWidth()) / 2)}
       width={overlayWidth()}
       height={boxHeight()}
       backgroundColor={uiColors.bgCrust}
@@ -84,7 +91,7 @@ export function LogAiOverlay(props: LogAiOverlayProps) {
 
       <Show when={(props.loading || props.streaming) && !props.promptMode && props.summary === null}>
         <box flexDirection="row" marginTop={1} height={1} alignItems="center" gap={1}>
-          <Spinner frames={knightRiderFrames} color={knightRiderColor} interval={40} />
+          <text fg={uiColors.primary}>{knightRiderFrames[frameIndex()]}</text>
           <text fg={uiColors.textSecondary}>
             {props.loading ? ` Analyzing…` : ' Generating…'}
           </text>
@@ -121,7 +128,7 @@ export function LogAiOverlay(props: LogAiOverlayProps) {
         </ScrollableContent>
         <Show when={props.loading || props.streaming}>
           <box flexDirection="row" marginTop={1} height={1} alignItems="center" gap={1}>
-            <Spinner frames={knightRiderFrames} color={knightRiderColor} interval={40} />
+            <text fg={uiColors.primary}>{knightRiderFrames[frameIndex()]}</text>
             <text fg={uiColors.textSecondary}> Generating…</text>
           </box>
         </Show>

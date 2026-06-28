@@ -1,5 +1,4 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
-import { EDITOR_OPTIONS } from '@devenv/ui';
 import { guides as allGuides } from '../guides';
 
 import { isDownKey, isUpKey } from './nav-keys';
@@ -32,10 +31,12 @@ export async function handleMiscModalKeys(
 
     if (isEsc) {
       uiStore.setShowEditorPicker(false);
+      uiStore.setEditorPickerTargetPath(null);
       return true;
     }
 
-    const maxIdx = EDITOR_OPTIONS.length - 1;
+    const editorOptions = uiStore.editorPickerOptions();
+    const maxIdx = editorOptions.length - 1;
 
     if (isDownKey(event)) {
       uiStore.setEditorPickerSelectedIndex((prev) => Math.min(prev + 1, maxIdx));
@@ -48,9 +49,11 @@ export async function handleMiscModalKeys(
     }
 
     if (event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter') {
-      const selected = EDITOR_OPTIONS[uiStore.editorPickerSelectedIndex()];
+      const selected = editorOptions[uiStore.editorPickerSelectedIndex()];
+      const targetPath = uiStore.editorPickerTargetPath() ?? undefined;
       uiStore.setShowEditorPicker(false);
-      if (selected) utilActions.openInEditorWith(selected.id);
+      uiStore.setEditorPickerTargetPath(null);
+      if (selected) utilActions.openInEditorWith(selected.id, targetPath);
       return true;
     }
 

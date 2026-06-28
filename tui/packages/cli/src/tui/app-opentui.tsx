@@ -9,7 +9,7 @@ import { createCliRenderer } from "@opentui/core";
 import { setExitRenderer } from "./exit";
 import { onMount, createEffect, on, onCleanup } from "solid-js";
 import "opentui-spinner/solid";
-import packageJson from "../../package.json";
+import { APP_VERSION } from "../version";
 import { createClient } from "@devenv/core";
 import type { App } from "@devenv/types";
 import {
@@ -188,21 +188,7 @@ export function TUIApp(props: TUIAppProps) {
 		clearInterval(runningTextInterval);
 	});
 
-	createEffect(
-		on(
-			logStore.showLogModal,
-			(open) => {
-				if (open) {
-					const lastLine = Math.max(0, logStore.logs().split("\n").length - 1);
-					logStore.setLogSelectedLine(lastLine);
-					logStore.setLogScrollTop(
-						Math.max(0, lastLine - logStore.logViewportHeight() + 1),
-					);
-				}
-			},
-			{ defer: true },
-		),
-	);
+	/* selectedLine removed — no cursor line / visual mode */
 
 	// --- Initialization ---
 	onMount(() => {
@@ -323,7 +309,7 @@ export function TUIApp(props: TUIAppProps) {
 				header={
 					<Header
 						{...getHeaderInfo(headerDeps)}
-						version={packageJson.version}
+						version={APP_VERSION}
 						runningTextEnabled={uiStore.runningTextEnabled()}
 						runningTextOffset={uiStore.runningTextOffset()}
 					/>

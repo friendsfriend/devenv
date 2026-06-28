@@ -1,7 +1,7 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
 import type { ScriptParameter, SshHost } from '@devenv/types';
-import type { EditorChoice } from '@devenv/ui';
+import { EDITOR_OPTIONS, type EditorChoice } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
 import type { AgentStore } from '../stores/agent-store';
 import type { UiStore } from '../stores/ui-store';
@@ -35,6 +35,33 @@ const shellEscape = (value: string): string => `'${value.replace(/'/g, `'\\''`)}
 const buildHeldCommand = (cmd: string, args: string[]): string => {
   const fullCommand = [cmd, ...args].map(shellEscape).join(' ');
   return `${fullCommand}; exit_code=$?; echo; read -r -n 1 -s -p "Press any key to close..." _; echo; exit $exit_code`;
+};
+
+const commandExists = (bin: string): boolean => {
+  try {
+    const { spawnSync } = require('child_process') as typeof import('child_process');
+    const checker = process.platform === 'win32' ? 'where' : 'which';
+    return spawnSync(checker, [bin], { stdio: 'ignore', shell: false }).status === 0;
+  } catch {
+    return false;
+  }
+};
+
+const macAppExists = (appName: string): boolean => {
+  if (process.platform !== 'darwin') return false;
+  try {
+    const { spawnSync } = require('child_process') as typeof import('child_process');
+    return spawnSync('open', ['-Ra', appName], { stdio: 'ignore', shell: false }).status === 0;
+  } catch {
+    return false;
+  }
+};
+
+const isEditorAvailable = (editor: EditorChoice): boolean => {
+  if (editor === 'nvim') return commandExists('nvim');
+  if (editor === 'vscode') return commandExists('code');
+  if (editor === 'intellij') return commandExists('idea') || macAppExists('IntelliJ IDEA');
+  return false;
 };
 
 export function createUtilActions(
@@ -423,9 +450,16 @@ export function createUtilActions(
     }
   };
 
-  const openEditorPicker = () => {
+  const openEditorPicker = (targetPath?: string) => {
     const app = getSelectedApp();
-    if (!app) return;
+    if (!targetPath && !app) return;
+    const availableEditors = EDITOR_OPTIONS.filter((option) => isEditorAvailable(option.id));
+    if (availableEditors.length === 0) {
+      uiStore.showError('No Editors Found', 'No supported editors found in PATH. Install nvim, code, or idea, then try again.');
+      return;
+    }
+    uiStore.setEditorPickerOptions(availableEditors);
+    uiStore.setEditorPickerTargetPath(targetPath ?? null);
     uiStore.setEditorPickerSelectedIndex(0);
     uiStore.setShowEditorPicker(true);
   };
@@ -457,18 +491,12 @@ export function createUtilActions(
     }
 
     if (editor === 'intellij') {
-      if (process.platform === 'darwin') {
-        // On macOS prefer the `idea` CLI (JetBrains Toolbox shell script) and fall
-        // back to the `open -a` approach when it is not in PATH.
-        try {
-          spawnSync('which', ['idea'], { stdio: 'ignore', shell: false });
-          Bun.spawn(['idea', resolvedPath], { stdout: 'ignore', stderr: 'ignore', stdin: 'ignore' }).unref();
-        } catch {
-          Bun.spawn(['open', '-a', 'IntelliJ IDEA', resolvedPath], { stdout: 'ignore', stderr: 'ignore', stdin: 'ignore' }).unref();
-        }
-      } else {
-        // Linux / Windows: rely on the `idea` shell script being in PATH
+      if (commandExists('idea')) {
         Bun.spawn(['idea', resolvedPath], { stdout: 'ignore', stderr: 'ignore', stdin: 'ignore' }).unref();
+      } else if (macAppExists('IntelliJ IDEA')) {
+        Bun.spawn(['open', '-a', 'IntelliJ IDEA', resolvedPath], { stdout: 'ignore', stderr: 'ignore', stdin: 'ignore' }).unref();
+      } else {
+        uiStore.showError('Editor Not Found', 'IntelliJ IDEA is not available. Install the idea CLI or the macOS app, then try again.');
       }
       return;
     }

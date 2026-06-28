@@ -6,8 +6,7 @@ import { handleHorizontalScrollKey } from './horizontal-scroll';
  * Handles keyboard events for the Log modal:
  * - AI prompt mode (type prompt, submit, dismiss)
  * - Search mode (type query, navigate matches)
- * - Visual mode (select range, copy)
- * - Line navigation (j/k/d/u/g/G)
+ * - Viewport scrolling (j/k/d/u/g/G/←/→) — no cursor line, visual mode removed
  * - Horizontal scroll (h/l)
  * - AI overlay scroll & followup input
  */
@@ -17,9 +16,8 @@ export async function handleLogModalKeys(
   actions: KeyboardActions,
   ctx: KeyboardContext,
 ): Promise<boolean> {
-  const { logStore, uiStore } = stores;
+  const { logStore } = stores;
   const { appActions, logActions, utilActions } = actions;
-  const { renderer } = ctx;
 
   if (!logStore.showLogModal()) return false;
 
@@ -72,7 +70,6 @@ export async function handleLogModalKeys(
       const matches = logStore.logSearchMatchLinesList();
       if (matches.length > 0 && logStore.logSearchMatchIndex() < 0) {
         logStore.setLogSearchMatchIndex(0);
-        logStore.setLogSelectedLine(matches[0]);
         logStore.logScrollBoxRef?.scrollTo(matches[0]);
         logActions.syncLogScroll();
       }
@@ -98,13 +95,29 @@ export async function handleLogModalKeys(
     return true;
   }
 
-  // e — open system log file in editor (only in normal mode)
-  if ((event.name === 'e' || event.sequence === 'e') && !logStore.logVisualModeActive()) {
-    utilActions.openLogFileInEditor();
+  const writeLogsToTempFile = async (): Promise<string | null> => {
+    const logContent = logStore.logs();
+    if (!logContent) return null;
+    const tmpPath = `/tmp/devenv-logs-${Date.now()}.log`;
+    await Bun.write(tmpPath, logContent);
+    return tmpPath;
+  };
+
+  // Shift+E — choose editor for current log content
+  if (event.name === 'E' || event.sequence === 'E' || (event.name === 'e' && event.shift)) {
+    const tmpPath = await writeLogsToTempFile();
+    if (tmpPath) utilActions.openEditorPicker(tmpPath);
     return true;
   }
 
-  // Shift+A — toggle AI overlay: re-show if state exists, else enter prompt mode directly
+  // e — write current log content to temp file and open in default editor
+  if ((event.name === 'e' && !event.shift) || event.sequence === 'e') {
+    const tmpPath = await writeLogsToTempFile();
+    if (tmpPath) utilActions.openInEditor(tmpPath);
+    return true;
+  }
+
+  // Shift+A — toggle AI overlay
   if (
     (event.name === 'A' || (event.name === 'a' && event.shift)) &&
     !logStore.logSearchMode()
@@ -112,27 +125,14 @@ export async function handleLogModalKeys(
     if (logStore.logAiSummary() !== null || logStore.logAiLoading() || logStore.logAiStreaming() || logStore.logAiError() !== null || logStore.logAiPromptMode()) {
       logStore.setLogAiVisible((v) => !v);
     } else {
-      const visualActive = logStore.logVisualModeActive();
-      if (visualActive) {
-        const allLines = logStore.logs().split('\n');
-        const start = Math.min(logStore.logVisualModeStart(), logStore.logSelectedLine());
-        const end   = Math.max(logStore.logVisualModeStart(), logStore.logSelectedLine());
-        const selectedLogs = allLines.slice(start, end + 1).join('\n');
-        logStore.setLogVisualModeActive(false);
-        logStore.pendingAiVisualLogs = selectedLogs;
-        logStore.setLogAiPromptText('');
-        logStore.setLogAiVisible(true);
-        void logActions.runAiAnalysis(undefined, selectedLogs);
-      } else {
-        logStore.setLogAiPromptText('');
-        logStore.setLogAiPromptMode(true);
-        logStore.setLogAiVisible(true);
-      }
+      logStore.setLogAiPromptText('');
+      logStore.setLogAiPromptMode(true);
+      logStore.setLogAiVisible(true);
     }
     return true;
   }
 
-  // ESC — clear followup text → hide overlay (keep state) → exit visual mode → close modal
+  // ESC — clear followup text → hide overlay (keep state) → close modal
   if (
     event.name === 'escape' ||
     event.name === 'Escape' ||
@@ -147,8 +147,6 @@ export async function handleLogModalKeys(
       logStore.setLogSearchMatchIndex(-1);
     } else if (logStore.logAiVisible() && (logStore.logAiSummary() !== null || logStore.logAiLoading() || logStore.logAiError() !== null || logStore.logAiPromptMode())) {
       logActions.dismissAiOverlay();
-    } else if (logStore.logVisualModeActive()) {
-      logStore.setLogVisualModeActive(false);
     } else {
       logActions.closeLogModal();
     }
@@ -167,8 +165,6 @@ export async function handleLogModalKeys(
     if (event.ctrl && name === 'g') { logStore.logAiAtBottom = false; aiSb.scrollTo(0); logStore.logAiLastScrollTop = 0; return true; }
     if (event.ctrl && name === 'G') { logStore.logAiAtBottom = true; aiSb.scrollTo(aiSb.scrollHeight); logStore.logAiLastScrollTop = aiSb.scrollTop; return true; }
   }
-
-  // Ctrl+O removed (was opencode session link)
 
   // ── Followup input: capture printable chars into the followup text field ──
   if (logStore.logAiVisible() && logStore.logAiSummary() !== null && !logStore.logAiLoading() && !logStore.logAiStreaming()) {
@@ -195,102 +191,47 @@ export async function handleLogModalKeys(
   const lineCount = logStore.logs().split('\n').length;
   const maxLine = Math.max(0, lineCount - 1);
 
-  const scrollToCenter = (line: number) => {
-    if (!sb) return;
-    const vpHeight = sb.viewport.height > 0 ? sb.viewport.height : renderer.height;
-    const maxScrollTop = Math.max(0, lineCount - vpHeight);
-    const half = Math.floor(vpHeight / 2);
-    const target = Math.max(0, Math.min(line - half, maxScrollTop));
-    sb.scrollTo(target);
-    logActions.syncLogScroll();
-  };
+  // ── Viewport scrolling (no cursor line) ───────────────────────────────
 
-  // v — toggle visual mode
-  if (event.name === 'v' || event.sequence === 'v') {
-    if (logStore.logVisualModeActive()) {
-      logStore.setLogVisualModeActive(false);
-    } else {
-      logStore.setLogVisualModeStart(logStore.logSelectedLine());
-      logStore.setLogVisualModeActive(true);
-    }
-    return true;
-  }
-
-  // c — copy current line (normal mode) or selected range (visual mode)
-  if (event.name === 'c' || event.sequence === 'c') {
-    const logLines = logStore.logs().split('\n');
-    let text: string;
-    if (logStore.logVisualModeActive()) {
-      const start = Math.min(logStore.logVisualModeStart(), logStore.logSelectedLine());
-      const end   = Math.max(logStore.logVisualModeStart(), logStore.logSelectedLine());
-      text = logLines.slice(start, end + 1).join('\n');
-      logStore.setLogVisualModeActive(false);
-    } else {
-      text = logLines[logStore.logSelectedLine()] ?? '';
-    }
-    if (text) {
-      try {
-        const { copyToClipboard } = await import('@devenv/core');
-        const base64 = Buffer.from(text).toString('base64');
-        const osc52 = `\x1b]52;c;${base64}\x07`;
-        const finalOsc52 = process.env.TMUX
-          ? `\x1bPtmux;\x1b${osc52}\x1b\\`
-          : osc52;
-        process.stdout.write(finalOsc52);
-        copyToClipboard(text);
-        uiStore.setCopyStatus('✓ Copied');
-        setTimeout(() => uiStore.setCopyStatus(null), 2000);
-      } catch (error) {
-        const { getLogger } = await import('@devenv/core');
-        getLogger().write('ERROR', `Failed to copy log line: ${error}`);
-      }
-    }
-    return true;
-  }
-
-  // j / Down — move cursor down, keep it centered
+  // j / Down — scroll viewport down by 1 line
   if (isDownKey(event)) {
-    const next = Math.min(logStore.logSelectedLine() + 1, maxLine);
-    logStore.setLogSelectedLine(next);
-    scrollToCenter(next);
+    if (sb) sb.scrollBy(1);
+    logActions.syncLogScroll();
     return true;
   }
 
-  // k / Up — move cursor up, keep it centered
+  // k / Up — scroll viewport up by 1 line
   if (isUpKey(event)) {
-    const next = Math.max(logStore.logSelectedLine() - 1, 0);
-    logStore.setLogSelectedLine(next);
-    scrollToCenter(next);
+    if (sb) sb.scrollBy(-1);
+    logActions.syncLogScroll();
     return true;
   }
 
-  // d — move cursor + viewport down half page (10 lines)
+  // d — scroll down half viewport
   if (event.name === 'd') {
-    const next = Math.min(logStore.logSelectedLine() + 10, maxLine);
-    logStore.setLogSelectedLine(next);
-    scrollToCenter(next);
+    if (sb) sb.scrollBy(Math.floor((sb.viewport.height || 10) / 2));
+    logActions.syncLogScroll();
     return true;
   }
 
-  // u — move cursor + viewport up half page (10 lines)
+  // u — scroll up half viewport
   if (event.name === 'u') {
-    const next = Math.max(logStore.logSelectedLine() - 10, 0);
-    logStore.setLogSelectedLine(next);
-    scrollToCenter(next);
+    if (sb) sb.scrollBy(-Math.floor((sb.viewport.height || 10) / 2));
+    logActions.syncLogScroll();
     return true;
   }
 
   // g — go to top
   if (event.name === 'g' && !event.shift) {
-    logStore.setLogSelectedLine(0);
-    scrollToCenter(0);
+    if (sb) sb.scrollTo(0);
+    logActions.syncLogScroll();
     return true;
   }
 
   // G — go to bottom
   if (event.name === 'G' || (event.name === 'g' && event.shift)) {
-    logStore.setLogSelectedLine(maxLine);
-    scrollToCenter(maxLine);
+    if (sb) sb.scrollTo(sb.scrollHeight);
+    logActions.syncLogScroll();
     return true;
   }
 
@@ -304,25 +245,25 @@ export async function handleLogModalKeys(
     return true;
   }
 
-  // n — jump to next search match
+  // n — jump to next search match (scrolls directly, no cursor)
   if ((event.name === 'n' || event.sequence === 'n') && logStore.logSearchMatchLinesList().length > 0) {
     const matches = logStore.logSearchMatchLinesList();
     const next = (logStore.logSearchMatchIndex() + 1) % matches.length;
     logStore.setLogSearchMatchIndex(next);
     const line = matches[next];
-    logStore.setLogSelectedLine(line);
-    scrollToCenter(line);
+    if (sb) sb.scrollTo(line);
+    logActions.syncLogScroll();
     return true;
   }
 
-  // p — jump to previous search match
+  // p — jump to previous search match (scrolls directly, no cursor)
   if ((event.name === 'p' || event.sequence === 'p') && logStore.logSearchMatchLinesList().length > 0) {
     const matches = logStore.logSearchMatchLinesList();
     const prev = (logStore.logSearchMatchIndex() - 1 + matches.length) % matches.length;
     logStore.setLogSearchMatchIndex(prev);
     const line = matches[prev];
-    logStore.setLogSelectedLine(line);
-    scrollToCenter(line);
+    if (sb) sb.scrollTo(line);
+    logActions.syncLogScroll();
     return true;
   }
 

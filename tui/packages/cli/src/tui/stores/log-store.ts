@@ -7,9 +7,6 @@ export function createLogStore() {
   const [showLogModal, setShowLogModal] = createSignal(false);
   const [logScrollTop, setLogScrollTop] = createSignal(0);
   const [logViewportHeight, setLogViewportHeight] = createSignal(40);
-  const [logSelectedLine, setLogSelectedLine] = createSignal(0);
-  const [logVisualModeActive, setLogVisualModeActive] = createSignal(false);
-  const [logVisualModeStart, setLogVisualModeStart] = createSignal(0);
   const [logSearchMode, setLogSearchMode] = createSignal(false);
   const [logSearchQuery, setLogSearchQuery] = createSignal('');
   const [logSearchMatchIndex, setLogSearchMatchIndex] = createSignal(-1);
@@ -58,12 +55,8 @@ export function createLogStore() {
     setLogScrollTop,
     logViewportHeight,
     setLogViewportHeight,
-    logSelectedLine,
-    setLogSelectedLine,
-    logVisualModeActive,
-    setLogVisualModeActive,
-    logVisualModeStart,
-    setLogVisualModeStart,
+    // logSelectedLine, logVisualModeActive, logVisualModeStart removed —
+    // no cursor line / visual mode; viewport scrolls directly.
     logSearchMode,
     setLogSearchMode,
     logSearchQuery,
@@ -118,9 +111,7 @@ export function createLogStore() {
     set logAiLastScrollTop(value: number) {
       logAiLastScrollTop = value;
     },
-    // Transient field: holds selected log lines when visual mode triggers AI picker.
-    // Set in log-modal-keys, consumed in global-keys after picker confirms.
-    pendingAiVisualLogs: undefined as string | undefined,
+
   };
 }
 

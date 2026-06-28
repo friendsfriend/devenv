@@ -18,18 +18,16 @@ export function createLogActions(
   };
 
   /**
-   * Set the store signals (logSelectedLine, logScrollTop) to the bottom of the
-   * current log content so keyboard navigation starts at the correct position.
-   * No sb.scrollTo() here — stickyScroll handles the initial viewport placement.
-   * syncLogScroll() (called from onScrollBoxReady) will read the actual scrollTop
-   * once the scrollbox has settled.
+   * Set logScrollTop to the bottom of the current log content so the viewport
+   * starts at the last lines. No sb.scrollTo() here — stickyScroll handles the
+   * initial viewport placement. syncLogScroll() (called from onScrollBoxReady)
+   * reads the actual scrollTop after the scrollbox settles.
    */
   const scrollToLogBottom = () => {
     const lineCount = logStore.logs().split('\n').length;
     const sb = logStore.logScrollBoxRef;
     const vh = (sb && sb.viewport.height > 0) ? sb.viewport.height : logStore.logViewportHeight();
     if (vh > 0) logStore.setLogViewportHeight(vh);
-    logStore.setLogSelectedLine(Math.max(0, lineCount - 1));
     logStore.setLogScrollTop(Math.max(0, lineCount - vh));
   };
 
@@ -64,9 +62,6 @@ export function createLogActions(
     logStore.logScrollBoxRef = undefined;
     logStore.setLogScrollTop(0);
     logStore.setLogViewportHeight(40);
-    logStore.setLogSelectedLine(0);
-    logStore.setLogVisualModeActive(false);
-    logStore.setLogVisualModeStart(0);
     logStore.setLogSearchMode(false);
     logStore.setLogSearchQuery('');
     logStore.setLogSearchMatchIndex(-1);

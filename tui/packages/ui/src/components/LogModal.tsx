@@ -5,7 +5,7 @@ import { useRenderer } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
 import { ansiToStyledText, stripAnsi } from '../ansiToStyledText';
 import { GenericModal } from './GenericModal';
-import { HelpText } from './HelpText';
+import { formatHelpText } from './HelpText';
 import { LogAiOverlay } from './LogAiOverlay';
 import { ScrollableContent } from './ScrollableContent';
 
@@ -21,17 +21,8 @@ export interface LogModalProps {
   onScrollBoxReady: (scrollBox: ScrollBoxRenderable) => void;
   onClose: () => void;
 
-  /** Current vertical scroll offset (lines from top). Updated by parent after each scroll. */
-  scrollTop: number;
-  /** Number of visible rows in the viewport. Used for windowed rendering. */
-  viewportHeight: number;
-
-  /** Index of the currently highlighted line (cursor). Always visible. */
-  selectedLine: number;
-  /** Whether visual line selection mode is active (v key toggles). */
-  visualModeActive: boolean;
-  /** Line index where the visual selection started. */
-  visualModeStart: number;
+  // scrollTop / viewportHeight intentionally omitted (OpenTUI built-in viewportCulling handles it)
+  // Mouse selection works natively; no cursor line / visual mode.
 
   // ── Search ──────────────────────────────────────────────────────────────
   /** Whether the user is currently typing a search query (/ was pressed). */
@@ -117,20 +108,17 @@ function splitMatches(text: string, query: string): Array<{ text: string; isMatc
 /**
  * LogModal — scrollable log viewer rendered as a full-height popup overlay.
  *
- * Follows the same pattern as DiffViewModal:
  * - Pure presentational component, no useKeyboard hook.
- * - Scrolling is driven imperatively by the parent via scrollBy/scrollTo on the
+ * - Scrolling driven imperatively by parent via scrollBy/scrollTo on the
  *   ScrollBoxRenderable exposed through onScrollBoxReady.
  * - Uses GenericModal for consistent backdrop + sizing.
  * - Starts at the bottom via stickyScroll/stickyStart="bottom".
- * - Highlights the cursor line at all times; visual mode highlights a range.
- * - Search mode: / opens an inline query bar; all matches are highlighted in
- *   yellow; n/p navigate between matches.
+ * - No cursor line or visual mode — viewport scrolling with j/k/d/u/g/G.
+ * - Search mode: / opens inline query bar; matches highlighted in yellow;
+ *   n/p navigate between matches.
  */
 export function LogModal(props: LogModalProps) {
   const renderer = useRenderer();
-  let scrollBox: ScrollBoxRenderable | undefined;
-
   const dimensions = () => ({
     width: renderer.width,
     height: renderer.height,
@@ -139,18 +127,7 @@ export function LogModal(props: LogModalProps) {
   const lines = createMemo(() => props.logs.split('\n'));
   const lineCount = () => lines().length;
 
-  // No windowed rendering — all lines are passed to <For> and OpenTUI's built-in
-  // viewportCulling handles skipping off-screen nodes at the renderer level.
-  // Windowed rendering (topSpacer + slice + bottomSpacer) caused a layout race:
-  // setting logScrollTop grew topSpacerHeight in the same tick as sb.scrollTo(),
-  // so OpenTUI clamped the scroll to the old (small) scrollHeight → blank page.
-
-  const isInVisualSelection = (index: number): boolean => {
-    if (!props.visualModeActive) return false;
-    const start = Math.min(props.visualModeStart, props.selectedLine);
-    const end   = Math.max(props.visualModeStart, props.selectedLine);
-    return index >= start && index <= end;
-  };
+  // All lines are passed to <For>; OpenTUI viewportCulling handles off-screen clipping.
 
   const isCurrentSearchMatch = (index: number): boolean => {
     if (props.searchMatchIndex < 0) return false;
@@ -167,9 +144,6 @@ export function LogModal(props: LogModalProps) {
         <text fg={uiColors.textPrimary}>
           <b>{props.title}</b>
         </text>
-        <Show when={props.visualModeActive}>
-          <text fg={uiColors.warning}> VISUAL</text>
-        </Show>
         {/* While typing: show live input; after confirm: show query + match count */}
         <Show
           when={props.searchMode}
@@ -197,58 +171,39 @@ export function LogModal(props: LogModalProps) {
     </box>
   );
 
-  // ── footer ──────────────────────────────────────────────────────────────
+  // ── keybind help text (standard modal style: plain string via formatHelpText) ──
 
-  const customFooter = () => (
-    <box paddingTop={1} flexShrink={0}>
-      <HelpText entries={
-        props.searchMode
-          ? [
-              { key: 'Enter', action: 'Confirm search' },
-              { key: 'Backspace', action: 'Delete char' },
-              { key: 'Esc', action: 'Cancel search' },
-            ]
-          : props.visualModeActive
-          ? [
-              { key: 'j/k', action: 'Extend selection' },
-              { key: 'c', action: 'Copy selection' },
-              { key: 'A', action: 'AI (selection)' },
-              { key: 'Esc', action: 'Exit visual' },
-            ]
-          : [
-              { key: 'j/k', action: 'Up/Down' },
-              { key: 'h/l ←/→', action: 'Left/Right' },
-              { key: 'u/d', action: 'Page' },
-              { key: 'g/G', action: 'Top/Bot' },
-              { key: '/', action: 'Search' },
-              { key: 'n/p', action: 'Next/Prev match' },
-              { key: 'v', action: 'Visual mode' },
-              { key: 'c', action: 'Copy line' },
-              { key: 'e', action: 'Open in editor' },
-              { key: 'A', action: 'AI analysis' },
-              { key: 'Esc', action: 'Close' },
-            ]
-      } />
-    </box>
-  );
+  const keybinds = () => props.searchMode
+    ? formatHelpText([
+        { key: 'Enter', action: 'Confirm search' },
+        { key: 'Backspace', action: 'Delete char' },
+        { key: 'Esc', action: 'Cancel search' },
+      ])
+    : formatHelpText([
+        { key: '/', action: 'Search' },
+        { key: 'n/p', action: 'Next/Prev match' },
+        { key: 'e', action: 'Open in editor' },
+        { key: 'Shift+E', action: 'Choose editor' },
+        { key: 'A', action: 'AI analysis' },
+        { key: 'Esc', action: 'Close' },
+      ]);
 
   // ── render ──────────────────────────────────────────────────────────────
 
   return (
+    <>
     <GenericModal
       title=""
-      helpText=""
+      helpText={keybinds()}
       widthPercent={0.92}
       heightPercent={(dimensions().height - 4) / dimensions().height}
       customHeader={customHeader()}
-      customFooter={customFooter()}
       onBackdropClick={props.onClose}
     >
       <ScrollableContent
         axes={['x', 'y']}
         keyboardAxes={['x']}
         onScrollBoxReady={(r) => {
-          scrollBox = r;
           props.onScrollBoxReady(r);
         }}
         viewportCulling={true}
@@ -259,22 +214,8 @@ export function LogModal(props: LogModalProps) {
           <For each={lines()}>
             {(line, localIndex) => {
               const index = localIndex;
-              const isCursor = () => index() === props.selectedLine;
-              const inSelection = () => isInVisualSelection(index());
               const isMatchLine = () => props.searchMatchLines.has(index());
               const isCurrentMatch = () => isCurrentSearchMatch(index());
-
-              const bgColor = () => {
-                if (isCursor())       return uiColors.primary;
-                if (inSelection())    return uiColors.bgSurface2;
-                if (isCurrentMatch()) return uiColors.bgSurface2;
-                return undefined;
-              };
-
-              const fgColor = () => {
-                if (isCursor()) return uiColors.bgBase;
-                return uiColors.textPrimary;
-              };
 
               const lineWidth = Math.max(stripAnsi(line).length, 1);
               const styledLine = ansiToStyledText(line);
@@ -285,26 +226,25 @@ export function LogModal(props: LogModalProps) {
               return (
                 <box
                   flexDirection="row"
-                  backgroundColor={bgColor()}
                   style={{ flexShrink: 0, height: 1, minWidth: '100%', width: lineWidth }}
                 >
                   <Show
                     when={hasSearch()}
                     fallback={
                       styledLine
-                        ? <text fg={fgColor()}>
+                        ? <text fg={uiColors.textPrimary}>
                             <For each={styledLine.chunks}>
                               {(chunk) => <span style={chunkStyle(chunk)}>{chunk.text}</span>}
                             </For>
                           </text>
-                        : <text fg={fgColor()}>{line}</text>
+                        : <text fg={uiColors.textPrimary}>{line}</text>
                     }
                   >
                     <For each={splitMatches(stripAnsi(line), query())}>
                       {(seg) => (
                         <Show
                           when={seg.isMatch}
-                          fallback={<text fg={fgColor()}>{seg.text}</text>}
+                          fallback={<text fg={uiColors.textPrimary}>{seg.text}</text>}
                         >
                           <text
                             fg={colors.base}
@@ -322,19 +262,20 @@ export function LogModal(props: LogModalProps) {
           </For>
         </box>
       </ScrollableContent>
-      <Show when={props.aiVisible && (props.aiPromptMode || props.aiLoading || props.aiSummary !== null || props.aiError !== null)}>
-        <LogAiOverlay
-          promptMode={props.aiPromptMode}
-          promptText={props.aiPromptText}
-          loading={props.aiLoading}
-          streaming={props.aiStreaming}
-          summary={props.aiSummary}
-          error={props.aiError}
-          followupText={props.aiFollowupText}
-          onDismiss={props.onAiDismiss}
-          onScrollBoxReady={props.onAiScrollBoxReady}
-        />
-      </Show>
     </GenericModal>
+    <Show when={props.aiVisible && (props.aiPromptMode || props.aiLoading || props.aiSummary !== null || props.aiError !== null)}>
+      <LogAiOverlay
+        promptMode={props.aiPromptMode}
+        promptText={props.aiPromptText}
+        loading={props.aiLoading}
+        streaming={props.aiStreaming}
+        summary={props.aiSummary}
+        error={props.aiError}
+        followupText={props.aiFollowupText}
+        onDismiss={props.onAiDismiss}
+        onScrollBoxReady={props.onAiScrollBoxReady}
+      />
+    </Show>
+    </>
   );
 }

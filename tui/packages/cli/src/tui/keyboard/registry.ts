@@ -234,10 +234,9 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["g/G"], description: "Go to top/bottom", context: "logModal", category: "Navigation" },
 	{ keys: ["/"], description: "Search logs", context: "logModal", category: "Actions" },
 	{ keys: ["n/p"], description: "Next/prev search match", context: "logModal", category: "Actions" },
-	{ keys: ["v"], description: "Toggle visual selection mode", context: "logModal", category: "Actions" },
-	{ keys: ["c"], description: "Copy selected line/range", context: "logModal", category: "Actions" },
-	{ keys: ["e"], description: "Open log file in $EDITOR", context: "logModal", category: "Actions" },
-	{ keys: ["Shift+A"], description: "AI analysis on log selection", context: "logModal", category: "Actions" },
+	{ keys: ["e"], description: "Open logs in $EDITOR", context: "logModal", category: "Actions" },
+	{ keys: ["Shift+E"], description: "Choose editor for logs", context: "logModal", category: "Actions" },
+	{ keys: ["Shift+A"], description: "AI analysis", context: "logModal", category: "Actions" },
 	{ keys: ["Esc"], description: "Close logs", context: "logModal", category: "General" },
 	{ keys: ["q"], description: "Quit application", context: "logModal", category: "General" },
 

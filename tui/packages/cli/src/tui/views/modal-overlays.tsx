@@ -410,7 +410,10 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 			</Show>
 
 			<Show when={uiStore.showEditorPicker()}>
-				<EditorPickerView selectedIndex={uiStore.editorPickerSelectedIndex()} />
+				<EditorPickerView
+					selectedIndex={uiStore.editorPickerSelectedIndex()}
+					options={uiStore.editorPickerOptions()}
+				/>
 			</Show>
 
 			<Show when={uiStore.showScriptArgsModal()}>
@@ -546,11 +549,6 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 						setTimeout(() => logActions.syncLogScroll(), 0);
 					}}
 					onClose={logActions.closeLogModal}
-					scrollTop={logStore.logScrollTop()}
-					viewportHeight={logStore.logViewportHeight()}
-					selectedLine={logStore.logSelectedLine()}
-					visualModeActive={logStore.logVisualModeActive()}
-					visualModeStart={logStore.logVisualModeStart()}
 					searchMode={logStore.logSearchMode()}
 					searchQuery={logStore.logSearchQuery()}
 					searchMatchLines={logStore.logSearchMatchLines()}
