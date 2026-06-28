@@ -149,6 +149,8 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 ├── opencode.json                        # OpenCode configuration (optional)
 ├── providers/                           # Git provider credentials
 │   └── <name>.json                      # Individual provider definitions
+├── themes/                              # Custom TUI themes
+│   └── <theme-name>.json                # OpenCode-compatible theme JSON
 ├── agents/                              # Agent space definitions
 │   └── agent-<space-id>.md              # Per-agent markdown files
 ├── apps/
@@ -191,6 +193,48 @@ Optional file for `${VAR}` substitution in compose files, provider JSON files, a
 ### `opencode.json`
 
 OpenCode configuration file. Referenced by the server for OpenCode integration features.
+
+### `themes/`
+
+Custom TUI themes live in `DEVENV_CONFIG_DIR/themes/` (default `~/.config/devenv/themes/`). Drop an OpenCode-compatible theme file at:
+
+```text
+~/.config/devenv/themes/<theme-name>.json
+```
+
+Restart the TUI, then open the theme picker with `T`. Custom themes appear alongside built-in OpenCode themes and can override built-in names.
+
+DevEnv also provides a `system` theme. It queries your terminal foreground, background, and ANSI palette at startup, then builds a theme from those colors.
+
+Theme files use the OpenCode theme shape:
+
+```json
+{
+  "defs": {
+    "bg": "#101014",
+    "fg": "#f0f0f5"
+  },
+  "theme": {
+    "primary": "#7aa2f7",
+    "secondary": "#bb9af7",
+    "accent": "#7dcfff",
+    "error": "#f7768e",
+    "warning": "#e0af68",
+    "success": "#9ece6a",
+    "info": "#7dcfff",
+    "text": "fg",
+    "textMuted": "#9aa5ce",
+    "background": "bg",
+    "backgroundPanel": "#16161e",
+    "backgroundElement": "#1f2335",
+    "border": "#3b4261",
+    "borderActive": "#7aa2f7",
+    "selectedListItemText": "bg"
+  }
+}
+```
+
+See Help → Guides → Custom Themes for full field guidance.
 
 ### `providers/`
 
