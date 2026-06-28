@@ -78,7 +78,8 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["S"], description: "Stop container", context: "table", category: "Docker" },
 	{ keys: ["R"], description: "Restart container", context: "table", category: "Docker" },
 	{ keys: ["r"], description: "Refresh status (non-scripts tab)", context: "table", category: "Docker" },
-	{ keys: ["B"], description: "Build application", context: "table", category: "Docker" },
+	{ keys: ["b"], description: "Build application / toggle build logs while running", context: "table", category: "Docker" },
+	{ keys: ["t"], description: "Test application / toggle test logs while running", context: "table", category: "Docker" },
 
 	// ========== table — Git ==========
 	{ keys: ["p"], description: "Git pull", context: "table", category: "Git" },

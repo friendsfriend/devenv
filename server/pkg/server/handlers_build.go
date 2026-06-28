@@ -20,7 +20,8 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req struct {
-		Ident string `json:"ident"`
+		Ident    string `json:"ident"`
+		TargetID string `json:"targetId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -45,7 +46,11 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 
 	// Perform build operation asynchronously using BuildService
 	// The BuildService will handle status updates via the status manager
-	go s.services.BuildService().BuildAppWithStatus(targetApp)
+	if req.TargetID != "" {
+		go s.services.BuildService().BuildAppTargetWithStatus(targetApp, req.TargetID)
+	} else {
+		go s.services.BuildService().BuildAppWithStatus(targetApp)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -62,8 +67,9 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Ident   string `json:"ident"`
-		Profile string `json:"profile"`
+		Ident    string `json:"ident"`
+		Profile  string `json:"profile"`
+		TargetID string `json:"targetId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -122,7 +128,11 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] Run initiated for app: %s", req.Ident)
 
-	go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
+	if req.TargetID != "" {
+		go s.services.BuildService().RunAppTargetWithStatus(targetApp, req.TargetID)
+	} else {
+		go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -139,7 +149,8 @@ func (s *Server) handleTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Ident string `json:"ident"`
+		Ident    string `json:"ident"`
+		TargetID string `json:"targetId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -161,7 +172,11 @@ func (s *Server) handleTest(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] Test started for app: %s", req.Ident)
 
-	go s.services.BuildService().TestAppWithStatus(targetApp)
+	if req.TargetID != "" {
+		go s.services.BuildService().TestAppTargetWithStatus(targetApp, req.TargetID)
+	} else {
+		go s.services.BuildService().TestAppWithStatus(targetApp)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -178,8 +193,9 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Ident   string `json:"ident"`
-		Profile string `json:"profile"`
+		Ident    string `json:"ident"`
+		Profile  string `json:"profile"`
+		TargetID string `json:"targetId"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -201,13 +217,80 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] Run initiated for app: %s", req.Ident)
 
-	go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
+	if req.TargetID != "" {
+		go s.services.BuildService().RunAppTargetWithStatus(targetApp, req.TargetID)
+	} else {
+		go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Run initiated for %s", targetApp.DisplayName),
 	})
+}
+
+func (s *Server) handleShellActionScript(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodPut {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	var req struct {
+		Ident   string `json:"ident"`
+		Action  string `json:"action"`
+		Profile string `json:"profile"`
+		Command string `json:"command"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+	if req.Ident == "" || req.Action == "" {
+		respondBadRequest(w, "ident and action fields required")
+		return
+	}
+	if s.findAppByIdent(req.Ident) == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+	path, err := s.services.ResourcesManager().WriteShellActionScript(req.Ident, resources.AppAction(req.Action), req.Profile, req.Command)
+	if err != nil {
+		respondErrorMessage(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	respondJSON(w, map[string]interface{}{"success": true, "path": path}, http.StatusOK)
+}
+
+func (s *Server) handleGetActionTargets(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	ident := r.PathValue("ident")
+	action := r.PathValue("action")
+	if ident == "" || action == "" {
+		respondBadRequest(w, "ident and action path parameters required")
+		return
+	}
+
+	targetApp := s.findAppByIdent(ident)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+
+	targets, err := s.services.ResourcesManager().DiscoverActionTargets(targetApp.Ident, targetApp.LocalDirectoryPath, resources.AppAction(action))
+	if err != nil {
+		respondInternalError(w, err)
+		return
+	}
+	if targets == nil {
+		targets = []resources.ActionTarget{}
+	}
+
+	respondJSON(w, map[string]interface{}{"targets": targets}, http.StatusOK)
 }
 
 func (s *Server) handleGetProfiles(w http.ResponseWriter, r *http.Request) {

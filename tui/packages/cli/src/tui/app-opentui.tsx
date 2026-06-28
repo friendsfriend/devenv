@@ -128,7 +128,7 @@ export function TUIApp(props: TUIAppProps) {
 		client,
 		showError,
 	);
-	const dockerActions = createDockerActions(appStore, client, showError);
+	const dockerActions = createDockerActions(appStore, uiStore, client, showError);
 	const gitActions = createGitActions(appStore, uiStore, client, showError);
 	const providerActions = createProviderActions(
 		appStore,

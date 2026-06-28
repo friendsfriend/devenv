@@ -82,7 +82,34 @@ services:
 
 For profile variants, use `IDENT-PROFILE-compose.yml` (e.g., `my-service-staging-compose.yml`).
 
-## 4. Link to infrastructure
+## 4. Add shell action variants
+
+Shell actions live next to Docker resources and can coexist with them:
+
+- `~/.config/devenv/apps/build/IDENT-build.sh` — shell build target
+- `~/.config/devenv/apps/build/IDENT-test.sh` — shell test target
+- `~/.config/devenv/apps/run/IDENT-PROFILE.sh` — shell run profile
+
+Example run profile:
+
+```sh
+#!/usr/bin/env sh
+# devenv:name=Dev Server
+# devenv:mode=tmux
+set -eu
+bun run dev
+```
+
+Metadata:
+
+- `devenv:name` controls picker label.
+- `devenv:mode=tmux` opens run scripts in a new tmux window.
+- Build/test shell scripts default to logged execution.
+- Run shell scripts default to tmux.
+
+Tmux mode requires the DevEnv server process to run inside tmux. Attach mode connected to a server without `TMUX` will fail clearly instead of launching hidden background processes. Stop/restart target the tracked tmux window id.
+
+## 5. Link to infrastructure
 
 If your app depends on infra services (databases, queues), add `depends_on` in the compose file and reference the infra service name:
 
@@ -93,7 +120,7 @@ services:
       - postgres
 ```
 
-## 5. Add from the TUI
+## 6. Add from the TUI
 
 Alternatively, press `+` in the TUI table view to add an app interactively — select provider, search for a repository, name it, and choose a branch.
 

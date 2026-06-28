@@ -1,5 +1,5 @@
 import { createMemo, createSignal } from 'solid-js';
-import type { App, WorktreeInfo } from '@devenv/types';
+import type { ActionTarget, App, AppAction, WorktreeInfo } from '@devenv/types';
 import type { BranchInfo, AppDetailKind } from '@devenv/ui';
 import type { SshHost } from '@devenv/types';
 
@@ -29,6 +29,12 @@ export function createUiStore() {
   const [profilePickerLoading, setProfilePickerLoading] = createSignal(false);
   const [profilePickerSelectedIndex, setProfilePickerSelectedIndex] = createSignal(0);
   const [profilePickerAppIdent, setProfilePickerAppIdent] = createSignal<string | null>(null);
+  const [showActionTargetPicker, setShowActionTargetPicker] = createSignal(false);
+  const [actionTargetPickerTargets, setActionTargetPickerTargets] = createSignal<ActionTarget[]>([]);
+  const [actionTargetPickerLoading, setActionTargetPickerLoading] = createSignal(false);
+  const [actionTargetPickerSelectedIndex, setActionTargetPickerSelectedIndex] = createSignal(0);
+  const [actionTargetPickerAppIdent, setActionTargetPickerAppIdent] = createSignal<string | null>(null);
+  const [actionTargetPickerAction, setActionTargetPickerAction] = createSignal<AppAction>('run');
   const [showLoadingModal, setShowLoadingModal] = createSignal(false);
   const [loadingModalMessage, setLoadingModalMessage] = createSignal('Loading...');
   const [showPassphraseModal, setShowPassphraseModal] = createSignal(false);
@@ -141,6 +147,18 @@ export function createUiStore() {
     setProfilePickerSelectedIndex,
     profilePickerAppIdent,
     setProfilePickerAppIdent,
+    showActionTargetPicker,
+    setShowActionTargetPicker,
+    actionTargetPickerTargets,
+    setActionTargetPickerTargets,
+    actionTargetPickerLoading,
+    setActionTargetPickerLoading,
+    actionTargetPickerSelectedIndex,
+    setActionTargetPickerSelectedIndex,
+    actionTargetPickerAppIdent,
+    setActionTargetPickerAppIdent,
+    actionTargetPickerAction,
+    setActionTargetPickerAction,
     showLoadingModal,
     setShowLoadingModal,
     loadingModalMessage,

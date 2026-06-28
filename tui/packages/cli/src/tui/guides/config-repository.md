@@ -45,8 +45,17 @@ rm -f .env
 If you do not have config yet, create the folders you want to share, for example:
 
 ```bash
-mkdir -p apps/definitions libraries/definitions infrastructure/definitions
+mkdir -p apps/definitions apps/build apps/compose apps/run libraries/definitions infrastructure/definitions
 ```
+
+Per-app action resources are shareable config files:
+
+- Docker build/test: `apps/build/<ident>-build.Dockerfile`, `apps/build/<ident>-test.Dockerfile`
+- Shell build/test: `apps/build/<ident>-build.sh`, `apps/build/<ident>-test.sh`
+- Docker run: `apps/compose/<ident>-compose.yml`, `apps/compose/<ident>-<profile>-compose.yml`
+- Shell run: `apps/run/<ident>-<profile>.sh`
+
+Shell scripts can include metadata comments such as `# devenv:name=Dev Server` and `# devenv:mode=tmux`. Tmux run scripts require the DevEnv server to run inside tmux.
 
 ## 3. Ignore local-only files
 

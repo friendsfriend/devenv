@@ -19,7 +19,7 @@ func TestBuildAppNoCheckout(t *testing.T) {
 	var got string
 	svc.buildAppInternal(&app.App{
 		LocalDirectoryPath: "/nonexistent",
-	}, func(s string) { got = s })
+	}, "", func(s string) { got = s })
 
 	if !strings.Contains(got, "Checkout needed") {
 		t.Fatalf("expected 'Checkout needed', got %q", got)
@@ -31,6 +31,7 @@ type fakeResourceMgr struct {
 	copyTemplates    []string
 	dockerfileErr    error
 	composeErr       error
+	targets          []resources.ActionTarget
 }
 
 func (f *fakeResourceMgr) ExistsDir(path string) (bool, error) {
@@ -63,6 +64,22 @@ func (f *fakeResourceMgr) DiscoverProfiles(_, _ string) ([]string, error) {
 	return nil, nil
 }
 
+func (f *fakeResourceMgr) DiscoverActionTargets(_, _ string, action resources.AppAction) ([]resources.ActionTarget, error) {
+	if f.targets != nil {
+		return f.targets, nil
+	}
+	if action == resources.AppActionRun {
+		if f.composeErr != nil {
+			return nil, f.composeErr
+		}
+		return []resources.ActionTarget{{ID: "run:docker:default", Action: action, Runtime: resources.ActionRuntimeDocker, Label: "default", SourcePath: "/fake/compose.yml"}}, nil
+	}
+	if f.dockerfileErr != nil {
+		return nil, f.dockerfileErr
+	}
+	return []resources.ActionTarget{{ID: string(action) + ":docker", Action: action, Runtime: resources.ActionRuntimeDocker, Label: "Docker", SourcePath: "/fake/dockerfile"}}, nil
+}
+
 func (f *fakeResourceMgr) EnvFilePath() (string, bool) {
 	return "", false
 }
@@ -80,13 +97,26 @@ type fakeCommandRunner struct {
 	err       error
 	silentOut string
 	silentErr error
+	lastCmd   string
+	lastArgs  []string
+	lastDir   string
 }
 
-func (f *fakeCommandRunner) RunCommandWithLogging(_, _ string, _ []string, _ []string, _ string) (error, string) {
+func (f *fakeCommandRunner) RunCommandWithLogging(_, command string, args []string, _ []string, workingDir string) (error, string) {
+	f.lastCmd = command
+	f.lastArgs = args
+	f.lastDir = workingDir
 	return f.err, ""
 }
 
-func (f *fakeCommandRunner) RunCommandSilent(_ string, _ []string, _ []string, _ string) (error, string) {
+func (f *fakeCommandRunner) RunCommandWithLoggingToFile(appIdent, command string, args []string, envVars []string, workingDir string, _ string) (error, string) {
+	return f.RunCommandWithLogging(appIdent, command, args, envVars, workingDir)
+}
+
+func (f *fakeCommandRunner) RunCommandSilent(command string, args []string, _ []string, workingDir string) (error, string) {
+	f.lastCmd = command
+	f.lastArgs = args
+	f.lastDir = workingDir
 	if f.silentErr != nil {
 		return f.silentErr, ""
 	}
@@ -128,7 +158,7 @@ func TestBuildAppCopyTemplates(t *testing.T) {
 			svc.buildAppInternal(&app.App{
 				Ident:              "test-app",
 				LocalDirectoryPath: appDir,
-			}, func(s string) { got = s })
+			}, "", func(s string) { got = s })
 
 			if tt.wantErrSubstr != "" {
 				if !strings.Contains(got, tt.wantErrSubstr) {
@@ -163,7 +193,7 @@ func TestBuildAppCopiedFilesRemovedAfterBuild(t *testing.T) {
 	svc.buildAppInternal(&app.App{
 		Ident:              "test-app",
 		LocalDirectoryPath: appDir,
-	}, func(string) {})
+	}, "", func(string) {})
 
 	for _, p := range []string{f1, f2} {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
@@ -184,7 +214,7 @@ func TestBuildAppDockerfileError(t *testing.T) {
 	svc.buildAppInternal(&app.App{
 		Ident:              "test-app",
 		LocalDirectoryPath: appDir,
-	}, func(s string) { got = s })
+	}, "", func(s string) { got = s })
 
 	if !strings.Contains(got, "no dockerfile") {
 		t.Fatalf("expected dockerfile error, got %q", got)
@@ -198,7 +228,7 @@ func TestTestAppCheckoutNeeded(t *testing.T) {
 	svc.testAppInternal(&app.App{
 		Ident:              "test-app",
 		LocalDirectoryPath: "/nonexistent/path",
-	}, func(s string) { got = s })
+	}, "", func(s string) { got = s })
 
 	if !strings.Contains(got, "Checkout needed") {
 		t.Fatalf("expected 'Checkout needed', got %q", got)
@@ -212,7 +242,7 @@ func TestRunAppCheckoutNeeded(t *testing.T) {
 	svc.runAppInternal(&app.App{
 		Ident:              "test-app",
 		LocalDirectoryPath: "/nonexistent/path",
-	}, "", func(s string) { got = s })
+	}, "", "", func(s string) { got = s })
 
 	if !strings.Contains(got, "Checkout needed") {
 		t.Fatalf("expected 'Checkout needed', got %q", got)
@@ -231,9 +261,84 @@ func TestRunAppComposeFileError(t *testing.T) {
 	svc.runAppInternal(&app.App{
 		Ident:              "test-app",
 		LocalDirectoryPath: appDir,
-	}, "", func(s string) { got = s })
+	}, "", "", func(s string) { got = s })
 
 	if !strings.Contains(got, "no compose file") {
 		t.Fatalf("expected compose error, got %q", got)
+	}
+}
+
+func TestShellBuildTargetRunsWithLoggingFromAppDir(t *testing.T) {
+	appDir := t.TempDir()
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
+		ID:         "build:shell",
+		Action:     resources.AppActionBuild,
+		Runtime:    resources.ActionRuntimeShell,
+		Label:      "Shell",
+		LaunchMode: resources.LaunchModeLogged,
+		SourcePath: "/config/apps/build/test-app-build.sh",
+	}}}
+	runner := &fakeCommandRunner{}
+	svc := &service{resourceMgr: fake, executor: runner}
+
+	var got string
+	svc.buildAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "build:shell", func(s string) { got = s })
+
+	if got != "build successful" {
+		t.Fatalf("status = %q, want build successful", got)
+	}
+	if runner.lastCmd != "sh" || runner.lastArgs[0] != "/config/apps/build/test-app-build.sh" || runner.lastDir != appDir {
+		t.Fatalf("unexpected shell command: cmd=%q args=%v dir=%q", runner.lastCmd, runner.lastArgs, runner.lastDir)
+	}
+}
+
+func TestShellTmuxRunRequiresTmux(t *testing.T) {
+	t.Setenv("TMUX", "")
+	appDir := t.TempDir()
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
+		ID:         "run:shell:dev",
+		Action:     resources.AppActionRun,
+		Runtime:    resources.ActionRuntimeShell,
+		Profile:    "dev",
+		LaunchMode: resources.LaunchModeTmux,
+		SourcePath: "/config/apps/run/test-app-dev.sh",
+	}}}
+	svc := &service{resourceMgr: fake, executor: &fakeCommandRunner{}}
+
+	var got string
+	svc.runAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "", "run:shell:dev", func(s string) { got = s })
+
+	if !strings.Contains(got, "requires DevEnv server process to run inside tmux") {
+		t.Fatalf("status = %q", got)
+	}
+}
+
+func TestShellTmuxRunStoresWindowAndStopKillsIt(t *testing.T) {
+	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
+	appDir := t.TempDir()
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
+		ID:         "run:shell:dev",
+		Action:     resources.AppActionRun,
+		Runtime:    resources.ActionRuntimeShell,
+		Profile:    "dev",
+		LaunchMode: resources.LaunchModeTmux,
+		SourcePath: "/config/apps/run/test-app-dev.sh",
+	}}}
+	runner := &fakeCommandRunner{silentOut: "%7\n"}
+	svc := &service{resourceMgr: fake, executor: runner, tmuxRuns: make(map[string]ShellTmuxRunState)}
+
+	var got string
+	svc.runAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "", "run:shell:dev", func(s string) { got = s })
+	if got != "run successful" {
+		t.Fatalf("status = %q, want run successful", got)
+	}
+	if svc.tmuxRuns["test-app"].WindowID != "%7" {
+		t.Fatalf("stored state = %#v", svc.tmuxRuns["test-app"])
+	}
+	if err := svc.StopShellTmuxRun("test-app"); err != nil {
+		t.Fatalf("StopShellTmuxRun error = %v", err)
+	}
+	if runner.lastCmd != "tmux" || len(runner.lastArgs) < 3 || runner.lastArgs[0] != "kill-window" || runner.lastArgs[2] != "%7" {
+		t.Fatalf("unexpected stop command: %s %v", runner.lastCmd, runner.lastArgs)
 	}
 }

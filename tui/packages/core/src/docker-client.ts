@@ -1,12 +1,48 @@
-import type { ContainerStats } from '@devenv/types';
+import type { ActionTarget, AppAction, ContainerStats, ShellActionScriptRequest, ShellActionScriptResponse } from '@devenv/types';
 import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
+
+export async function getActionTargets(
+  deps: ClientDeps,
+  appIdent: string,
+  action: AppAction
+): Promise<ActionTarget[]> {
+  const response = await deps.fetchFn(
+    `${deps.baseUrl}/api/apps/${encodeURIComponent(appIdent)}/actions/${encodeURIComponent(action)}/targets`,
+    { method: 'GET' }
+  );
+
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+    return [];
+  }
+
+  const data = (await response.json()) as { targets: ActionTarget[] };
+  return data.targets;
+}
 
 /**
  * Start an app using docker compose (creates/starts containers)
  * This is the preferred method for starting apps that may not have running containers
  */
-export async function startApp(deps: ClientDeps, appIdent: string, profile: string = ''): Promise<void> {
+export async function createShellActionScript(
+  deps: ClientDeps,
+  request: ShellActionScriptRequest
+): Promise<ShellActionScriptResponse> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/shell-script`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+
+  return (await response.json()) as ShellActionScriptResponse;
+}
+
+export async function startApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string): Promise<void> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -16,7 +52,7 @@ export async function startApp(deps: ClientDeps, appIdent: string, profile: stri
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ident: appIdent, profile }),
+      body: JSON.stringify({ ident: appIdent, profile, targetId }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -37,7 +73,7 @@ export async function startApp(deps: ClientDeps, appIdent: string, profile: stri
   }
 }
 
-export async function testApp(deps: ClientDeps, appIdent: string): Promise<void> {
+export async function testApp(deps: ClientDeps, appIdent: string, targetId?: string): Promise<void> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -47,7 +83,7 @@ export async function testApp(deps: ClientDeps, appIdent: string): Promise<void>
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ident: appIdent }),
+      body: JSON.stringify({ ident: appIdent, targetId }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -68,7 +104,7 @@ export async function testApp(deps: ClientDeps, appIdent: string): Promise<void>
   }
 }
 
-export async function runApp(deps: ClientDeps, appIdent: string, profile: string = ''): Promise<void> {
+export async function runApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string): Promise<void> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -78,7 +114,7 @@ export async function runApp(deps: ClientDeps, appIdent: string, profile: string
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ident: appIdent, profile }),
+      body: JSON.stringify({ ident: appIdent, profile, targetId }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -102,13 +138,13 @@ export async function runApp(deps: ClientDeps, appIdent: string, profile: string
 /**
  * Trigger build operation for an app
  */
-export async function buildApp(deps: ClientDeps, appIdent: string): Promise<void> {
+export async function buildApp(deps: ClientDeps, appIdent: string, targetId?: string): Promise<void> {
   const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/build`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ident: appIdent }),
+    body: JSON.stringify({ ident: appIdent, targetId }),
   });
 
   if (!response.ok) {

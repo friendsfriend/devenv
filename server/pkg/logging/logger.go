@@ -2,11 +2,14 @@ package logging
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -33,6 +36,8 @@ type Logger interface {
 	ReadAppLogs(appIdent string, maxEntries int) (string, error)
 	// RunCommandWithLogging executes a command and logs the result.
 	RunCommandWithLogging(appIdent, command string, args []string, envVars []string, workingDir string) (error, string)
+	// RunCommandWithLoggingToFile executes a command and streams stdout/stderr to logPath.
+	RunCommandWithLoggingToFile(appIdent, command string, args []string, envVars []string, workingDir string, logPath string) (error, string)
 }
 
 // OperationType represents the type of operation being logged
@@ -335,20 +340,102 @@ func (l *fileLogger) ReadAppLogs(appIdent string, maxEntries int) (string, error
 }
 
 func (l *fileLogger) RunCommandWithLogging(appIdent, command string, args []string, envVars []string, workingDir string) (error, string) {
+	return l.RunCommandWithLoggingToFile(appIdent, command, args, envVars, workingDir, "")
+}
+
+func (l *fileLogger) RunCommandWithLoggingToFile(appIdent, command string, args []string, envVars []string, workingDir string, logPath string) (error, string) {
 	cmd := exec.Command(command, args...)
 	cmd.Env = append(os.Environ(), envVars...)
 	cmd.Dir = workingDir
-	out, err := cmd.CombinedOutput()
 
-	output := string(out)
+	logFile, closeLog := l.openCommandLog(appIdent, command, args, logPath)
+	defer closeLog()
 
-	// Log the command execution using the unified logger
-	l.LogCommand(appIdent, l.getAppDisplayName(appIdent), command, args, err, output)
+	var output bytes.Buffer
+	writer := &lockedMultiWriter{writers: []io.Writer{&output}}
+	if logFile != nil {
+		writer.writers = append(writer.writers, logFile)
+	}
+	cmd.Stdout = writer
+	cmd.Stderr = writer
 
-	// Also create individual log file for backward compatibility
-	l.logCommandToIndividualFile(appIdent, command, args, output, err)
+	err := cmd.Run()
+	out := output.String()
+	if logFile != nil {
+		timestamp := time.Now().Format("2006-01-02 15:04:05")
+		if err != nil {
+			_, _ = fmt.Fprintf(logFile, "\n[%s] Error: %s\n", timestamp, err.Error())
+		}
+		_, _ = fmt.Fprintf(logFile, "[%s] ---\n\n", timestamp)
+	}
 
-	return err, output
+	// Log summary to unified status log; full output is in the individual app log.
+	l.LogCommand(appIdent, l.getAppDisplayName(appIdent), command, args, err, out)
+	return err, out
+}
+
+type lockedMultiWriter struct {
+	mu      sync.Mutex
+	writers []io.Writer
+}
+
+func (w *lockedMultiWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for _, writer := range w.writers {
+		if _, err := writer.Write(p); err != nil {
+			return 0, err
+		}
+	}
+	return len(p), nil
+}
+
+func (l *fileLogger) openCommandLog(appIdent, command string, args []string, logPath string) (*os.File, func()) {
+	if logPath != "" {
+		if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+			return nil, func() {}
+		}
+		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			return nil, func() {}
+		}
+		timestamp := time.Now().Format("2006-01-02 15:04:05")
+		_, _ = fmt.Fprintf(logFile, "[%s] Command: %s %s\n", timestamp, command, strings.Join(args, " "))
+		return logFile, func() { _ = logFile.Close() }
+	}
+	return l.openIndividualAppLog(appIdent, command, args)
+}
+
+func (l *fileLogger) openIndividualAppLog(appIdent, command string, args []string) (*os.File, func()) {
+	logDir := filepath.Join(l.homeDir, "logs")
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return nil, func() {}
+	}
+	logFilePath := filepath.Join(logDir, appIdent+".log")
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, func() {}
+	}
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = fmt.Fprintf(logFile, "[%s] Command: %s %s\n", timestamp, command, strings.Join(args, " "))
+	return logFile, func() { _ = logFile.Close() }
+}
+
+func (l *fileLogger) readIndividualAppLog(appIdent string, maxEntries int) (string, error) {
+	logFilePath := filepath.Join(l.homeDir, "logs", appIdent+".log")
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		return "", err
+	}
+	lines := strings.Split(string(content), "\n")
+	maxLines := maxEntries
+	if maxLines <= 0 {
+		maxLines = 500
+	}
+	if len(lines) > maxLines {
+		lines = lines[len(lines)-maxLines:]
+	}
+	return strings.Join(lines, "\n"), nil
 }
 
 // logCommandToIndividualFile maintains backward compatibility with individual app log files

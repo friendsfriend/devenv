@@ -511,26 +511,7 @@ export async function handleTableKeys(
 					);
 					break;
 				}
-				uiStore.setProfilePickerLoading(true);
-				uiStore.setProfilePickerProfiles([]);
-				uiStore.setProfilePickerHasDockerfile(false);
-				uiStore.setProfilePickerSelectedIndex(0);
-				uiStore.setProfilePickerAppIdent(app.ident);
-				uiStore.setShowProfilePicker(true);
-				client
-					.getProfiles(app.ident)
-					.then((result) => {
-						uiStore.setProfilePickerProfiles(result.profiles);
-						uiStore.setProfilePickerHasDockerfile(result.hasDockerfile);
-					})
-					.catch((e) => {
-						getLogger().write("WARN", `Failed to fetch profiles: ${e}`);
-						uiStore.setProfilePickerProfiles([]);
-						uiStore.setProfilePickerHasDockerfile(false);
-					})
-					.finally(() => {
-						uiStore.setProfilePickerLoading(false);
-					});
+				void dockerActions.performAppAction("run");
 			}
 			break;
 		case "S":
@@ -610,11 +591,35 @@ export async function handleTableKeys(
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
 				utilActions.launchLazydocker();
 			break;
-		case "B":
-			// Build (uppercase B)
-			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				dockerActions.performBuild();
+		case "b":
+		case "B": {
+			// Build. If build already running, toggle live operation logs.
+			if (appStore.activeTab() !== "scripts" && appList.length > 0) {
+				const selected = getSelectedApp();
+				if (!selected) break;
+				const app = appStore.apps().find((a) => a.ident === selected.ident) ?? selected;
+				if (app.operationStatus?.operation === "build" && app.operationStatus.status === "active") {
+					void logActions.toggleActionLogForApp(app.ident, app.displayName, "Build Output");
+				} else {
+					void dockerActions.performBuild();
+				}
+			}
 			break;
+		}
+		case "t": {
+			// Test. If test already running, toggle live operation logs.
+			if (appStore.activeTab() !== "scripts" && appList.length > 0) {
+				const selected = getSelectedApp();
+				if (!selected) break;
+				const app = appStore.apps().find((a) => a.ident === selected.ident) ?? selected;
+				if (app.operationStatus?.operation === "test" && app.operationStatus.status === "active") {
+					void logActions.toggleActionLogForApp(app.ident, app.displayName, "Test Output");
+				} else {
+					void dockerActions.performTest();
+				}
+			}
+			break;
+		}
 		case "A":
 			// Open Agent view (uppercase A)
 			agentActions.openAgentView();

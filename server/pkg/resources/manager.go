@@ -19,6 +19,9 @@ type Manager interface {
 	ResolveComposeFile(appIdent, localDir string, profile string) (string, error)
 	ResolveInfrastructureComposeFile(infraIdent string) (string, error)
 	DiscoverProfiles(appIdent, localDir string) ([]string, error)
+	DiscoverActionTargets(appIdent, localDir string, action AppAction) ([]ActionTarget, error)
+	MigrateLegacyActionResources() ([]string, error)
+	WriteShellActionScript(appIdent string, action AppAction, profile string, command string) (string, error)
 	EnvFilePath() (string, bool)
 	AgentFilePath(spaceID string) (string, error)
 	AgentsDir() string
@@ -118,23 +121,27 @@ func (m *manager) ResolveDockerfileForAction(appIdent, localDir string, action A
 //  2. Error — no fallback
 func (m *manager) ResolveComposeFile(appIdent, localDir string, profile string) (string, error) {
 	if profile != "" {
-		profileConfigFileName := fmt.Sprintf("%s-%s-compose.yml", appIdent, profile)
-		// App compose files now live under apps/compose
-		profileConfigPath := filepath.Join(m.configDir, "apps", "compose", profileConfigFileName)
-		if _, err := os.Stat(profileConfigPath); err == nil {
-			return profileConfigPath, nil
-		} else if !errors.Is(err, fs.ErrNotExist) {
-			return "", err
+		for _, ext := range []string{"yml", "yaml"} {
+			profileConfigFileName := fmt.Sprintf("%s-%s-compose.%s", appIdent, profile, ext)
+			// App compose files now live under apps/compose
+			profileConfigPath := filepath.Join(m.configDir, "apps", "compose", profileConfigFileName)
+			if _, err := os.Stat(profileConfigPath); err == nil {
+				return profileConfigPath, nil
+			} else if !errors.Is(err, fs.ErrNotExist) {
+				return "", err
+			}
 		}
 	}
 
-	configFileName := fmt.Sprintf("%s-compose.yml", appIdent)
-	// App compose files now live under apps/compose
-	configPath := filepath.Join(m.configDir, "apps", "compose", configFileName)
-	if _, err := os.Stat(configPath); err == nil {
-		return configPath, nil
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return "", err
+	for _, ext := range []string{"yml", "yaml"} {
+		configFileName := fmt.Sprintf("%s-compose.%s", appIdent, ext)
+		// App compose files now live under apps/compose
+		configPath := filepath.Join(m.configDir, "apps", "compose", configFileName)
+		if _, err := os.Stat(configPath); err == nil {
+			return configPath, nil
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return "", err
+		}
 	}
 
 	return "", fmt.Errorf("no compose file found for %q: checked config dir: %w",
@@ -167,16 +174,17 @@ func (m *manager) DiscoverProfiles(appIdent, localDir string) ([]string, error) 
 	composeDir := filepath.Join(m.configDir, "apps", "compose")
 	if entries, err := os.ReadDir(composeDir); err == nil {
 		prefix := appIdent + "-"
-		suffix := "-compose.yml"
-		minLen := len(prefix) + len(suffix) + 1
 		for _, entry := range entries {
 			if entry.IsDir() {
 				continue
 			}
 			name := entry.Name()
-			if len(name) >= minLen && strings.HasPrefix(name, prefix) && strings.HasSuffix(name, suffix) {
-				profile := name[len(prefix) : len(name)-len(suffix)]
-				profiles = append(profiles, profile)
+			for _, suffix := range []string{"-compose.yml", "-compose.yaml"} {
+				minLen := len(prefix) + len(suffix) + 1
+				if len(name) >= minLen && strings.HasPrefix(name, prefix) && strings.HasSuffix(name, suffix) {
+					profile := name[len(prefix) : len(name)-len(suffix)]
+					profiles = append(profiles, profile)
+				}
 			}
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {

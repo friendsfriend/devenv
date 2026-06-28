@@ -1,5 +1,11 @@
 # tmux-window-spawning
 
+## Purpose
+
+Spawn interactive external tools in tmux windows while keeping the DevEnv TUI active.
+
+## Requirements
+
 ### Requirement: Tmux environment detection
 The system SHALL detect whether it is running inside a tmux session and whether the `tmux` binary is available before attempting to spawn windows. Detection MUST check both `process.env.TMUX` (set by tmux on session entry) and the availability of the `tmux` binary in PATH. If either condition is not met, the system SHALL fall back to the existing suspend/resume behavior.
 
@@ -83,3 +89,27 @@ When a tool is spawned in a new tmux window, the devenv TUI SHALL remain running
 #### Scenario: TUI is unaffected when user closes the spawned tool
 - **WHEN** the user exits lazygit, lazydocker, or nvim in the spawned tmux window
 - **THEN** the devenv TUI SHALL continue running normally in its original window
+
+### Requirement: Spawn app run scripts in named tmux windows
+When a shell app run target uses launch mode `tmux`, the system SHALL open the script in a new tmux window named for DevEnv, the app, and the run profile.
+
+#### Scenario: App run script launched in tmux
+- **WHEN** the user launches shell run profile `dev` for app `my-app` and tmux is available to the DevEnv server process
+- **THEN** a new tmux window SHALL be created with `apps/run/my-app-dev.sh` running in it
+- **THEN** the window name SHALL identify the app and profile, such as `devenv - my-app - dev`
+
+#### Scenario: App run script working directory
+- **WHEN** the tmux window is created for shell run profile `dev`
+- **THEN** the tmux window working directory SHALL be the selected app's local checkout directory
+
+### Requirement: Capture tmux window identity for app runs
+The system SHALL capture the tmux window id when spawning an app run script so lifecycle operations can target the correct window.
+
+#### Scenario: Window id captured after spawn
+- **WHEN** a shell app run script is spawned with `tmux new-window`
+- **THEN** the system SHALL capture the tmux `window_id` for the created window
+- **THEN** the system SHALL associate that `window_id` with the active app run target
+
+#### Scenario: Stop targets captured window
+- **WHEN** the user stops an active shell tmux app run
+- **THEN** the system SHALL kill the captured tmux window id rather than searching by name

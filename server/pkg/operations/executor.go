@@ -53,3 +53,7 @@ func (e *Executor) RunCommandLive(command string, args []string, envVars []strin
 func (e *Executor) RunCommandWithLogging(appIdent, command string, args []string, envVars []string, workingDir string) (error, string) {
 	return e.logger.RunCommandWithLogging(appIdent, command, args, envVars, workingDir)
 }
+
+func (e *Executor) RunCommandWithLoggingToFile(appIdent, command string, args []string, envVars []string, workingDir string, logPath string) (error, string) {
+	return e.logger.RunCommandWithLoggingToFile(appIdent, command, args, envVars, workingDir, logPath)
+}
