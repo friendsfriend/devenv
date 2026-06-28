@@ -19,6 +19,7 @@ export const EDITOR_OPTIONS: EditorOption[] = [
 
 export interface EditorPickerViewProps {
   selectedIndex: number;
+  options: EditorOption[];
 }
 
 function EditorRow(props: {
@@ -62,7 +63,7 @@ export function EditorPickerView(props: EditorPickerViewProps) {
       ])}
       widthPercent={0.4}
       heightPercent={0.3}
-      items={EDITOR_OPTIONS}
+      items={props.options}
       selectedIndex={props.selectedIndex}
       reservedHeight={4}
       scrollIndicatorLabel="editors"

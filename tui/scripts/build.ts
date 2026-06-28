@@ -15,7 +15,10 @@ process.chdir(dir)
 const solidPluginPath = path.resolve(dir, "./node_modules/@opentui/solid/scripts/solid-plugin.js")
 const solidPlugin = (await import(solidPluginPath)).default
 
-import pkg from "../packages/cli/package.json"
+import rootPkg from "../../package.json"
+import cliPkg from "../packages/cli/package.json"
+
+const appVersion = rootPkg.version
 
 const singleFlag = process.argv.includes("--single")
 const baselineFlag = process.argv.includes("--baseline")
@@ -100,7 +103,7 @@ await $`rm -rf dist`
 
 const binaries: Record<string, string> = {}
 if (!skipInstall) {
-  await $`bun install --os="*" --cpu="*" @opentui/core@${pkg.dependencies["@opentui/core"]}`
+  await $`bun install --os="*" --cpu="*" @opentui/core@${cliPkg.dependencies["@opentui/core"]}`
 }
 
 // Build Go server binaries for each platform first
@@ -180,12 +183,12 @@ for (const item of targets) {
       autoloadPackageJson: true,
       target: name.replace("devenv", "bun") as any,
       outfile: `dist/${name}/bin/devenv`,
-      execArgv: [`--user-agent=devenv/${pkg.version}`, "--use-system-ca", "--"],
+      execArgv: [`--user-agent=devenv/${appVersion}`, "--use-system-ca", "--"],
       windows: {},
     },
     entrypoints: ["./packages/cli/src/spawn.ts", parserWorker],
     define: {
-      DEVENV_VERSION: `'${pkg.version}'`,
+      DEVENV_VERSION: `'${appVersion}'`,
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       EMBEDDED_SERVER_BINARY_BASE64: `'${serverBinaryBase64}'`,
     },
@@ -195,7 +198,7 @@ for (const item of targets) {
     JSON.stringify(
       {
         name,
-        version: pkg.version,
+        version: appVersion,
         os: [item.os],
         cpu: [item.arch],
       },
@@ -203,7 +206,7 @@ for (const item of targets) {
       2,
     ),
   )
-  binaries[name] = pkg.version
+  binaries[name] = appVersion
 }
 
 export { binaries }

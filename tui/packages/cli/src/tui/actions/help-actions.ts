@@ -188,13 +188,6 @@ export function createHelpActions(
 					{ key: "Backspace", action: "Delete Char" },
 					{ key: "Esc", action: "Cancel Search" },
 				]);
-			if (logStore.logVisualModeActive())
-				return filterFooterKeybinds([
-					{ key: "j/k", action: "Extend Selection" },
-					{ key: "c", action: "Copy Selection" },
-					{ key: "v/Esc", action: "Exit Visual" },
-					{ key: "q", action: "Quit" },
-				]);
 			return getFooterKeybindsForContext("logModal");
 		}
 		if (appStore.viewMode() === "issueDetail") {

@@ -65,7 +65,7 @@ export const guides: Guide[] = [
   {
     key: "using-log-viewer",
     title: "Using the Log Viewer",
-    description: "Container logs, operation logs, search, visual mode, keyboard shortcuts",
+    description: "Container logs, operation logs, search, viewport scrolling, keyboard shortcuts",
     import: () => import("./using-log-viewer.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {

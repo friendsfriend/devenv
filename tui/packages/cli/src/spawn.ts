@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
 import fs from 'fs';
+import { APP_VERSION } from './version';
 
 // Embedded server binary (base64 encoded) - defined at compile time
 // @ts-ignore - EMBEDDED_SERVER_BINARY_BASE64 will be defined at compile time
@@ -93,7 +94,7 @@ async function getEmbeddedServerPath(): Promise<string | null> {
 program
   .name('devenv')
   .description('DevEnv - Development Environment CLI')
-  .version('1.0.0');
+  .version(APP_VERSION);
 
 program
   .command('spawn', { isDefault: true })

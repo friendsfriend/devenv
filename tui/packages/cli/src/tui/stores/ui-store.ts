@@ -1,6 +1,6 @@
 import { createMemo, createSignal } from 'solid-js';
 import type { ActionTarget, App, AppAction, WorktreeInfo } from '@devenv/types';
-import type { BranchInfo, AppDetailKind } from '@devenv/ui';
+import type { BranchInfo, AppDetailKind, EditorOption } from '@devenv/ui';
 import type { SshHost } from '@devenv/types';
 
 export function createUiStore() {
@@ -43,6 +43,8 @@ export function createUiStore() {
   const [pendingSshHost, setPendingSshHost] = createSignal<SshHost | null>(null);
   const [showEditorPicker, setShowEditorPicker] = createSignal(false);
   const [editorPickerSelectedIndex, setEditorPickerSelectedIndex] = createSignal(0);
+  const [editorPickerTargetPath, setEditorPickerTargetPath] = createSignal<string | null>(null);
+  const [editorPickerOptions, setEditorPickerOptions] = createSignal<EditorOption[]>([]);
   const [showThemePicker, setShowThemePicker] = createSignal(false);
   const [themePickerSelectedIndex, setThemePickerSelectedIndex] = createSignal(0);
   const [themePickerFilterActive, setThemePickerFilterActive] = createSignal(false);
@@ -175,6 +177,10 @@ export function createUiStore() {
     setShowEditorPicker,
     editorPickerSelectedIndex,
     setEditorPickerSelectedIndex,
+    editorPickerTargetPath,
+    setEditorPickerTargetPath,
+    editorPickerOptions,
+    setEditorPickerOptions,
     showThemePicker,
     setShowThemePicker,
     themePickerSelectedIndex,

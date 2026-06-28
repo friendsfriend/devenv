@@ -10,3 +10,4 @@
 * When working with OpenTUI components, layouts, keymaps, plugins, or bindings, consult `OPENTUI_GUIDE.md` first.
 * When creating or modifying reusable custom OpenTUI components, document them in `OPENTUI_GUIDE.md`.
 * This project uses bun. Don't use pnpm or npm
+* Never run `bun run build` unless explicitly requested. Use `bun run build:single` instead.
