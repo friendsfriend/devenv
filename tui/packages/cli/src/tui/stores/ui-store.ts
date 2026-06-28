@@ -37,6 +37,12 @@ export function createUiStore() {
   const [pendingSshHost, setPendingSshHost] = createSignal<SshHost | null>(null);
   const [showEditorPicker, setShowEditorPicker] = createSignal(false);
   const [editorPickerSelectedIndex, setEditorPickerSelectedIndex] = createSignal(0);
+  const [showThemePicker, setShowThemePicker] = createSignal(false);
+  const [themePickerSelectedIndex, setThemePickerSelectedIndex] = createSignal(0);
+  const [themePickerFilterActive, setThemePickerFilterActive] = createSignal(false);
+  const [themePickerFilterQuery, setThemePickerFilterQuery] = createSignal('');
+  const [activeThemeName, setActiveThemeName] = createSignal('catppuccin');
+  const [themePickerOriginalTheme, setThemePickerOriginalTheme] = createSignal('catppuccin');
   const [showCreateBranchModal, setShowCreateBranchModal] = createSignal(false);
   const [createBranchName, setCreateBranchName] = createSignal('');
   // When true, the branch selector was opened from the worktree manager to create a new worktree.
@@ -151,6 +157,18 @@ export function createUiStore() {
     setShowEditorPicker,
     editorPickerSelectedIndex,
     setEditorPickerSelectedIndex,
+    showThemePicker,
+    setShowThemePicker,
+    themePickerSelectedIndex,
+    setThemePickerSelectedIndex,
+    themePickerFilterActive,
+    setThemePickerFilterActive,
+    themePickerFilterQuery,
+    setThemePickerFilterQuery,
+    activeThemeName,
+    setActiveThemeName,
+    themePickerOriginalTheme,
+    setThemePickerOriginalTheme,
     showCreateBranchModal,
     setShowCreateBranchModal,
     createBranchName,

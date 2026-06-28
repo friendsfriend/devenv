@@ -79,6 +79,7 @@ import {
 	getHeaderInfo,
 } from "./views";
 import type { ViewStores, ViewActions } from "./views";
+import { applyTheme, loadThemeName } from "./theme-settings";
 
 export interface TUIAppProps {
 	serverUrl: string;
@@ -97,6 +98,9 @@ export function TUIApp(props: TUIAppProps) {
 	const uiStore = createUiStore();
 	const agentStore = createAgentStore();
 	const appDetailStore = createAppDetailStore();
+	const initialTheme = loadThemeName();
+	applyTheme(initialTheme);
+	uiStore.setActiveThemeName(initialTheme);
 
 	const showError = uiStore.showError;
 	const client = createClient(props.serverUrl, undefined, showError);

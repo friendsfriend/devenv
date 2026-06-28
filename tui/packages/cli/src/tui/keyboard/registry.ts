@@ -28,6 +28,7 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["?"], description: "Show help", context: "global", category: "General" },
 	{ keys: ["Ctrl+/"], description: "Toggle OpenTUI console", context: "global", category: "General" },
 	{ keys: ["Ctrl+R"], description: "Toggle running text for overflowing focused fields", footerDescription: "Run text", context: "global", category: "General" },
+	{ keys: ["T"], description: "Open theme picker", footerDescription: "Theme", context: "global", category: "General" },
 	{ keys: ["Esc"], description: "Close OpenTUI console when visible", context: "global", category: "General" },
 	{ keys: ["Ctrl+C"], description: "Copy selection; press twice to quit", context: "global", category: "General" },
 	{ keys: ["Ctrl+Shift+C", "Cmd+C"], description: "Copy selection", context: "global", category: "General" },
@@ -41,6 +42,10 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["j/k", "↑/↓"], description: "Navigate profiles", context: "profilePicker", category: "Navigation" },
 	{ keys: ["Enter"], description: "Start with selected profile", context: "profilePicker", category: "Actions" },
 	{ keys: ["Esc"], description: "Cancel profile picker", context: "profilePicker", category: "General" },
+	{ keys: ["j/k", "↑/↓"], description: "Navigate themes", context: "themePicker", category: "Navigation" },
+	{ keys: ["/"], description: "Filter themes", context: "themePicker", category: "Actions" },
+	{ keys: ["Enter"], description: "Apply selected theme / finish filter", context: "themePicker", category: "Actions" },
+	{ keys: ["Esc"], description: "Close theme picker", context: "themePicker", category: "General" },
 
 	// ========== table — Navigation ==========
 	{ keys: ["↑", "k"], description: "Move selection up", context: "table", category: "Navigation" },
