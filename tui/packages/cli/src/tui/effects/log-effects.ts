@@ -3,7 +3,7 @@ import type { DevEnvClient } from '@devenv/core';
 
 type LogEffectStore = {
   logRefreshParams: () => {
-    type: 'container' | 'operation' | 'job' | null;
+    type: 'container' | 'operation' | 'action' | 'job' | null;
     containerID?: string;
     appIdent?: string;
     jobId?: number;
@@ -63,12 +63,14 @@ export function setupLogEffects(logStore: LogEffectStore, client: DevEnvClient) 
     const intervalId = setInterval(async () => {
       try {
         if (params.type === 'operation' && params.appIdent) {
-          logStore.setLogs(await client.getOperationLogs(params.appIdent, 100));
+          logStore.setLogs(await client.getOperationLogs(params.appIdent, 1000));
+        } else if (params.type === 'action' && params.appIdent) {
+          logStore.setLogs(await client.getActionLog(params.appIdent));
         } else if (params.type === 'job' && params.jobId) {
           logStore.setLogs(await client.getJobLogs(params.appIdent || '', params.jobId, params.sourceType));
         }
       } catch {}
-    }, 10000);
+    }, 1000);
 
     onCleanup(() => clearInterval(intervalId));
   });

@@ -15,6 +15,7 @@ import {
 	SshHostPickerView,
 	PassphraseModal,
 	ProfilePickerView,
+	ActionTargetPickerView,
 	EditorPickerView,
 	WorktreeManagerModal,
 	ScriptArgsModal,
@@ -396,6 +397,15 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					}}
 					onCancel={() => uiStore.setShowProfilePicker(false)}
 					loading={uiStore.profilePickerLoading()}
+				/>
+			</Show>
+
+			<Show when={uiStore.showActionTargetPicker()}>
+				<ActionTargetPickerView
+					title={`Select ${uiStore.actionTargetPickerAction()} target`}
+					targets={uiStore.actionTargetPickerTargets()}
+					selectedIndex={uiStore.actionTargetPickerSelectedIndex()}
+					loading={uiStore.actionTargetPickerLoading()}
 				/>
 			</Show>
 

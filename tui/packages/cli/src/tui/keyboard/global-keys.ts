@@ -82,8 +82,8 @@ export async function handleGlobalKeys(
     return true;
   }
 
-  // GLOBAL: T opens theme picker.
-  if (!uiStore.showThemePicker() && (event.name === 'T' || (event.name === 't' && event.shift))) {
+  // GLOBAL: Shift+T opens theme picker. Use sequence/shift so lowercase t remains available for Test.
+  if (!uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
     const current = uiStore.activeThemeName();
     uiStore.setThemePickerOriginalTheme(current);
     uiStore.setThemePickerFilterActive(false);
@@ -236,6 +236,33 @@ export async function handleGlobalKeys(
     }
     if (event.name === 'n' || event.name === 'escape' || event.name === 'Escape') {
       uiStore.setShowConfirmDialog(false);
+      return true;
+    }
+    return true;
+  }
+
+  if (uiStore.showActionTargetPicker()) {
+    if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
+      uiStore.setShowActionTargetPicker(false);
+      return true;
+    }
+    if (isDownKey(event)) {
+      const max = Math.max(0, uiStore.actionTargetPickerTargets().length - 1);
+      uiStore.setActionTargetPickerSelectedIndex((prev) => Math.min(prev + 1, max));
+      return true;
+    }
+    if (isUpKey(event)) {
+      uiStore.setActionTargetPickerSelectedIndex((prev) => Math.max(prev - 1, 0));
+      return true;
+    }
+    if (event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter') {
+      const target = uiStore.actionTargetPickerTargets()[uiStore.actionTargetPickerSelectedIndex()];
+      if (target) {
+        uiStore.setShowActionTargetPicker(false);
+        const ident = uiStore.actionTargetPickerAppIdent();
+        const app = ident ? appStore.apps().find(a => a.ident === ident) : undefined;
+        if (app) void dockerActions.runSelectedTarget(app, uiStore.actionTargetPickerAction(), target);
+      }
       return true;
     }
     return true;

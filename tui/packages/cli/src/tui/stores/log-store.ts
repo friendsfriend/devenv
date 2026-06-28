@@ -22,9 +22,9 @@ export function createLogStore() {
   const [logAiFollowupText, setLogAiFollowupText] = createSignal('');
   const [logAiHistory, setLogAiHistory] = createSignal<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [logAiVisible, setLogAiVisible] = createSignal(false);
-  const [logType, setLogType] = createSignal<'container' | 'operation' | 'job' | null>(null);
+  const [logType, setLogType] = createSignal<'container' | 'operation' | 'action' | 'job' | null>(null);
   const [logRefreshParams, setLogRefreshParams] = createSignal<{
-    type: 'container' | 'operation' | 'job' | null;
+    type: 'container' | 'operation' | 'action' | 'job' | null;
     containerID?: string;
     appIdent?: string;
     jobId?: number;

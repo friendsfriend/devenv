@@ -47,6 +47,36 @@ export interface App {
 	scriptParameters?: ScriptParameter[];
 }
 
+export type AppAction = "build" | "test" | "run";
+export type ActionRuntime = "docker" | "shell";
+export type LaunchMode = "logged" | "tmux";
+
+export interface ActionTarget {
+	id: string;
+	action: AppAction;
+	runtime: ActionRuntime;
+	label: string;
+	profile?: string;
+	launchMode?: LaunchMode;
+	sourcePath: string;
+}
+
+export interface ActionTargetsResponse {
+	targets: ActionTarget[];
+}
+
+export interface ShellActionScriptRequest {
+	ident: string;
+	action: AppAction;
+	profile?: string;
+	command?: string;
+}
+
+export interface ShellActionScriptResponse {
+	success: boolean;
+	path: string;
+}
+
 export interface AppStatus {
 	ident: string;
 	dockerInfo?: DockerInfo;

@@ -1,15 +1,17 @@
 import type { DevEnvClient } from '@devenv/core';
-import type { App, InfraService } from '@devenv/types';
+import type { ActionTarget, App, AppAction, InfraService } from '@devenv/types';
 import type { AppStore } from '../stores/app-store';
+import type { UiStore } from '../stores/ui-store';
 
 export function createDockerActions(
   appStore: AppStore,
+  uiStore: UiStore,
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
 ) {
   const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
 
-  const performDockerOperation = async (action: 'start' | 'stop' | 'restart', app: App | InfraService, profile?: string) => {
+  const performDockerOperation = async (action: 'start' | 'stop' | 'restart', app: App | InfraService, profile?: string, targetId?: string) => {
     const appIdent = app.ident;
     appStore.setOperationInProgressForApp(appIdent);
     appStore.setError(null);
@@ -26,7 +28,7 @@ export function createDockerActions(
 
     try {
       if (action === 'start') {
-        await client.startApp(appIdent, profile || '');
+        await client.startApp(appIdent, profile || '', targetId);
       } else if (action === 'stop') {
         const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;
         if (!containerID) throw new Error('No container identifier available for stop operation');
@@ -72,27 +74,47 @@ export function createDockerActions(
     void performDockerOperation(action, app);
   };
 
-  const performBuild = async () => {
-    if (appStore.operationInProgressForApp()) {
-      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
-      return;
+  const setActionStatus = (appIdent: string, action: AppAction, message: string) => {
+    appStore.setApps(appStore.apps().map((a) =>
+      a.ident === appIdent ? { ...a, operationStatus: { operation: action, status: 'active', message } } : a,
+    ));
+  };
+
+  const createShellTarget = async (app: App, action: AppAction) => {
+    const profile = action === 'run' ? 'dev' : undefined;
+    try {
+      const result = await client.createShellActionScript({ ident: app.ident, action, profile });
+      showError('Shell Target Created', `Created ${action} shell target for ${app.displayName}:\n${result.path}\n\nEdit this file in your config repository, then run the action again.`);
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+      showError('Create Shell Target Failed', `Failed to create shell ${action} target for ${app.displayName}.\n\nError: ${errorMsg}`);
     }
-    const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
-    if (!app) return;
+  };
+
+  const showNoTargets = (action: AppAction, app: App) => {
+    const path = action === 'run'
+      ? `apps/run/${app.ident}-dev.sh`
+      : `apps/build/${app.ident}-${action}.sh`;
+    uiStore.setConfirmDialogTitle('No Target Configured');
+    uiStore.setConfirmDialogMessage(`No ${action} target is configured for ${app.displayName}.\n\nCreate shell script ${path}?`);
+    uiStore.setConfirmDialogAction(() => () => { void createShellTarget(app, action); });
+    uiStore.setShowConfirmDialog(true);
+  };
+
+  const runSelectedTarget = async (app: App, action: AppAction, target: ActionTarget) => {
     const appIdent = app.ident;
     appStore.setOperationInProgressForApp(appIdent);
     appStore.setError(null);
-    appStore.setApps(appStore.apps().map((a) =>
-      a.ident === appIdent ? { ...a, operationStatus: { operation: 'build', status: 'active', message: 'Building...' } } : a,
-    ));
+    setActionStatus(appIdent, action, `${action.charAt(0).toUpperCase() + action.slice(1)}ing ${target.label}...`);
     try {
-      await client.buildApp(appIdent);
+      if (action === 'build') await client.buildApp(appIdent, target.id);
+      else if (action === 'test') await client.testApp(appIdent, target.id);
+      else await client.runApp(appIdent, target.profile || '', target.id);
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
-      const appName = appStore.apps().find((a) => a.ident === appIdent)?.displayName || 'Unknown App';
-      showError('Build Failed', `Failed to build ${appName}.\n\nError: ${errorMsg}`);
+      showError(`${action.charAt(0).toUpperCase() + action.slice(1)} Failed`, `Failed to ${action} ${app.displayName}.\n\nError: ${errorMsg}`);
       appStore.setApps(appStore.apps().map((a) =>
-        a.ident === appIdent ? { ...a, operationStatus: { operation: 'build', status: 'failed', message: 'Build failed' } } : a,
+        a.ident === appIdent ? { ...a, operationStatus: { operation: action, status: 'failed', message: `${action} failed` } } : a,
       ));
       setTimeout(() => {
         appStore.setApps(appStore.apps().map((a) => (a.ident === appIdent ? { ...a, operationStatus: undefined } : a)));
@@ -102,7 +124,57 @@ export function createDockerActions(
     }
   };
 
-  return { requestDockerOperation, performDockerOperation, performBuild };
+  const openActionTargetPicker = (app: App, action: AppAction, targets: ActionTarget[]) => {
+    uiStore.setActionTargetPickerTargets(targets);
+    uiStore.setActionTargetPickerSelectedIndex(0);
+    uiStore.setActionTargetPickerAppIdent(app.ident);
+    uiStore.setActionTargetPickerAction(action);
+    uiStore.setShowActionTargetPicker(true);
+  };
+
+  const performAppAction = async (action: AppAction) => {
+    const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
+    if (!app) return;
+
+    const currentApp = appStore.apps().find((a) => a.ident === app.ident) ?? app;
+    if (currentApp.operationStatus?.status === 'active') {
+      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      return;
+    }
+    if (appStore.operationInProgressForApp()) {
+      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      return;
+    }
+
+    uiStore.setActionTargetPickerLoading(true);
+    try {
+      const targets = await client.getActionTargets(app.ident, action);
+      if (targets.length === 0) {
+        showNoTargets(action, app);
+        return;
+      }
+      if (targets.length === 1) {
+        await runSelectedTarget(app, action, targets[0]);
+        return;
+      }
+      openActionTargetPicker(app, action, targets);
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : 'Unknown error';
+      showError('Target Discovery Failed', `Failed to load ${action} targets for ${app.displayName}.\n\nError: ${errorMsg}`);
+    } finally {
+      uiStore.setActionTargetPickerLoading(false);
+    }
+  };
+
+  const performBuild = async () => {
+    await performAppAction('build');
+  };
+
+  const performTest = async () => {
+    await performAppAction('test');
+  };
+
+  return { requestDockerOperation, performDockerOperation, performBuild, performTest, performAppAction, runSelectedTarget };
 }
 
 export type DockerActions = ReturnType<typeof createDockerActions>;

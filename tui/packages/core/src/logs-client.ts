@@ -18,6 +18,18 @@ export async function getOperationLogs(
   return await response.text();
 }
 
+export async function getActionLog(deps: ClientDeps, appIdent: string): Promise<string> {
+  const response = await deps.fetchFn(
+    `${deps.baseUrl}/api/logs/action/${encodeURIComponent(appIdent)}`
+  );
+
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+
+  return await response.text();
+}
+
 /**
  * Get recent status log entries
  */

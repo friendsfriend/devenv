@@ -128,6 +128,54 @@ export function createLogActions(
     }
   };
 
+  const openActionLogForApp = async (appIdent: string, appName: string, titlePrefix = 'Action Log') => {
+    logStore.setLogs('');
+    logStore.setLogTitle(`${titlePrefix}: ${appName} (live)`);
+    logStore.setLogType('action');
+    logStore.setShowLogModal(true);
+    logStore.setLogRefreshParams({ type: null });
+    try {
+      logStore.setLogs(await client.getActionLog(appIdent));
+      scrollToLogBottom();
+      logStore.setLogRefreshParams({ type: 'action', appIdent });
+    } catch (e) {
+      logStore.setLogs(`Error fetching action log: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
+  const toggleActionLogForApp = async (appIdent: string, appName: string, titlePrefix = 'Action Log') => {
+    const params = logStore.logRefreshParams();
+    if (logStore.showLogModal() && params.type === 'action' && params.appIdent === appIdent) {
+      closeLogModal();
+      return;
+    }
+    await openActionLogForApp(appIdent, appName, titlePrefix);
+  };
+
+  const openOperationLogsForApp = async (appIdent: string, appName: string, titlePrefix = 'Operation Logs') => {
+    logStore.setLogs('');
+    logStore.setLogTitle(`${titlePrefix}: ${appName} (live)`);
+    logStore.setLogType('operation');
+    logStore.setShowLogModal(true);
+    logStore.setLogRefreshParams({ type: null });
+    try {
+      logStore.setLogs(await client.getOperationLogs(appIdent, 500));
+      scrollToLogBottom();
+      logStore.setLogRefreshParams({ type: 'operation', appIdent });
+    } catch (e) {
+      logStore.setLogs(`Error fetching operation logs: ${e instanceof Error ? e.message : 'Unknown error'}`);
+    }
+  };
+
+  const toggleOperationLogsForApp = async (appIdent: string, appName: string, titlePrefix = 'Operation Logs') => {
+    const params = logStore.logRefreshParams();
+    if (logStore.showLogModal() && params.type === 'operation' && params.appIdent === appIdent) {
+      closeLogModal();
+      return;
+    }
+    await openOperationLogsForApp(appIdent, appName, titlePrefix);
+  };
+
   const loadJobLogs = async (jobId: number, jobName: string) => {
     const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
     if (!app) return;
@@ -216,6 +264,10 @@ export function createLogActions(
     loadContainerLogs,
     loadOperationLogs,
     loadJobLogs,
+    openActionLogForApp,
+    toggleActionLogForApp,
+    openOperationLogsForApp,
+    toggleOperationLogsForApp,
     runAiAnalysis,
     dismissAiOverlay,
     clearAiState,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -236,6 +237,33 @@ func (s *Server) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleStatusLog fetches recent status log entries (GET) or appends a new entry (POST).
+func (s *Server) handleActionLog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := strings.TrimPrefix(r.URL.Path, "/api/logs/action/")
+	if appIdent == "" {
+		respondBadRequest(w, "App ident required")
+		return
+	}
+
+	path, ok := s.services.BuildService().ActiveOperationLogPath(appIdent)
+	if !ok {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write([]byte("No active action log found for " + appIdent))
+		return
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to read action log: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write(content)
+}
+
 func (s *Server) handleStatusLog(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:

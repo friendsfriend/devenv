@@ -32,7 +32,7 @@ func (g Generator) Generate() error {
 	}
 	for path, content := range g.files() {
 		mode := fs.FileMode(0644)
-		if filepath.Dir(path) == scriptsDir {
+		if filepath.Dir(path) == scriptsDir || filepath.Ext(path) == ".sh" && filepath.Dir(filepath.Dir(path)) == filepath.Join(g.ConfigDir, "apps") {
 			mode = 0755
 		}
 		if err := writeFile(path, content, mode); err != nil {
@@ -89,6 +89,7 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "apps", "build", "go-rest-postgres-test.Dockerfile"):   goTestDockerfile,
 		filepath.Join(c, "apps", "build", "bhvr-site-build.Dockerfile"):         bunBuildDockerfile,
 		filepath.Join(c, "apps", "build", "bhvr-site-test.Dockerfile"):          bunTestDockerfile,
+		filepath.Join(c, "apps", "run", "bhvr-site-dev.sh"):                     bunRunShellScript,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-build.Dockerfile"):   bunLibBuildDockerfile,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-test.Dockerfile"):    bunLibTestDockerfile,
 		filepath.Join(s, "hello.sh"):                                            helloShellScript,
@@ -96,6 +97,13 @@ func (g Generator) files() map[string]string {
 		filepath.Join(s, "hello.ts"):                                            helloTypescriptScript,
 	}
 }
+
+const bunRunShellScript = `#!/usr/bin/env sh
+# devenv:name=Dev Server
+# devenv:mode=tmux
+set -eu
+bun run dev
+`
 
 const helloShellScript = `#!/usr/bin/env bash
 set -euo pipefail

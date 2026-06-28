@@ -82,6 +82,8 @@ export { PassphraseModal } from "./components/PassphraseModal";
 export type { PassphraseModalProps } from "./components/PassphraseModal";
 export { ProfilePickerView } from "./components/ProfilePickerView";
 export type { ProfilePickerProps } from "./components/ProfilePickerView";
+export { ActionTargetPickerView } from "./components/ActionTargetPickerView";
+export type { ActionTargetPickerProps } from "./components/ActionTargetPickerView";
 export {
 	EditorPickerView,
 	EDITOR_OPTIONS,

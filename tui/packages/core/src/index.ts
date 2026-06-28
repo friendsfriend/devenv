@@ -43,6 +43,8 @@ import {
 import { createCustomFetch, createCustomFetchWithSSE } from "./custom-fetch";
 import {
 	buildApp,
+	createShellActionScript,
+	getActionTargets,
 	getContainerLogs,
 	restartContainer,
 	runApp,
@@ -87,6 +89,7 @@ import {
 	analyzeLogsWithAI,
 	analyzeLogsWithAIStream,
 	analyzeMRWithAIStream,
+	getActionLog,
 	getOperationLogs,
 	getStatusLog,
 	addStatusLog,
@@ -253,6 +256,9 @@ export class DevEnvClient {
 	}
 	getOperationLogs(appIdent: string, limit: number = 100): Promise<string> {
 		return getOperationLogs(this.deps, appIdent, limit);
+	}
+	getActionLog(appIdent: string): Promise<string> {
+		return getActionLog(this.deps, appIdent);
 	}
 	getStatusLog(limit: number = 50): Promise<StatusLogEntry[]> {
 		return getStatusLog(this.deps, limit);
@@ -598,19 +604,30 @@ export class DevEnvClient {
 	deleteProvider(name: string): Promise<void> {
 		return deleteProvider(this.deps, name);
 	}
-	startApp(appIdent: string, profile: string = ""): Promise<void> {
-		return startApp(this.deps, appIdent, profile);
+	startApp(appIdent: string, profile: string = "", targetId?: string): Promise<void> {
+		return startApp(this.deps, appIdent, profile, targetId);
+	}
+	createShellActionScript(
+		request: import("@devenv/types").ShellActionScriptRequest,
+	): Promise<import("@devenv/types").ShellActionScriptResponse> {
+		return createShellActionScript(this.deps, request);
 	}
 	getProfiles(
 		appIdent: string,
 	): Promise<{ profiles: string[]; hasDockerfile: boolean }> {
 		return getProfiles(this.deps, appIdent);
 	}
-	testApp(appIdent: string): Promise<void> {
-		return testApp(this.deps, appIdent);
+	getActionTargets(
+		appIdent: string,
+		action: import("@devenv/types").AppAction,
+	): Promise<import("@devenv/types").ActionTarget[]> {
+		return getActionTargets(this.deps, appIdent, action);
 	}
-	runApp(appIdent: string, profile: string = ""): Promise<void> {
-		return runApp(this.deps, appIdent, profile);
+	testApp(appIdent: string, targetId?: string): Promise<void> {
+		return testApp(this.deps, appIdent, targetId);
+	}
+	runApp(appIdent: string, profile: string = "", targetId?: string): Promise<void> {
+		return runApp(this.deps, appIdent, profile, targetId);
 	}
 	startContainer(containerID: string): Promise<void> {
 		return startContainer(this.deps, containerID);
@@ -658,8 +675,8 @@ export class DevEnvClient {
 	gitCreateBranch(appIdent: string, branchName: string): Promise<void> {
 		return gitCreateBranch(this.deps, appIdent, branchName);
 	}
-	buildApp(appIdent: string): Promise<void> {
-		return buildApp(this.deps, appIdent);
+	buildApp(appIdent: string, targetId?: string): Promise<void> {
+		return buildApp(this.deps, appIdent, targetId);
 	}
 	retryJob(appIdent: string, jobId: number): Promise<void> {
 		return retryJob(this.deps, appIdent, jobId);
