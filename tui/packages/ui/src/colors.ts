@@ -1,3 +1,5 @@
+import { themeColor } from './theme';
+
 /**
  * Catppuccin Mocha Color Palette
  * https://github.com/catppuccin/catppuccin
@@ -44,58 +46,49 @@ export const colors = {
 } as const;
 
 /**
- * Common UI element colors mapped to Catppuccin palette
+ * Common UI element colors mapped to active OpenCode-compatible theme.
  */
 export const uiColors = {
-  // Primary brand color
-  primary: colors.blue,
-  primaryDim: colors.sapphire,
+  get primary() { return themeColor('primary', colors.blue); },
+  get primaryDim() { return themeColor('secondary', colors.sapphire); },
 
-  // Status indicators
-  success: colors.green,
-  warning: colors.yellow,
-  error: colors.red,
-  info: colors.sky,
+  get success() { return themeColor('success', colors.green); },
+  get warning() { return themeColor('warning', colors.yellow); },
+  get error() { return themeColor('error', colors.red); },
+  get info() { return themeColor('info', colors.sky); },
 
-  // Interactive elements
-  highlight: colors.mauve,
-  accent: colors.lavender,
+  get highlight() { return themeColor('accent', colors.mauve); },
+  get accent() { return themeColor('accent', colors.lavender); },
 
-  // Text
-  textPrimary: colors.text,
-  textSecondary: colors.subtext1,
-  textTertiary: colors.subtext0,
-  textMuted: colors.overlay2,
+  get textPrimary() { return themeColor('text', colors.text); },
+  get textSecondary() { return themeColor('textMuted', colors.subtext1); },
+  get textTertiary() { return themeColor('textMuted', colors.subtext0); },
+  get textMuted() { return themeColor('textMuted', colors.overlay2); },
 
-  // Backgrounds
-  bgBase: colors.base,
-  bgMantle: colors.mantle,
-  bgCrust: colors.crust,
-  bgSurface0: colors.surface0,
-  bgSurface1: colors.surface1,
-  bgSurface2: colors.surface2,
+  get bgBase() { return themeColor('background', colors.base); },
+  get bgMantle() { return themeColor('backgroundPanel', colors.mantle); },
+  get bgCrust() { return themeColor('background', colors.crust); },
+  get bgSurface0() { return themeColor('backgroundElement', colors.surface0); },
+  get bgSurface1() { return themeColor('backgroundMenu', colors.surface1); },
+  get bgSurface2() { return themeColor('borderSubtle', colors.surface2); },
 
-  // Borders
-  border: colors.surface2,
-  borderFocus: colors.blue,
-  borderHighlight: colors.lavender,
+  get border() { return themeColor('border', colors.surface2); },
+  get borderFocus() { return themeColor('borderActive', colors.blue); },
+  get borderHighlight() { return themeColor('borderActive', colors.lavender); },
 
-  // Selection
-  selectionBg: colors.surface1,
-  selectionBgActive: colors.surface2,
-  selectionText: colors.text,
+  get selectionBg() { return themeColor('primary', colors.surface1); },
+  get selectionBgActive() { return themeColor('accent', colors.surface2); },
+  get selectionText() { return themeColor('selectedListItemText', colors.text); },
 
-  // Scrollbar
-  scrollbarTrack: colors.surface0,   // track background  (#313244)
-  scrollbarThumb: colors.overlay0,   // thumb             (#6c7086)
+  get scrollbarTrack() { return themeColor('backgroundElement', colors.surface0); },
+  get scrollbarThumb() { return themeColor('border', colors.overlay0); },
 
-  // Diff colors (OpenCode-aligned)
-  diffAdded: colors.green,           // Text color for added lines
-  diffRemoved: colors.red,           // Text color for removed lines
-  diffContext: colors.overlay2,      // Text color for context lines
-  diffAddedBg: '#24312b',            // Background for added lines (dark green tint)
-  diffRemovedBg: '#3c2a32',          // Background for removed lines (dark red tint)
-  diffContextBg: colors.mantle,      // Background for context lines
+  get diffAdded() { return themeColor('diffAdded', colors.green); },
+  get diffRemoved() { return themeColor('diffRemoved', colors.red); },
+  get diffContext() { return themeColor('diffContext', colors.overlay2); },
+  get diffAddedBg() { return themeColor('diffAddedBg', '#24312b'); },
+  get diffRemovedBg() { return themeColor('diffRemovedBg', '#3c2a32'); },
+  get diffContextBg() { return themeColor('diffContextBg', colors.mantle); },
 } as const;
 
 export type CatppuccinColor = keyof typeof colors;

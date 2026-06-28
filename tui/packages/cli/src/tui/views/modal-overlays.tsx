@@ -28,6 +28,8 @@ import {
 	FilterModal,
 	SortModal,
 	HelpView,
+	ThemePickerView,
+	themeNames,
 	uiColors,
 } from "@devenv/ui";
 import type { ModalOverlaysProps } from "./types";
@@ -50,6 +52,17 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 		<>
 			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddAppModal() && !uiStore.showMarkdownModal()}>
 				<FirstStepsView appStore={appStore} providerStore={providerStore} />
+			</Show>
+			<Show when={uiStore.showThemePicker()}>
+				<ThemePickerView
+					selectedIndex={uiStore.themePickerSelectedIndex()}
+					activeTheme={uiStore.activeThemeName()}
+					filterQuery={uiStore.themePickerFilterQuery()}
+					filterActive={uiStore.themePickerFilterActive()}
+					themes={uiStore.themePickerFilterQuery()
+						? themeNames.filter((name) => name.toLowerCase().includes(uiStore.themePickerFilterQuery().toLowerCase()))
+						: themeNames}
+				/>
 			</Show>
 			<Show when={uiStore.showMarkdownModal()}>
 				<MarkdownModal

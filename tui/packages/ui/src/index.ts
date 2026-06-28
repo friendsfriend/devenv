@@ -49,6 +49,8 @@ export type {
 	FindRepoMode,
 } from "./components/AddAppModal";
 export { HelpView } from "./components/HelpView";
+export { ThemePickerView } from "./components/ThemePickerView";
+export type { ThemePickerViewProps } from "./components/ThemePickerView";
 export { ConfirmDialog } from "./components/ConfirmDialog";
 export { BranchSelectorView } from "./components/BranchSelectorView";
 export { BranchCreateModal } from "./components/BranchCreateModal";
@@ -114,6 +116,7 @@ export type { HelpTextProps, HelpEntry } from "./components/HelpText";
 
 // Export color scheme
 export { colors, uiColors, SCROLLBAR_OPTIONS } from "./colors";
+export { themeNames, setActiveThemeName, getActiveThemeName, themeColorForTheme } from "./theme";
 export type { CatppuccinColor, UIColor } from "./colors";
 
 // Export markdown syntax style helper
