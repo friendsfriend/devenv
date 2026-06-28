@@ -11,6 +11,7 @@ export interface HeaderProps {
   detail?: string;
   details?: HeaderDetail[];
   right?: string;
+  version?: string;
   severity?: 'normal' | 'success' | 'warning' | 'error';
   runningTextEnabled?: boolean;
   runningTextOffset?: number;
@@ -39,6 +40,7 @@ export function Header(props: HeaderProps) {
   const accent = () => colorForSeverity(props.severity);
   const primaryDetail = () => formatDetail(props.details?.[0], props.context);
   const secondaryDetail = () => formatDetail(props.details?.[1], props.detail);
+  const helpText = () => props.version ? `v${props.version} · ? help` : '? help';
   const rightWidth = () => Math.min(RIGHT_WIDTH, Math.max(0, dimensions().width - LOGO_WIDTH - TITLE_WIDTH - 8));
   const middleWidth = () => Math.max(0, dimensions().width - LOGO_WIDTH - TITLE_WIDTH - rightWidth() - 4);
 
@@ -74,7 +76,7 @@ export function Header(props: HeaderProps) {
         </box>
         <box style={{ flexGrow: 1 }} />
         <box style={{ width: rightWidth() }}>
-          <RunningText text="? help" width={rightWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+          <RunningText text={helpText()} width={rightWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
       </box>
     </box>

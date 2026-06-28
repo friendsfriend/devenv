@@ -9,6 +9,7 @@ import { createCliRenderer } from "@opentui/core";
 import { setExitRenderer } from "./exit";
 import { onMount, createEffect, on, onCleanup } from "solid-js";
 import "opentui-spinner/solid";
+import packageJson from "../../package.json";
 import { createClient } from "@devenv/core";
 import type { App } from "@devenv/types";
 import {
@@ -317,6 +318,7 @@ export function TUIApp(props: TUIAppProps) {
 				header={
 					<Header
 						{...getHeaderInfo(headerDeps)}
+						version={packageJson.version}
 						runningTextEnabled={uiStore.runningTextEnabled()}
 						runningTextOffset={uiStore.runningTextOffset()}
 					/>

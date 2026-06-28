@@ -17,7 +17,7 @@
     },
     "packages/cli": {
       "name": "@devenv/cli",
-      "version": "1.0.0",
+      "version": "0.6.0",
       "bin": {
         "devenv": "./src/spawn.ts",
       },
@@ -36,18 +36,18 @@
     },
     "packages/core": {
       "name": "@devenv/core",
-      "version": "1.0.0",
+      "version": "0.6.0",
       "dependencies": {
         "@devenv/types": "workspace:*",
       },
     },
     "packages/types": {
       "name": "@devenv/types",
-      "version": "1.0.0",
+      "version": "0.6.0",
     },
     "packages/ui": {
       "name": "@devenv/ui",
-      "version": "1.0.0",
+      "version": "0.6.0",
       "dependencies": {
         "@devenv/core": "workspace:*",
         "@devenv/types": "workspace:*",
