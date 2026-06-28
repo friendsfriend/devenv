@@ -116,7 +116,8 @@ export type { HelpTextProps, HelpEntry } from "./components/HelpText";
 
 // Export color scheme
 export { colors, uiColors, SCROLLBAR_OPTIONS } from "./colors";
-export { themeNames, setActiveThemeName, getActiveThemeName, themeColorForTheme } from "./theme";
+export { themeNames, setActiveThemeName, getActiveThemeName, themeColorForTheme, setCustomThemes, setSystemTheme, isThemeJson } from "./theme";
+export type { ThemeJson } from "./theme";
 export type { CatppuccinColor, UIColor } from "./colors";
 
 // Export markdown syntax style helper

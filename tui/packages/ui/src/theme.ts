@@ -74,7 +74,34 @@ export const DEFAULT_THEME_JSON: Record<string, ThemeJson> = {
   zenburn: zenburn as ThemeJson,
 };
 
+const customThemeJson: Record<string, ThemeJson> = {};
+let systemThemeJson: ThemeJson | undefined;
 export const themeNames = Object.keys(DEFAULT_THEME_JSON).sort();
+
+function allThemeJson(): Record<string, ThemeJson> {
+  return systemThemeJson ? { ...DEFAULT_THEME_JSON, ...customThemeJson, system: systemThemeJson } : { ...DEFAULT_THEME_JSON, ...customThemeJson };
+}
+
+function syncThemeNames() {
+  themeNames.splice(0, themeNames.length, ...Object.keys(allThemeJson()).sort());
+}
+
+export function isThemeJson(value: unknown): value is ThemeJson {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const theme = Reflect.get(value, "theme");
+  return !!theme && typeof theme === "object" && !Array.isArray(theme);
+}
+
+export function setCustomThemes(themes: Record<string, ThemeJson>) {
+  for (const key of Object.keys(customThemeJson)) delete customThemeJson[key];
+  Object.assign(customThemeJson, themes);
+  syncThemeNames();
+}
+
+export function setSystemTheme(theme: ThemeJson | undefined) {
+  systemThemeJson = theme;
+  syncThemeNames();
+}
 
 const [activeThemeName, setActiveThemeNameSignal] = createSignal("catppuccin");
 
@@ -112,7 +139,7 @@ function resolveValue(theme: ThemeJson, value: unknown, fallback: string, mode: 
 }
 
 export function setActiveThemeName(name: string): boolean {
-  if (!DEFAULT_THEME_JSON[name]) return false;
+  if (!allThemeJson()[name]) return false;
   setActiveThemeNameSignal(name);
   return true;
 }
@@ -122,7 +149,7 @@ export function getActiveThemeName() {
 }
 
 function activeTheme() {
-  return DEFAULT_THEME_JSON[activeThemeName()] ?? DEFAULT_THEME_JSON.catppuccin;
+  return allThemeJson()[activeThemeName()] ?? DEFAULT_THEME_JSON.catppuccin;
 }
 
 export function themeColor(key: string, fallback: string): string {
@@ -130,7 +157,7 @@ export function themeColor(key: string, fallback: string): string {
 }
 
 export function themeColorForTheme(name: string, key: string, fallback: string): string {
-  const theme = DEFAULT_THEME_JSON[name];
+  const theme = allThemeJson()[name];
   if (!theme) return fallback;
   return resolveColor(theme, key, fallback);
 }

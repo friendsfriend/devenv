@@ -79,7 +79,7 @@ import {
 	getHeaderInfo,
 } from "./views";
 import type { ViewStores, ViewActions } from "./views";
-import { applyTheme, loadThemeName } from "./theme-settings";
+import { applyTheme, loadCustomThemes, loadSystemTheme, loadThemeName, queryTerminalThemeColors } from "./theme-settings";
 
 export interface TUIAppProps {
 	serverUrl: string;
@@ -98,6 +98,7 @@ export function TUIApp(props: TUIAppProps) {
 	const uiStore = createUiStore();
 	const agentStore = createAgentStore();
 	const appDetailStore = createAppDetailStore();
+	loadCustomThemes();
 	const initialTheme = loadThemeName();
 	applyTheme(initialTheme);
 	uiStore.setActiveThemeName(initialTheme);
@@ -384,6 +385,8 @@ export async function startTUI(serverUrl: string) {
 	try {
 		// Force enable color support for terminal
 		process.env.FORCE_COLOR = "3"; // Force truecolor
+		const terminalThemeColors = await queryTerminalThemeColors();
+		loadSystemTheme(terminalThemeColors);
 
 		const renderer = await createCliRenderer({
 			exitOnCtrlC: false,

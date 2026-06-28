@@ -45,6 +45,12 @@ export const guides: Guide[] = [
     import: () => import("./using-worktrees.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
+    key: "custom-themes",
+    title: "Custom Themes",
+    description: "Create OpenCode-compatible themes in ~/.config/devenv/themes",
+    import: () => import("./custom-themes.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
     key: "using-ai-features",
     title: "Using AI Features",
     description: "AI agent view, sessions, pi agent integration",
