@@ -101,14 +101,14 @@ export async function handleDiffModalKeys(
     }
 
     // Regular text input (printable characters)
-    if (event.name && event.name.length === 1 && !event.ctrl && !event.meta) {
-      mrStore.setReplyText(mrStore.replyText() + event.name);
+    if (event.sequence && event.sequence.length === 1 && event.sequence >= ' ' && !event.ctrl && !event.meta) {
+      mrStore.setReplyText(mrStore.replyText() + event.sequence);
       return true;
     }
 
-    // Space key
-    if (event.name === 'space' || event.name === ' ') {
-      mrStore.setReplyText(mrStore.replyText() + ' ');
+    // Fallback for terminals that only populate event.name
+    if (event.name && event.name.length === 1 && !event.ctrl && !event.meta) {
+      mrStore.setReplyText(mrStore.replyText() + event.name);
       return true;
     }
 

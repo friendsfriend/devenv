@@ -54,7 +54,7 @@ export async function handleGlobalKeys(
   actions: KeyboardActions,
   ctx: KeyboardContext,
 ): Promise<boolean> {
-  const { uiStore, appStore, logStore, agentStore } = stores;
+  const { uiStore, appStore, logStore, agentStore, mrStore } = stores;
   const { appActions, dockerActions, utilActions, logActions, agentActions } = actions;
   const { renderer, launchPi } = ctx;
 
@@ -82,8 +82,10 @@ export async function handleGlobalKeys(
     return true;
   }
 
-  // GLOBAL: Shift+T opens theme picker. Use sequence/shift so lowercase t remains available for Test.
-  if (!uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
+  const diffTextInputActive = mrStore.showDiffModal() && (mrStore.showCommentModal() || !!mrStore.replyMode());
+
+  // GLOBAL: Shift+T opens theme picker. Do not intercept text input in diff comments/replies.
+  if (!diffTextInputActive && !uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
     const current = uiStore.activeThemeName();
     uiStore.setThemePickerOriginalTheme(current);
     uiStore.setThemePickerFilterActive(false);
@@ -104,14 +106,11 @@ export async function handleGlobalKeys(
     // 'c' to copy error message to clipboard
     if (event.name === 'c') {
       const { copyToClipboard } = await import('@devenv/core');
-      const success = copyToClipboard(uiStore.errorDialogMessage());
+      const text = `${uiStore.errorDialogTitle()}\n\n${uiStore.errorDialogMessage()}`;
+      const success = copyToClipboard(text);
       if (success) {
-        // Show brief success message by updating the error dialog message
-        const originalMessage = uiStore.errorDialogMessage();
-        uiStore.setErrorDialogMessage(`${originalMessage}\n\n✓ Copied to clipboard!`);
-        setTimeout(() => {
-          uiStore.setErrorDialogMessage(originalMessage);
-        }, 1000);
+        uiStore.setCopyStatus('✓ Copied');
+        setTimeout(() => uiStore.setCopyStatus(null), 2000);
       }
       return true;
     }
