@@ -241,6 +241,7 @@ func (s *Server) handleShellActionScript(w http.ResponseWriter, r *http.Request)
 		Action  string `json:"action"`
 		Profile string `json:"profile"`
 		Command string `json:"command"`
+		Runtime string `json:"runtime"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -254,7 +255,20 @@ func (s *Server) handleShellActionScript(w http.ResponseWriter, r *http.Request)
 		respondNotFound(w, "App not found")
 		return
 	}
-	path, err := s.services.ResourcesManager().WriteShellActionScript(req.Ident, resources.AppAction(req.Action), req.Profile, req.Command)
+	if req.Runtime == "" {
+		req.Runtime = string(resources.ActionRuntimeShell)
+	}
+	var path string
+	var err error
+	switch resources.ActionRuntime(req.Runtime) {
+	case resources.ActionRuntimeShell:
+		path, err = s.services.ResourcesManager().WriteShellActionScript(req.Ident, resources.AppAction(req.Action), req.Profile, req.Command)
+	case resources.ActionRuntimePowerShell:
+		path, err = s.services.ResourcesManager().WritePowerShellActionScript(req.Ident, resources.AppAction(req.Action), req.Profile, req.Command)
+	default:
+		respondErrorMessage(w, "unsupported action runtime "+req.Runtime, http.StatusBadRequest)
+		return
+	}
 	if err != nil {
 		respondErrorMessage(w, err.Error(), http.StatusBadRequest)
 		return

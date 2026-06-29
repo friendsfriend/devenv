@@ -33,6 +33,29 @@ func TestWriteShellActionScript(t *testing.T) {
 		}
 	})
 
+	t.Run("powershell build script template", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		path, err := NewManager(configDir).WritePowerShellActionScript("my-app", AppActionBuild, "", "bun run build")
+		if err != nil {
+			t.Fatalf("WritePowerShellActionScript error = %v", err)
+		}
+		wantPath := filepath.Join(configDir, "apps", "build", "my-app-build.ps1")
+		if path != wantPath {
+			t.Fatalf("path = %q, want %q", path, wantPath)
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(content)
+		for _, want := range []string{"# devenv:mode=logged", "$ErrorActionPreference = \"Stop\"", "bun run build"} {
+			if !strings.Contains(text, want) {
+				t.Fatalf("content missing %q:\n%s", want, text)
+			}
+		}
+	})
+
 	t.Run("run profile validation prevents traversal", func(t *testing.T) {
 		t.Parallel()
 		_, err := NewManager(t.TempDir()).WriteShellActionScript("my-app", AppActionRun, "../dev", "bun dev")

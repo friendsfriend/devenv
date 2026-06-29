@@ -44,6 +44,29 @@ func TestDiscoverActionTargets(t *testing.T) {
 		}
 	})
 
+	t.Run("discovers powershell build and run targets", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		writeFile(t, filepath.Join(configDir, "apps", "build", "my-app-build.ps1"), "# devenv:name=Windows Build\n")
+		writeFile(t, filepath.Join(configDir, "apps", "run", "my-app-dev.ps1"), "# devenv:name=Windows Dev\n")
+
+		buildTargets, err := NewManager(configDir).DiscoverActionTargets("my-app", "", AppActionBuild)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets build error = %v", err)
+		}
+		if len(buildTargets) != 1 || buildTargets[0].ID != "build:powershell" || buildTargets[0].Label != "Windows Build" || buildTargets[0].Command == "" {
+			t.Fatalf("buildTargets = %#v, want powershell build", buildTargets)
+		}
+
+		runTargets, err := NewManager(configDir).DiscoverActionTargets("my-app", "", AppActionRun)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets run error = %v", err)
+		}
+		if len(runTargets) != 1 || runTargets[0].ID != "run:powershell:dev" || runTargets[0].Label != "Windows Dev" || runTargets[0].LaunchMode != LaunchModeTmux {
+			t.Fatalf("runTargets = %#v, want powershell run", runTargets)
+		}
+	})
+
 	t.Run("discovers root build tool targets", func(t *testing.T) {
 		t.Parallel()
 		configDir := t.TempDir()

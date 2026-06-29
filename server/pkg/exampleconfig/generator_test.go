@@ -35,7 +35,12 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		"apps/build/go-rest-postgres-test.Dockerfile",
 		"apps/build/bhvr-site-build.Dockerfile",
 		"apps/build/bhvr-site-test.Dockerfile",
+		"apps/build/bhvr-site-build.sh",
+		"apps/build/bhvr-site-test.sh",
+		"apps/build/bhvr-site-build.ps1",
+		"apps/build/bhvr-site-test.ps1",
 		"apps/run/bhvr-site-dev.sh",
+		"apps/run/bhvr-site-dev.ps1",
 		"apps/build/bun-lib-starter-build.Dockerfile",
 		"apps/build/bun-lib-starter-test.Dockerfile",
 	}
@@ -52,7 +57,7 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		t.Fatalf("shell run script is not executable: %v", runScriptInfo.Mode())
 	}
 
-	for _, name := range []string{"hello.sh", "hello.py", "hello.ts"} {
+	for _, name := range []string{"hello.sh", "hello.ps1", "hello.py", "hello.ts"} {
 		path := filepath.Join(homeDir, "scripts", name)
 		info, err := os.Stat(path)
 		if err != nil {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -25,8 +26,9 @@ const (
 type ActionRuntime string
 
 const (
-	ActionRuntimeDocker ActionRuntime = "docker"
-	ActionRuntimeShell  ActionRuntime = "shell"
+	ActionRuntimeDocker     ActionRuntime = "docker"
+	ActionRuntimeShell      ActionRuntime = "shell"
+	ActionRuntimePowerShell ActionRuntime = "powershell"
 )
 
 // LaunchMode identifies how a shell action target launches.
@@ -68,13 +70,11 @@ func (m *manager) DiscoverActionTargets(appIdent, localDir string, action AppAct
 		if ok {
 			targets = append(targets, dockerTarget)
 		}
-		shellTarget, ok, err := m.discoverShellBuildTestTarget(appIdent, action)
+		scriptTargets, err := m.discoverScriptBuildTestTargets(appIdent, action)
 		if err != nil {
 			return nil, err
 		}
-		if ok {
-			targets = append(targets, shellTarget)
-		}
+		targets = append(targets, scriptTargets...)
 		rootTargets, err := m.discoverRootBuildToolTargets(localDir, action)
 		if err != nil {
 			return nil, err
@@ -91,11 +91,11 @@ func (m *manager) DiscoverActionTargets(appIdent, localDir string, action AppAct
 			return nil, err
 		}
 		targets = append(targets, dockerTargets...)
-		shellTargets, err := m.discoverShellRunTargets(appIdent)
+		scriptTargets, err := m.discoverScriptRunTargets(appIdent)
 		if err != nil {
 			return nil, err
 		}
-		targets = append(targets, shellTargets...)
+		targets = append(targets, scriptTargets...)
 		rootTargets, err := m.discoverRootBuildToolTargets(localDir, action)
 		if err != nil {
 			return nil, err
@@ -129,22 +129,34 @@ func (m *manager) discoverDockerBuildTestTarget(appIdent string, action AppActio
 	return ActionTarget{}, false, nil
 }
 
-func (m *manager) discoverShellBuildTestTarget(appIdent string, action AppAction) (ActionTarget, bool, error) {
-	path := filepath.Join(m.configDir, "apps", "build", fmt.Sprintf("%s-%s.sh", appIdent, action))
-	if _, err := os.Stat(path); err == nil {
-		meta, err := parseShellScriptMetadata(path, LaunchModeLogged)
-		if err != nil {
-			return ActionTarget{}, false, err
+func (m *manager) discoverScriptBuildTestTargets(appIdent string, action AppAction) ([]ActionTarget, error) {
+	var targets []ActionTarget
+	for _, candidate := range []struct {
+		ext     string
+		runtime ActionRuntime
+		label   string
+		command string
+		args    func(string) []string
+	}{
+		{ext: ".sh", runtime: ActionRuntimeShell, label: "Shell", command: "sh", args: func(path string) []string { return []string{path} }},
+		{ext: ".ps1", runtime: ActionRuntimePowerShell, label: "PowerShell", command: powerShellCommand(), args: func(path string) []string { return []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path} }},
+	} {
+		path := filepath.Join(m.configDir, "apps", "build", fmt.Sprintf("%s-%s%s", appIdent, action, candidate.ext))
+		if _, err := os.Stat(path); err == nil {
+			meta, err := parseShellScriptMetadata(path, LaunchModeLogged)
+			if err != nil {
+				return nil, err
+			}
+			label := meta.Name
+			if label == "" {
+				label = candidate.label
+			}
+			targets = append(targets, ActionTarget{ID: actionTargetID(action, candidate.runtime, ""), Action: action, Runtime: candidate.runtime, Label: label, LaunchMode: meta.Mode, SourcePath: path, Command: candidate.command, Args: candidate.args(path)})
+		} else if !errors.Is(err, fs.ErrNotExist) {
+			return nil, err
 		}
-		label := meta.Name
-		if label == "" {
-			label = "Shell"
-		}
-		return ActionTarget{ID: actionTargetID(action, ActionRuntimeShell, ""), Action: action, Runtime: ActionRuntimeShell, Label: label, LaunchMode: meta.Mode, SourcePath: path}, true, nil
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return ActionTarget{}, false, err
 	}
-	return ActionTarget{}, false, nil
+	return targets, nil
 }
 
 func (m *manager) discoverRootBuildToolTargets(localDir string, action AppAction) ([]ActionTarget, error) {
@@ -450,7 +462,7 @@ func (m *manager) discoverDockerRunTargets(appIdent string) ([]ActionTarget, err
 	return targets, nil
 }
 
-func (m *manager) discoverShellRunTargets(appIdent string) ([]ActionTarget, error) {
+func (m *manager) discoverScriptRunTargets(appIdent string) ([]ActionTarget, error) {
 	runDir := filepath.Join(m.configDir, "apps", "run")
 	entries, err := os.ReadDir(runDir)
 	if err != nil {
@@ -461,27 +473,36 @@ func (m *manager) discoverShellRunTargets(appIdent string) ([]ActionTarget, erro
 	}
 
 	prefix := appIdent + "-"
-	suffix := ".sh"
 	var targets []ActionTarget
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
-		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, suffix) || len(name) <= len(prefix)+len(suffix) {
-			continue
+		for _, candidate := range []struct {
+			ext     string
+			runtime ActionRuntime
+			command string
+			args    func(string) []string
+		}{
+			{ext: ".sh", runtime: ActionRuntimeShell, command: "sh", args: func(path string) []string { return []string{path} }},
+			{ext: ".ps1", runtime: ActionRuntimePowerShell, command: powerShellCommand(), args: func(path string) []string { return []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path} }},
+		} {
+			if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, candidate.ext) || len(name) <= len(prefix)+len(candidate.ext) {
+				continue
+			}
+			profile := name[len(prefix) : len(name)-len(candidate.ext)]
+			path := filepath.Join(runDir, name)
+			meta, err := parseShellScriptMetadata(path, LaunchModeTmux)
+			if err != nil {
+				return nil, err
+			}
+			label := meta.Name
+			if label == "" {
+				label = profile
+			}
+			targets = append(targets, ActionTarget{ID: actionTargetID(AppActionRun, candidate.runtime, profile), Action: AppActionRun, Runtime: candidate.runtime, Label: label, Profile: profile, LaunchMode: meta.Mode, SourcePath: path, Command: candidate.command, Args: candidate.args(path)})
 		}
-		profile := name[len(prefix) : len(name)-len(suffix)]
-		path := filepath.Join(runDir, name)
-		meta, err := parseShellScriptMetadata(path, LaunchModeTmux)
-		if err != nil {
-			return nil, err
-		}
-		label := meta.Name
-		if label == "" {
-			label = profile
-		}
-		targets = append(targets, ActionTarget{ID: actionTargetID(AppActionRun, ActionRuntimeShell, profile), Action: AppActionRun, Runtime: ActionRuntimeShell, Label: label, Profile: profile, LaunchMode: meta.Mode, SourcePath: path})
 	}
 	return targets, nil
 }
@@ -520,6 +541,13 @@ func parseShellScriptMetadata(path string, defaultMode LaunchMode) (shellScriptM
 		return shellScriptMetadata{}, err
 	}
 	return meta, nil
+}
+
+func powerShellCommand() string {
+	if _, err := exec.LookPath("pwsh"); err == nil {
+		return "pwsh"
+	}
+	return "powershell"
 }
 
 func actionTargetID(action AppAction, runtime ActionRuntime, profile string) string {

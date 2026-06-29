@@ -127,7 +127,7 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 		statusCb("Error: no build target configured")
 		return
 	}
-	if target.Runtime == resources.ActionRuntimeShell {
+	if target.Runtime != resources.ActionRuntimeDocker {
 		s.runShellLogged(a, target, "build", statusCb)
 		return
 	}
@@ -224,12 +224,7 @@ func (s *service) runShellTmux(a *app.App, target resources.ActionTarget, status
 		statusCb("Error: unsupported shell run launch mode " + string(target.LaunchMode))
 		return
 	}
-	command := "sh"
-	args := []string{target.SourcePath}
-	if target.Command != "" {
-		command = target.Command
-		args = target.Args
-	}
+	command, args := scriptCommandForTarget(target)
 	if err := ensureCommandAvailable(command, a.LocalDirectoryPath); err != nil {
 		statusCb("Error: required tool not found: " + command)
 		return
@@ -301,12 +296,7 @@ func (s *service) runShellLogged(a *app.App, target resources.ActionTarget, oper
 		statusCb("Error: " + err.Error())
 		return
 	}
-	command := "sh"
-	args := []string{target.SourcePath}
-	if target.Command != "" {
-		command = target.Command
-		args = target.Args
-	}
+	command, args := scriptCommandForTarget(target)
 	if err := ensureCommandAvailable(command, a.LocalDirectoryPath); err != nil {
 		statusCb("Error: required tool not found: " + command)
 		return
@@ -319,6 +309,20 @@ func (s *service) runShellLogged(a *app.App, target resources.ActionTarget, oper
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)
 	}
+}
+
+func scriptCommandForTarget(target resources.ActionTarget) (string, []string) {
+	if target.Command != "" {
+		return target.Command, target.Args
+	}
+	if target.Runtime == resources.ActionRuntimePowerShell {
+		command := "powershell"
+		if _, err := exec.LookPath("pwsh"); err == nil {
+			command = "pwsh"
+		}
+		return command, []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", target.SourcePath}
+	}
+	return "sh", []string{target.SourcePath}
 }
 
 func ensureCommandAvailable(command, workingDir string) error {
@@ -415,7 +419,7 @@ func (s *service) testAppInternal(a *app.App, targetID string, statusCb func(str
 		statusCb("Error: no test target configured")
 		return
 	}
-	if target.Runtime == resources.ActionRuntimeShell {
+	if target.Runtime != resources.ActionRuntimeDocker {
 		s.runShellLogged(a, target, "test", statusCb)
 		return
 	}
@@ -464,7 +468,7 @@ func (s *service) runAppInternal(a *app.App, profile string, targetID string, st
 		statusCb("Error: no run target configured")
 		return
 	}
-	if target.Runtime == resources.ActionRuntimeShell {
+	if target.Runtime != resources.ActionRuntimeDocker {
 		s.runShellTmux(a, target, statusCb)
 		return
 	}

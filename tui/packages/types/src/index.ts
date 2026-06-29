@@ -48,7 +48,7 @@ export interface App {
 }
 
 export type AppAction = "build" | "test" | "run";
-export type ActionRuntime = "docker" | "shell";
+export type ActionRuntime = "docker" | "shell" | "powershell";
 export type LaunchMode = "logged" | "tmux";
 
 export interface ActionTarget {
@@ -70,6 +70,7 @@ export interface ShellActionScriptRequest {
 	action: AppAction;
 	profile?: string;
 	command?: string;
+	runtime?: ActionRuntime;
 }
 
 export interface ShellActionScriptResponse {
