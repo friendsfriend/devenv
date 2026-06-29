@@ -34,7 +34,7 @@ export function hasRunningAppInTab(tab: TabType, appStore: AppStore): boolean {
 				: appStore.infraServices();
 
 	return appsInTab.some((app) => {
-		const status = app.dockerInfo?.Status?.toLowerCase();
+		const status = (app.status ? app.status : app.dockerInfo?.Status)?.toLowerCase();
 		return status === "running" || status === "up";
 	});
 }

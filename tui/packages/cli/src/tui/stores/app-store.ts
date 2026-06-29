@@ -294,9 +294,15 @@ export function createAppStore() {
 				repositoryPath: "",
 				branch: "",
 				appType: "LIB" as const,
-				containerBaseName: svc.containerBaseName,
+				containerBaseName: svc.containerBaseName || svc.ident,
 				dockerInfo: svc.dockerInfo,
 				operationStatus: svc.operationStatus,
+				status: svc.status,
+				type: svc.type,
+				shellPath: svc.shellPath,
+				powerShellPath: svc.powerShellPath,
+				defaultRunner: svc.defaultRunner,
+				logPath: svc.logPath,
 			})) as App[];
 		}
 		return allApps;

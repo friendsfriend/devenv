@@ -428,3 +428,81 @@ func TestShellTmuxRunStoresWindowAndStopKillsIt(t *testing.T) {
 		t.Fatalf("unexpected stop command: %s %v", runner.lastCmd, runner.lastArgs)
 	}
 }
+
+type fakeAppRegistry struct {
+	apps  []app.App
+	infra []app.InfraService
+}
+
+func (f fakeAppRegistry) GetApps() []app.App                   { return f.apps }
+func (f fakeAppRegistry) GetInfraServices() []app.InfraService { return f.infra }
+func (f fakeAppRegistry) GetAppByIdent(ident string) (app.App, bool) {
+	for _, a := range f.apps {
+		if a.Ident == ident {
+			return a, true
+		}
+	}
+	return app.App{}, false
+}
+
+type fakeInfraStarter struct {
+	started []string
+	err     error
+}
+
+func (f *fakeInfraStarter) StartInfrastructureServiceWithStatus(infra app.InfraService) {
+	f.started = append(f.started, infra.Ident)
+}
+func (f *fakeInfraStarter) StartScriptInfrastructureServiceWithStatus(infra app.InfraService, _ string) error {
+	f.started = append(f.started, infra.Ident)
+	return f.err
+}
+
+func TestRunAppStartsDependenciesBeforeRequestedTarget(t *testing.T) {
+	t.Setenv("TMUX", "")
+	frontendDir := t.TempDir()
+	backendDir := t.TempDir()
+	frontendID := resources.AppRunTargetID("frontend", resources.ActionRuntimeShell, "dev")
+	backendID := resources.AppRunTargetID("backend", resources.ActionRuntimeShell, "dev")
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{
+		{ID: frontendID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/config/apps/run/frontend-dev.sh", Requires: []resources.DependencyRef{{App: "backend", Runtime: string(resources.ActionRuntimeShell), Profile: "dev"}, {Infra: "postgres"}}},
+		{ID: backendID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/config/apps/run/backend-dev.sh"},
+	}}
+	runner := &fakeCommandRunner{}
+	infra := &fakeInfraStarter{}
+	svc := &service{resourceMgr: fake, executor: runner, tmuxRuns: map[string]ShellTmuxRunState{}, appRegistry: fakeAppRegistry{apps: []app.App{{Ident: "frontend", LocalDirectoryPath: frontendDir}, {Ident: "backend", LocalDirectoryPath: backendDir}}, infra: []app.InfraService{{Ident: "postgres"}}}, infraStarter: infra}
+
+	var statuses []string
+	svc.runAppInternal(&app.App{Ident: "frontend", LocalDirectoryPath: frontendDir}, "", frontendID, func(s string) { statuses = append(statuses, s) })
+	joined := strings.Join(statuses, "\n")
+	if !strings.Contains(joined, "starting dependency "+resources.InfraTargetID("postgres")) || !strings.Contains(joined, "starting dependency "+backendID) {
+		t.Fatalf("statuses = %#v", statuses)
+	}
+	if len(infra.started) != 1 || infra.started[0] != "postgres" {
+		t.Fatalf("started infra = %#v", infra.started)
+	}
+	if runner.lastArgs[0] != "/config/apps/run/frontend-dev.sh" || runner.lastDir != frontendDir {
+		t.Fatalf("last run = %s %v dir=%s", runner.lastCmd, runner.lastArgs, runner.lastDir)
+	}
+}
+
+func TestRunAppDependencyCyclePreventsStart(t *testing.T) {
+	appDir := t.TempDir()
+	aID := resources.AppRunTargetID("a", resources.ActionRuntimeShell, "dev")
+	bID := resources.AppRunTargetID("b", resources.ActionRuntimeShell, "dev")
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{
+		{ID: aID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/a.sh", Requires: []resources.DependencyRef{{App: "b", Runtime: string(resources.ActionRuntimeShell), Profile: "dev"}}},
+		{ID: bID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/b.sh", Requires: []resources.DependencyRef{{App: "a", Runtime: string(resources.ActionRuntimeShell), Profile: "dev"}}},
+	}}
+	runner := &fakeCommandRunner{}
+	svc := &service{resourceMgr: fake, executor: runner, tmuxRuns: map[string]ShellTmuxRunState{}, appRegistry: fakeAppRegistry{apps: []app.App{{Ident: "a", LocalDirectoryPath: appDir}, {Ident: "b", LocalDirectoryPath: appDir}}}, infraStarter: &fakeInfraStarter{}}
+
+	var got string
+	svc.runAppInternal(&app.App{Ident: "a", LocalDirectoryPath: appDir}, "", aID, func(s string) { got = s })
+	if !strings.Contains(got, "dependency cycle") {
+		t.Fatalf("status = %q", got)
+	}
+	if runner.lastCmd != "" {
+		t.Fatalf("runner called despite cycle: %s", runner.lastCmd)
+	}
+}

@@ -37,6 +37,12 @@ export interface App {
 	dockerInfo?: DockerInfo;
 	gitStatus?: string;
 	operationStatus?: OperationStatus;
+	status?: "running" | "stopped" | "failed" | string;
+	type?: InfraServiceType;
+	logPath?: string;
+	shellPath?: string;
+	powerShellPath?: string;
+	defaultRunner?: ScriptRunner;
 	resourceType?: "app" | "script-folder" | "script-file";
 	scriptPath?: string;
 	scriptRelativePath?: string;
@@ -48,8 +54,15 @@ export interface App {
 }
 
 export type AppAction = "build" | "test" | "run";
-export type ActionRuntime = "docker" | "shell" | "powershell";
+export type ActionRuntime = "docker" | "shell" | "powershell" | "systemshell";
 export type LaunchMode = "logged" | "tmux";
+
+export interface DependencyRef {
+	app?: string;
+	runtime?: ActionRuntime;
+	profile?: string;
+	infra?: string;
+}
 
 export interface ActionTarget {
 	id: string;
@@ -59,6 +72,7 @@ export interface ActionTarget {
 	profile?: string;
 	launchMode?: LaunchMode;
 	sourcePath: string;
+	requires?: DependencyRef[];
 }
 
 export interface ActionTargetsResponse {
@@ -85,6 +99,7 @@ export interface AppStatus {
 	branch?: string;
 	activeWorktree?: string;
 	operationStatus?: OperationStatus; // NEW: Current operation status
+	status?: "running" | "stopped" | "failed" | string;
 }
 
 // Operation status for showing in-progress operations
@@ -114,11 +129,21 @@ export interface DockerInfo {
 	Ports: string; // Go uses PascalCase
 }
 
+export type InfraServiceType = "docker" | "script";
+export type InfraServiceStatus = "running" | "stopped" | "failed" | string;
+export type ScriptRunner = "shell" | "powershell";
+
 export interface InfraService {
 	ident: string;
 	displayName: string;
-	containerBaseName: string;
+	type?: InfraServiceType;
+	containerBaseName?: string;
 	dockerInfo?: DockerInfo;
+	status?: InfraServiceStatus;
+	logPath?: string;
+	shellPath?: string;
+	powerShellPath?: string;
+	defaultRunner?: ScriptRunner;
 	operationStatus?: OperationStatus;
 }
 

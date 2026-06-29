@@ -32,7 +32,7 @@ func (g Generator) Generate() error {
 	}
 	for path, content := range g.files() {
 		mode := fs.FileMode(0644)
-		if filepath.Dir(path) == scriptsDir || filepath.Ext(path) == ".sh" && filepath.Dir(filepath.Dir(path)) == filepath.Join(g.ConfigDir, "apps") {
+		if filepath.Dir(path) == scriptsDir || filepath.Ext(path) == ".sh" && (filepath.Dir(filepath.Dir(path)) == filepath.Join(g.ConfigDir, "apps") || filepath.Dir(path) == filepath.Join(g.ConfigDir, "infrastructure", "scripts")) {
 			mode = 0755
 		}
 		if err := writeFile(path, content, mode); err != nil {
@@ -74,17 +74,21 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, ".env"): "DEVENV_HOME=" + h + "\n",
 		filepath.Join(c, "apps", "definitions", "go-rest-postgres.json"):        `{"ident":"go-rest-postgres","displayName":"Go REST Postgres","repositoryPath":"https://github.com/pauljamescleary/go-rest-postgres.git","appType":"APP","containerBaseName":"go-rest-postgres","sourceType":"git","gitMode":"BRANCH"}` + "\n",
 		filepath.Join(c, "apps", "definitions", "bhvr-site.json"):               `{"ident":"bhvr-site","displayName":"Bun TypeScript App","repositoryPath":"https://github.com/stevedylandev/bhvr-site.git","appType":"APP","containerBaseName":"bhvr-site","sourceType":"git","gitMode":"BRANCH"}` + "\n",
+		filepath.Join(c, "apps", "definitions", "event-worker.json"):            `{"ident":"event-worker","displayName":"Event Worker","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","appType":"APP","containerBaseName":"event-worker","sourceType":"git","gitMode":"BRANCH"}` + "\n",
 		filepath.Join(c, "libraries", "definitions", "bun-lib-starter.json"):    `{"ident":"bun-lib-starter","displayName":"Bun Library Starter","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","appType":"LIB","containerBaseName":"bun-lib-starter","sourceType":"git","gitMode":"BRANCH"}` + "\n",
 		filepath.Join(c, "infrastructure", "definitions", "postgres.json"):      `{"ident":"postgres","displayName":"Postgres","containerBaseName":"example-postgres"}` + "\n",
 		filepath.Join(c, "infrastructure", "definitions", "redis.json"):         `{"ident":"redis","displayName":"Redis","containerBaseName":"example-redis"}` + "\n",
 		filepath.Join(c, "infrastructure", "definitions", "mailpit.json"):       `{"ident":"mailpit","displayName":"Mailpit","containerBaseName":"example-mailpit"}` + "\n",
+		filepath.Join(c, "infrastructure", "definitions", "script-clock.json"):  `{"ident":"script-clock","displayName":"Script Clock","type":"script","shellPath":"` + filepath.Join(c, "infrastructure", "scripts", "script-clock.sh") + `","cwd":"` + c + `","args":["--interval","2"],"env":{"DEVENV_EXAMPLE":"true"}}` + "\n",
 		filepath.Join(c, "apps", "compose", "go-rest-postgres-compose.yml"):     goCompose,
 		filepath.Join(c, "apps", "compose", "bhvr-site-compose.yml"):            bunCompose,
 		filepath.Join(c, "apps", "compose", "bhvr-site-debug-compose.yml"):      bunDebugCompose,
 		filepath.Join(c, "apps", "compose", "bhvr-site-with-redis-compose.yml"): bunRedisCompose,
+		filepath.Join(c, "apps", "compose", "event-worker-compose.yml"):         eventWorkerCompose,
 		filepath.Join(c, "infrastructure", "compose", "postgres-compose.yml"):   postgresCompose,
 		filepath.Join(c, "infrastructure", "compose", "redis-compose.yml"):      redisCompose,
 		filepath.Join(c, "infrastructure", "compose", "mailpit-compose.yml"):    mailpitCompose,
+		filepath.Join(c, "infrastructure", "scripts", "script-clock.sh"):        scriptClockShellScript,
 		filepath.Join(c, "apps", "build", "go-rest-postgres-build.Dockerfile"):  goBuildDockerfile,
 		filepath.Join(c, "apps", "build", "go-rest-postgres-test.Dockerfile"):   goTestDockerfile,
 		filepath.Join(c, "apps", "build", "bhvr-site-build.Dockerfile"):         bunBuildDockerfile,
@@ -95,6 +99,8 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "apps", "build", "bhvr-site-test.ps1"):                 bunTestPowerShellScript,
 		filepath.Join(c, "apps", "run", "bhvr-site-dev.sh"):                     bunRunShellScript,
 		filepath.Join(c, "apps", "run", "bhvr-site-dev.ps1"):                    bunRunPowerShellScript,
+		filepath.Join(c, "apps", "run", "event-worker-dev.sh"):                  eventWorkerRunShellScript,
+		filepath.Join(c, "apps", "run", "event-worker-dev.ps1"):                 eventWorkerRunPowerShellScript,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-build.Dockerfile"):   bunLibBuildDockerfile,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-test.Dockerfile"):    bunLibTestDockerfile,
 		filepath.Join(s, "hello.sh"):                                            helloShellScript,
@@ -121,8 +127,11 @@ bun test
 `
 
 const bunRunShellScript = `#!/usr/bin/env sh
-# devenv:name=Dev Server
+# devenv:name=Dev Server (complex deps)
 # devenv:mode=tmux
+# Shared infra: redis and script-clock. Unique infra: mailpit.
+# App deps: go-rest-postgres via Docker default profile, event-worker via systemshell dev profile.
+# devenv:requires=[{"app":"go-rest-postgres","runtime":"docker","profile":"default"},{"app":"event-worker","runtime":"systemshell","profile":"dev"},{"infra":"redis"},{"infra":"script-clock"},{"infra":"mailpit"}]
 set -eu
 bun run dev
 `
@@ -147,12 +156,50 @@ bun test
 exit $LASTEXITCODE
 `
 
-const bunRunPowerShellScript = `# devenv:name=Dev Server (PowerShell)
+const bunRunPowerShellScript = `# devenv:name=Dev Server (PowerShell complex deps)
 # devenv:mode=tmux
+# Shared infra: redis. Unique infra: mailpit.
+# devenv:requires=[{"app":"go-rest-postgres","runtime":"docker","profile":"default"},{"app":"event-worker","runtime":"systemshell","profile":"dev"},{"infra":"redis"},{"infra":"mailpit"}]
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 bun run dev
 exit $LASTEXITCODE
+`
+
+const eventWorkerRunShellScript = `#!/usr/bin/env sh
+# devenv:name=Event Worker (system shell)
+# devenv:mode=tmux
+# Shared infra with bhvr-site: redis and script-clock. Shared Docker infra with go-rest-postgres: postgres.
+# devenv:requires=[{"infra":"postgres"},{"infra":"redis"},{"infra":"script-clock"}]
+set -eu
+echo "Event worker consuming jobs with Redis and Postgres"
+while true; do sleep 10; done
+`
+
+const eventWorkerRunPowerShellScript = `# devenv:name=Event Worker (PowerShell)
+# devenv:mode=tmux
+# Windows drift example: worker needs postgres and redis, but not script-clock.
+# devenv:requires=[{"infra":"postgres"},{"infra":"redis"}]
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+Write-Host "Event worker consuming jobs with Redis and Postgres"
+while ($true) { Start-Sleep -Seconds 10 }
+`
+
+const scriptClockShellScript = `#!/usr/bin/env sh
+set -eu
+interval="2"
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --interval) interval="${2:-2}"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+echo "Script Clock starting (DEVENV_EXAMPLE=${DEVENV_EXAMPLE:-false})"
+while true; do
+  date '+script-clock %Y-%m-%dT%H:%M:%S%z'
+  sleep "$interval"
+done
 `
 
 const helloShellScript = `#!/usr/bin/env bash
@@ -254,7 +301,9 @@ console.log("Checking " + service);
 if (verbose) console.log("Verbose mode enabled");
 `
 
-const goCompose = `services:
+const goCompose = `x-devenv:
+  requires: [{"infra":"postgres"},{"infra":"script-clock"}]
+services:
   go-rest-postgres:
     build:
       context: ../../..
@@ -286,7 +335,9 @@ const bunDebugCompose = `services:
     ports: ["3000:3000", "6499:6499"]
 `
 
-const bunRedisCompose = `services:
+const bunRedisCompose = `x-devenv:
+  requires: [{"app":"go-rest-postgres","runtime":"docker","profile":"default"},{"infra":"redis"},{"infra":"script-clock"}]
+services:
   bhvr-site:
     build:
       context: ../../..
@@ -296,6 +347,17 @@ const bunRedisCompose = `services:
     ports: ["3000:3000"]
   bhvr-redis:
     image: redis:7-alpine
+`
+
+const eventWorkerCompose = `x-devenv:
+  requires: [{"infra":"postgres"},{"infra":"redis"}]
+services:
+  event-worker:
+    image: oven/bun:1
+    command: sh -c "echo event-worker docker profile running && sleep infinity"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/example?sslmode=disable
+      REDIS_URL: redis://redis:6379
 `
 
 const postgresCompose = `services:

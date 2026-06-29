@@ -58,24 +58,30 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 	infraServices := s.infraServices
 	responses := make([]InfraServiceResponse, 0, len(infraServices))
 
-	// Prepare infrastructure service adapters for batch Docker info fetch
+	// Prepare Docker infrastructure adapters only; script services use script lifecycle state.
 	infraAdapters := make([]docker.InfraService, 0, len(infraServices))
 	for i := range infraServices {
-		infraAdapters = append(infraAdapters, &infraServiceAdapter{service: &infraServices[i]})
+		if infraServices[i].Type == "" || infraServices[i].Type == app.InfraServiceTypeDocker {
+			infraAdapters = append(infraAdapters, &infraServiceAdapter{service: &infraServices[i]})
+		}
 	}
 
-	// Batch fetch Docker info for infrastructure services
 	dockerInfoMap, err := dockerClient.BatchGetInfo(nil, infraAdapters)
 	if err != nil {
 		log.Printf("Error fetching Docker status for infrastructure services: %v", err)
-		// Continue with empty docker info
 	}
 
-	// Build response with Docker info
 	for _, svc := range infraServices {
 		var dockerInfo *docker.Info
-		if info, exists := dockerInfoMap[svc.Ident]; exists {
-			dockerInfo = &info
+		statusValue := svc.Status
+		logPath := svc.LogPath
+		if svc.Type == "" || svc.Type == app.InfraServiceTypeDocker {
+			if info, exists := dockerInfoMap[svc.Ident]; exists {
+				dockerInfo = &info
+				statusValue = strings.ToLower(info.Status)
+			}
+		} else if svc.Type == app.InfraServiceTypeScript {
+			statusValue, logPath = s.services.OperationsService().ScriptInfrastructureStatus(svc.Ident)
 		}
 
 		s.opStatusMu.RLock()
@@ -85,8 +91,14 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 		responses = append(responses, InfraServiceResponse{
 			Ident:             svc.Ident,
 			DisplayName:       svc.DisplayName,
+			Type:              svc.Type,
 			ContainerBaseName: svc.GetContainerBaseName(),
 			DockerInfo:        dockerInfo,
+			Status:            statusValue,
+			LogPath:           logPath,
+			ShellPath:         svc.ShellPath,
+			PowerShellPath:    svc.PowerShellPath,
+			DefaultRunner:     svc.DefaultRunner,
 			OperationStatus:   opStatus,
 		})
 	}
@@ -125,6 +137,10 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 		currentBranch := gitRepo.GetCurrentBranch(&appAdapter{app: &a})
 		opStatus := s.getOperationStatus(a.Ident)
 
+		appRunStatus := "stopped"
+		if s.services.BuildService().IsShellTmuxRunActive(a.Ident) {
+			appRunStatus = "running"
+		}
 		statuses = append(statuses, AppStatusResponse{
 			Ident:           a.Ident,
 			DockerInfo:      &dockerInfo,
@@ -132,6 +148,7 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 			Branch:          currentBranch,
 			ActiveWorktree:  a.ActiveWorktree,
 			OperationStatus: opStatus,
+			Status:          appRunStatus,
 		})
 	}
 

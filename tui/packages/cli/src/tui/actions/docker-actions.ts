@@ -11,7 +11,7 @@ export function createDockerActions(
 ) {
   const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
 
-  const performDockerOperation = async (action: 'start' | 'stop' | 'restart', app: App | InfraService, profile?: string, targetId?: string) => {
+  const performDockerOperation = async (action: 'start' | 'stop' | 'restart', app: App | InfraService, profile?: string, targetId?: string, runner?: 'shell' | 'powershell') => {
     const appIdent = app.ident;
     appStore.setOperationInProgressForApp(appIdent);
     appStore.setError(null);
@@ -27,8 +27,25 @@ export function createDockerActions(
     ));
 
     try {
-      if (action === 'start') {
-        await client.startApp(appIdent, profile || '', targetId);
+      const isScriptInfra = 'type' in app && app.type === 'script';
+      if (isScriptInfra && action === 'start') {
+        if (app.shellPath && app.powerShellPath && !app.defaultRunner && !runner) {
+          uiStore.setActionTargetPickerTargets([
+            { id: 'infra:runner:shell', action: 'run', runtime: 'shell', label: 'Shell', sourcePath: app.shellPath },
+            { id: 'infra:runner:powershell', action: 'run', runtime: 'powershell', label: 'PowerShell', sourcePath: app.powerShellPath },
+          ]);
+          uiStore.setActionTargetPickerSelectedIndex(0);
+          uiStore.setActionTargetPickerAppIdent(app.ident);
+          uiStore.setActionTargetPickerAction('run');
+          uiStore.setShowActionTargetPicker(true);
+          return;
+        }
+        await client.startInfraService(appIdent, runner);
+      } else if (isScriptInfra && action === 'stop') {
+        await client.stopInfraService(appIdent);
+      } else if (action === 'start') {
+        if ('type' in app) await client.startInfraService(appIdent);
+        else await client.startApp(appIdent, profile || '', targetId);
       } else if (action === 'stop') {
         const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;
         if (!containerID) throw new Error('No container identifier available for stop operation');

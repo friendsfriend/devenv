@@ -21,6 +21,17 @@ type commandRunner interface {
 	RunCommandSilent(command string, args []string, envVars []string, workingDir string) (error, string)
 }
 
+type appRegistry interface {
+	GetApps() []app.App
+	GetInfraServices() []app.InfraService
+	GetAppByIdent(ident string) (app.App, bool)
+}
+
+type infraStarter interface {
+	StartInfrastructureServiceWithStatus(infra app.InfraService)
+	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
+}
+
 type resourceManager interface {
 	ExistsDir(string) (bool, error)
 	ResolveDockerfileForAction(appIdent, localDir string, action resources.ActionType) (string, error)
@@ -43,8 +54,10 @@ type Service interface {
 	RunAppTargetWithStatus(a *app.App, targetID string)
 	StopShellTmuxRun(appIdent string) error
 	RestartShellTmuxRun(a *app.App) error
+	IsShellTmuxRunActive(appIdent string) bool
 	ActiveOperationLogPath(appIdent string) (string, bool)
 	SetOnComplete(callback func(appIdent string))
+	ConfigureRunDependencies(apps appRegistry, infra infraStarter)
 }
 
 type service struct {
@@ -56,6 +69,8 @@ type service struct {
 	tmuxRuns     map[string]ShellTmuxRunState
 	activeLogMu  sync.RWMutex
 	activeLogMap map[string]string
+	appRegistry  appRegistry
+	infraStarter infraStarter
 }
 
 func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr status.Manager) Service {
@@ -79,6 +94,11 @@ type ShellTmuxRunState struct {
 
 func (s *service) SetOnComplete(callback func(appIdent string)) {
 	s.OnComplete = callback
+}
+
+func (s *service) ConfigureRunDependencies(apps appRegistry, infra infraStarter) {
+	s.appRegistry = apps
+	s.infraStarter = infra
 }
 
 func (s *service) BuildAppWithStatus(a *app.App) {
@@ -277,6 +297,22 @@ func (s *service) StopShellTmuxRun(appIdent string) error {
 	return nil
 }
 
+func (s *service) IsShellTmuxRunActive(appIdent string) bool {
+	s.tmuxMu.Lock()
+	state, ok := s.tmuxRuns[appIdent]
+	s.tmuxMu.Unlock()
+	if !ok {
+		return false
+	}
+	if err, _ := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", state.WindowID, "#{window_id}"}, []string{}, ""); err != nil {
+		s.tmuxMu.Lock()
+		delete(s.tmuxRuns, appIdent)
+		s.tmuxMu.Unlock()
+		return false
+	}
+	return true
+}
+
 func (s *service) RestartShellTmuxRun(a *app.App) error {
 	s.tmuxMu.Lock()
 	state, ok := s.tmuxRuns[a.Ident]
@@ -468,6 +504,16 @@ func (s *service) runAppInternal(a *app.App, profile string, targetID string, st
 		statusCb("Error: no run target configured")
 		return
 	}
+	if s.appRegistry != nil && s.infraStarter != nil {
+		if err := s.startRunDependencies(target, statusCb); err != nil {
+			statusCb("Error: " + err.Error())
+			return
+		}
+	}
+	s.startRunTarget(a, target, statusCb)
+}
+
+func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, statusCb func(string)) {
 	if target.Runtime != resources.ActionRuntimeDocker {
 		s.runShellTmux(a, target, statusCb)
 		return
@@ -495,4 +541,81 @@ func (s *service) runAppInternal(a *app.App, profile string, targetID string, st
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)
 	}
+}
+
+func (s *service) startRunDependencies(target resources.ActionTarget, statusCb func(string)) error {
+	registry, err := s.buildTargetRegistry()
+	if err != nil {
+		return err
+	}
+	plan, err := registry.ResolveStartPlan(target.ID)
+	if err != nil {
+		return err
+	}
+	for _, item := range plan {
+		if item.ID == target.ID {
+			continue
+		}
+		statusCb("starting dependency " + item.ID + "...")
+		if item.Kind == resources.TargetKindInfra {
+			infra, ok := s.findInfra(item.Infra)
+			if !ok {
+				return fmt.Errorf("unknown infrastructure service %q", item.Infra)
+			}
+			if infra.Type == app.InfraServiceTypeScript {
+				if err := s.infraStarter.StartScriptInfrastructureServiceWithStatus(infra, ""); err != nil {
+					return err
+				}
+			} else {
+				s.infraStarter.StartInfrastructureServiceWithStatus(infra)
+			}
+			continue
+		}
+		depApp, ok := s.appRegistry.GetAppByIdent(item.App)
+		if !ok {
+			return fmt.Errorf("unknown app %q", item.App)
+		}
+		depTarget, ok, err := s.selectActionTarget(&depApp, resources.AppActionRun, item.ID, item.Profile)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("unknown app run target %q", item.ID)
+		}
+		s.startRunTarget(&depApp, depTarget, statusCb)
+	}
+	return nil
+}
+
+func (s *service) buildTargetRegistry() (resources.TargetRegistry, error) {
+	var items []resources.RegistryTarget
+	for _, a := range s.appRegistry.GetApps() {
+		targets, err := s.resourceMgr.DiscoverActionTargets(a.Ident, a.LocalDirectoryPath, resources.AppActionRun)
+		if err != nil {
+			return resources.TargetRegistry{}, err
+		}
+		for _, target := range targets {
+			items = append(items, resources.RegistryTarget{ID: target.ID, Kind: resources.TargetKindAppRun, App: a.Ident, Runtime: target.Runtime, Profile: target.Profile, Requires: target.Requires, Running: s.isRunTargetActive(a.Ident, target.ID)})
+		}
+	}
+	for _, infra := range s.appRegistry.GetInfraServices() {
+		items = append(items, resources.RegistryTarget{ID: resources.InfraTargetID(infra.Ident), Kind: resources.TargetKindInfra, Infra: infra.Ident, Running: infra.Status == app.InfraStatusRunning})
+	}
+	return resources.NewTargetRegistry(items), nil
+}
+
+func (s *service) findInfra(ident string) (app.InfraService, bool) {
+	for _, infra := range s.appRegistry.GetInfraServices() {
+		if infra.Ident == ident {
+			return infra, true
+		}
+	}
+	return app.InfraService{}, false
+}
+
+func (s *service) isRunTargetActive(appIdent, targetID string) bool {
+	s.tmuxMu.Lock()
+	state, ok := s.tmuxRuns[appIdent]
+	s.tmuxMu.Unlock()
+	return ok && state.TargetID == targetID
 }

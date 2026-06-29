@@ -27,6 +27,9 @@ import {
 	getDockerInfo,
 	getGitInfo,
 	getInfraServices,
+	startInfraService,
+	stopInfraService,
+	getInfraServiceLogs,
 	getProfiles,
 	getStatus,
 	createApp,
@@ -202,6 +205,15 @@ export class DevEnvClient {
 	}
 	getInfraServices(): Promise<InfraService[]> {
 		return getInfraServices(this.deps);
+	}
+	startInfraService(ident: string, runner?: string): Promise<void> {
+		return startInfraService(this.deps, ident, runner);
+	}
+	stopInfraService(ident: string): Promise<void> {
+		return stopInfraService(this.deps, ident);
+	}
+	getInfraServiceLogs(ident: string): Promise<string> {
+		return getInfraServiceLogs(this.deps, ident);
 	}
 	getStatus(): Promise<AppStatus[]> {
 		return getStatus(this.deps);

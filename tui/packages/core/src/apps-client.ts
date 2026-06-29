@@ -37,6 +37,23 @@ export async function getInfraServices(deps: ClientDeps): Promise<InfraService[]
   return data.services;
 }
 
+export async function startInfraService(deps: ClientDeps, ident: string, runner?: string): Promise<void> {
+  const params = runner ? `?runner=${encodeURIComponent(runner)}` : '';
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/infra-services/${encodeURIComponent(ident)}/start${params}`, { method: 'POST' });
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
+export async function stopInfraService(deps: ClientDeps, ident: string): Promise<void> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/infra-services/${encodeURIComponent(ident)}/stop`, { method: 'POST' });
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
+export async function getInfraServiceLogs(deps: ClientDeps, ident: string): Promise<string> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/infra-services/${encodeURIComponent(ident)}/logs`);
+  if (!response.ok) await handleFetchError(response, deps.onError);
+  return response.text();
+}
+
 /**
  * Get status for all applications (Docker + Git info)
  */

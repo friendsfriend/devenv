@@ -71,6 +71,8 @@ Create a Docker Compose file for running the app:
 ```
 
 ```yaml
+x-devenv:
+  requires: [{"infra":"postgres"},{"app":"api","runtime":"systemshell","profile":"dev"}]
 services:
   my-service:
     image: my-service:latest
@@ -80,7 +82,7 @@ services:
       - .env
 ```
 
-For profile variants, use `IDENT-PROFILE-compose.yml` (e.g., `my-service-staging-compose.yml`).
+For profile variants, use `IDENT-PROFILE-compose.yml` (e.g., `my-service-staging-compose.yml`). `x-devenv.requires` is optional and declares DevEnv-run dependencies for this Docker run target. Docker Compose `depends_on` is not used for DevEnv dependency orchestration.
 
 ## 4. Add shell action variants
 
@@ -96,29 +98,36 @@ Example run profile:
 #!/usr/bin/env sh
 # devenv:name=Dev Server
 # devenv:mode=tmux
+# devenv:requires=[{"app":"api","runtime":"systemshell","profile":"dev"},{"infra":"postgres"}]
 set -eu
 bun run dev
 ```
+
+PowerShell run profiles use `~/.config/devenv/apps/run/IDENT-PROFILE.ps1` and support the same metadata comments.
+
+`systemshell` is a portable run runtime: DevEnv uses `.ps1` on Windows and `.sh` on macOS/Linux. It is strict: missing platform script fails instead of falling back. Docker `dev`, shell `dev`, PowerShell `dev`, and systemshell `dev` are separate targets.
 
 Metadata:
 
 - `devenv:name` controls picker label.
 - `devenv:mode=tmux` opens run scripts in a new tmux window.
+- `devenv:requires=[...]` declares DevEnv dependencies as inline JSON.
 - Build/test shell scripts default to logged execution.
 - Run shell scripts default to tmux.
 
 Tmux mode requires the DevEnv server process to run inside tmux. Attach mode connected to a server without `TMUX` will fail clearly instead of launching hidden background processes. Stop/restart target the tracked tmux window id.
 
-## 5. Link to infrastructure
+## 5. Link to infrastructure or other apps
 
-If your app depends on infra services (databases, queues), add `depends_on` in the compose file and reference the infra service name:
+Use DevEnv metadata, not Docker Compose `depends_on`:
 
-```yaml
-services:
-  my-service:
-    depends_on:
-      - postgres
+```sh
+# devenv:requires=[{"infra":"postgres"},{"app":"worker","runtime":"docker","profile":"dev"}]
 ```
+
+App dependency refs require `app`, `runtime`, and `profile`; they always target run actions. Infra refs require `infra`. DevEnv starts missing dependencies before the requested target and leaves them running when you stop the requested target.
+
+This is a breaking change for configs that relied on Compose `depends_on` as DevEnv dependency source. No migration or compatibility shim exists; update configs manually to `devenv:requires` or `x-devenv.requires`.
 
 ## 6. Add from the TUI
 
