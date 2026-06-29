@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 
@@ -7,13 +8,32 @@ export interface RunningTextProps {
   enabled?: boolean;
   active?: boolean;
   offset?: number;
+  align?: 'left' | 'right';
   fg?: string;
   attributes?: any;
   resetKey?: string | number;
 }
 
-export function runningTextFrame(text: string, width: number, enabled: boolean, active: boolean, offset: number, delayTicks = 13, endHoldTicks = 13): string {
+export function runningTextFrame(text: string, width: number, enabled: boolean, active: boolean, offset: number, delayTicks = 13, endHoldTicks = 13, align: 'left' | 'right' = 'left'): string {
   if (width <= 0) return '';
+
+  if (align === 'right') {
+    if (text.length <= width) return text.padStart(width, ' ');
+
+    const initial = width <= 1 ? text.slice(0, width) : `${text.slice(0, width - 1)}…`;
+    if (!enabled || !active) return initial;
+
+    const maxScroll = Math.max(0, text.length - width);
+    const cycleTicks = delayTicks + maxScroll + endHoldTicks;
+    const phase = cycleTicks > 0 ? offset % cycleTicks : 0;
+
+    if (phase < delayTicks) return initial;
+
+    const scrollOffset = phase - delayTicks;
+    if (scrollOffset >= maxScroll) return text.slice(text.length - width);
+
+    return text.slice(scrollOffset, scrollOffset + width);
+  }
 
   const textWidth = Math.max(0, width - 1);
   const withTrailingSpace = (value: string) => `${value.slice(0, textWidth)} `;
@@ -48,13 +68,14 @@ export function RunningText(props: RunningTextProps) {
     const enabled = props.enabled ?? false;
     const active = props.active ?? false;
     const currentOffset = props.offset ?? 0;
-    const resetToken = `${enabled}|${active}|${text}|${currentWidth}|${props.resetKey ?? ''}`;
+    const alignment = props.align ?? 'left';
+    const resetToken = `${enabled}|${active}|${text}|${currentWidth}|${alignment}|${props.resetKey ?? ''}`;
     if (resetToken !== previousResetToken) {
       previousResetToken = resetToken;
       startOffset = currentOffset;
     }
     const relativeOffset = Math.max(0, currentOffset - startOffset);
-    return runningTextFrame(text, currentWidth, enabled, active, relativeOffset);
+    return runningTextFrame(text, currentWidth, enabled, active, relativeOffset, 13, 13, alignment);
   });
 
   return <text fg={props.fg} attributes={props.attributes}>{content()}</text>;

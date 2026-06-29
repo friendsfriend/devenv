@@ -1,10 +1,11 @@
 import { RGBA, ScrollBoxRenderable, TextAttributes } from '@opentui/core';
+import { isDiffFileAddedOrDeleted } from '@devenv/core';
 import { useRenderer } from '@opentui/solid';
 import { createMemo, For, Show, createEffect, createSignal } from 'solid-js';
 import { uiColors } from '../colors';
 import type { Discussion } from '@devenv/types';
 import { GenericModal } from './GenericModal';
-import { HelpText } from './HelpText';
+import { formatHelpTextLines } from './HelpText';
 import { ScrollableContent } from './ScrollableContent';
 
 interface DiffViewModalProps {
@@ -16,6 +17,8 @@ interface DiffViewModalProps {
   visualModeActive: boolean;  // Is visual selection mode active (v key)
   visualModeStart: number;  // Starting line of visual selection
   forceSplitView?: boolean | null;  // null = auto (based on width), true = force split, false = force unified
+  isNewFile?: boolean;
+  isDeletedFile?: boolean;
   commentMode: boolean;  // Is comment input mode active
   commentText: string;  // Current comment text being typed
   discussions?: Discussion[];  // NEW: Comment threads to display inline
@@ -163,13 +166,9 @@ export function DiffViewModal(props: DiffViewModalProps) {
     return lines;
   });
 
-  // Detect if file is entirely new or deleted (added/deleted files should always use unified view)
+  // Detect truly new/deleted files. Addition-only/deletion-only hunks in existing files still support split view.
   const isFileAddedOrDeleted = createMemo(() => {
-    const lines = parsedLines();
-    const hasAddedLines = lines.some(l => l.type === 'added');
-    const hasRemovedLines = lines.some(l => l.type === 'removed');
-    // File is considered added/deleted if it has only one type of change (not both)
-    return (hasAddedLines && !hasRemovedLines) || (!hasAddedLines && hasRemovedLines);
+    return props.isNewFile === true || props.isDeletedFile === true || isDiffFileAddedOrDeleted(props.diff);
   });
 
   // Determine if we should use split view based on terminal width or forced override
@@ -479,32 +478,35 @@ export function DiffViewModal(props: DiffViewModalProps) {
   );
 
   // Custom footer with context-sensitive help text
+  const footerHelpLines = () => formatHelpTextLines(
+    props.commentMode
+      ? [
+          { key: 'Type', action: 'Comment' },
+          { key: 'Enter', action: 'Linebreak' },
+          { key: 'Ctrl+Enter', action: 'Submit' },
+          { key: 'Esc', action: 'Cancel' },
+        ]
+      : [
+          { key: 'j/k', action: 'Nav' },
+          { key: 'n/N', action: 'Next/Prev' },
+          { key: 'v', action: 'Visual' },
+          { key: 'c', action: 'Comment' },
+          { key: 'r', action: 'Reply' },
+          { key: 't', action: 'Toggle' },
+          { key: 's', action: 'Split' },
+          { key: 'h/l ←/→', action: 'Scroll' },
+          { key: '[/]', action: 'File' },
+          { key: 'e', action: 'Edit' },
+          { key: 'Esc', action: 'Close' },
+        ],
+    Math.max(1, Math.floor(dimensions().width * 0.9) - 4),
+  );
+
   const customFooter = () => (
-    <box paddingTop={1} flexShrink={0}>
-      <box flexDirection="row" justifyContent="flex-start" alignItems="center">
-        <Show when={!props.commentMode}>
-          <HelpText entries={[
-            { key: 'j/k', action: 'Nav' },
-            { key: 'n/N', action: 'Next/Prev' },
-            { key: 'v', action: 'Visual' },
-            { key: 'c', action: 'Comment' },
-            { key: 'r', action: 'Reply' },
-            { key: 't', action: 'Toggle' },
-            { key: 's', action: 'Split' },
-            { key: 'h/l ←/→', action: 'Scroll' },
-            { key: '[/]', action: 'File' },
-            { key: 'e', action: 'Edit' },
-            { key: 'Esc', action: 'Close' }
-          ]} />
-        </Show>
-        <Show when={props.commentMode}>
-          <HelpText entries={[
-            { key: 'Type', action: 'Comment' },
-            { key: 'Ctrl+Enter', action: 'Submit' },
-            { key: 'Esc', action: 'Cancel' }
-          ]} />
-        </Show>
-      </box>
+    <box paddingTop={1} flexShrink={0} flexDirection="column">
+      <For each={footerHelpLines()}>
+        {(line) => <text fg={uiColors.textMuted}>{line}</text>}
+      </For>
     </box>
   );
 

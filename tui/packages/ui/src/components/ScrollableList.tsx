@@ -399,8 +399,9 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
           <box
             style={{
               width: '100%',
-              flexGrow: 1,
-              flexShrink: 1,
+              height: listAreaLines(),
+              flexGrow: 0,
+              flexShrink: 0,
               minHeight: 0,
               flexDirection: 'row',
             }}

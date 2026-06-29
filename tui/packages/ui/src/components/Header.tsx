@@ -64,7 +64,7 @@ export function Header(props: HeaderProps) {
         </box>
         <box style={{ flexGrow: 1 }} />
         <box style={{ width: rightWidth() }}>
-          <RunningText text={props.right ?? ''} width={rightWidth()} fg={accent()} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+          <RunningText text={props.right ?? ''} width={rightWidth()} align="right" fg={accent()} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
       </box>
       <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
@@ -76,7 +76,7 @@ export function Header(props: HeaderProps) {
         </box>
         <box style={{ flexGrow: 1 }} />
         <box style={{ width: rightWidth() }}>
-          <RunningText text={helpText()} width={rightWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+          <RunningText text={helpText()} width={rightWidth()} align="right" fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
       </box>
     </box>

@@ -494,6 +494,8 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					visualModeActive={mrStore.diffModalVisualMode()}
 					visualModeStart={mrStore.diffModalVisualStart()}
 					forceSplitView={mrStore.diffModalForceSplitView()}
+					isNewFile={mrStore.currentDiffFile()!.new_file}
+					isDeletedFile={mrStore.currentDiffFile()!.deleted_file}
 					commentMode={mrStore.showCommentModal()}
 					commentText={mrStore.commentText()}
 					discussions={mrStore.mrDiscussions()}

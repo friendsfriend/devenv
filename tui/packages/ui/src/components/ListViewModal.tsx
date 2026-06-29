@@ -3,6 +3,7 @@ import { useTerminalDimensions } from '@opentui/solid';
 import { createMemo } from 'solid-js';
 import { GenericModal } from './GenericModal';
 import { ScrollableList } from './ScrollableList';
+import { formatHelpTextLines } from './HelpText';
 
 export interface ListViewModalProps<T> {
   // ── Data ───────────────────────────────────────────────────────────────────
@@ -98,18 +99,27 @@ export function ListViewModal<T>(props: ListViewModalProps<T>): JSX.Element {
   const dialogHeight = createMemo(() =>
     Math.floor(dimensions().height * heightPercent()),
   );
+  const dialogWidth = createMemo(() =>
+    Math.floor(dimensions().width * (props.widthPercent ?? 0.5)),
+  );
+  const helpLineCount = createMemo(() =>
+    formatHelpTextLines(props.helpText ? props.helpText.split(/\s+•\s+/).map((chunk) => {
+      const [key, ...actionParts] = chunk.trim().split(/\s+/);
+      return { key: key ?? '', action: actionParts.join(' ') };
+    }) : [], Math.max(1, dialogWidth() - 4)).length,
+  );
 
   /**
    * Lines available for ScrollableList content (= everything inside the modal
    * excluding GenericModal's own chrome).
    *
    * GenericModal chrome:
-   *   paddingTop (1) + title row (1) + paddingBottom (1) + helpText row (1) = 4
+   *   paddingTop (1) + title row (1) + paddingBottom (1) + wrapped helpText rows (N) = 3 + N
    *
    * `props.reservedHeight` covers extra slot content above the list (default 2).
    */
   const availableLines = createMemo(() =>
-    Math.max(4, dialogHeight() - 4 - (props.reservedHeight ?? 2)),
+    Math.max(4, dialogHeight() - (3 + helpLineCount()) - (props.reservedHeight ?? 2)),
   );
 
   return (

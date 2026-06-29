@@ -180,7 +180,7 @@ export async function handleChangedFilesKeys(
       mrStore.setDiffModalSelectedLine(0);
       mrStore.setDiffModalVisualMode(false);
       mrStore.setDiffModalVisualStart(0);
-      mrStore.setDiffModalForceSplitView(computeInitialSplitView(selectedChange.diff, ctx.renderer.width));
+      mrStore.setDiffModalForceSplitView(computeInitialSplitView(selectedChange.diff, ctx.renderer.width, selectedChange.new_file || selectedChange.deleted_file));
       mrStore.setShowDiffModal(true);
     }
     return true;

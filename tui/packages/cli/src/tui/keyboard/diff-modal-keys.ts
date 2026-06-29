@@ -40,7 +40,31 @@ export async function handleDiffModalKeys(
       }
       return true;
     }
-    // Comment modal is open — block all other keys (text input handled by component)
+
+    // Enter inserts a line break; Ctrl+Enter submits.
+    if (event.name === 'return' || event.name === 'enter' || event.name === 'Return' || event.name === 'Enter') {
+      mrStore.setCommentText(mrStore.commentText() + '\n');
+      return true;
+    }
+
+    // Backspace to delete last character
+    if (event.name === 'backspace' || event.name === 'Backspace') {
+      mrStore.setCommentText(mrStore.commentText().slice(0, -1));
+      return true;
+    }
+
+    // Regular text input (printable characters)
+    if (event.sequence && event.sequence.length === 1 && event.sequence >= ' ' && !event.ctrl && !event.meta) {
+      mrStore.setCommentText(mrStore.commentText() + event.sequence);
+      return true;
+    }
+
+    // Fallback for terminals that only populate event.name
+    if (event.name && event.name.length === 1 && !event.ctrl && !event.meta) {
+      mrStore.setCommentText(mrStore.commentText() + event.name);
+      return true;
+    }
+
     return true;
   }
 
@@ -77,14 +101,14 @@ export async function handleDiffModalKeys(
     }
 
     // Regular text input (printable characters)
-    if (event.name && event.name.length === 1 && !event.ctrl && !event.meta) {
-      mrStore.setReplyText(mrStore.replyText() + event.name);
+    if (event.sequence && event.sequence.length === 1 && event.sequence >= ' ' && !event.ctrl && !event.meta) {
+      mrStore.setReplyText(mrStore.replyText() + event.sequence);
       return true;
     }
 
-    // Space key
-    if (event.name === 'space' || event.name === ' ') {
-      mrStore.setReplyText(mrStore.replyText() + ' ');
+    // Fallback for terminals that only populate event.name
+    if (event.name && event.name.length === 1 && !event.ctrl && !event.meta) {
+      mrStore.setReplyText(mrStore.replyText() + event.name);
       return true;
     }
 
