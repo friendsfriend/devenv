@@ -292,7 +292,63 @@ func TestShellBuildTargetRunsWithLoggingFromAppDir(t *testing.T) {
 	}
 }
 
-func TestShellTmuxRunRequiresTmux(t *testing.T) {
+func TestMissingRootBuildToolReportsClearError(t *testing.T) {
+	appDir := t.TempDir()
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
+		ID:         "build:shell:missing",
+		Action:     resources.AppActionBuild,
+		Runtime:    resources.ActionRuntimeShell,
+		Label:      "Missing build",
+		LaunchMode: resources.LaunchModeLogged,
+		SourcePath: filepath.Join(appDir, "Makefile"),
+		Command:    "devenv-missing-build-tool-for-test",
+		Args:       []string{"build"},
+	}}}
+	runner := &fakeCommandRunner{}
+	svc := &service{resourceMgr: fake, executor: runner}
+
+	var got string
+	svc.buildAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "build:shell:missing", func(s string) { got = s })
+
+	if got != "Error: required tool not found: devenv-missing-build-tool-for-test" {
+		t.Fatalf("status = %q", got)
+	}
+	if runner.lastCmd != "" {
+		t.Fatalf("command runner should not be called, got %q", runner.lastCmd)
+	}
+}
+
+func TestRootBuildToolTargetRunsCommandFromAppDir(t *testing.T) {
+	appDir := t.TempDir()
+	toolPath := filepath.Join(appDir, "devenv-tool")
+	if err := os.WriteFile(toolPath, []byte("#!/bin/sh\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
+		ID:         "build:shell:make",
+		Action:     resources.AppActionBuild,
+		Runtime:    resources.ActionRuntimeShell,
+		Label:      "Make build",
+		LaunchMode: resources.LaunchModeLogged,
+		SourcePath: filepath.Join(appDir, "Makefile"),
+		Command:    "./devenv-tool",
+		Args:       []string{"build"},
+	}}}
+	runner := &fakeCommandRunner{}
+	svc := &service{resourceMgr: fake, executor: runner}
+
+	var got string
+	svc.buildAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "build:shell:make", func(s string) { got = s })
+
+	if got != "build successful" {
+		t.Fatalf("status = %q, want build successful", got)
+	}
+	if runner.lastCmd != "./devenv-tool" || len(runner.lastArgs) != 1 || runner.lastArgs[0] != "build" || runner.lastDir != appDir {
+		t.Fatalf("unexpected root tool command: cmd=%q args=%v dir=%q", runner.lastCmd, runner.lastArgs, runner.lastDir)
+	}
+}
+
+func TestShellTmuxRunFallsBackToLoggedWithoutTmux(t *testing.T) {
 	t.Setenv("TMUX", "")
 	appDir := t.TempDir()
 	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
@@ -303,13 +359,17 @@ func TestShellTmuxRunRequiresTmux(t *testing.T) {
 		LaunchMode: resources.LaunchModeTmux,
 		SourcePath: "/config/apps/run/test-app-dev.sh",
 	}}}
-	svc := &service{resourceMgr: fake, executor: &fakeCommandRunner{}}
+	runner := &fakeCommandRunner{}
+	svc := &service{resourceMgr: fake, executor: runner}
 
-	var got string
-	svc.runAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "", "run:shell:dev", func(s string) { got = s })
+	var statuses []string
+	svc.runAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "", "run:shell:dev", func(s string) { statuses = append(statuses, s) })
 
-	if !strings.Contains(got, "requires DevEnv server process to run inside tmux") {
-		t.Fatalf("status = %q", got)
+	if len(statuses) < 2 || statuses[0] != "tmux unavailable; running logged" || statuses[len(statuses)-1] != "run successful" {
+		t.Fatalf("statuses = %#v, want logged fallback then success", statuses)
+	}
+	if runner.lastCmd != "sh" || runner.lastArgs[0] != "/config/apps/run/test-app-dev.sh" || runner.lastDir != appDir {
+		t.Fatalf("unexpected fallback command: cmd=%q args=%v dir=%q", runner.lastCmd, runner.lastArgs, runner.lastDir)
 	}
 }
 
