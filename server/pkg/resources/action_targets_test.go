@@ -44,6 +44,133 @@ func TestDiscoverActionTargets(t *testing.T) {
 		}
 	})
 
+	t.Run("discovers root build tool targets", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		localDir := t.TempDir()
+		writeFile(t, filepath.Join(localDir, "Makefile"), "build:\n\techo make\n")
+		writeFile(t, filepath.Join(localDir, "justfile"), "build:\n\techo just\n")
+		writeFile(t, filepath.Join(localDir, "Taskfile.yml"), "version: '3'\ntasks:\n  build:\n    cmds:\n      - echo task\n")
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", localDir, AppActionBuild)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		seen := map[string]ActionTarget{}
+		for _, target := range targets {
+			seen[target.ID] = target
+		}
+		for _, id := range []string{"build:shell:make", "build:shell:just", "build:shell:task"} {
+			if seen[id].Command == "" || len(seen[id].Args) != 1 || seen[id].Args[0] != "build" {
+				t.Fatalf("missing root tool target %s: %#v", id, targets)
+			}
+		}
+	})
+
+	t.Run("discovers language build tool defaults", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		localDir := t.TempDir()
+		writeFile(t, filepath.Join(localDir, "package.json"), `{"packageManager":"bun@1.3.14","scripts":{"build":"vite build","test":"vitest"}}`)
+		writeFile(t, filepath.Join(localDir, "go.mod"), "module example.com/app\n")
+		writeFile(t, filepath.Join(localDir, "Cargo.toml"), "[package]\nname = \"app\"\n")
+		writeFile(t, filepath.Join(localDir, "pom.xml"), "<project></project>")
+		writeFile(t, filepath.Join(localDir, "gradlew"), "#!/bin/sh\n")
+		writeFile(t, filepath.Join(localDir, "pyproject.toml"), "[project]\nname = \"app\"\n")
+		writeFile(t, filepath.Join(localDir, "uv.lock"), "")
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", localDir, AppActionBuild)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		seen := map[string]ActionTarget{}
+		for _, target := range targets {
+			seen[target.ID] = target
+		}
+		checks := map[string]string{
+			"build:shell:package-bun": "bun build (default for package.json)",
+			"build:shell:go":          "go build (default for go.mod)",
+			"build:shell:cargo":       "cargo build (default for Cargo.toml)",
+			"build:shell:maven":       "mvn package (default for pom.xml)",
+			"build:shell:gradle":      "./gradlew build (default for Gradle)",
+			"build:shell:uv":          "uv build (default for pyproject.toml)",
+		}
+		for id, label := range checks {
+			if seen[id].Label != label {
+				t.Fatalf("target %s label = %q, want %q; targets=%#v", id, seen[id].Label, label, targets)
+			}
+		}
+	})
+
+	t.Run("discovers bun lockb package target", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		localDir := t.TempDir()
+		writeFile(t, filepath.Join(localDir, "package.json"), `{"scripts":{"test":"vitest"}}`)
+		writeFile(t, filepath.Join(localDir, "bun.lockb"), "")
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", localDir, AppActionTest)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		if len(targets) != 1 || targets[0].ID != "test:shell:package-bun" || targets[0].Command != "bun" || targets[0].Args[1] != "test" {
+			t.Fatalf("targets = %#v, want bun test target", targets)
+		}
+	})
+
+	t.Run("discovers bun test default without package script", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		localDir := t.TempDir()
+		writeFile(t, filepath.Join(configDir, "apps", "build", "my-app-test.sh"), "#!/bin/sh\n")
+		writeFile(t, filepath.Join(localDir, "package.json"), `{"packageManager":"bun@1.3.14","scripts":{"build":"bun run build.ts"}}`)
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", localDir, AppActionTest)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		seen := map[string]ActionTarget{}
+		for _, target := range targets {
+			seen[target.ID] = target
+		}
+		if seen["test:shell"].SourcePath == "" || seen["test:shell:package-bun"].Label != "bun test (default for package.json)" {
+			t.Fatalf("targets = %#v, want shell script and bun default", targets)
+		}
+	})
+
+	t.Run("discovers default dev run targets", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		localDir := t.TempDir()
+		writeFile(t, filepath.Join(localDir, "package.json"), `{"scripts":{"dev":"vite --host"}}`)
+		writeFile(t, filepath.Join(localDir, "bun.lock"), "")
+		writeFile(t, filepath.Join(localDir, "Makefile"), "run:\n\techo run\n")
+		writeFile(t, filepath.Join(localDir, "go.mod"), "module example.com/app\n")
+		writeFile(t, filepath.Join(localDir, "Cargo.toml"), "[package]\nname = \"app\"\n")
+		writeFile(t, filepath.Join(localDir, "gradlew"), "#!/bin/sh\n")
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", localDir, AppActionRun)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		seen := map[string]ActionTarget{}
+		for _, target := range targets {
+			seen[target.ID] = target
+		}
+		checks := map[string]string{
+			"run:shell:make":        "make run (default for Makefile)",
+			"run:shell:package-bun": "bun dev (default for package.json)",
+			"run:shell:go":          "go run . (default for go.mod)",
+			"run:shell:cargo":       "cargo run (default for Cargo.toml)",
+			"run:shell:gradle":      "./gradlew run (default for Gradle)",
+		}
+		for id, label := range checks {
+			if seen[id].Label != label || seen[id].LaunchMode != LaunchModeTmux {
+				t.Fatalf("target %s = %#v, want label %q tmux", id, seen[id], label)
+			}
+		}
+	})
+
 	t.Run("discovers docker run default profile and shell profile", func(t *testing.T) {
 		t.Parallel()
 		configDir := t.TempDir()

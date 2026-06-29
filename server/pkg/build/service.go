@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -223,15 +224,27 @@ func (s *service) runShellTmux(a *app.App, target resources.ActionTarget, status
 		statusCb("Error: unsupported shell run launch mode " + string(target.LaunchMode))
 		return
 	}
+	command := "sh"
+	args := []string{target.SourcePath}
+	if target.Command != "" {
+		command = target.Command
+		args = target.Args
+	}
+	if err := ensureCommandAvailable(command, a.LocalDirectoryPath); err != nil {
+		statusCb("Error: required tool not found: " + command)
+		return
+	}
 	if strings.TrimSpace(os.Getenv("TMUX")) == "" {
-		statusCb("Error: tmux launch requires DevEnv server process to run inside tmux")
+		statusCb("tmux unavailable; running logged")
+		s.runShellLogged(a, target, "run", statusCb)
 		return
 	}
 
 	windowName := fmt.Sprintf("devenv - %s - %s", a.Ident, target.Profile)
 	statusCb("opening tmux window...")
-	args := []string{"new-window", "-P", "-F", "#{window_id}", "-n", windowName, "-c", a.LocalDirectoryPath, "sh", target.SourcePath}
-	if err, output := s.executor.RunCommandSilent("tmux", args, []string{}, a.LocalDirectoryPath); err != nil {
+	tmuxArgs := []string{"new-window", "-P", "-F", "#{window_id}", "-n", windowName, "-c", a.LocalDirectoryPath, command}
+	tmuxArgs = append(tmuxArgs, args...)
+	if err, output := s.executor.RunCommandSilent("tmux", tmuxArgs, []string{}, a.LocalDirectoryPath); err != nil {
 		statusCb("Error: tmux launch failed: " + err.Error())
 		return
 	} else {
@@ -288,7 +301,17 @@ func (s *service) runShellLogged(a *app.App, target resources.ActionTarget, oper
 		statusCb("Error: " + err.Error())
 		return
 	}
-	if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, "sh", []string{target.SourcePath}, []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
+	command := "sh"
+	args := []string{target.SourcePath}
+	if target.Command != "" {
+		command = target.Command
+		args = target.Args
+	}
+	if err := ensureCommandAvailable(command, a.LocalDirectoryPath); err != nil {
+		statusCb("Error: required tool not found: " + command)
+		return
+	}
+	if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, command, args, []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
 		statusCb("Error: " + runErr.Error())
 		return
 	}
@@ -296,6 +319,25 @@ func (s *service) runShellLogged(a *app.App, target resources.ActionTarget, oper
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)
 	}
+}
+
+func ensureCommandAvailable(command, workingDir string) error {
+	if strings.ContainsAny(command, `/\\`) {
+		path := command
+		if !filepath.IsAbs(path) {
+			path = filepath.Join(workingDir, path)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
+		}
+		if info.IsDir() || info.Mode()&0111 == 0 {
+			return fmt.Errorf("not executable")
+		}
+		return nil
+	}
+	_, err := exec.LookPath(command)
+	return err
 }
 
 func (s *service) startOperationLog(appIdent, operation string) (string, error) {
