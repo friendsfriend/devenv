@@ -89,20 +89,70 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "apps", "build", "go-rest-postgres-test.Dockerfile"):   goTestDockerfile,
 		filepath.Join(c, "apps", "build", "bhvr-site-build.Dockerfile"):         bunBuildDockerfile,
 		filepath.Join(c, "apps", "build", "bhvr-site-test.Dockerfile"):          bunTestDockerfile,
+		filepath.Join(c, "apps", "build", "bhvr-site-build.sh"):                 bunBuildShellScript,
+		filepath.Join(c, "apps", "build", "bhvr-site-test.sh"):                  bunTestShellScript,
+		filepath.Join(c, "apps", "build", "bhvr-site-build.ps1"):                bunBuildPowerShellScript,
+		filepath.Join(c, "apps", "build", "bhvr-site-test.ps1"):                 bunTestPowerShellScript,
 		filepath.Join(c, "apps", "run", "bhvr-site-dev.sh"):                     bunRunShellScript,
+		filepath.Join(c, "apps", "run", "bhvr-site-dev.ps1"):                    bunRunPowerShellScript,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-build.Dockerfile"):   bunLibBuildDockerfile,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-test.Dockerfile"):    bunLibTestDockerfile,
 		filepath.Join(s, "hello.sh"):                                            helloShellScript,
+		filepath.Join(s, "hello.ps1"):                                           helloPowerShellScript,
 		filepath.Join(s, "hello.py"):                                            helloPythonScript,
 		filepath.Join(s, "hello.ts"):                                            helloTypescriptScript,
 	}
 }
+
+const bunBuildShellScript = `#!/usr/bin/env sh
+# devenv:name=Local Build
+# devenv:mode=logged
+set -eu
+bun install --frozen-lockfile || bun install
+bun run build
+`
+
+const bunTestShellScript = `#!/usr/bin/env sh
+# devenv:name=Local Test
+# devenv:mode=logged
+set -eu
+bun install --frozen-lockfile || bun install
+bun test
+`
 
 const bunRunShellScript = `#!/usr/bin/env sh
 # devenv:name=Dev Server
 # devenv:mode=tmux
 set -eu
 bun run dev
+`
+
+const bunBuildPowerShellScript = `# devenv:name=Local Build (PowerShell)
+# devenv:mode=logged
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+bun install --frozen-lockfile
+if ($LASTEXITCODE -ne 0) { bun install; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+bun run build
+exit $LASTEXITCODE
+`
+
+const bunTestPowerShellScript = `# devenv:name=Local Test (PowerShell)
+# devenv:mode=logged
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+bun install --frozen-lockfile
+if ($LASTEXITCODE -ne 0) { bun install; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE } }
+bun test
+exit $LASTEXITCODE
+`
+
+const bunRunPowerShellScript = `# devenv:name=Dev Server (PowerShell)
+# devenv:mode=tmux
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+bun run dev
+exit $LASTEXITCODE
 `
 
 const helloShellScript = `#!/usr/bin/env bash
@@ -134,6 +184,33 @@ done
 suffix="."
 if [[ "$excited" == true ]]; then suffix="!"; fi
 echo "Hello ${name} from ${environment}${suffix}"
+`
+
+const helloPowerShellScript = `#!/usr/bin/env pwsh
+if ($args -contains "--devenv-metadata") {
+  @'
+[
+  {"name":"name","type":"string","required":true,"description":"Name to greet","defaultValue":"DevEnv","flag":"--name"},
+  {"name":"environment","type":"enum","required":true,"description":"Target environment","defaultValue":"dev","choices":["dev","test","prod"],"flag":"--env"},
+  {"name":"excited","type":"bool","required":false,"description":"Add extra enthusiasm","flag":"--excited"}
+]
+'@ | Write-Output
+  exit 0
+}
+
+$name = "DevEnv"
+$environment = "dev"
+$excited = $false
+for ($i = 0; $i -lt $args.Count; $i++) {
+  switch ($args[$i]) {
+    "--name" { if ($i + 1 -lt $args.Count) { $name = $args[++$i] } }
+    "--env" { if ($i + 1 -lt $args.Count) { $environment = $args[++$i] } }
+    "--excited" { $excited = $true }
+  }
+}
+
+$suffix = if ($excited) { "!" } else { "." }
+Write-Output "Hello $name from $environment$suffix"
 `
 
 const helloPythonScript = `#!/usr/bin/env python3

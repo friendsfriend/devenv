@@ -82,9 +82,10 @@ export function createDockerActions(
 
   const createShellTarget = async (app: App, action: AppAction) => {
     const profile = action === 'run' ? 'dev' : undefined;
+    const runtime = process.platform === 'win32' ? 'powershell' : 'shell';
     try {
-      const result = await client.createShellActionScript({ ident: app.ident, action, profile });
-      showError('Shell Target Created', `Created ${action} shell target for ${app.displayName}:\n${result.path}\n\nEdit this file in your config repository, then run the action again.`);
+      const result = await client.createShellActionScript({ ident: app.ident, action, profile, runtime });
+      showError('Shell Target Created', `Created ${action} ${runtime} target for ${app.displayName}:\n${result.path}\n\nEdit this file in your config repository, then run the action again.`);
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
       showError('Create Shell Target Failed', `Failed to create shell ${action} target for ${app.displayName}.\n\nError: ${errorMsg}`);
@@ -92,11 +93,12 @@ export function createDockerActions(
   };
 
   const showNoTargets = (action: AppAction, app: App) => {
+    const ext = process.platform === 'win32' ? '.ps1' : '.sh';
     const path = action === 'run'
-      ? `apps/run/${app.ident}-dev.sh`
-      : `apps/build/${app.ident}-${action}.sh`;
+      ? `apps/run/${app.ident}-dev${ext}`
+      : `apps/build/${app.ident}-${action}${ext}`;
     uiStore.setConfirmDialogTitle('No Target Configured');
-    uiStore.setConfirmDialogMessage(`No ${action} target is configured for ${app.displayName}.\n\nCreate shell script ${path}?`);
+    uiStore.setConfirmDialogMessage(`No ${action} target is configured for ${app.displayName}.\n\nCreate script ${path}?`);
     uiStore.setConfirmDialogAction(() => () => { void createShellTarget(app, action); });
     uiStore.setShowConfirmDialog(true);
   };

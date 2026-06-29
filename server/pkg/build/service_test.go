@@ -292,6 +292,32 @@ func TestShellBuildTargetRunsWithLoggingFromAppDir(t *testing.T) {
 	}
 }
 
+func TestMissingScriptShellReportsClearError(t *testing.T) {
+	appDir := t.TempDir()
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
+		ID:         "build:powershell",
+		Action:     resources.AppActionBuild,
+		Runtime:    resources.ActionRuntimePowerShell,
+		Label:      "PowerShell",
+		LaunchMode: resources.LaunchModeLogged,
+		SourcePath: filepath.Join(appDir, "test-app-build.ps1"),
+		Command:    "devenv-missing-powershell-for-test",
+		Args:       []string{"-File", filepath.Join(appDir, "test-app-build.ps1")},
+	}}}
+	runner := &fakeCommandRunner{}
+	svc := &service{resourceMgr: fake, executor: runner}
+
+	var got string
+	svc.buildAppInternal(&app.App{Ident: "test-app", LocalDirectoryPath: appDir}, "build:powershell", func(s string) { got = s })
+
+	if got != "Error: required tool not found: devenv-missing-powershell-for-test" {
+		t.Fatalf("status = %q", got)
+	}
+	if runner.lastCmd != "" {
+		t.Fatalf("command runner should not be called, got %q", runner.lastCmd)
+	}
+}
+
 func TestMissingRootBuildToolReportsClearError(t *testing.T) {
 	appDir := t.TempDir()
 	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
