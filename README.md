@@ -204,6 +204,8 @@ DEVENV_CONTAINER_RUNTIME=docker
 # DEVENV_CONTAINER_RUNTIME=podman
 ```
 
+Docker runtime uses `docker` plus `docker-compose`. Podman runtime uses `podman` plus `podman-compose`.
+
 ### `opencode.json`
 
 OpenCode configuration file. Referenced by the server for OpenCode integration features.

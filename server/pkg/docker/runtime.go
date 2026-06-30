@@ -25,6 +25,13 @@ func RuntimeCommand() string {
 	return selectedRuntime.Command
 }
 
+func ComposeCommand() string {
+	if selectedRuntime.Name == "podman" {
+		return "podman-compose"
+	}
+	return "docker-compose"
+}
+
 func SelectRuntime(configured string) (Runtime, error) {
 	name := strings.ToLower(strings.TrimSpace(configured))
 	if name == "" {

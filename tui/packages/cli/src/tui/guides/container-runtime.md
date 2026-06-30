@@ -54,7 +54,7 @@ EOF
 
 3. Restart DevEnv.
 
-DevEnv uses the Podman-compatible Docker API socket for status, logs, stats, and lifecycle operations. Build, run, compose, cp, and inspect commands use the `podman` CLI.
+DevEnv uses the Podman-compatible Docker API socket for status, logs, stats, and lifecycle operations. Build, cp, and inspect commands use the `podman` CLI. Compose operations use `podman-compose`.
 
 If your Podman socket is custom, set:
 
@@ -64,6 +64,8 @@ DEVENV_PODMAN_HOST=unix:///path/to/podman.sock
 ```
 
 `DOCKER_HOST` also works for Podman if `DEVENV_PODMAN_HOST` is unset.
+
+Docker runtime uses `docker` plus `docker-compose`. Podman runtime uses `podman` plus `podman-compose`.
 
 ## Behavior
 

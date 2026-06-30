@@ -54,7 +54,7 @@ func (s *service) SetOnComplete(callback func(appIdent string)) {
 }
 
 func (s *service) newComposeArgs() []string {
-	args := []string{"compose", "-p", "devenv"}
+	args := []string{"-p", "devenv"}
 	if s.envFilePath != "" {
 		args = append(args, "--env-file", s.envFilePath)
 	}
@@ -74,7 +74,7 @@ func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "-f", composeFilePath, "up", "-d")
 
-	err, _ = s.executor.RunCommandWithLogging(infra.Ident, docker.RuntimeCommand(), composeArgs, []string{}, "")
+	err, _ = s.executor.RunCommandWithLogging(infra.Ident, docker.ComposeCommand(), composeArgs, []string{}, "")
 	if err != nil {
 		callback("Error: " + err.Error())
 		return
@@ -100,7 +100,7 @@ func (s *service) killAndRemoveContainersForAppInternal(a *app.App, statusCb fun
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), composeArgs, []string{}, "")
+	err, _ := s.executor.RunCommandWithLogging(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, "")
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -126,7 +126,7 @@ func (s *service) killAllRunningContainersInternal(apps []app.App, statusCb func
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ := s.executor.RunCommandWithLogging("all-apps", docker.RuntimeCommand(), composeArgs, []string{}, "")
+	err, _ := s.executor.RunCommandWithLogging("all-apps", docker.ComposeCommand(), composeArgs, []string{}, "")
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return

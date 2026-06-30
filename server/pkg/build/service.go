@@ -524,7 +524,7 @@ func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, stat
 
 	composeFilePath := target.SourcePath
 
-	composeArgs := []string{"compose", "-p", "devenv", "-f", composeFilePath}
+	composeArgs := []string{"-p", "devenv", "-f", composeFilePath}
 
 	if envFilePath, ok := s.resourceMgr.EnvFilePath(); ok {
 		composeArgs = append(composeArgs, "--env-file", envFilePath)
@@ -533,7 +533,7 @@ func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, stat
 	composeArgs = append(composeArgs, "up", "-d")
 
 	statusCb("starting containers...")
-	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), composeArgs, []string{}, a.LocalDirectoryPath); runErr != nil {
+	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, a.LocalDirectoryPath); runErr != nil {
 		statusCb("Error: " + runErr.Error())
 		return
 	}
