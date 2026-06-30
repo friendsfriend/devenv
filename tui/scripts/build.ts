@@ -106,6 +106,23 @@ if (!skipInstall) {
   await $`bun install --os="*" --cpu="*" @opentui/core@${cliPkg.dependencies["@opentui/core"]}`
 }
 
+// Work around Bun 1.3.14 ESM/CJS interop for @opentui/solid's Babel module resolver import.
+// babel-plugin-module-resolver is CommonJS and may not expose a synthetic default during Bun.build.
+const solidTransformPath = path.resolve(dir, "./node_modules/@opentui/solid/scripts/solid-transform.js")
+if (fs.existsSync(solidTransformPath)) {
+  const source = fs.readFileSync(solidTransformPath, "utf8")
+  const oldImport = 'import moduleResolver from "babel-plugin-module-resolver";'
+  if (source.includes(oldImport) && !source.includes("createRequire(import.meta.url)")) {
+    fs.writeFileSync(
+      solidTransformPath,
+      source.replace(
+        oldImport,
+        'import { createRequire } from "module";\nconst require = createRequire(import.meta.url);\nconst moduleResolver = require("babel-plugin-module-resolver");',
+      ),
+    )
+  }
+}
+
 // Build Go server binaries for each platform first
 const projectRoot = path.resolve(dir, "..")
 const serverDir = path.join(projectRoot, "server")
