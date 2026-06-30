@@ -19,6 +19,8 @@ type Service interface {
 	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
 	StopScriptInfrastructureServiceWithStatus(ident string) error
 	ScriptInfrastructureStatus(ident string) (string, string)
+	ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle
+	RecoverScriptInfrastructureRuns(infra []app.InfraService)
 	KillAndRemoveAllContainersForAppWithStatus(a *app.App)
 	KillAllRunningContainersWithStatus(apps []app.App)
 	SetOnComplete(callback func(appIdent string))
@@ -180,13 +182,13 @@ func (s *service) StartScriptInfrastructureServiceWithStatus(infra app.InfraServ
 
 	if strings.TrimSpace(os.Getenv("TMUX")) != "" {
 		windowName := fmt.Sprintf("devenv - infra - %s", infra.Ident)
-		cmdArgs := []string{"new-window", "-P", "-F", "#{window_id}", "-n", windowName, "-c", infra.Cwd, command}
+		cmdArgs := []string{"new-window", "-P", "-F", "#{window_id}:#{pane_pid}", "-n", windowName, "-c", infra.Cwd, command}
 		cmdArgs = append(cmdArgs, args...)
 		if err, output := s.executor.RunCommandSilent("tmux", cmdArgs, scriptEnv(infra.Env), infra.Cwd); err == nil {
-			windowID := strings.TrimSpace(output)
+			windowID, panePID := parseTmuxWindowAndPID(output)
 			if windowID != "" {
 				s.scriptMu.Lock()
-				s.scriptRuns[infra.Ident] = &scriptRunState{service: infra, runner: selectedRunner, mode: "tmux", paneID: windowID, logPath: logPath, exitCh: make(chan error)}
+				s.scriptRuns[infra.Ident] = &scriptRunState{service: infra, runner: selectedRunner, mode: "tmux", paneID: windowID, pid: panePID, logPath: logPath, startedAt: time.Now(), exitCh: make(chan error)}
 				s.scriptMu.Unlock()
 				statusCb("start successful")
 				if s.OnComplete != nil {
@@ -205,7 +207,7 @@ func (s *service) StartScriptInfrastructureServiceWithStatus(infra app.InfraServ
 	}
 	s.scriptMu.Lock()
 	delete(s.scriptTerminal, infra.Ident)
-	s.scriptRuns[infra.Ident] = &scriptRunState{service: infra, runner: selectedRunner, mode: "logged", cmd: cmd, logPath: logPath, exitCh: exitCh}
+	s.scriptRuns[infra.Ident] = &scriptRunState{service: infra, runner: selectedRunner, mode: "logged", pid: cmd.Process.Pid, cmd: cmd, logPath: logPath, startedAt: time.Now(), exitCh: exitCh}
 	s.scriptMu.Unlock()
 	go s.watchScriptExit(infra.Ident, exitCh)
 	statusCb("start successful")
@@ -224,7 +226,7 @@ func (s *service) watchScriptExit(ident string, exitCh chan error) {
 	s.scriptMu.Lock()
 	if st, ok := s.scriptRuns[ident]; ok {
 		st.service.Status = scriptStatus
-		st.service.ExecutionHandle = &app.ExecutionHandle{Mode: st.mode, PaneID: st.paneID, Runner: st.runner, ExitCode: exitCodeFromError(err), StartedAt: time.Now().Format(time.RFC3339)}
+		st.service.ExecutionHandle = &app.ExecutionHandle{Mode: st.mode, PaneID: st.paneID, PID: st.pid, Runner: st.runner, ExitCode: exitCodeFromError(err), StartedAt: st.startedAt.Format(time.RFC3339)}
 		s.scriptTerminal[ident] = scriptTerminalState{status: scriptStatus, logPath: st.logPath}
 		delete(s.scriptRuns, ident)
 	}
@@ -263,6 +265,47 @@ func (s *service) StopScriptInfrastructureServiceWithStatus(ident string) error 
 	return nil
 }
 
+func (s *service) RecoverScriptInfrastructureRuns(infra []app.InfraService) {
+	if strings.TrimSpace(os.Getenv("TMUX")) == "" {
+		return
+	}
+	err, output := s.executor.RunCommandSilent("tmux", []string{"list-windows", "-a", "-F", "#{window_id}:#{window_name}:#{pane_pid}"}, []string{}, "")
+	if err != nil {
+		return
+	}
+	known := make(map[string]app.InfraService, len(infra))
+	for _, svc := range infra {
+		if svc.Type == app.InfraServiceTypeScript {
+			known[svc.Ident] = svc
+		}
+	}
+	for _, line := range strings.Split(output, "\n") {
+		windowID, windowName, panePID := parseTmuxWindowLine(line)
+		if windowID == "" || !strings.HasPrefix(windowName, "devenv - infra - ") {
+			continue
+		}
+		ident := strings.TrimSpace(strings.TrimPrefix(windowName, "devenv - infra - "))
+		svc, ok := known[ident]
+		if !ok || (panePID > 0 && !processAlive(panePID)) {
+			continue
+		}
+		s.scriptMu.Lock()
+		if _, exists := s.scriptRuns[ident]; !exists {
+			s.scriptRuns[ident] = &scriptRunState{service: svc, runner: svc.DefaultRunner, mode: "tmux", paneID: windowID, pid: panePID, logPath: svc.LogPath, startedAt: time.Now(), exitCh: make(chan error)}
+		}
+		s.scriptMu.Unlock()
+	}
+}
+
+func (s *service) ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle {
+	s.scriptMu.Lock()
+	defer s.scriptMu.Unlock()
+	if st, ok := s.scriptRuns[ident]; ok {
+		return &app.ExecutionHandle{Mode: st.mode, PaneID: st.paneID, PID: st.pid, Runner: st.runner, StartedAt: st.startedAt.Format(time.RFC3339)}
+	}
+	return nil
+}
+
 func (s *service) ScriptInfrastructureStatus(ident string) (string, string) {
 	s.scriptMu.Lock()
 	defer s.scriptMu.Unlock()
@@ -274,7 +317,14 @@ func (s *service) ScriptInfrastructureStatus(ident string) (string, string) {
 		return app.InfraStatusStopped, ""
 	}
 	if st.mode == "tmux" {
-		if err, _ := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", st.paneID, "#{window_id}"}, []string{}, ""); err != nil {
+		if err, output := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", st.paneID, "#{window_id}:#{pane_pid}"}, []string{}, ""); err != nil {
+			delete(s.scriptRuns, ident)
+			s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped}
+			return app.InfraStatusStopped, ""
+		} else if _, panePID := parseTmuxWindowAndPID(output); panePID > 0 {
+			st.pid = panePID
+		}
+		if st.pid > 0 && !processAlive(st.pid) {
 			delete(s.scriptRuns, ident)
 			s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped}
 			return app.InfraStatusStopped, ""
@@ -291,6 +341,11 @@ func (s *service) ScriptInfrastructureStatus(ident string) (string, string) {
 		s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped, logPath: st.logPath}
 		return app.InfraStatusStopped, st.logPath
 	default:
+		if st.pid > 0 && !processAlive(st.pid) {
+			delete(s.scriptRuns, ident)
+			s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped, logPath: st.logPath}
+			return app.InfraStatusStopped, st.logPath
+		}
 		return app.InfraStatusRunning, st.logPath
 	}
 }

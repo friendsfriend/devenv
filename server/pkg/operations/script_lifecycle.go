@@ -15,13 +15,15 @@ import (
 )
 
 type scriptRunState struct {
-	service app.InfraService
-	runner  string
-	mode    string
-	paneID  string
-	cmd     *exec.Cmd
-	logPath string
-	exitCh  chan error
+	service   app.InfraService
+	runner    string
+	mode      string
+	paneID    string
+	pid       int
+	cmd       *exec.Cmd
+	logPath   string
+	startedAt time.Time
+	exitCh    chan error
 }
 
 type scriptTerminalState struct {
@@ -98,6 +100,20 @@ func defaultScriptLogPath(homeDir, ident string) string {
 	return filepath.Join(homeDir, "logs", "infrastructure", ident+".log")
 }
 
+func processAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			return false
+		}
+		return proc.Signal(syscall.Signal(0)) == nil
+	}
+	return syscall.Kill(pid, 0) == nil
+}
+
 func killProcessGroup(cmd *exec.Cmd) error {
 	if cmd == nil || cmd.Process == nil {
 		return nil
@@ -137,6 +153,32 @@ func startLoggedProcess(svc app.InfraService, command string, args []string, log
 		exitCh <- err
 	}()
 	return cmd, exitCh, nil
+}
+
+func parseTmuxWindowAndPID(output string) (string, int) {
+	windowID, _, pid := parseTmuxWindowLine(output)
+	return windowID, pid
+}
+
+func parseTmuxWindowLine(output string) (string, string, int) {
+	parts := strings.Split(strings.TrimSpace(output), ":")
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
+		return "", "", 0
+	}
+	if len(parts) == 2 {
+		pid := 0
+		_, _ = fmt.Sscanf(strings.TrimSpace(parts[1]), "%d", &pid)
+		return strings.TrimSpace(parts[0]), "", pid
+	}
+	pid := 0
+	if len(parts) > 2 {
+		_, _ = fmt.Sscanf(strings.TrimSpace(parts[len(parts)-1]), "%d", &pid)
+	}
+	windowName := ""
+	if len(parts) > 2 {
+		windowName = strings.TrimSpace(strings.Join(parts[1:len(parts)-1], ":"))
+	}
+	return strings.TrimSpace(parts[0]), windowName, pid
 }
 
 func exitCodeFromError(err error) int {

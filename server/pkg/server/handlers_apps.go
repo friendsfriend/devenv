@@ -75,6 +75,7 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 		var dockerInfo *docker.Info
 		statusValue := svc.Status
 		logPath := svc.LogPath
+		executionHandle := svc.ExecutionHandle
 		if svc.Type == "" || svc.Type == app.InfraServiceTypeDocker {
 			if info, exists := dockerInfoMap[svc.Ident]; exists {
 				dockerInfo = &info
@@ -82,6 +83,7 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 			}
 		} else if svc.Type == app.InfraServiceTypeScript {
 			statusValue, logPath = s.services.OperationsService().ScriptInfrastructureStatus(svc.Ident)
+			executionHandle = s.services.OperationsService().ScriptInfrastructureExecutionHandle(svc.Ident)
 		}
 
 		s.opStatusMu.RLock()
@@ -100,6 +102,7 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 			PowerShellPath:    svc.PowerShellPath,
 			DefaultRunner:     svc.DefaultRunner,
 			OperationStatus:   opStatus,
+			ExecutionHandle:   executionHandle,
 		})
 	}
 

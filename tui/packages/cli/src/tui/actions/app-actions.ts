@@ -74,9 +74,14 @@ export function createAppActions(
           appStore.setInfraServices((prev) =>
             prev.map((svc) => {
               if (svc.ident !== ident) return svc;
+              const { executionHandle } = event.properties;
               const updated: typeof svc = { ...svc, dockerInfo: dockerInfo ?? svc.dockerInfo };
               if ('status' in event.properties) updated.status = status;
               if ('logPath' in event.properties) updated.logPath = logPath;
+              if ('executionHandle' in event.properties) {
+                if (executionHandle == null) delete updated.executionHandle;
+                else updated.executionHandle = executionHandle;
+              }
               if ('operationStatus' in event.properties) {
                 if (operationStatus == null) delete updated.operationStatus;
                 else updated.operationStatus = operationStatus;

@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
@@ -56,6 +58,7 @@ type Service interface {
 	StopShellTmuxRun(appIdent string) error
 	RestartShellTmuxRun(a *app.App) error
 	IsShellTmuxRunActive(appIdent string) bool
+	RecoverShellTmuxRuns(apps []app.App)
 	ActiveOperationLogPath(appIdent string) (string, bool)
 	SetOnComplete(callback func(appIdent string))
 	ConfigureRunDependencies(apps appRegistry, infra infraStarter)
@@ -90,6 +93,7 @@ type ShellTmuxRunState struct {
 	TargetID  string
 	Profile   string
 	WindowID  string
+	PID       int
 	StartedAt time.Time
 }
 
@@ -240,6 +244,46 @@ func (s *service) selectActionTarget(a *app.App, action resources.AppAction, tar
 	return targets[0], true, nil
 }
 
+func parseTmuxWindowAndPID(output string) (string, int) {
+	windowID, _, pid := parseTmuxWindowLine(output)
+	return windowID, pid
+}
+
+func parseTmuxWindowLine(output string) (string, string, int) {
+	parts := strings.Split(strings.TrimSpace(output), ":")
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
+		return "", "", 0
+	}
+	if len(parts) == 2 {
+		pid := 0
+		_, _ = fmt.Sscanf(strings.TrimSpace(parts[1]), "%d", &pid)
+		return strings.TrimSpace(parts[0]), "", pid
+	}
+	pid := 0
+	if len(parts) > 2 {
+		_, _ = fmt.Sscanf(strings.TrimSpace(parts[len(parts)-1]), "%d", &pid)
+	}
+	windowName := ""
+	if len(parts) > 2 {
+		windowName = strings.TrimSpace(strings.Join(parts[1:len(parts)-1], ":"))
+	}
+	return strings.TrimSpace(parts[0]), windowName, pid
+}
+
+func processAlive(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	if runtime.GOOS == "windows" {
+		proc, err := os.FindProcess(pid)
+		if err != nil {
+			return false
+		}
+		return proc.Signal(syscall.Signal(0)) == nil
+	}
+	return syscall.Kill(pid, 0) == nil
+}
+
 func (s *service) runShellTmux(a *app.App, target resources.ActionTarget, statusCb func(string)) {
 	if target.LaunchMode != resources.LaunchModeTmux {
 		statusCb("Error: unsupported shell run launch mode " + string(target.LaunchMode))
@@ -258,13 +302,13 @@ func (s *service) runShellTmux(a *app.App, target resources.ActionTarget, status
 
 	windowName := fmt.Sprintf("devenv - %s - %s", a.Ident, target.Profile)
 	statusCb("opening tmux window...")
-	tmuxArgs := []string{"new-window", "-P", "-F", "#{window_id}", "-n", windowName, "-c", a.LocalDirectoryPath, command}
+	tmuxArgs := []string{"new-window", "-P", "-F", "#{window_id}:#{pane_pid}", "-n", windowName, "-c", a.LocalDirectoryPath, command}
 	tmuxArgs = append(tmuxArgs, args...)
 	if err, output := s.executor.RunCommandSilent("tmux", tmuxArgs, []string{}, a.LocalDirectoryPath); err != nil {
 		statusCb("Error: tmux launch failed: " + err.Error())
 		return
 	} else {
-		windowID := strings.TrimSpace(output)
+		windowID, panePID := parseTmuxWindowAndPID(output)
 		if windowID == "" {
 			statusCb("Error: tmux launch did not return a window id")
 			return
@@ -273,7 +317,7 @@ func (s *service) runShellTmux(a *app.App, target resources.ActionTarget, status
 		if s.tmuxRuns == nil {
 			s.tmuxRuns = make(map[string]ShellTmuxRunState)
 		}
-		s.tmuxRuns[a.Ident] = ShellTmuxRunState{AppIdent: a.Ident, TargetID: target.ID, Profile: target.Profile, WindowID: windowID, StartedAt: time.Now()}
+		s.tmuxRuns[a.Ident] = ShellTmuxRunState{AppIdent: a.Ident, TargetID: target.ID, Profile: target.Profile, WindowID: windowID, PID: panePID, StartedAt: time.Now()}
 		s.tmuxMu.Unlock()
 	}
 	statusCb("run successful")
@@ -305,13 +349,63 @@ func (s *service) IsShellTmuxRunActive(appIdent string) bool {
 	if !ok {
 		return false
 	}
-	if err, _ := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", state.WindowID, "#{window_id}"}, []string{}, ""); err != nil {
+	if err, output := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", state.WindowID, "#{window_id}:#{pane_pid}"}, []string{}, ""); err != nil {
+		s.tmuxMu.Lock()
+		delete(s.tmuxRuns, appIdent)
+		s.tmuxMu.Unlock()
+		return false
+	} else if _, panePID := parseTmuxWindowAndPID(output); panePID > 0 {
+		state.PID = panePID
+		s.tmuxMu.Lock()
+		s.tmuxRuns[appIdent] = state
+		s.tmuxMu.Unlock()
+	}
+	if state.PID > 0 && !processAlive(state.PID) {
 		s.tmuxMu.Lock()
 		delete(s.tmuxRuns, appIdent)
 		s.tmuxMu.Unlock()
 		return false
 	}
 	return true
+}
+
+func (s *service) RecoverShellTmuxRuns(apps []app.App) {
+	if strings.TrimSpace(os.Getenv("TMUX")) == "" {
+		return
+	}
+	err, output := s.executor.RunCommandSilent("tmux", []string{"list-windows", "-a", "-F", "#{window_id}:#{window_name}:#{pane_pid}"}, []string{}, "")
+	if err != nil {
+		return
+	}
+	known := make(map[string]app.App, len(apps))
+	for _, a := range apps {
+		known[a.Ident] = a
+	}
+	for _, line := range strings.Split(output, "\n") {
+		windowID, windowName, panePID := parseTmuxWindowLine(line)
+		if windowID == "" || !strings.HasPrefix(windowName, "devenv - ") || strings.HasPrefix(windowName, "devenv - infra - ") {
+			continue
+		}
+		parts := strings.Split(windowName, " - ")
+		if len(parts) < 3 {
+			continue
+		}
+		ident, profile := strings.TrimSpace(parts[1]), strings.TrimSpace(parts[2])
+		if _, ok := known[ident]; !ok {
+			continue
+		}
+		if panePID > 0 && !processAlive(panePID) {
+			continue
+		}
+		s.tmuxMu.Lock()
+		if s.tmuxRuns == nil {
+			s.tmuxRuns = make(map[string]ShellTmuxRunState)
+		}
+		if _, exists := s.tmuxRuns[ident]; !exists {
+			s.tmuxRuns[ident] = ShellTmuxRunState{AppIdent: ident, Profile: profile, WindowID: windowID, PID: panePID, StartedAt: time.Now()}
+		}
+		s.tmuxMu.Unlock()
+	}
 }
 
 func (s *service) RestartShellTmuxRun(a *app.App) error {

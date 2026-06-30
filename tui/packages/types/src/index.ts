@@ -133,6 +133,15 @@ export type InfraServiceType = "docker" | "script";
 export type InfraServiceStatus = "running" | "stopped" | "failed" | string;
 export type ScriptRunner = "shell" | "powershell";
 
+export interface ExecutionHandle {
+	mode: string;
+	paneId?: string;
+	pid?: number;
+	runner?: ScriptRunner | string;
+	startedAt?: string;
+	exitCode?: number;
+}
+
 export interface InfraService {
 	ident: string;
 	displayName: string;
@@ -145,6 +154,7 @@ export interface InfraService {
 	powerShellPath?: string;
 	defaultRunner?: ScriptRunner;
 	operationStatus?: OperationStatus;
+	executionHandle?: ExecutionHandle;
 }
 
 export type ScriptParameterType = "string" | "int" | "decimal" | "number" | "bool" | "enum";

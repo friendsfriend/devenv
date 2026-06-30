@@ -77,17 +77,18 @@ type AppStatusResponse struct {
 }
 
 type InfraServiceResponse struct {
-	Ident             string           `json:"ident"`
-	DisplayName       string           `json:"displayName"`
-	Type              string           `json:"type,omitempty"`
-	ContainerBaseName string           `json:"containerBaseName,omitempty"`
-	DockerInfo        *docker.Info     `json:"dockerInfo,omitempty"`
-	Status            string           `json:"status,omitempty"`
-	LogPath           string           `json:"logPath,omitempty"`
-	ShellPath         string           `json:"shellPath,omitempty"`
-	PowerShellPath    string           `json:"powerShellPath,omitempty"`
-	DefaultRunner     string           `json:"defaultRunner,omitempty"`
-	OperationStatus   *OperationStatus `json:"operationStatus,omitempty"`
+	Ident             string               `json:"ident"`
+	DisplayName       string               `json:"displayName"`
+	Type              string               `json:"type,omitempty"`
+	ContainerBaseName string               `json:"containerBaseName,omitempty"`
+	DockerInfo        *docker.Info         `json:"dockerInfo,omitempty"`
+	Status            string               `json:"status,omitempty"`
+	LogPath           string               `json:"logPath,omitempty"`
+	ShellPath         string               `json:"shellPath,omitempty"`
+	PowerShellPath    string               `json:"powerShellPath,omitempty"`
+	DefaultRunner     string               `json:"defaultRunner,omitempty"`
+	OperationStatus   *OperationStatus     `json:"operationStatus,omitempty"`
+	ExecutionHandle   *app.ExecutionHandle `json:"executionHandle,omitempty"`
 }
 
 func NewServer(port int) *Server {
@@ -112,6 +113,8 @@ func (s *Server) Start() error {
 	}
 	s.apps = s.services.AppManager().GetApps()
 	s.infraServices = s.services.AppManager().GetInfraServices()
+	s.services.BuildService().RecoverShellTmuxRuns(s.apps)
+	s.services.OperationsService().RecoverScriptInfrastructureRuns(s.infraServices)
 
 	logging.SetStatusLogBroadcaster(func(entry logging.LogEntry) {
 		s.BroadcastEvent(Event{
@@ -144,6 +147,7 @@ func (s *Server) Start() error {
 	go s.startGitPoller()
 	go s.startReconciliationPoller()
 	go s.startDockerEventListener()
+	go s.startScriptHealthPoller()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/apps", s.handleGetApps)
@@ -377,6 +381,24 @@ func (s *Server) findIdentByContainerName(containerName string) string {
 		}
 	}
 	return ""
+}
+
+func (s *Server) startScriptHealthPoller() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		for i := range s.apps {
+			_ = s.services.BuildService().IsShellTmuxRunActive(s.apps[i].Ident)
+			s.broadcastAppStatus(s.apps[i].Ident)
+		}
+		for i := range s.infraServices {
+			if s.infraServices[i].Type != app.InfraServiceTypeScript {
+				continue
+			}
+			_, _ = s.services.OperationsService().ScriptInfrastructureStatus(s.infraServices[i].Ident)
+			s.broadcastAppStatus(s.infraServices[i].Ident)
+		}
+	}
 }
 
 func (s *Server) startGitPoller() {
@@ -632,6 +654,7 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 			statusValue, logPath := s.services.OperationsService().ScriptInfrastructureStatus(appIdent)
 			props["status"] = statusValue
 			props["logPath"] = logPath
+			props["executionHandle"] = s.services.OperationsService().ScriptInfrastructureExecutionHandle(appIdent)
 		} else {
 			adapter := &infraServiceAdapter{service: targetInfraService}
 			dockerInfo := dockerClient.GetInfoForInfra(adapter)
@@ -878,6 +901,8 @@ func (s *Server) reloadAppConfig() {
 	}
 	s.apps = s.services.AppManager().GetApps()
 	s.infraServices = s.services.AppManager().GetInfraServices()
+	s.services.BuildService().RecoverShellTmuxRuns(s.apps)
+	s.services.OperationsService().RecoverScriptInfrastructureRuns(s.infraServices)
 }
 
 func (s *Server) updateOrCreateRepoWithStatus(targetApp *app.App, callback func()) {

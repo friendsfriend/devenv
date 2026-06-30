@@ -179,6 +179,12 @@ export function AppDetailView(props: AppDetailViewProps) {
                   <text fg={uiColors.textSecondary}>{props.app.dockerInfo?.Ports}</text>
                 </box>
               </Show>
+              <Show when={(props.app as any).executionHandle?.pid}>
+                <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                  <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>PID: </text>
+                  <text fg={uiColors.textSecondary}>{(props.app as any).executionHandle?.pid}</text>
+                </box>
+              </Show>
             </Show>
 
             <Show when={props.kind === 'library'}>
