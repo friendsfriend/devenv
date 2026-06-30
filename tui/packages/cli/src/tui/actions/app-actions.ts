@@ -102,6 +102,13 @@ export function createAppActions(
               return rest;
             }),
           );
+          appStore.setInfraServices((prev) =>
+            prev.map((svc) => {
+              if (svc.ident !== appIdent) return svc;
+              const { operationStatus: _op, ...rest } = svc;
+              return rest;
+            }),
+          );
         }
 
         if (event.type === 'statuslog.entry') {

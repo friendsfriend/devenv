@@ -868,6 +868,7 @@ func (s *Server) OnStatusUpdate(appStatus *status.AppStatus) {
 
 func (s *Server) OnStatusCleared(appIdent string) {
 	s.clearOperationStatus(appIdent)
+	s.broadcastAppStatusWithRetry(appIdent, "")
 	log.Printf("[DEBUG] Operation status cleared: %s", appIdent)
 }
 
