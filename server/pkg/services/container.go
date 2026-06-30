@@ -160,9 +160,20 @@ func NewContainer() (Container, error) {
 		return nil, fmt.Errorf("failed to create logger: %w", err)
 	}
 
-	dockerClient, err := docker.NewClient()
+	containerRuntime := os.Getenv("DEVENV_CONTAINER_RUNTIME")
+	if envFilePath != "" {
+		if vars, loadErr := resources.LoadEnvFile(envFilePath); loadErr == nil {
+			if vars["DEVENV_CONTAINER_RUNTIME"] != "" {
+				containerRuntime = vars["DEVENV_CONTAINER_RUNTIME"]
+			}
+			if vars["DEVENV_PODMAN_HOST"] != "" && os.Getenv("DEVENV_PODMAN_HOST") == "" {
+				_ = os.Setenv("DEVENV_PODMAN_HOST", vars["DEVENV_PODMAN_HOST"])
+			}
+		}
+	}
+	dockerClient, err := docker.NewClient(containerRuntime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Docker client: %w", err)
+		return nil, fmt.Errorf("failed to create container runtime client: %w", err)
 	}
 
 	appManager := app.NewManager(homeDir, configDir, stateStore)

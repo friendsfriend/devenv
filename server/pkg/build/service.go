@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
+	"github.com/friendsfriend/devenv/pkg/docker"
 	"github.com/friendsfriend/devenv/pkg/resources"
 	"github.com/friendsfriend/devenv/pkg/status"
 )
@@ -179,7 +180,7 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 	defer os.Remove(localDockerfilePath)
 
 	statusCb("building image...")
-	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, "docker", []string{"build", "--rm", "-f", localDockerfilePath, "-t", imageName, "."}, []string{}, a.LocalDirectoryPath); buildErr != nil {
+	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), []string{"build", "--rm", "-f", localDockerfilePath, "-t", imageName, "."}, []string{}, a.LocalDirectoryPath); buildErr != nil {
 		statusCb("Error: " + buildErr.Error())
 		return
 	}
@@ -402,7 +403,7 @@ func (s *service) ActiveOperationLogPath(appIdent string) (string, bool) {
 }
 
 func (s *service) readArtifactsLabel(imageName string) (string, error) {
-	inspectErr, output := s.executor.RunCommandSilent("docker", []string{"inspect", "--format", "{{json .Config.Labels}}", imageName}, []string{}, "")
+	inspectErr, output := s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"inspect", "--format", "{{json .Config.Labels}}", imageName}, []string{}, "")
 	if inspectErr != nil {
 		return "", fmt.Errorf("failed to inspect image %s: %w", imageName, inspectErr)
 	}
@@ -418,12 +419,12 @@ func (s *service) readArtifactsLabel(imageName string) (string, error) {
 func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath string) error {
 	containerName := fmt.Sprintf("%s-extract", appIdent)
 
-	if createErr, _ := s.executor.RunCommandSilent("docker", []string{"create", "--name", containerName, imageName}, []string{}, ""); createErr != nil {
+	if createErr, _ := s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"create", "--name", containerName, imageName}, []string{}, ""); createErr != nil {
 		return fmt.Errorf("failed to create extraction container: %w", createErr)
 	}
 
 	defer func() {
-		s.executor.RunCommandSilent("docker", []string{"rm", containerName}, []string{}, "")
+		s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"rm", containerName}, []string{}, "")
 	}()
 
 	destPath := filepath.Join(localDir, artifactsPath)
@@ -432,7 +433,7 @@ func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath 
 	}
 
 	containerSrc := fmt.Sprintf("%s:%s", containerName, artifactsPath)
-	if cpErr, _ := s.executor.RunCommandSilent("docker", []string{"cp", containerSrc, destPath}, []string{}, ""); cpErr != nil {
+	if cpErr, _ := s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"cp", containerSrc, destPath}, []string{}, ""); cpErr != nil {
 		return fmt.Errorf("failed to copy artifacts: %w", cpErr)
 	}
 
@@ -474,13 +475,13 @@ func (s *service) testAppInternal(a *app.App, targetID string, statusCb func(str
 	defer os.Remove(localDockerfilePath)
 
 	statusCb("building test image...")
-	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, "docker", []string{"build", "--rm", "-f", localDockerfilePath, "-t", testImageName, "."}, []string{}, a.LocalDirectoryPath); buildErr != nil {
+	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), []string{"build", "--rm", "-f", localDockerfilePath, "-t", testImageName, "."}, []string{}, a.LocalDirectoryPath); buildErr != nil {
 		statusCb("Error: " + buildErr.Error())
 		return
 	}
 
 	statusCb("running tests...")
-	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, "docker", []string{"run", "--rm", testImageName}, []string{}, a.LocalDirectoryPath); runErr != nil {
+	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), []string{"run", "--rm", testImageName}, []string{}, a.LocalDirectoryPath); runErr != nil {
 		statusCb("Error: tests failed")
 		return
 	}
@@ -532,7 +533,7 @@ func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, stat
 	composeArgs = append(composeArgs, "up", "-d")
 
 	statusCb("starting containers...")
-	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, "docker", composeArgs, []string{}, a.LocalDirectoryPath); runErr != nil {
+	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), composeArgs, []string{}, a.LocalDirectoryPath); runErr != nil {
 		statusCb("Error: " + runErr.Error())
 		return
 	}

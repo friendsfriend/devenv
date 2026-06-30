@@ -15,6 +15,12 @@ export const guides: Guide[] = [
     import: () => import("./config-repository.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
+    key: "container-runtime",
+    title: "Container Runtime",
+    description: "Choose Docker or Podman via DEVENV_CONTAINER_RUNTIME",
+    import: () => import("./container-runtime.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
     key: "adding-apps",
     title: "Adding an App",
     description: "App definitions, Dockerfiles, Compose config, and infra linking",

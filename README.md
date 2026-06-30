@@ -44,7 +44,7 @@ The Go backend uses dependency injection via `services.Container` — no global 
 
 - **Bun** 1.3.10+
 - **Go** 1.26+
-- **Docker** (for container management features)
+- **Docker** or **Podman** (for container management features)
 
 ## Quick Start
 
@@ -72,6 +72,7 @@ bun run build:single
 Task-focused guides are available from the TUI Help view (`?`) and linked below:
 
 - [Configuration Repository](tui/packages/cli/src/tui/guides/config-repository.md) — Share DevEnv config across machines or with a team
+- [Container Runtime](tui/packages/cli/src/tui/guides/container-runtime.md) — Choose Docker or Podman via `DEVENV_CONTAINER_RUNTIME`
 - [Adding an App](tui/packages/cli/src/tui/guides/adding-apps.md) — App definitions, Dockerfiles, Compose config, and infra linking
 - [Adding a Script](tui/packages/cli/src/tui/guides/adding-scripts.md) — Script discovery, --devenv-metadata convention, parameter types
 - [Adding Infrastructure](tui/packages/cli/src/tui/guides/adding-infrastructure.md) — Infra definitions, Compose placement, sharing between apps
@@ -140,6 +141,8 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 |---|---|---|
 | `DEVENV_HOME` | `~/devenv` | Root directory for cloned repositories, logs, and script collections |
 | `DEVENV_CONFIG_DIR` | `~/.config/devenv` | Config directory override |
+| `DEVENV_CONTAINER_RUNTIME` | `docker` | Container runtime for Docker-compatible features. Set to `docker` or `podman` in `~/.config/devenv/.env` |
+| `DEVENV_PODMAN_HOST` | unset | Optional Podman Docker API socket override, e.g. `unix:///run/user/501/podman/podman.sock` |
 
 ### Directory Structure
 
@@ -184,11 +187,22 @@ Script collections live under `$DEVENV_HOME/scripts/` (default `~/devenv/scripts
 
 ### `.env`
 
-Optional file for `${VAR}` substitution in compose files, provider JSON files, and templates. Standard `KEY=VALUE` format with comments (`#`) and quoted values. The server does **not** read configuration from this file — it is only used as a variable source for substitution.
+Optional local file for machine-specific DevEnv settings and `${VAR}` substitution in compose files, provider JSON files, and templates. Standard `KEY=VALUE` format with comments (`#`) and quoted values. Do not commit it.
 
 | Variable | Description |
 |---|---|
+| `DEVENV_HOME` | Root directory for cloned repositories, logs, and script collections |
+| `DEVENV_CONTAINER_RUNTIME` | Container runtime: `docker` (default) or `podman` |
+| `DEVENV_PODMAN_HOST` | Optional Podman Docker API socket override |
 | `CUSTOM_ENV_VAR` | Available as `${CUSTOM_ENV_VAR}` in compose files, provider JSON, and templates |
+
+Example:
+
+```dotenv
+DEVENV_HOME=$HOME/devenv
+DEVENV_CONTAINER_RUNTIME=docker
+# DEVENV_CONTAINER_RUNTIME=podman
+```
 
 ### `opencode.json`
 

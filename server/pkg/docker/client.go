@@ -101,11 +101,22 @@ type containerCache struct {
 	mutex      sync.RWMutex
 }
 
-// NewClient creates a new Docker client
-func NewClient() (Client, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+// NewClient creates a Docker-compatible client (Docker or Podman).
+func NewClient(configuredRuntime string) (Client, error) {
+	rt, err := SelectRuntime(configuredRuntime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Docker client: %w", err)
+		return nil, err
+	}
+
+	opts := []client.Opt{client.WithAPIVersionNegotiation()}
+	if rt.Host != "" {
+		opts = append(opts, client.WithHost(rt.Host))
+	} else {
+		opts = append(opts, client.FromEnv)
+	}
+	cli, err := client.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create %s client: %w", rt.Name, err)
 	}
 
 	return &dockerClient{
