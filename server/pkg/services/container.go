@@ -169,6 +169,9 @@ func NewContainer() (Container, error) {
 			if vars["DEVENV_PODMAN_HOST"] != "" && os.Getenv("DEVENV_PODMAN_HOST") == "" {
 				_ = os.Setenv("DEVENV_PODMAN_HOST", vars["DEVENV_PODMAN_HOST"])
 			}
+			if vars["PODMAN_COMPOSE_PROVIDER"] != "" && os.Getenv("PODMAN_COMPOSE_PROVIDER") == "" {
+				_ = os.Setenv("PODMAN_COMPOSE_PROVIDER", vars["PODMAN_COMPOSE_PROVIDER"])
+			}
 		}
 	}
 	dockerClient, err := docker.NewClient(containerRuntime)
