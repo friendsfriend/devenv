@@ -23,14 +23,21 @@ func New() (Generator, error) {
 }
 
 func (g Generator) Generate() error {
-	if err := ensureEmpty(g.ConfigDir, "config directory"); err != nil {
+	if err := ensureEmptyConfigDir(g.ConfigDir); err != nil {
 		return err
 	}
 	scriptsDir := filepath.Join(g.HomeDir, "scripts")
-	if err := ensureEmpty(scriptsDir, "scripts directory"); err != nil {
+	if err := ensureEmpty(scriptsDir, "scripts directory", scriptsDir); err != nil {
 		return err
 	}
 	for path, content := range g.files() {
+		if path == filepath.Join(g.ConfigDir, ".env") {
+			if _, err := os.Stat(path); err == nil {
+				continue
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+		}
 		mode := fs.FileMode(0644)
 		if filepath.Dir(path) == scriptsDir || filepath.Ext(path) == ".sh" && (filepath.Dir(filepath.Dir(path)) == filepath.Join(g.ConfigDir, "apps") || filepath.Dir(path) == filepath.Join(g.ConfigDir, "infrastructure", "scripts")) {
 			mode = 0755
@@ -42,7 +49,11 @@ func (g Generator) Generate() error {
 	return nil
 }
 
-func ensureEmpty(dir, label string) error {
+func ensureEmptyConfigDir(dir string) error {
+	return ensureEmpty(dir, "config directory", dir)
+}
+
+func ensureEmpty(dir, label, root string) error {
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil
@@ -51,10 +62,14 @@ func ensureEmpty(dir, label string) error {
 		return err
 	}
 	for _, entry := range entries {
+		path := filepath.Join(dir, entry.Name())
 		if !entry.IsDir() {
+			if path == filepath.Join(root, ".env") {
+				continue
+			}
 			return fmt.Errorf("%s %q is not empty; move existing files or choose a clean directory", label, dir)
 		}
-		if err := ensureEmpty(filepath.Join(dir, entry.Name()), label); err != nil {
+		if err := ensureEmpty(path, label, root); err != nil {
 			return err
 		}
 	}

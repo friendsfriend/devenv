@@ -129,6 +129,29 @@ func TestGenerateAllowsEmptyStartupCreatedDirs(t *testing.T) {
 	}
 }
 
+func TestGenerateIgnoresExistingConfigEnvFile(t *testing.T) {
+	configDir := t.TempDir()
+	homeDir := t.TempDir()
+	envPath := filepath.Join(configDir, ".env")
+	original := "DEVENV_HOME=/custom\nDEVENV_CONTAINER_RUNTIME=podman\n"
+	if err := os.WriteFile(envPath, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Generator{ConfigDir: configDir, HomeDir: homeDir}).Generate(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(envPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != original {
+		t.Fatalf("env file was overwritten:\n%s", data)
+	}
+	if _, err := os.Stat(filepath.Join(configDir, "apps", "definitions", "go-rest-postgres.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGenerateRejectsNonEmptyConfigDirWithoutWrites(t *testing.T) {
 	configDir := t.TempDir()
 	homeDir := t.TempDir()
