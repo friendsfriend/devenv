@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"regexp"
 	"sync"
 	"syscall"
 	"time"
@@ -367,16 +366,13 @@ func (s *Server) startDockerEventListener() {
 }
 
 func (s *Server) findIdentByContainerName(containerName string) string {
-	re := regexp.MustCompile(`-\d+$`)
-	baseName := re.ReplaceAllString(containerName, "")
-
 	for i := range s.apps {
-		if s.apps[i].GetContainerBaseName() == baseName {
+		if docker.ContainerNameMatches(containerName, s.apps[i].Ident, s.apps[i].GetContainerBaseName()) {
 			return s.apps[i].Ident
 		}
 	}
 	for i := range s.infraServices {
-		if s.infraServices[i].GetContainerBaseName() == baseName {
+		if docker.ContainerNameMatches(containerName, s.infraServices[i].Ident, s.infraServices[i].GetContainerBaseName()) {
 			return s.infraServices[i].Ident
 		}
 	}

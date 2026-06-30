@@ -6,6 +6,7 @@ import { ContentFrame } from './ContentStack';
 import { DetailSection } from './DetailSection';
 import type { App, MergeRequest, ContainerStats } from '@devenv/types';
 import { ScrollableContent } from './ScrollableContent';
+import { getStatusStyle } from '../statusUtils';
 
 export type AppDetailKind = 'app' | 'library' | 'infra';
 
@@ -168,7 +169,7 @@ export function AppDetailView(props: AppDetailViewProps) {
               </box>
               <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
                 <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Status: </text>
-                <text fg={props.app.dockerInfo?.Status?.toLowerCase().startsWith('up') ? uiColors.success : uiColors.textMuted}>
+                <text fg={getStatusStyle(props.app.dockerInfo?.Status || 'unknown').color}>
                   {props.app.dockerInfo?.Status || 'unknown'}
                 </text>
               </box>

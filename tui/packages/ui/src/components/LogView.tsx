@@ -1,4 +1,5 @@
 import { createSignal, onMount, createEffect, For, type JSX } from 'solid-js';
+import { TextAttributes } from '@opentui/core';
 import { useKeyboard, useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 
@@ -113,6 +114,31 @@ export function LogView(props: LogViewProps) {
     }
   });
 
+  const lineStyle = (line: string): { fg: string; bg?: string; attributes?: number } => {
+    const normalized = line.toLowerCase();
+    const isCommandEnd = /^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] ---\s*$/.test(line.trim());
+    const isSuccess = /\b(build successful|tests passed|run successful|start successful|completed)\b/.test(normalized);
+    const isFailure = /\b(error:|failed|exit status [1-9]|command failed)\b/.test(normalized);
+
+    if (isCommandEnd) {
+      return { fg: uiColors.highlight, bg: uiColors.bgSurface0, attributes: TextAttributes.BOLD };
+    }
+    if (isFailure) {
+      return { fg: uiColors.error, bg: uiColors.diffRemovedBg, attributes: TextAttributes.BOLD };
+    }
+    if (isSuccess) {
+      return { fg: uiColors.success, bg: uiColors.diffAddedBg, attributes: TextAttributes.BOLD };
+    }
+    return { fg: uiColors.textPrimary };
+  };
+
+  const decoratedLine = (line: string): string => {
+    if (/^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] ---\s*$/.test(line.trim())) {
+      return `${line}  execution finished`;
+    }
+    return line;
+  };
+
   // Get visible lines - return array of individual lines for rendering
   const visibleLines = () => {
     const allLines = lines();
@@ -150,13 +176,16 @@ export function LogView(props: LogViewProps) {
           }}
         >
           <For each={visibleLines()}>
-            {(line) => (
-              <box style={{ width: '100%', height: 1, flexShrink: 0 }}>
-                <text style={{ fg: uiColors.textPrimary }}>
-                  {line}
-                </text>
-              </box>
-            )}
+            {(line) => {
+              const style = () => lineStyle(line);
+              return (
+                <box style={{ width: '100%', height: 1, flexShrink: 0, backgroundColor: style().bg }}>
+                  <text style={{ fg: style().fg }} attributes={style().attributes}>
+                    {decoratedLine(line)}
+                  </text>
+                </box>
+              );
+            }}
           </For>
         </box>
       </box>
