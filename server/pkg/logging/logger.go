@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -316,8 +317,10 @@ func (l *fileLogger) ReadAppLogs(appIdent string, maxEntries int) (string, error
 		appEntries = appEntries[len(appEntries)-maxEntries:]
 	}
 
+	commandLog, commandLogErr := l.readRawIndividualAppLog(appIdent)
+
 	// Format as text similar to old format
-	if len(appEntries) == 0 {
+	if len(appEntries) == 0 && commandLog == "" {
 		return "", nil
 	}
 
@@ -336,6 +339,17 @@ func (l *fileLogger) ReadAppLogs(appIdent string, maxEntries int) (string, error
 		result.WriteString(fmt.Sprintf("[%s] ---\n\n", timestamp))
 	}
 
+	if commandLog != "" {
+		result.WriteString("Command input/output log\n")
+		result.WriteString("========================\n")
+		result.WriteString(commandLog)
+		if !strings.HasSuffix(commandLog, "\n") {
+			result.WriteString("\n")
+		}
+	} else if commandLogErr != nil && !os.IsNotExist(commandLogErr) {
+		result.WriteString(fmt.Sprintf("Command log unavailable: %v\n", commandLogErr))
+	}
+
 	return result.String(), nil
 }
 
@@ -348,7 +362,7 @@ func (l *fileLogger) RunCommandWithLoggingToFile(appIdent, command string, args 
 	cmd.Env = append(os.Environ(), envVars...)
 	cmd.Dir = workingDir
 
-	logFile, closeLog := l.openCommandLog(appIdent, command, args, logPath)
+	logFile, closeLog := l.openCommandLog(appIdent, command, args, envVars, workingDir, logPath)
 	defer closeLog()
 
 	var output bytes.Buffer
@@ -364,7 +378,9 @@ func (l *fileLogger) RunCommandWithLoggingToFile(appIdent, command string, args 
 	if logFile != nil {
 		timestamp := time.Now().Format("2006-01-02 15:04:05")
 		if err != nil {
-			_, _ = fmt.Fprintf(logFile, "\n[%s] Error: %s\n", timestamp, err.Error())
+			_, _ = fmt.Fprintf(logFile, "\n[%s] Exit: ERROR (%s)\n", timestamp, err.Error())
+		} else {
+			_, _ = fmt.Fprintf(logFile, "\n[%s] Exit: SUCCESS\n", timestamp)
 		}
 		_, _ = fmt.Fprintf(logFile, "[%s] ---\n\n", timestamp)
 	}
@@ -390,7 +406,7 @@ func (w *lockedMultiWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (l *fileLogger) openCommandLog(appIdent, command string, args []string, logPath string) (*os.File, func()) {
+func (l *fileLogger) openCommandLog(appIdent, command string, args []string, envVars []string, workingDir string, logPath string) (*os.File, func()) {
 	if logPath != "" {
 		if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
 			return nil, func() {}
@@ -399,14 +415,13 @@ func (l *fileLogger) openCommandLog(appIdent, command string, args []string, log
 		if err != nil {
 			return nil, func() {}
 		}
-		timestamp := time.Now().Format("2006-01-02 15:04:05")
-		_, _ = fmt.Fprintf(logFile, "[%s] Command: %s %s\n", timestamp, command, strings.Join(args, " "))
+		l.writeCommandHeader(logFile, command, args, envVars, workingDir)
 		return logFile, func() { _ = logFile.Close() }
 	}
-	return l.openIndividualAppLog(appIdent, command, args)
+	return l.openIndividualAppLog(appIdent, command, args, envVars, workingDir)
 }
 
-func (l *fileLogger) openIndividualAppLog(appIdent, command string, args []string) (*os.File, func()) {
+func (l *fileLogger) openIndividualAppLog(appIdent, command string, args []string, envVars []string, workingDir string) (*os.File, func()) {
 	logDir := filepath.Join(l.homeDir, "logs")
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return nil, func() {}
@@ -416,9 +431,38 @@ func (l *fileLogger) openIndividualAppLog(appIdent, command string, args []strin
 	if err != nil {
 		return nil, func() {}
 	}
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	_, _ = fmt.Fprintf(logFile, "[%s] Command: %s %s\n", timestamp, command, strings.Join(args, " "))
+	l.writeCommandHeader(logFile, command, args, envVars, workingDir)
 	return logFile, func() { _ = logFile.Close() }
+}
+
+func (l *fileLogger) writeCommandHeader(logFile *os.File, command string, args []string, envVars []string, workingDir string) {
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = fmt.Fprintf(logFile, "[%s] Command: %s\n", timestamp, shellQuoteCommand(command, args))
+	if workingDir != "" {
+		_, _ = fmt.Fprintf(logFile, "[%s] Working directory: %s\n", timestamp, workingDir)
+	}
+	if len(envVars) > 0 {
+		_, _ = fmt.Fprintf(logFile, "[%s] Environment overrides: %s\n", timestamp, strings.Join(envVars, " "))
+	}
+	_, _ = fmt.Fprintf(logFile, "[%s] Output:\n", timestamp)
+}
+
+func shellQuoteCommand(command string, args []string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, strconv.Quote(command))
+	for _, arg := range args {
+		parts = append(parts, strconv.Quote(arg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func (l *fileLogger) readRawIndividualAppLog(appIdent string) (string, error) {
+	logFilePath := filepath.Join(l.homeDir, "logs", appIdent+".log")
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
 }
 
 func (l *fileLogger) readIndividualAppLog(appIdent string, maxEntries int) (string, error) {
