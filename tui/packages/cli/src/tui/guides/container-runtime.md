@@ -67,6 +67,8 @@ DEVENV_PODMAN_HOST=unix:///path/to/podman.sock
 
 Docker runtime uses `docker` plus `docker-compose`. Podman runtime uses `podman` plus `podman-compose`.
 
+See [Effective Docker Builds](effective-docker-builds.md) for writing fast build Dockerfiles that stay compatible with both runtimes.
+
 ## Behavior
 
 - DevEnv never auto-switches between Docker and Podman.

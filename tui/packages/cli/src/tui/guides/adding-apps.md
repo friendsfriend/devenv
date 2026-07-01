@@ -133,4 +133,4 @@ This is a breaking change for configs that relied on Compose `depends_on` as Dev
 
 Alternatively, press `+` in the TUI table view to add an app interactively — select provider, search for a repository, name it, and choose a branch.
 
-See [Adding Infrastructure](adding-infrastructure.md) for shared services and [Adding Libraries](adding-libraries.md) for library definitions.
+See [Effective Docker Builds](effective-docker-builds.md) for fast Dockerfiles that work with Docker and Podman. See [Adding Infrastructure](adding-infrastructure.md) for shared services and [Adding Libraries](adding-libraries.md) for library definitions.

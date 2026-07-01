@@ -25,6 +25,10 @@ func RuntimeCommand() string {
 	return selectedRuntime.Command
 }
 
+func RuntimeName() string {
+	return selectedRuntime.Name
+}
+
 func ComposeCommand() string {
 	if selectedRuntime.Name == "podman" {
 		return "podman-compose"

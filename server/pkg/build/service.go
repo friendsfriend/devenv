@@ -184,7 +184,8 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 	defer os.Remove(localDockerfilePath)
 
 	statusCb("building image...")
-	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), []string{"build", "--rm", "-f", localDockerfilePath, "-t", imageName, "."}, []string{}, a.LocalDirectoryPath); buildErr != nil {
+	buildArgs, buildEnv := s.dockerBuildCommandArgs(imageName, localDockerfilePath, a.LocalDirectoryPath)
+	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), buildArgs, buildEnv, a.LocalDirectoryPath); buildErr != nil {
 		statusCb("Error: " + buildErr.Error())
 		return
 	}
@@ -207,6 +208,35 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)
 	}
+}
+
+func (s *service) dockerBuildCommandArgs(imageName, dockerfilePath, workingDir string) ([]string, []string) {
+	args := []string{"build", "--rm", "--progress=plain"}
+	envVars := []string{}
+
+	switch docker.RuntimeName() {
+	case "docker":
+		envVars = append(envVars, "DOCKER_BUILDKIT=1")
+		args = append(args, "--cache-from", imageName, "--build-arg", "BUILDKIT_INLINE_CACHE=1")
+	case "podman":
+		if s.containerBuildSupportsFlag("--layers", workingDir) {
+			args = append(args, "--layers")
+		}
+		if s.containerBuildSupportsFlag("--cache-from", workingDir) {
+			args = append(args, "--cache-from", imageName)
+		}
+	}
+
+	args = append(args, "-f", dockerfilePath, "-t", imageName, ".")
+	return args, envVars
+}
+
+func (s *service) containerBuildSupportsFlag(flag, workingDir string) bool {
+	err, output := s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"build", "--help"}, []string{}, workingDir)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(output, flag)
 }
 
 func (s *service) selectActionTarget(a *app.App, action resources.AppAction, targetID, profile string) (resources.ActionTarget, bool, error) {

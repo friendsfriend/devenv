@@ -37,6 +37,7 @@ console.log("");
 
 // Parse arguments
 const args = process.argv.slice(2);
+const skipInstall = args.includes("--skip-install");
 
 try {
 	// Clean dist directory
@@ -48,8 +49,12 @@ try {
 
 	const tuiDir = path.join(rootDir, "tui");
 
-	console.log("📦 Running bun install...");
-	await $`cd ${tuiDir} && bun install --force`;
+	if (skipInstall) {
+		console.log("📦 Skipping bun install (--skip-install)...");
+	} else {
+		console.log("📦 Running bun install...");
+		await $`cd ${tuiDir} && bun install --force`;
+	}
 	patchOpenTUISolidTransform(tuiDir);
 
 	console.log("");
@@ -59,7 +64,11 @@ try {
 
 	// Build TUI (compiles Go server + bundles TypeScript into self-contained binaries).
 	// Temporarily hide tui/bunfig.toml so @opentui/solid/preload does not run before build patching.
-	const buildArgs = args.includes("--single") ? ["--single"] : [];
+	const buildArgs = [
+		...(args.includes("--single") ? ["--single"] : []),
+		...(args.includes("--baseline") ? ["--baseline"] : []),
+		...(skipInstall ? ["--skip-install"] : []),
+	];
 	const bunfigPath = path.join(tuiDir, "bunfig.toml");
 	const bunfigTmpPath = path.join(tuiDir, ".bunfig.toml.devenv-build-tmp");
 	if (fs.existsSync(bunfigPath)) fs.renameSync(bunfigPath, bunfigTmpPath);

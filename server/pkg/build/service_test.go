@@ -99,13 +99,24 @@ type fakeCommandRunner struct {
 	silentErr error
 	lastCmd   string
 	lastArgs  []string
+	lastEnv   []string
 	lastDir   string
+	commands  []recordedCommand
 }
 
-func (f *fakeCommandRunner) RunCommandWithLogging(_, command string, args []string, _ []string, workingDir string) (error, string) {
+type recordedCommand struct {
+	command string
+	args    []string
+	envVars []string
+	dir     string
+}
+
+func (f *fakeCommandRunner) RunCommandWithLogging(_, command string, args []string, envVars []string, workingDir string) (error, string) {
 	f.lastCmd = command
 	f.lastArgs = args
+	f.lastEnv = envVars
 	f.lastDir = workingDir
+	f.commands = append(f.commands, recordedCommand{command: command, args: append([]string(nil), args...), envVars: append([]string(nil), envVars...), dir: workingDir})
 	return f.err, ""
 }
 
@@ -113,10 +124,12 @@ func (f *fakeCommandRunner) RunCommandWithLoggingToFile(appIdent, command string
 	return f.RunCommandWithLogging(appIdent, command, args, envVars, workingDir)
 }
 
-func (f *fakeCommandRunner) RunCommandSilent(command string, args []string, _ []string, workingDir string) (error, string) {
+func (f *fakeCommandRunner) RunCommandSilent(command string, args []string, envVars []string, workingDir string) (error, string) {
 	f.lastCmd = command
 	f.lastArgs = args
+	f.lastEnv = envVars
 	f.lastDir = workingDir
+	f.commands = append(f.commands, recordedCommand{command: command, args: append([]string(nil), args...), envVars: append([]string(nil), envVars...), dir: workingDir})
 	if f.silentErr != nil {
 		return f.silentErr, ""
 	}
@@ -171,6 +184,41 @@ func TestBuildAppCopyTemplates(t *testing.T) {
 				t.Fatalf("unexpected error status: %q", got)
 			}
 		})
+	}
+}
+
+func TestBuildAppDockerUsesBuildKitAndCache(t *testing.T) {
+	appDir := t.TempDir()
+	runner := &fakeCommandRunner{silentOut: `{}`}
+	svc := &service{resourceMgr: &fakeResourceMgr{}, executor: runner}
+
+	svc.buildAppInternal(&app.App{
+		Ident:              "test-app",
+		LocalDirectoryPath: appDir,
+	}, "", func(string) {})
+
+	var buildCmd *recordedCommand
+	for i := range runner.commands {
+		if len(runner.commands[i].args) > 0 && runner.commands[i].args[0] == "build" {
+			buildCmd = &runner.commands[i]
+			break
+		}
+	}
+	if buildCmd == nil {
+		t.Fatalf("expected docker build command, got %#v", runner.commands)
+	}
+	args := strings.Join(buildCmd.args, " ")
+	if !strings.Contains(args, "--cache-from test-app:latest") {
+		t.Fatalf("expected docker build cache-from args, got %#v", buildCmd.args)
+	}
+	if !strings.Contains(args, "--build-arg BUILDKIT_INLINE_CACHE=1") {
+		t.Fatalf("expected inline cache build arg, got %#v", buildCmd.args)
+	}
+	if !strings.Contains(args, "--progress=plain") {
+		t.Fatalf("expected plain progress, got %#v", buildCmd.args)
+	}
+	if strings.Join(buildCmd.envVars, " ") != "DOCKER_BUILDKIT=1" {
+		t.Fatalf("expected BuildKit env, got %#v", buildCmd.envVars)
 	}
 }
 

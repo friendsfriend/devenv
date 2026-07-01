@@ -1,0 +1,14 @@
+.git
+.github
+.pi
+.opencode
+node_modules
+tui/node_modules
+dist
+tui/dist
+tui/server-binaries
+coverage
+.tmp
+*.log
+.DS_Store
+**/.DS_Store

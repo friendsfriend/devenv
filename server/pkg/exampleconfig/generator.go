@@ -390,9 +390,69 @@ networks:
 const redisCompose = "services:\n  redis:\n    image: redis:7-alpine\n    ports: [\"6379:6379\"]\n"
 const mailpitCompose = "services:\n  mailpit:\n    image: axllent/mailpit:latest\n    ports: [\"8025:8025\", \"1025:1025\"]\n"
 
-const goBuildDockerfile = "FROM golang:1.25-alpine\nWORKDIR /src\nCOPY . .\nRUN go mod download || true\nRUN go build ./...\nCMD [\"go\", \"run\", \"./...\"]\n"
-const goTestDockerfile = "FROM golang:1.25-alpine\nWORKDIR /src\nCOPY . .\nRUN go test ./...\n"
-const bunBuildDockerfile = "FROM oven/bun:1\nWORKDIR /src\nCOPY . .\nRUN bun install --frozen-lockfile || bun install\nRUN bun run build || true\nCMD [\"bun\", \"run\", \"dev\"]\n"
-const bunTestDockerfile = "FROM oven/bun:1\nWORKDIR /src\nCOPY . .\nRUN bun install --frozen-lockfile || bun install\nRUN bun test || true\n"
-const bunLibBuildDockerfile = "FROM oven/bun:1\nWORKDIR /src\nCOPY . .\nRUN bun install --frozen-lockfile || bun install\nRUN bun run build\n"
-const bunLibTestDockerfile = "FROM oven/bun:1\nWORKDIR /src\nCOPY . .\nRUN bun install --frozen-lockfile || bun install\nRUN bun test || true\n"
+const goBuildDockerfile = `FROM golang:1.25-alpine AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go build -o /out/go-rest-postgres .
+
+FROM alpine:3.22
+LABEL devenv.artifacts="/out"
+COPY --from=build /out /out
+CMD ["/out/go-rest-postgres"]
+`
+
+const goTestDockerfile = `FROM golang:1.25-alpine
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go test ./...
+`
+
+const bunBuildDockerfile = `FROM oven/bun:1 AS deps
+WORKDIR /src
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+FROM deps AS build
+COPY . .
+RUN bun run build
+
+FROM oven/bun:1
+LABEL devenv.artifacts="dist"
+WORKDIR /src
+COPY --from=build /src /src
+CMD ["bun", "run", "dev"]
+`
+
+const bunTestDockerfile = `FROM oven/bun:1
+WORKDIR /src
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun test
+`
+
+const bunLibBuildDockerfile = `FROM oven/bun:1 AS deps
+WORKDIR /src
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+
+FROM deps AS build
+COPY . .
+RUN bun run build
+
+FROM scratch
+LABEL devenv.artifacts="/out"
+COPY --from=build /src/dist /out
+`
+
+const bunLibTestDockerfile = `FROM oven/bun:1
+WORKDIR /src
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun test
+`
