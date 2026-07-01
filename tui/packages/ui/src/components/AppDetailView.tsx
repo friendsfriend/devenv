@@ -169,8 +169,8 @@ export function AppDetailView(props: AppDetailViewProps) {
               </box>
               <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
                 <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Status: </text>
-                <text fg={getStatusStyle(props.app.dockerInfo?.Status || 'unknown').color}>
-                  {props.app.dockerInfo?.Status || 'unknown'}
+                <text fg={getStatusStyle(props.app.status || props.app.dockerInfo?.Status || 'unknown').color}>
+                  {props.app.status || props.app.dockerInfo?.Status || 'unknown'}
                 </text>
               </box>
               <Show when={props.app.dockerInfo?.Ports}>

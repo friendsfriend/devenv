@@ -77,7 +77,7 @@ export function Table<T = string>(props: TableProps<T>) {
 
 	const isRunning = (app: App) => {
 		if (app.operationStatus?.status === "active") return true;
-		const status = app.dockerInfo?.Status?.toLowerCase() || "";
+		const status = (app.status || app.dockerInfo?.Status || "").toLowerCase();
 		return status.includes("up") || status.includes("running") || status.includes("healthy");
 	};
 
@@ -106,7 +106,7 @@ export function Table<T = string>(props: TableProps<T>) {
 		}
 		if (app.resourceType === "script-folder") return "folder";
 		if (app.resourceType === "script-file") return app.scriptExecutable ? "executable" : "script";
-		return formatStatus(app.dockerInfo?.Status || "not found");
+		return formatStatus(app.status || app.dockerInfo?.Status || "not found");
 	};
 
 	const gitStatus = (app: App) => app.gitStatus?.trim() || "...";
@@ -139,7 +139,7 @@ export function Table<T = string>(props: TableProps<T>) {
 			}
 		}
 		if (app.resourceType === "script-folder" || app.resourceType === "script-file") return uiColors.textSecondary;
-		return getStatusStyle(app.dockerInfo?.Status || "not found").color;
+		return getStatusStyle(app.status || app.dockerInfo?.Status || "not found").color;
 	};
 
 	const appMetadata = (app: App) => {

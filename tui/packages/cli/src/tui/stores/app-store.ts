@@ -101,7 +101,7 @@ function folderPaths(nodes: ScriptNode[]): string[] {
 
 function appStatusRank(app: App): number {
 	if (app.operationStatus?.status === "active") return 0;
-	const status = app.dockerInfo?.Status?.toLowerCase() || "";
+	const status = (app.status || app.dockerInfo?.Status || "").toLowerCase();
 	if (status.includes("up") || status.includes("running") || status.includes("healthy")) return 0;
 	return 1;
 }
@@ -237,7 +237,7 @@ export function createAppStore() {
 
 	const appFilterValue = (app: App, key: string) => {
 		if (key === "status") {
-			const status = app.dockerInfo?.Status?.toLowerCase() || "not found";
+			const status = (app.status || app.dockerInfo?.Status || "not found").toLowerCase();
 			if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "running";
 			if (status.includes("exit") || status.includes("stop")) return "exited";
 			return status;
