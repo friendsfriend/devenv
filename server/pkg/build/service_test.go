@@ -520,6 +520,10 @@ func (f *fakeInfraStarter) StartScriptInfrastructureServiceWithStatus(infra app.
 	f.started = append(f.started, infra.Ident)
 	return f.err
 }
+func (f *fakeInfraStarter) StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error {
+	f.started = append(f.started, infra.Ident)
+	return f.err
+}
 
 func TestRunAppStartsDependenciesBeforeRequestedTarget(t *testing.T) {
 	t.Setenv("TMUX", "")

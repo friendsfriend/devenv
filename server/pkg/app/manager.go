@@ -55,13 +55,14 @@ type App struct {
 
 // Infrastructure service types.
 const (
-	InfraServiceTypeDocker  = "docker"
-	InfraServiceTypeScript  = "script"
-	ScriptRunnerShell       = "shell"
-	ScriptRunnerPowerShell  = "powershell"
-	InfraStatusStopped      = "stopped"
-	InfraStatusRunning      = "running"
-	InfraStatusFailed       = "failed"
+	InfraServiceTypeDocker     = "docker"
+	InfraServiceTypeScript     = "script"
+	InfraServiceTypeKubernetes = "kubernetes"
+	ScriptRunnerShell          = "shell"
+	ScriptRunnerPowerShell     = "powershell"
+	InfraStatusStopped         = "stopped"
+	InfraStatusRunning         = "running"
+	InfraStatusFailed          = "failed"
 )
 
 // InfraService represents an infrastructure service.
@@ -79,16 +80,28 @@ type InfraService struct {
 	Status            string            `json:"status,omitempty"`
 	LogPath           string            `json:"logPath,omitempty"`
 	ExecutionHandle   *ExecutionHandle  `json:"executionHandle,omitempty"`
+	Kubernetes        *KubernetesInfra  `json:"kubernetes,omitempty"`
+}
+
+// KubernetesInfra describes a Helm-backed Kubernetes infrastructure service.
+type KubernetesInfra struct {
+	Profile   string   `json:"profile,omitempty"`
+	ChartPath string   `json:"chartPath,omitempty"`
+	Release   string   `json:"release,omitempty"`
+	Namespace string   `json:"namespace,omitempty"`
+	Values    []string `json:"values,omitempty"`
+	Wait      bool     `json:"wait,omitempty"`
+	Timeout   string   `json:"timeout,omitempty"`
 }
 
 // ExecutionHandle tracks active script infrastructure execution.
 type ExecutionHandle struct {
-	Mode     string `json:"mode"`
-	PaneID   string `json:"paneId,omitempty"`
-	PID      int    `json:"pid,omitempty"`
-	Runner   string `json:"runner,omitempty"`
+	Mode      string `json:"mode"`
+	PaneID    string `json:"paneId,omitempty"`
+	PID       int    `json:"pid,omitempty"`
+	Runner    string `json:"runner,omitempty"`
 	StartedAt string `json:"startedAt,omitempty"`
-	ExitCode int    `json:"exitCode,omitempty"`
+	ExitCode  int    `json:"exitCode,omitempty"`
 }
 
 // appConfigFile is the on-disk representation of a single application
@@ -793,6 +806,26 @@ func normalizeInfraService(svc *InfraService) error {
 		}
 		if svc.DefaultRunner == ScriptRunnerPowerShell && strings.TrimSpace(svc.PowerShellPath) == "" {
 			return fmt.Errorf("script service %q defaultRunner powershell requires powerShellPath", svc.Ident)
+		}
+		if svc.Status == "" {
+			svc.Status = InfraStatusStopped
+		}
+		return nil
+	case InfraServiceTypeKubernetes:
+		if svc.Kubernetes == nil {
+			return fmt.Errorf("kubernetes service %q requires kubernetes config", svc.Ident)
+		}
+		if strings.TrimSpace(svc.Kubernetes.ChartPath) == "" {
+			return fmt.Errorf("kubernetes service %q requires chartPath", svc.Ident)
+		}
+		if svc.Kubernetes.Profile == "" {
+			svc.Kubernetes.Profile = "local"
+		}
+		if svc.Kubernetes.Release == "" {
+			svc.Kubernetes.Release = svc.Ident
+		}
+		if svc.Kubernetes.Namespace == "" {
+			svc.Kubernetes.Namespace = "default"
 		}
 		if svc.Status == "" {
 			svc.Status = InfraStatusStopped

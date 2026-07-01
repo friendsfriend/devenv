@@ -21,13 +21,30 @@ function targetText(target: ActionTarget): string {
   return `${targetBadge(target)} ${target.label}${profile}`;
 }
 
+function targetDetails(target: ActionTarget): string {
+  if (target.runtime !== 'kubernetes' || !target.kubernetes) return '';
+  const k = target.kubernetes;
+  const parts = [
+    `chart ${k.chartPath}`,
+    `release ${k.release}`,
+    `ns ${k.namespace}`,
+  ];
+  if (k.image?.repository) parts.push(`image ${k.image.repository}:${k.image.tag || 'dev'}`);
+  if (k.secrets?.length) parts.push(`secrets ${k.secrets.map((s) => `${s.name}(${s.keys.join(',')})`).join(',')}`);
+  if (k.ports?.length) parts.push(`ports ${k.ports.map((p) => `${p.localPort}:${p.remotePort}`).join(',')}`);
+  if (target.requires?.length) parts.push(`deps ${target.requires.length}`);
+  return parts.join(' · ');
+}
+
 function ActionTargetRow(props: { target: ActionTarget; isSelected: boolean }) {
   const cursor = () => props.isSelected ? '► ' : '  ';
+  const details = () => targetDetails(props.target);
+  const height = () => details() ? 2 : 1;
 
   return (
     <box
       backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
-      style={{ width: '100%', height: 1, paddingLeft: 1, paddingRight: 1 }}
+      style={{ width: '100%', height: height(), paddingLeft: 1, paddingRight: 1 }}
     >
       <text
         fg={uiColors.textPrimary}
@@ -35,6 +52,9 @@ function ActionTargetRow(props: { target: ActionTarget; isSelected: boolean }) {
       >
         {cursor()}{targetText(props.target)}
       </text>
+      {details() ? (
+        <text fg={uiColors.textSecondary}>  {details()}</text>
+      ) : null}
     </box>
   );
 }

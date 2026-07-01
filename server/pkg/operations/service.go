@@ -17,6 +17,8 @@ import (
 type Service interface {
 	StartInfrastructureServiceWithStatus(infra app.InfraService)
 	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
+	StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
+	StopKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
 	StopScriptInfrastructureServiceWithStatus(ident string) error
 	ScriptInfrastructureStatus(ident string) (string, string)
 	ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle
@@ -64,6 +66,10 @@ func (s *service) newComposeArgs() []string {
 }
 
 func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
+	if infra.Type == app.InfraServiceTypeKubernetes {
+		_ = s.StartKubernetesInfrastructureServiceWithStatus(infra)
+		return
+	}
 	callback := s.statusMgr.StartOperation(infra.Ident, status.OpStart)
 	callback("starting...")
 

@@ -28,6 +28,7 @@ export function createDockerActions(
 
     try {
       const isScriptInfra = 'type' in app && app.type === 'script';
+      const isKubernetesInfra = 'type' in app && app.type === 'kubernetes';
       if (isScriptInfra && action === 'start') {
         if (app.shellPath && app.powerShellPath && !app.defaultRunner && !runner) {
           uiStore.setActionTargetPickerTargets([
@@ -41,7 +42,7 @@ export function createDockerActions(
           return;
         }
         await client.startInfraService(appIdent, runner);
-      } else if (isScriptInfra && action === 'stop') {
+      } else if ((isScriptInfra || isKubernetesInfra) && action === 'stop') {
         await client.stopInfraService(appIdent);
       } else if (action === 'start') {
         if ('type' in app) await client.startInfraService(appIdent);

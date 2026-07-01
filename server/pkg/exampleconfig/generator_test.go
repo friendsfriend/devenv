@@ -26,6 +26,7 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		"infrastructure/definitions/redis.json",
 		"infrastructure/definitions/mailpit.json",
 		"infrastructure/definitions/script-clock.json",
+		"infrastructure/definitions/postgres-k8s.json",
 		"apps/compose/go-rest-postgres-compose.yml",
 		"apps/compose/bhvr-site-compose.yml",
 		"apps/compose/bhvr-site-debug-compose.yml",
@@ -35,6 +36,13 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		"infrastructure/compose/redis-compose.yml",
 		"infrastructure/compose/mailpit-compose.yml",
 		"infrastructure/scripts/script-clock.sh",
+		"apps/k8s/bhvr-site/devenv.k8s.json",
+		"apps/k8s/bhvr-site/values.yaml",
+		"apps/k8s/bhvr-site/chart/Chart.yaml",
+		"apps/k8s/bhvr-site/chart/templates/deployment.yaml",
+		"apps/k8s/bhvr-site/chart/templates/service.yaml",
+		"infrastructure/k8s/postgres/Chart.yaml",
+		"infrastructure/k8s/postgres/values.yaml",
 		"apps/build/go-rest-postgres-build.Dockerfile",
 		"apps/build/go-rest-postgres-test.Dockerfile",
 		"apps/build/bhvr-site-build.Dockerfile",
@@ -84,6 +92,16 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 	}
 	if !strings.Contains(string(eventWorkerCompose), "x-devenv:") || !strings.Contains(string(eventWorkerCompose), `{"infra":"postgres"}`) || !strings.Contains(string(eventWorkerCompose), `{"infra":"redis"}`) {
 		t.Fatalf("event-worker compose deps missing:\n%s", eventWorkerCompose)
+	}
+
+	k8sRun, err := os.ReadFile(filepath.Join(configDir, "apps", "k8s", "bhvr-site", "devenv.k8s.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{`"profile": "k8s-local"`, `$CONFIG/apps/k8s/bhvr-site/chart`, `"runtime": "kubernetes"`, `"infra": "postgres-k8s"`, `"resource": "svc/bhvr-site"`} {
+		if !strings.Contains(string(k8sRun), want) {
+			t.Fatalf("bhvr-site Kubernetes run config missing %s:\n%s", want, k8sRun)
+		}
 	}
 
 	for _, name := range []string{"hello.sh", "hello.ps1", "hello.py", "hello.ts"} {

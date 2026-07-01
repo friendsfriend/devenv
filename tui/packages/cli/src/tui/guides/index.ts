@@ -21,6 +21,12 @@ export const guides: Guide[] = [
     import: () => import("./container-runtime.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
+    key: "kubernetes-runtime",
+    title: "Kubernetes Runtime",
+    description: "Run Helm app and infrastructure targets on managed kind",
+    import: () => import("./kubernetes-runtime.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
     key: "effective-docker-builds",
     title: "Effective Docker Builds",
     description: "Write fast Dockerfiles for Docker and Podman build targets",

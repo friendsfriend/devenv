@@ -54,7 +54,7 @@ export interface App {
 }
 
 export type AppAction = "build" | "test" | "run";
-export type ActionRuntime = "docker" | "shell" | "powershell" | "systemshell";
+export type ActionRuntime = "docker" | "shell" | "powershell" | "systemshell" | "kubernetes";
 export type LaunchMode = "logged" | "tmux";
 
 export interface DependencyRef {
@@ -62,6 +62,21 @@ export interface DependencyRef {
 	runtime?: ActionRuntime;
 	profile?: string;
 	infra?: string;
+}
+
+export interface KubernetesTargetMetadata {
+	chartPath: string;
+	release: string;
+	namespace: string;
+	valuesFiles?: string[];
+	image?: {
+		repository?: string;
+		tag?: string;
+		pullPolicy?: string;
+	};
+	secrets?: { name: string; keys: string[] }[];
+	ports?: { name?: string; resource: string; localPort: number; remotePort: number }[];
+	sourcePath: string;
 }
 
 export interface ActionTarget {
@@ -73,6 +88,7 @@ export interface ActionTarget {
 	launchMode?: LaunchMode;
 	sourcePath: string;
 	requires?: DependencyRef[];
+	kubernetes?: KubernetesTargetMetadata;
 }
 
 export interface ActionTargetsResponse {
@@ -129,7 +145,7 @@ export interface DockerInfo {
 	Ports: string; // Go uses PascalCase
 }
 
-export type InfraServiceType = "docker" | "script";
+export type InfraServiceType = "docker" | "script" | "kubernetes";
 export type InfraServiceStatus = "running" | "stopped" | "failed" | string;
 export type ScriptRunner = "shell" | "powershell";
 

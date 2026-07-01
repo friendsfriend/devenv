@@ -316,3 +316,83 @@ services:
 		}
 	})
 }
+
+func TestDiscoverKubernetesActionTargets(t *testing.T) {
+	writeFile := func(t *testing.T, path, content string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	index := func(targets []ActionTarget) map[string]ActionTarget {
+		seen := map[string]ActionTarget{}
+		for _, target := range targets {
+			seen[target.ID] = target
+		}
+		return seen
+	}
+
+	t.Run("single chart discovery", func(t *testing.T) {
+		configDir := t.TempDir()
+		appDir := t.TempDir()
+		writeFile(t, filepath.Join(appDir, "Chart.yaml"), "apiVersion: v2\nname: my-app\nversion: 0.1.0\n")
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", appDir, AppActionRun)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		seen := index(targets)
+		target := seen["app/my-app/run/kubernetes/local"]
+		if target.Runtime != ActionRuntimeKubernetes || target.Kubernetes == nil {
+			t.Fatalf("missing kubernetes target: %#v", targets)
+		}
+		if target.Kubernetes.ChartPath != appDir || target.Kubernetes.Release != "my-app" {
+			t.Fatalf("metadata = %#v", target.Kubernetes)
+		}
+	})
+
+	t.Run("multiple charts stable ids", func(t *testing.T) {
+		configDir := t.TempDir()
+		appDir := t.TempDir()
+		writeFile(t, filepath.Join(appDir, "charts", "api", "Chart.yaml"), "apiVersion: v2\nname: api\nversion: 0.1.0\n")
+		writeFile(t, filepath.Join(appDir, "charts", "worker", "Chart.yaml"), "apiVersion: v2\nname: worker\nversion: 0.1.0\n")
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", appDir, AppActionRun)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		seen := index(targets)
+		if seen["app/my-app/run/kubernetes/api"].Profile != "api" || seen["app/my-app/run/kubernetes/worker"].Profile != "worker" {
+			t.Fatalf("missing stable chart ids: %#v", targets)
+		}
+	})
+
+	t.Run("config overrides and redacts secret values", func(t *testing.T) {
+		configDir := t.TempDir()
+		appDir := t.TempDir()
+		writeFile(t, filepath.Join(appDir, "helm", "Chart.yaml"), "apiVersion: v2\nname: repo\nversion: 0.1.0\n")
+		writeFile(t, filepath.Join(configDir, "apps", "k8s", "my-app", "values.yaml"), "image: local\n")
+		writeFile(t, filepath.Join(configDir, "apps", "k8s", "my-app", KubernetesConfigFileName), `{"targets":[{"profile":"dev","chart":{"path":"$APP/helm","values":["$CONFIG/apps/k8s/my-app/values.yaml"]},"release":"custom","namespace":"apps","secrets":[{"name":"env","keys":["DB_PASS"]}],"requires":[{"infra":"postgres","runtime":"kubernetes","profile":"local"}]}]}`)
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("my-app", appDir, AppActionRun)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		target := index(targets)["app/my-app/run/kubernetes/dev"]
+		if target.Kubernetes == nil || target.Kubernetes.Release != "custom" || target.Kubernetes.Namespace != "apps" {
+			t.Fatalf("metadata = %#v", target.Kubernetes)
+		}
+		if target.Kubernetes.ChartPath != filepath.Join(appDir, "helm") || target.Kubernetes.ValuesFiles[0] != filepath.Join(configDir, "apps", "k8s", "my-app", "values.yaml") {
+			t.Fatalf("paths = %#v", target.Kubernetes)
+		}
+		if len(target.Kubernetes.Secrets) != 1 || target.Kubernetes.Secrets[0].Keys[0] != "DB_PASS" {
+			t.Fatalf("secret metadata leaked or missing: %#v", target.Kubernetes.Secrets)
+		}
+		if len(target.Requires) != 1 || target.Requires[0].Infra != "postgres" || target.Requires[0].Runtime != "kubernetes" {
+			t.Fatalf("requires = %#v", target.Requires)
+		}
+	})
+}

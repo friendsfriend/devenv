@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
+	osExec "os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -33,6 +33,7 @@ type appRegistry interface {
 type infraStarter interface {
 	StartInfrastructureServiceWithStatus(infra app.InfraService)
 	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
+	StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
 }
 
 type resourceManager interface {
@@ -73,6 +74,8 @@ type service struct {
 	OnComplete     func(appIdent string)
 	tmuxMu         sync.Mutex
 	tmuxRuns       map[string]ShellTmuxRunState
+	portForwardMu  sync.Mutex
+	portForwards   map[string][]*osExec.Cmd
 	activeLogMu    sync.RWMutex
 	activeLogMap   map[string]string
 	lastRunMu      sync.RWMutex
@@ -89,6 +92,7 @@ func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr statu
 		tmuxRuns:       make(map[string]ShellTmuxRunState),
 		activeLogMap:   make(map[string]string),
 		lastRunRuntime: make(map[string]resources.ActionRuntime),
+		portForwards:   make(map[string][]*osExec.Cmd),
 	}
 }
 
@@ -520,7 +524,7 @@ func scriptCommandForTarget(target resources.ActionTarget) (string, []string) {
 	}
 	if target.Runtime == resources.ActionRuntimePowerShell {
 		command := "powershell"
-		if _, err := exec.LookPath("pwsh"); err == nil {
+		if _, err := osExec.LookPath("pwsh"); err == nil {
 			command = "pwsh"
 		}
 		return command, []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", target.SourcePath}
@@ -543,7 +547,7 @@ func ensureCommandAvailable(command, workingDir string) error {
 		}
 		return nil
 	}
-	_, err := exec.LookPath(command)
+	_, err := osExec.LookPath(command)
 	return err
 }
 
@@ -688,6 +692,10 @@ func (s *service) runAppInternal(a *app.App, profile string, targetID string, st
 }
 
 func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, statusCb func(string)) {
+	if target.Runtime == resources.ActionRuntimeKubernetes {
+		s.runKubernetesTarget(a, target, statusCb)
+		return
+	}
 	if target.Runtime != resources.ActionRuntimeDocker {
 		s.runShellTmux(a, target, statusCb)
 		return
@@ -741,6 +749,10 @@ func (s *service) startRunDependencies(target resources.ActionTarget, statusCb f
 				if err := s.infraStarter.StartScriptInfrastructureServiceWithStatus(infra, ""); err != nil {
 					return err
 				}
+			} else if infra.Type == app.InfraServiceTypeKubernetes {
+				if err := s.infraStarter.StartKubernetesInfrastructureServiceWithStatus(infra); err != nil {
+					return err
+				}
 			} else {
 				s.infraStarter.StartInfrastructureServiceWithStatus(infra)
 			}
@@ -774,7 +786,12 @@ func (s *service) buildTargetRegistry() (resources.TargetRegistry, error) {
 		}
 	}
 	for _, infra := range s.appRegistry.GetInfraServices() {
-		items = append(items, resources.RegistryTarget{ID: resources.InfraTargetID(infra.Ident), Kind: resources.TargetKindInfra, Infra: infra.Ident, Running: infra.Status == app.InfraStatusRunning})
+		id := resources.InfraTargetID(infra.Ident)
+		if infra.Type == app.InfraServiceTypeKubernetes && infra.Kubernetes != nil {
+			id = resources.InfraRuntimeTargetID(infra.Ident, app.InfraServiceTypeKubernetes, infra.Kubernetes.Profile)
+			items = append(items, resources.RegistryTarget{ID: resources.InfraTargetID(infra.Ident), Kind: resources.TargetKindInfra, Infra: infra.Ident, Running: infra.Status == app.InfraStatusRunning})
+		}
+		items = append(items, resources.RegistryTarget{ID: id, Kind: resources.TargetKindInfra, Infra: infra.Ident, Running: infra.Status == app.InfraStatusRunning})
 	}
 	return resources.NewTargetRegistry(items), nil
 }

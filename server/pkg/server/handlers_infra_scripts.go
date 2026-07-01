@@ -24,6 +24,15 @@ func (s *Server) handleInfraServiceStart(w http.ResponseWriter, r *http.Request)
 		respondJSON(w, map[string]interface{}{"success": true, "action": "started"}, http.StatusOK)
 		return
 	}
+	if svc.Type == app.InfraServiceTypeKubernetes {
+		if err := s.services.OperationsService().StartKubernetesInfrastructureServiceWithStatus(*svc); err != nil {
+			respondErrorMessage(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.broadcastAppStatus(ident)
+		respondJSON(w, map[string]interface{}{"success": true, "action": "started"}, http.StatusOK)
+		return
+	}
 	runner := r.URL.Query().Get("runner")
 	if err := s.services.OperationsService().StartScriptInfrastructureServiceWithStatus(*svc, runner); err != nil {
 		respondErrorMessage(w, err.Error(), http.StatusBadRequest)
@@ -46,6 +55,15 @@ func (s *Server) handleInfraServiceStop(w http.ResponseWriter, r *http.Request) 
 	}
 	if svc.Type == "" || svc.Type == app.InfraServiceTypeDocker {
 		respondErrorMessage(w, "Docker infrastructure stop uses container actions", http.StatusBadRequest)
+		return
+	}
+	if svc.Type == app.InfraServiceTypeKubernetes {
+		if err := s.services.OperationsService().StopKubernetesInfrastructureServiceWithStatus(*svc); err != nil {
+			respondErrorMessage(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.broadcastAppStatus(ident)
+		respondJSON(w, map[string]interface{}{"success": true, "action": "stopped"}, http.StatusOK)
 		return
 	}
 	if err := s.services.OperationsService().StopScriptInfrastructureServiceWithStatus(ident); err != nil {

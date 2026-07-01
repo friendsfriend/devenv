@@ -44,10 +44,20 @@ func InfraTargetID(infraIdent string) string {
 	return "infra/" + infraIdent
 }
 
+func InfraRuntimeTargetID(infraIdent, runtime, profile string) string {
+	if strings.TrimSpace(runtime) == "" || strings.TrimSpace(profile) == "" {
+		return InfraTargetID(infraIdent)
+	}
+	return fmt.Sprintf("infra/%s/%s/%s", infraIdent, runtime, profile)
+}
+
 func (r TargetRegistry) ResolveRef(ref DependencyRef) (string, error) {
 	if strings.TrimSpace(ref.Infra) != "" {
-		id := InfraTargetID(ref.Infra)
+		id := InfraRuntimeTargetID(ref.Infra, ref.Runtime, ref.Profile)
 		if _, ok := r.targets[id]; !ok {
+			if ref.Runtime != "" || ref.Profile != "" {
+				return "", fmt.Errorf("unknown infrastructure target %q runtime %q profile %q", ref.Infra, ref.Runtime, ref.Profile)
+			}
 			return "", fmt.Errorf("unknown infrastructure service %q", ref.Infra)
 		}
 		return id, nil
@@ -115,7 +125,7 @@ func (r TargetRegistry) ResolveStartPlan(rootID string) ([]RegistryTarget, error
 
 func refKey(ref DependencyRef) string {
 	if ref.Infra != "" {
-		return "infra/" + ref.Infra
+		return InfraRuntimeTargetID(ref.Infra, ref.Runtime, ref.Profile)
 	}
 	return AppRunTargetID(ref.App, ActionRuntime(ref.Runtime), ref.Profile)
 }
