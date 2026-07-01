@@ -129,7 +129,10 @@ func kubernetesActionTarget(appIdent string, cfg KubernetesRunTargetConfig, sour
 	for _, secret := range cfg.Secrets {
 		secrets = append(secrets, KubernetesSecretSummary{Name: secret.Name, Keys: append([]string{}, secret.Keys...)})
 	}
-	label := fmt.Sprintf("Kubernetes %s", profile)
+	label := cfg.Name
+	if label == "" {
+		label = fmt.Sprintf("Kubernetes %s", profile)
+	}
 	return ActionTarget{
 		ID:         actionTargetID(appIdent, AppActionRun, ActionRuntimeKubernetes, profile),
 		Action:     AppActionRun,

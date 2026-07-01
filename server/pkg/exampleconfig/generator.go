@@ -467,6 +467,7 @@ const bunKubernetesConfig = `{
   "targets": [
     {
       "profile": "k8s-local",
+      "name": "Kubernetes Local (kind)",
       "chart": { "path": "$CONFIG/apps/k8s/bhvr-site/chart" },
       "values": ["$CONFIG/apps/k8s/bhvr-site/values.yaml"],
       "release": "bhvr-site-local",

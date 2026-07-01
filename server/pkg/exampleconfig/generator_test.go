@@ -98,7 +98,7 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"profile": "k8s-local"`, `$CONFIG/apps/k8s/bhvr-site/chart`, `"runtime": "kubernetes"`, `"infra": "postgres-k8s"`, `"resource": "svc/bhvr-site"`} {
+	for _, want := range []string{`"profile": "k8s-local"`, `"name": "Kubernetes Local (kind)"`, `$CONFIG/apps/k8s/bhvr-site/chart`, `"runtime": "kubernetes"`, `"infra": "postgres-k8s"`, `"resource": "svc/bhvr-site"`} {
 		if !strings.Contains(string(k8sRun), want) {
 			t.Fatalf("bhvr-site Kubernetes run config missing %s:\n%s", want, k8sRun)
 		}

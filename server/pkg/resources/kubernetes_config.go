@@ -13,6 +13,7 @@ const KubernetesConfigFileName = "devenv.k8s.json"
 // KubernetesRunTargetConfig describes one Helm-backed app run target.
 type KubernetesRunTargetConfig struct {
 	Profile   string                        `json:"profile,omitempty"`
+	Name      string                        `json:"name,omitempty"`
 	Chart     KubernetesHelmChartConfig     `json:"chart"`
 	Release   string                        `json:"release,omitempty"`
 	Namespace string                        `json:"namespace,omitempty"`
