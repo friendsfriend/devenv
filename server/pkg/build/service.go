@@ -211,13 +211,13 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 }
 
 func (s *service) dockerBuildCommandArgs(imageName, dockerfilePath, workingDir string) ([]string, []string) {
-	args := []string{"build", "--rm", "--progress=plain"}
+	args := []string{"build", "--rm"}
 	envVars := []string{}
 
 	switch docker.RuntimeName() {
 	case "docker":
 		envVars = append(envVars, "DOCKER_BUILDKIT=1")
-		args = append(args, "--cache-from", imageName, "--build-arg", "BUILDKIT_INLINE_CACHE=1")
+		args = append(args, "--progress=plain", "--cache-from", imageName, "--build-arg", "BUILDKIT_INLINE_CACHE=1")
 	case "podman":
 		if s.containerBuildSupportsFlag("--layers", workingDir) {
 			args = append(args, "--layers")
