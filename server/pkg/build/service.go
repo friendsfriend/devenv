@@ -60,30 +60,35 @@ type Service interface {
 	IsShellTmuxRunActive(appIdent string) bool
 	RecoverShellTmuxRuns(apps []app.App)
 	ActiveOperationLogPath(appIdent string) (string, bool)
+	LastRunRuntime(appIdent string) string
+	SetLastRunRuntime(appIdent string, runtime resources.ActionRuntime)
 	SetOnComplete(callback func(appIdent string))
 	ConfigureRunDependencies(apps appRegistry, infra infraStarter)
 }
 
 type service struct {
-	resourceMgr  resourceManager
-	executor     commandRunner
-	statusMgr    status.Manager
-	OnComplete   func(appIdent string)
-	tmuxMu       sync.Mutex
-	tmuxRuns     map[string]ShellTmuxRunState
-	activeLogMu  sync.RWMutex
-	activeLogMap map[string]string
-	appRegistry  appRegistry
-	infraStarter infraStarter
+	resourceMgr    resourceManager
+	executor       commandRunner
+	statusMgr      status.Manager
+	OnComplete     func(appIdent string)
+	tmuxMu         sync.Mutex
+	tmuxRuns       map[string]ShellTmuxRunState
+	activeLogMu    sync.RWMutex
+	activeLogMap   map[string]string
+	lastRunMu      sync.RWMutex
+	lastRunRuntime map[string]resources.ActionRuntime
+	appRegistry    appRegistry
+	infraStarter   infraStarter
 }
 
 func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr status.Manager) Service {
 	return &service{
-		resourceMgr:  resourceMgr,
-		executor:     exec,
-		statusMgr:    statusMgr,
-		tmuxRuns:     make(map[string]ShellTmuxRunState),
-		activeLogMap: make(map[string]string),
+		resourceMgr:    resourceMgr,
+		executor:       exec,
+		statusMgr:      statusMgr,
+		tmuxRuns:       make(map[string]ShellTmuxRunState),
+		activeLogMap:   make(map[string]string),
+		lastRunRuntime: make(map[string]resources.ActionRuntime),
 	}
 }
 
@@ -99,6 +104,21 @@ type ShellTmuxRunState struct {
 
 func (s *service) SetOnComplete(callback func(appIdent string)) {
 	s.OnComplete = callback
+}
+
+func (s *service) LastRunRuntime(appIdent string) string {
+	s.lastRunMu.RLock()
+	defer s.lastRunMu.RUnlock()
+	return string(s.lastRunRuntime[appIdent])
+}
+
+func (s *service) SetLastRunRuntime(appIdent string, runtime resources.ActionRuntime) {
+	s.lastRunMu.Lock()
+	defer s.lastRunMu.Unlock()
+	if s.lastRunRuntime == nil {
+		s.lastRunRuntime = make(map[string]resources.ActionRuntime)
+	}
+	s.lastRunRuntime[appIdent] = runtime
 }
 
 func (s *service) ConfigureRunDependencies(apps appRegistry, infra infraStarter) {
@@ -183,9 +203,15 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 	}
 	defer os.Remove(localDockerfilePath)
 
+	logPath, err := s.startOperationLog(a.Ident, "build")
+	if err != nil {
+		statusCb("Error: " + err.Error())
+		return
+	}
+
 	statusCb("building image...")
 	buildArgs, buildEnv := s.dockerBuildCommandArgs(imageName, localDockerfilePath, a.LocalDirectoryPath)
-	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), buildArgs, buildEnv, a.LocalDirectoryPath); buildErr != nil {
+	if buildErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.RuntimeCommand(), buildArgs, buildEnv, a.LocalDirectoryPath, logPath); buildErr != nil {
 		statusCb("Error: " + buildErr.Error())
 		return
 	}
@@ -362,6 +388,7 @@ func (s *service) runShellTmux(a *app.App, target resources.ActionTarget, status
 		s.tmuxRuns[a.Ident] = ShellTmuxRunState{AppIdent: a.Ident, TargetID: target.ID, Profile: target.Profile, WindowID: windowID, PID: panePID, StartedAt: time.Now()}
 		s.tmuxMu.Unlock()
 	}
+	s.SetLastRunRuntime(a.Ident, resources.ActionRuntimeShell)
 	statusCb("run successful")
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)
@@ -477,6 +504,9 @@ func (s *service) runShellLogged(a *app.App, target resources.ActionTarget, oper
 	if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, command, args, []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
 		statusCb("Error: " + runErr.Error())
 		return
+	}
+	if operation == "run" {
+		s.SetLastRunRuntime(a.Ident, resources.ActionRuntimeShell)
 	}
 	statusCb(operation + " successful")
 	if s.OnComplete != nil {
@@ -610,14 +640,21 @@ func (s *service) testAppInternal(a *app.App, targetID string, statusCb func(str
 	}
 	defer os.Remove(localDockerfilePath)
 
+	logPath, err := s.startOperationLog(a.Ident, "test")
+	if err != nil {
+		statusCb("Error: " + err.Error())
+		return
+	}
+
 	statusCb("building test image...")
-	if buildErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), []string{"build", "--rm", "-f", localDockerfilePath, "-t", testImageName, "."}, []string{}, a.LocalDirectoryPath); buildErr != nil {
+	buildArgs, buildEnv := s.dockerBuildCommandArgs(testImageName, localDockerfilePath, a.LocalDirectoryPath)
+	if buildErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.RuntimeCommand(), buildArgs, buildEnv, a.LocalDirectoryPath, logPath); buildErr != nil {
 		statusCb("Error: " + buildErr.Error())
 		return
 	}
 
 	statusCb("running tests...")
-	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.RuntimeCommand(), []string{"run", "--rm", testImageName}, []string{}, a.LocalDirectoryPath); runErr != nil {
+	if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.RuntimeCommand(), []string{"run", "--rm", testImageName}, []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
 		statusCb("Error: tests failed")
 		return
 	}
@@ -674,6 +711,7 @@ func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, stat
 		return
 	}
 
+	s.SetLastRunRuntime(a.Ident, resources.ActionRuntimeDocker)
 	statusCb("run successful")
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)

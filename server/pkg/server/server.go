@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -453,6 +454,7 @@ func (s *Server) startGitPoller() {
 					"gitStatus":       gitStatus,
 					"branch":          branch,
 					"operationStatus": opStatus,
+					"status":          s.appRuntimeStatus(app.Ident, dockerInfo),
 				},
 				Timestamp: time.Now(),
 			})
@@ -505,6 +507,7 @@ func (s *Server) startReconciliationPoller() {
 						"gitStatus":       gitStatus,
 						"branch":          branch,
 						"operationStatus": opStatus,
+						"status":          s.appRuntimeStatus(app.Ident, dockerInfo),
 					},
 					Timestamp: time.Now(),
 				})
@@ -534,6 +537,7 @@ func (s *Server) startReconciliationPoller() {
 							"ident":           svc.Ident,
 							"dockerInfo":      dockerInfo,
 							"operationStatus": opStatus,
+							"status":          dockerRuntimeStatus(dockerInfo),
 						},
 						Timestamp: time.Now(),
 					})
@@ -621,10 +625,7 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 		opStatus := s.opStatus[appIdent]
 		s.opStatusMu.RUnlock()
 
-		appRunStatus := "stopped"
-		if s.services != nil && s.services.BuildService() != nil && s.services.BuildService().IsShellTmuxRunActive(appIdent) {
-			appRunStatus = "running"
-		}
+		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
 		s.BroadcastEvent(Event{
 			Type: "status.updated",
 			Properties: map[string]interface{}{
@@ -659,6 +660,7 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 			adapter := &infraServiceAdapter{service: targetInfraService}
 			dockerInfo := dockerClient.GetInfoForInfra(adapter)
 			props["dockerInfo"] = dockerInfo
+			props["status"] = dockerRuntimeStatus(dockerInfo)
 		}
 		s.BroadcastEvent(Event{Type: "status.updated", Properties: props, Timestamp: time.Now()})
 		return
@@ -693,10 +695,7 @@ func (s *Server) broadcastAppStatusWithBranch(appIdent, knownBranch string) {
 		opStatus := s.opStatus[appIdent]
 		s.opStatusMu.RUnlock()
 
-		appRunStatus := "stopped"
-		if s.services != nil && s.services.BuildService() != nil && s.services.BuildService().IsShellTmuxRunActive(appIdent) {
-			appRunStatus = "running"
-		}
+		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
 		props := map[string]interface{}{
 			"ident":           appIdent,
 			"dockerInfo":      dockerInfo,
@@ -740,6 +739,28 @@ func (s *Server) broadcastAppStatusWithRetry(appIdent string, prevDockerStatus s
 			}
 		}
 	}()
+}
+
+func (s *Server) appRuntimeStatus(appIdent string, dockerInfo docker.Info) string {
+	if s.services != nil && s.services.BuildService() != nil {
+		switch s.services.BuildService().LastRunRuntime(appIdent) {
+		case "docker":
+			return dockerRuntimeStatus(dockerInfo)
+		case "shell", "powershell", "systemshell":
+			if s.services.BuildService().IsShellTmuxRunActive(appIdent) {
+				return "running"
+			}
+			return "stopped"
+		}
+	}
+	return dockerRuntimeStatus(dockerInfo)
+}
+
+func dockerRuntimeStatus(dockerInfo docker.Info) string {
+	if dockerInfo.Status != "" && dockerInfo.Status != "not found" && dockerInfo.Status != "error" {
+		return strings.ToLower(dockerInfo.Status)
+	}
+	return "stopped"
 }
 
 func (s *Server) getDockerStatus(appIdent string) string {

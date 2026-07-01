@@ -43,6 +43,9 @@ func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[INFO] Successfully started container: %s", containerID)
+	if appIdent != "" && s.services.BuildService() != nil {
+		s.services.BuildService().SetLastRunRuntime(appIdent, "docker")
+	}
 
 	// Update status log
 	if statusCallback != nil {
@@ -169,6 +172,9 @@ func (s *Server) handleDockerRestart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[INFO] Successfully restarted container: %s", containerID)
+	if appIdent != "" && s.services.BuildService() != nil {
+		s.services.BuildService().SetLastRunRuntime(appIdent, "docker")
+	}
 
 	// Update status log
 	if statusCallback != nil {

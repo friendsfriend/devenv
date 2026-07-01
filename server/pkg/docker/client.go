@@ -231,18 +231,19 @@ func (dc *dockerClient) GetInfo(app App) Info {
 		return Info{Status: "error"}
 	}
 
+	best := Info{Status: "not found"}
 	for _, ctr := range containers {
 		for _, name := range ctr.Names {
 			if ContainerNameMatches(name, app.GetIdent(), app.GetContainerBaseName()) {
-				return Info{
+				best = preferredContainerInfo(best, Info{
 					Status:      ctr.State,
 					ContainerID: ctr.ID,
 					Ports:       dc.getDockerPorts(ctr),
-				}
+				})
 			}
 		}
 	}
-	return Info{Status: "not found"}
+	return best
 }
 
 func (dc *dockerClient) GetInfoForInfra(infraService InfraService) Info {
@@ -251,18 +252,19 @@ func (dc *dockerClient) GetInfoForInfra(infraService InfraService) Info {
 		return Info{Status: "error"}
 	}
 
+	best := Info{Status: "not found"}
 	for _, ctr := range containers {
 		for _, name := range ctr.Names {
 			if ContainerNameMatches(name, infraService.GetIdent(), infraService.GetContainerBaseName()) {
-				return Info{
+				best = preferredContainerInfo(best, Info{
 					Status:      ctr.State,
 					ContainerID: ctr.ID,
 					Ports:       dc.getDockerPorts(ctr),
-				}
+				})
 			}
 		}
 	}
-	return Info{Status: "not found"}
+	return best
 }
 
 func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (map[string]Info, error) {
@@ -296,22 +298,22 @@ func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (
 			// Check against regular apps
 			for _, app := range apps {
 				if ContainerNameMatches(name, app.GetIdent(), app.GetContainerBaseName()) {
-					results[app.GetIdent()] = Info{
+					results[app.GetIdent()] = preferredContainerInfo(results[app.GetIdent()], Info{
 						Status:      ctr.State,
 						ContainerID: ctr.ID,
 						Ports:       dc.getDockerPorts(ctr),
-					}
+					})
 				}
 			}
 
 			// Check against infrastructure services
 			for _, infraApp := range infraServices {
 				if ContainerNameMatches(name, infraApp.GetIdent(), infraApp.GetContainerBaseName()) {
-					results[infraApp.GetIdent()] = Info{
+					results[infraApp.GetIdent()] = preferredContainerInfo(results[infraApp.GetIdent()], Info{
 						Status:      ctr.State,
 						ContainerID: ctr.ID,
 						Ports:       dc.getDockerPorts(ctr),
-					}
+					})
 				}
 			}
 		}
@@ -382,6 +384,34 @@ func (dc *dockerClient) containerNameFromEvent(containerID string, attrs map[str
 		}
 	}
 	return containerID
+}
+
+func preferredContainerInfo(current, candidate Info) Info {
+	if containerStatusRank(candidate.Status) > containerStatusRank(current.Status) {
+		return candidate
+	}
+	return current
+}
+
+func containerStatusRank(status string) int {
+	switch strings.ToLower(status) {
+	case "running":
+		return 100
+	case "restarting":
+		return 90
+	case "paused":
+		return 80
+	case "created":
+		return 70
+	case "exited", "dead", "removing":
+		return 10
+	case "not found", "":
+		return 0
+	case "error":
+		return -1
+	default:
+		return 50
+	}
 }
 
 func ContainerNameMatches(name, ident, containerBaseName string) bool {

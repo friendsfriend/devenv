@@ -87,6 +87,36 @@ coverage
 .cache
 ```
 
+## Handle workspaces and monorepos
+
+If `package.json` declares workspaces, copy each workspace manifest before installing. Package managers need those files to resolve the workspace graph.
+
+```dockerfile
+FROM oven/bun:1 AS deps
+WORKDIR /app
+COPY package.json bun.lock ./
+COPY server/package.json ./server/package.json
+COPY client/package.json ./client/package.json
+COPY shared/package.json ./shared/package.json
+RUN bun install --frozen-lockfile
+
+FROM deps AS build
+COPY . .
+RUN bun run build
+```
+
+Do not copy only the root `package.json` when it contains workspaces like `"./server"`, `"./client"`, or `"./shared"`; Bun will fail with `Workspace not found`.
+
+If install lifecycle scripts need source files (`postinstall`, `prepare`, generated types, TypeScript builds), skip them in the dependency-cache layer and run the real build after copying source:
+
+```dockerfile
+RUN bun install --frozen-lockfile --ignore-scripts
+COPY . .
+RUN bun run build
+```
+
+Without `--ignore-scripts`, `bun install` may run `postinstall` before `tsconfig.json` or workspace source files exist.
+
 ## Use cache mounts when available
 
 Cache mounts speed repeated installs and compiles. They work with Docker BuildKit and recent Podman/Buildah versions.

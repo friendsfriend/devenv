@@ -411,7 +411,7 @@ func (l *fileLogger) openCommandLog(appIdent, command string, args []string, env
 		if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
 			return nil, func() {}
 		}
-		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			return nil, func() {}
 		}

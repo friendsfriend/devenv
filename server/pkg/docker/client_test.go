@@ -2,6 +2,24 @@ package docker
 
 import "testing"
 
+func TestPreferredContainerInfoPrefersRunningOverExited(t *testing.T) {
+	current := Info{Status: "exited", ContainerID: "old"}
+	candidate := Info{Status: "running", ContainerID: "new"}
+	got := preferredContainerInfo(current, candidate)
+	if got.ContainerID != "new" {
+		t.Fatalf("expected running container to win, got %#v", got)
+	}
+}
+
+func TestPreferredContainerInfoKeepsRunningOverExited(t *testing.T) {
+	current := Info{Status: "running", ContainerID: "new"}
+	candidate := Info{Status: "exited", ContainerID: "old"}
+	got := preferredContainerInfo(current, candidate)
+	if got.ContainerID != "new" {
+		t.Fatalf("expected running container to stay selected, got %#v", got)
+	}
+}
+
 func TestContainerNameMatchesDockerAndPodmanComposeNames(t *testing.T) {
 	cases := []struct {
 		name  string

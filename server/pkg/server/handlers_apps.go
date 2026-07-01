@@ -140,10 +140,7 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 		currentBranch := gitRepo.GetCurrentBranch(&appAdapter{app: &a})
 		opStatus := s.getOperationStatus(a.Ident)
 
-		appRunStatus := "stopped"
-		if s.services.BuildService().IsShellTmuxRunActive(a.Ident) {
-			appRunStatus = "running"
-		}
+		appRunStatus := s.appRuntimeStatus(a.Ident, dockerInfo)
 		statuses = append(statuses, AppStatusResponse{
 			Ident:           a.Ident,
 			DockerInfo:      &dockerInfo,

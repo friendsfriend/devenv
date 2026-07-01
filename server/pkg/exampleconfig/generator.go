@@ -320,9 +320,7 @@ const goCompose = `x-devenv:
   requires: [{"infra":"postgres"},{"infra":"script-clock"}]
 services:
   go-rest-postgres:
-    build:
-      context: ../../..
-      dockerfile: apps/build/go-rest-postgres-build.Dockerfile
+    image: go-rest-postgres:latest
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/example?sslmode=disable
     ports: ["8080:8080"]
@@ -335,17 +333,13 @@ networks:
 
 const bunCompose = `services:
   bhvr-site:
-    build:
-      context: ../../..
-      dockerfile: apps/build/bhvr-site-build.Dockerfile
+    image: bhvr-site:latest
     ports: ["3000:3000"]
 `
 
 const bunDebugCompose = `services:
   bhvr-site:
-    build:
-      context: ../../..
-      dockerfile: apps/build/bhvr-site-build.Dockerfile
+    image: bhvr-site:latest
     command: bun --inspect run dev
     ports: ["3000:3000", "6499:6499"]
 `
@@ -354,9 +348,7 @@ const bunRedisCompose = `x-devenv:
   requires: [{"app":"go-rest-postgres","runtime":"docker","profile":"default"},{"infra":"redis"},{"infra":"script-clock"}]
 services:
   bhvr-site:
-    build:
-      context: ../../..
-      dockerfile: apps/build/bhvr-site-build.Dockerfile
+    image: bhvr-site:latest
     environment:
       REDIS_URL: redis://bhvr-redis:6379
     ports: ["3000:3000"]
@@ -414,7 +406,10 @@ RUN go test ./...
 const bunBuildDockerfile = `FROM oven/bun:1 AS deps
 WORKDIR /src
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+COPY server/package.json ./server/package.json
+COPY client/package.json ./client/package.json
+COPY shared/package.json ./shared/package.json
+RUN bun install --frozen-lockfile --ignore-scripts
 
 FROM deps AS build
 COPY . .
@@ -430,7 +425,10 @@ CMD ["bun", "run", "dev"]
 const bunTestDockerfile = `FROM oven/bun:1
 WORKDIR /src
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+COPY server/package.json ./server/package.json
+COPY client/package.json ./client/package.json
+COPY shared/package.json ./shared/package.json
+RUN bun install --frozen-lockfile --ignore-scripts
 COPY . .
 RUN bun test
 `
