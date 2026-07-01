@@ -492,6 +492,9 @@ export async function handleTableKeys(
 		case "c":
 			providerActions.loadProviders();
 			break;
+		case "9":
+			utilActions.launchK9s();
+			break;
 		case "s":
 			if (appStore.activeTab() === "scripts") {
 				if (appList.length > 0) {
@@ -504,11 +507,17 @@ export async function handleTableKeys(
 			if (appList.length > 0) {
 				const app = getSelectedApp();
 				if (!app) break;
+				if (app.operationStatus?.status === "active") {
+					await logActions.openActionLogForApp(app.ident, app.displayName || app.ident, "Action Log");
+					break;
+				}
 				if (appStore.operationInProgressForApp()) {
-					showError(
-						"Operation In Progress",
-						"Another operation is already in progress. Please wait for it to complete.",
-					);
+					const activeIdent = appStore.operationInProgressForApp();
+					if (!activeIdent) break;
+					const active = appStore.apps().find((a) => a.ident === activeIdent)
+						|| appStore.infraServices().find((svc) => svc.ident === activeIdent)
+						|| app;
+					await logActions.openActionLogForApp(activeIdent, active.displayName || active.ident, "Action Log");
 					break;
 				}
 				if (appStore.activeTab() === "infrastructure") {

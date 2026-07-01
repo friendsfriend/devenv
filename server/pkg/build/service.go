@@ -34,6 +34,7 @@ type infraStarter interface {
 	StartInfrastructureServiceWithStatus(infra app.InfraService)
 	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
 	StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
+	StartKubernetesInfrastructureServiceWithLog(infra app.InfraService, logPath string) error
 }
 
 type resourceManager interface {
@@ -56,12 +57,15 @@ type Service interface {
 	TestAppTargetWithStatus(a *app.App, targetID string)
 	RunAppWithStatus(a *app.App, profile string)
 	RunAppTargetWithStatus(a *app.App, targetID string)
+	StopAppWithStatus(a *app.App, targetID string)
 	StopShellTmuxRun(appIdent string) error
 	RestartShellTmuxRun(a *app.App) error
 	IsShellTmuxRunActive(appIdent string) bool
 	RecoverShellTmuxRuns(apps []app.App)
 	ActiveOperationLogPath(appIdent string) (string, bool)
 	LastRunRuntime(appIdent string) string
+	KubernetesRunStatus(appIdent string) string
+	DiscoverKubernetesRunStatus(appIdent, localDir string) string
 	SetLastRunRuntime(appIdent string, runtime resources.ActionRuntime)
 	SetOnComplete(callback func(appIdent string))
 	ConfigureRunDependencies(apps appRegistry, infra infraStarter)
@@ -80,6 +84,7 @@ type service struct {
 	activeLogMap   map[string]string
 	lastRunMu      sync.RWMutex
 	lastRunRuntime map[string]resources.ActionRuntime
+	lastKubernetes map[string]*resources.KubernetesTargetMetadata
 	appRegistry    appRegistry
 	infraStarter   infraStarter
 }
@@ -92,6 +97,7 @@ func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr statu
 		tmuxRuns:       make(map[string]ShellTmuxRunState),
 		activeLogMap:   make(map[string]string),
 		lastRunRuntime: make(map[string]resources.ActionRuntime),
+		lastKubernetes: make(map[string]*resources.KubernetesTargetMetadata),
 		portForwards:   make(map[string][]*osExec.Cmd),
 	}
 }
@@ -123,6 +129,79 @@ func (s *service) SetLastRunRuntime(appIdent string, runtime resources.ActionRun
 		s.lastRunRuntime = make(map[string]resources.ActionRuntime)
 	}
 	s.lastRunRuntime[appIdent] = runtime
+}
+
+func (s *service) setLastKubernetesTarget(appIdent string, target *resources.KubernetesTargetMetadata) {
+	s.lastRunMu.Lock()
+	defer s.lastRunMu.Unlock()
+	if s.lastKubernetes == nil {
+		s.lastKubernetes = make(map[string]*resources.KubernetesTargetMetadata)
+	}
+	s.lastKubernetes[appIdent] = target
+}
+
+func (s *service) KubernetesRunStatus(appIdent string) string {
+	s.lastRunMu.RLock()
+	target := s.lastKubernetes[appIdent]
+	s.lastRunMu.RUnlock()
+	if target == nil {
+		return "stopped"
+	}
+	return s.kubernetesTargetStatus(target)
+}
+
+func (s *service) DiscoverKubernetesRunStatus(appIdent, localDir string) string {
+	targets, err := s.resourceMgr.DiscoverActionTargets(appIdent, localDir, resources.AppActionRun)
+	if err != nil {
+		return "stopped"
+	}
+	for _, target := range targets {
+		if target.Runtime != resources.ActionRuntimeKubernetes || target.Kubernetes == nil {
+			continue
+		}
+		status := s.kubernetesTargetStatus(target.Kubernetes)
+		if !strings.HasPrefix(status, "stopped") {
+			s.setLastKubernetesTarget(appIdent, target.Kubernetes)
+			s.SetLastRunRuntime(appIdent, resources.ActionRuntimeKubernetes)
+			return status
+		}
+	}
+	return "stopped (0 pods)"
+}
+
+func (s *service) kubernetesTargetStatus(target *resources.KubernetesTargetMetadata) string {
+	cmd := "kubectl"
+	args := []string{"--context", "kind-devenv", "get", "pods", "--namespace", target.Namespace, "-l", "app.kubernetes.io/instance=" + target.Release, "--no-headers"}
+	err, output := s.executor.RunCommandSilent(cmd, args, []string{}, "")
+	if err != nil || strings.TrimSpace(output) == "" {
+		return "stopped (0 pods)"
+	}
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	total, running, failed := 0, 0, 0
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		total++
+		phase := strings.ToLower(fields[2])
+		if phase == "running" || phase == "succeeded" {
+			running++
+		}
+		if phase == "failed" || phase == "error" || strings.Contains(phase, "crash") {
+			failed++
+		}
+	}
+	if total == 0 {
+		return "stopped (0 pods)"
+	}
+	if failed > 0 {
+		return fmt.Sprintf("failed (%d/%d pods)", running, total)
+	}
+	if running == total {
+		return fmt.Sprintf("running (%d/%d pods)", running, total)
+	}
+	return fmt.Sprintf("starting (%d/%d pods)", running, total)
 }
 
 func (s *service) ConfigureRunDependencies(apps appRegistry, infra infraStarter) {
@@ -221,14 +300,14 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 	}
 
 	statusCb("extracting artifacts...")
-	artifactsPath, err := s.readArtifactsLabel(imageName)
+	artifactsPath, err := s.readArtifactsLabel(imageName, logPath)
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
 	}
 
 	if artifactsPath != "" {
-		if err := s.extractArtifacts(a.Ident, a.LocalDirectoryPath, imageName, artifactsPath); err != nil {
+		if err := s.extractArtifacts(a.Ident, a.LocalDirectoryPath, imageName, artifactsPath, logPath); err != nil {
 			statusCb("Error: artifact extraction failed: " + err.Error())
 			return
 		}
@@ -552,8 +631,13 @@ func ensureCommandAvailable(command, workingDir string) error {
 }
 
 func (s *service) startOperationLog(appIdent, operation string) (string, error) {
-	path := filepath.Join(os.TempDir(), "devenv-action-logs", fmt.Sprintf("%s-%s-%d.log", appIdent, operation, time.Now().UnixNano()))
+	logDir := filepath.Join(os.TempDir(), "devenv-action-logs")
+	cleanupOperationLogs(logDir, 24*time.Hour)
+	path := filepath.Join(logDir, fmt.Sprintf("%s-%s-%d.log", appIdent, operation, time.Now().UnixNano()))
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(fmt.Sprintf("[%s] Operation log started: app=%s operation=%s\n[%s] Retention: temporary log, auto-cleaned after 24h\n\n", time.Now().Format("2006-01-02 15:04:05"), appIdent, operation, time.Now().Format("2006-01-02 15:04:05"))), 0644); err != nil {
 		return "", err
 	}
 	s.activeLogMu.Lock()
@@ -572,8 +656,47 @@ func (s *service) ActiveOperationLogPath(appIdent string) (string, bool) {
 	return path, ok
 }
 
-func (s *service) readArtifactsLabel(imageName string) (string, error) {
-	inspectErr, output := s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"inspect", "--format", "{{json .Config.Labels}}", imageName}, []string{}, "")
+func (s *service) appendOperationLog(logPath, format string, args ...interface{}) {
+	if logPath == "" {
+		return
+	}
+	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = fmt.Fprintf(f, format, args...)
+}
+
+func (s *service) runActionCommand(appIdent, command string, args []string, envVars []string, workingDir, logPath string) (error, string) {
+	return s.executor.RunCommandWithLoggingToFile(appIdent, command, args, envVars, workingDir, logPath)
+}
+
+func cleanupOperationLogs(logDir string, maxAge time.Duration) {
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-maxAge)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(logDir, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			_ = os.Remove(path)
+		}
+	}
+}
+
+func (s *service) readArtifactsLabel(imageName string, logPath string) (string, error) {
+	args := []string{"inspect", "--format", "{{json .Config.Labels}}", imageName}
+	inspectErr, output := s.executor.RunCommandSilent(docker.RuntimeCommand(), args, []string{}, "")
+	s.logSilentCommand(logPath, docker.RuntimeCommand(), args, []string{}, "", output, inspectErr)
 	if inspectErr != nil {
 		return "", fmt.Errorf("failed to inspect image %s: %w", imageName, inspectErr)
 	}
@@ -586,15 +709,20 @@ func (s *service) readArtifactsLabel(imageName string) (string, error) {
 	return labels["devenv.artifacts"], nil
 }
 
-func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath string) error {
+func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath string, logPath string) error {
 	containerName := fmt.Sprintf("%s-extract", appIdent)
 
-	if createErr, _ := s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"create", "--name", containerName, imageName}, []string{}, ""); createErr != nil {
+	createArgs := []string{"create", "--name", containerName, imageName}
+	createErr, createOut := s.executor.RunCommandSilent(docker.RuntimeCommand(), createArgs, []string{}, "")
+	s.logSilentCommand(logPath, docker.RuntimeCommand(), createArgs, []string{}, "", createOut, createErr)
+	if createErr != nil {
 		return fmt.Errorf("failed to create extraction container: %w", createErr)
 	}
 
 	defer func() {
-		s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"rm", containerName}, []string{}, "")
+		rmArgs := []string{"rm", containerName}
+		rmErr, rmOut := s.executor.RunCommandSilent(docker.RuntimeCommand(), rmArgs, []string{}, "")
+		s.logSilentCommand(logPath, docker.RuntimeCommand(), rmArgs, []string{}, "", rmOut, rmErr)
 	}()
 
 	destPath := filepath.Join(localDir, artifactsPath)
@@ -603,7 +731,10 @@ func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath 
 	}
 
 	containerSrc := fmt.Sprintf("%s:%s", containerName, artifactsPath)
-	if cpErr, _ := s.executor.RunCommandSilent(docker.RuntimeCommand(), []string{"cp", containerSrc, destPath}, []string{}, ""); cpErr != nil {
+	cpArgs := []string{"cp", containerSrc, destPath}
+	cpErr, cpOut := s.executor.RunCommandSilent(docker.RuntimeCommand(), cpArgs, []string{}, "")
+	s.logSilentCommand(logPath, docker.RuntimeCommand(), cpArgs, []string{}, "", cpOut, cpErr)
+	if cpErr != nil {
 		return fmt.Errorf("failed to copy artifacts: %w", cpErr)
 	}
 
@@ -667,6 +798,11 @@ func (s *service) testAppInternal(a *app.App, targetID string, statusCb func(str
 }
 
 func (s *service) runAppInternal(a *app.App, profile string, targetID string, statusCb func(string)) {
+	logPath, logErr := s.startOperationLog(a.Ident, "run")
+	if logErr != nil {
+		statusCb("Error: " + logErr.Error())
+		return
+	}
 	folderExists, _ := s.resourceMgr.ExistsDir(a.LocalDirectoryPath)
 	if !folderExists {
 		statusCb("Error: Checkout needed")
@@ -683,17 +819,17 @@ func (s *service) runAppInternal(a *app.App, profile string, targetID string, st
 		return
 	}
 	if s.appRegistry != nil && s.infraStarter != nil {
-		if err := s.startRunDependencies(target, statusCb); err != nil {
+		if err := s.startRunDependencies(target, logPath, statusCb); err != nil {
 			statusCb("Error: " + err.Error())
 			return
 		}
 	}
-	s.startRunTarget(a, target, statusCb)
+	s.startRunTarget(a, target, logPath, statusCb)
 }
 
-func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, statusCb func(string)) {
+func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, logPath string, statusCb func(string)) {
 	if target.Runtime == resources.ActionRuntimeKubernetes {
-		s.runKubernetesTarget(a, target, statusCb)
+		s.runKubernetesTarget(a, target, logPath, statusCb)
 		return
 	}
 	if target.Runtime != resources.ActionRuntimeDocker {
@@ -714,7 +850,7 @@ func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, stat
 	composeArgs = append(composeArgs, "up", "-d")
 
 	statusCb("starting containers...")
-	if runErr, _ := s.executor.RunCommandWithLogging(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, a.LocalDirectoryPath); runErr != nil {
+	if runErr, _ := s.runActionCommand(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
 		statusCb("Error: " + runErr.Error())
 		return
 	}
@@ -726,7 +862,7 @@ func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, stat
 	}
 }
 
-func (s *service) startRunDependencies(target resources.ActionTarget, statusCb func(string)) error {
+func (s *service) startRunDependencies(target resources.ActionTarget, logPath string, statusCb func(string)) error {
 	registry, err := s.buildTargetRegistry()
 	if err != nil {
 		return err
@@ -750,7 +886,7 @@ func (s *service) startRunDependencies(target resources.ActionTarget, statusCb f
 					return err
 				}
 			} else if infra.Type == app.InfraServiceTypeKubernetes {
-				if err := s.infraStarter.StartKubernetesInfrastructureServiceWithStatus(infra); err != nil {
+				if err := s.infraStarter.StartKubernetesInfrastructureServiceWithLog(infra, logPath); err != nil {
 					return err
 				}
 			} else {
@@ -769,7 +905,7 @@ func (s *service) startRunDependencies(target resources.ActionTarget, statusCb f
 		if !ok {
 			return fmt.Errorf("unknown app run target %q", item.ID)
 		}
-		s.startRunTarget(&depApp, depTarget, statusCb)
+		s.startRunTarget(&depApp, depTarget, logPath, statusCb)
 	}
 	return nil
 }

@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"path/filepath"
+	"strings"
 
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
@@ -22,6 +23,9 @@ func ResolveImageBuild(appIdent, appDir string, cfg *resources.KubernetesImageCo
 	if repo == "" {
 		repo = appIdent
 	}
+	if runtimeCommand == "podman" && isShortImageName(repo) {
+		repo = "localhost/" + repo
+	}
 	tag := cfg.Tag
 	if tag == "" {
 		tag = "dev"
@@ -40,6 +44,32 @@ func ResolveImageBuild(appIdent, appDir string, cfg *resources.KubernetesImageCo
 		pullPolicy = "IfNotPresent"
 	}
 	return ImageBuildPlan{Command: Command{Name: runtimeCommand, Args: []string{"build", "-f", dockerfile, "-t", image, ctx}}, Image: image, Repository: repo, Tag: tag, PullPolicy: pullPolicy}, true
+}
+
+func ResolveImageReference(appIdent string, cfg *resources.KubernetesImageConfig, runtimeCommand string) (ImageBuildPlan, bool) {
+	if cfg == nil {
+		return ImageBuildPlan{}, false
+	}
+	repo := cfg.Repository
+	if repo == "" {
+		repo = appIdent
+	}
+	if runtimeCommand == "podman" && isShortImageName(repo) {
+		repo = "localhost/" + repo
+	}
+	tag := cfg.Tag
+	if tag == "" {
+		tag = "latest"
+	}
+	pullPolicy := cfg.PullPolicy
+	if pullPolicy == "" {
+		pullPolicy = "IfNotPresent"
+	}
+	return ImageBuildPlan{Image: repo + ":" + tag, Repository: repo, Tag: tag, PullPolicy: pullPolicy}, true
+}
+
+func isShortImageName(repo string) bool {
+	return !strings.Contains(repo, "/") && !strings.Contains(repo, ".") && !strings.Contains(repo, ":")
 }
 
 func HelmImageOverrides(cfg resources.KubernetesImageConfig, plan ImageBuildPlan) []string {

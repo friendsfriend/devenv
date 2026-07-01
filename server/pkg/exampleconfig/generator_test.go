@@ -39,10 +39,13 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		"apps/k8s/bhvr-site/devenv.k8s.json",
 		"apps/k8s/bhvr-site/values.yaml",
 		"apps/k8s/bhvr-site/chart/Chart.yaml",
+		"apps/k8s/bhvr-site/chart/values.yaml",
 		"apps/k8s/bhvr-site/chart/templates/deployment.yaml",
 		"apps/k8s/bhvr-site/chart/templates/service.yaml",
 		"infrastructure/k8s/postgres/Chart.yaml",
 		"infrastructure/k8s/postgres/values.yaml",
+		"infrastructure/k8s/postgres/templates/deployment.yaml",
+		"infrastructure/k8s/postgres/templates/service.yaml",
 		"apps/build/go-rest-postgres-build.Dockerfile",
 		"apps/build/go-rest-postgres-test.Dockerfile",
 		"apps/build/bhvr-site-build.Dockerfile",
@@ -86,6 +89,14 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 			t.Fatalf("bhvr-site complex deps missing %s:\n%s", want, bhvrRun)
 		}
 	}
+	bunBuildDockerfile, err := os.ReadFile(filepath.Join(configDir, "apps", "build", "bhvr-site-build.Dockerfile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(bunBuildDockerfile), `LABEL devenv.artifacts="/src/client/dist"`) {
+		t.Fatalf("bhvr-site build Dockerfile has wrong artifact label:\n%s", bunBuildDockerfile)
+	}
+
 	eventWorkerCompose, err := os.ReadFile(filepath.Join(configDir, "apps", "compose", "event-worker-compose.yml"))
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +109,7 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{`"profile": "k8s-local"`, `"name": "Kubernetes Local (kind)"`, `$CONFIG/apps/k8s/bhvr-site/chart`, `"runtime": "kubernetes"`, `"infra": "postgres-k8s"`, `"resource": "svc/bhvr-site"`} {
+	for _, want := range []string{`"profile": "k8s-local"`, `"name": "Kubernetes Local (kind)"`, `$CONFIG/apps/k8s/bhvr-site/chart`, `"tag": "latest"`, `"runtime": "kubernetes"`, `"infra": "postgres-k8s"`, `"resource": "svc/bhvr-site"`} {
 		if !strings.Contains(string(k8sRun), want) {
 			t.Fatalf("bhvr-site Kubernetes run config missing %s:\n%s", want, k8sRun)
 		}
@@ -199,5 +210,54 @@ func TestGenerateRejectsNonEmptyScriptsDirWithoutWrites(t *testing.T) {
 	}
 	if entries, err := os.ReadDir(configDir); err != nil || len(entries) != 0 {
 		t.Fatalf("config was written: entries=%d err=%v", len(entries), err)
+	}
+}
+
+func TestGenerateIgnoresExistingProviderDirectory(t *testing.T) {
+	configDir := t.TempDir()
+	homeDir := t.TempDir()
+	providerPath := filepath.Join(configDir, "providers", "github.json")
+	if err := os.MkdirAll(filepath.Dir(providerPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	original := `{"name":"github","type":"github"}` + "\n"
+	if err := os.WriteFile(providerPath, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Generator{ConfigDir: configDir, HomeDir: homeDir}).Generate(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(providerPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != original {
+		t.Fatalf("provider file was overwritten:\n%s", data)
+	}
+	if _, err := os.Stat(filepath.Join(configDir, "apps", "definitions", "go-rest-postgres.json")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGenerateIgnoresExistingTuiConfig(t *testing.T) {
+	configDir := t.TempDir()
+	homeDir := t.TempDir()
+	tuiPath := filepath.Join(configDir, "tui.json")
+	original := `{"theme":"aura"}` + "\n"
+	if err := os.WriteFile(tuiPath, []byte(original), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := (Generator{ConfigDir: configDir, HomeDir: homeDir}).Generate(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(tuiPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != original {
+		t.Fatalf("tui config was overwritten:\n%s", data)
+	}
+	if _, err := os.Stat(filepath.Join(configDir, "apps", "definitions", "go-rest-postgres.json")); err != nil {
+		t.Fatal(err)
 	}
 }

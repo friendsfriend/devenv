@@ -23,6 +23,23 @@ func TestResolveImageBuildCommands(t *testing.T) {
 	if !ok || plan.Command.Name != "podman" {
 		t.Fatalf("podman command = %#v ok=%v", plan.Command, ok)
 	}
+	shortCfg := &resources.KubernetesImageConfig{Repository: "app", Tag: "dev", Build: &resources.KubernetesImageBuildConfig{Context: "/src", Dockerfile: "/src/Dockerfile"}}
+	plan, ok = ResolveImageBuild("app", "/app", shortCfg, "podman")
+	if !ok || plan.Image != "localhost/app:dev" || plan.Repository != "localhost/app" {
+		t.Fatalf("podman short image plan = %#v ok=%v", plan, ok)
+	}
+}
+
+func TestResolveImageReference(t *testing.T) {
+	cfg := &resources.KubernetesImageConfig{Repository: "app", Tag: "latest", PullPolicy: "IfNotPresent"}
+	plan, ok := ResolveImageReference("app", cfg, "podman")
+	if !ok || plan.Image != "localhost/app:latest" || plan.Repository != "localhost/app" {
+		t.Fatalf("podman image ref = %#v ok=%v", plan, ok)
+	}
+	plan, ok = ResolveImageReference("app", cfg, "docker")
+	if !ok || plan.Image != "app:latest" || plan.Repository != "app" {
+		t.Fatalf("docker image ref = %#v ok=%v", plan, ok)
+	}
 }
 
 func TestKindLoadImageCommand(t *testing.T) {

@@ -84,6 +84,8 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 		} else if svc.Type == app.InfraServiceTypeScript {
 			statusValue, logPath = s.services.OperationsService().ScriptInfrastructureStatus(svc.Ident)
 			executionHandle = s.services.OperationsService().ScriptInfrastructureExecutionHandle(svc.Ident)
+		} else if svc.Type == app.InfraServiceTypeKubernetes {
+			statusValue = s.services.OperationsService().KubernetesInfrastructureStatus(svc)
 		}
 
 		s.opStatusMu.RLock()
@@ -235,12 +237,30 @@ func (s *Server) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[DEBUG] Operation logs request: appIdent=%s, limit=%d", appIdent, limit)
 
-	// Read operation logs from file using the logger
-	logs, err := s.services.Logger().ReadAppLogs(appIdent, limit)
+	// Put current temp action log first. It contains live full command/output and the
+	// latest failure should be visible immediately in operation log view.
+	var logs string
+	if path, ok := s.services.BuildService().ActiveOperationLogPath(appIdent); ok {
+		if content, readErr := os.ReadFile(path); readErr == nil && len(content) > 0 {
+			logs += "Active action command log\n=========================\n" + string(content)
+		}
+	} else if path, ok := s.services.OperationsService().ActiveOperationLogPath(appIdent); ok {
+		if content, readErr := os.ReadFile(path); readErr == nil && len(content) > 0 {
+			logs += "Active action command log\n=========================\n" + string(content)
+		}
+	}
+
+	persistentLogs, err := s.services.Logger().ReadAppLogs(appIdent, limit)
 	if err != nil {
 		log.Printf("[ERROR] Failed to fetch operation logs: %v", err)
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch operation logs: %v", err), http.StatusInternalServerError)
 		return
+	}
+	if persistentLogs != "" {
+		if logs != "" {
+			logs += "\n"
+		}
+		logs += "Persistent operation log\n========================\n" + persistentLogs
 	}
 
 	if logs == "" {
@@ -267,6 +287,9 @@ func (s *Server) handleActionLog(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path, ok := s.services.BuildService().ActiveOperationLogPath(appIdent)
+	if !ok {
+		path, ok = s.services.OperationsService().ActiveOperationLogPath(appIdent)
+	}
 	if !ok {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.Write([]byte("No active action log found for " + appIdent))

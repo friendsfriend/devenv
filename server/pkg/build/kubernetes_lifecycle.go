@@ -2,8 +2,12 @@ package build
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
@@ -11,14 +15,9 @@ import (
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
 
-func (s *service) runKubernetesTarget(a *app.App, target resources.ActionTarget, statusCb func(string)) {
+func (s *service) runKubernetesTarget(a *app.App, target resources.ActionTarget, logPath string, statusCb func(string)) {
 	if target.Kubernetes == nil {
 		statusCb("Error: missing Kubernetes target metadata")
-		return
-	}
-	logPath, err := s.startOperationLog(a.Ident, "run")
-	if err != nil {
-		statusCb("Error: " + err.Error())
 		return
 	}
 	runner := k8s.NewRunner(docker.Runtime{Name: docker.RuntimeName(), Command: docker.RuntimeCommand()})
@@ -30,7 +29,7 @@ func (s *service) runKubernetesTarget(a *app.App, target resources.ActionTarget,
 	if !s.ensureKubernetesCluster(a, runner, logPath, statusCb) {
 		return
 	}
-	if !s.applyKubernetesSecrets(a, target, runner, statusCb) {
+	if !s.applyKubernetesSecrets(a, target, runner, logPath, statusCb) {
 		return
 	}
 	statusCb("uninstalling existing Helm release...")
@@ -44,16 +43,24 @@ func (s *service) runKubernetesTarget(a *app.App, target resources.ActionTarget,
 		args = append(args, "-f", values)
 	}
 	if target.Kubernetes.Image != nil {
+		cleanupDockerfile := s.prepareKubernetesDockerfile(a, target, statusCb)
+		if cleanupDockerfile != nil {
+			defer cleanupDockerfile()
+		}
 		if plan, ok := k8s.ResolveImageBuild(a.Ident, a.LocalDirectoryPath, target.Kubernetes.Image, docker.RuntimeCommand()); ok {
 			statusCb("building Kubernetes image...")
 			if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, plan.Command.Name, plan.Command.Args, plan.Command.Env, a.LocalDirectoryPath, logPath); runErr != nil {
 				statusCb("Error: " + runErr.Error())
 				return
 			}
-			load := runner.KindLoadImageCommand(plan.Image)
 			statusCb("loading image into kind...")
-			if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, load.Name, load.Args, load.Env, a.LocalDirectoryPath, logPath); runErr != nil {
-				statusCb("Error: " + runErr.Error())
+			if !s.loadKubernetesImage(a, runner, plan.Image, logPath, statusCb) {
+				return
+			}
+			args = append(args, k8s.HelmImageOverrides(*target.Kubernetes.Image, plan)...)
+		} else if plan, ok := k8s.ResolveImageReference(a.Ident, target.Kubernetes.Image, docker.RuntimeCommand()); ok {
+			statusCb("loading existing image into kind...")
+			if !s.loadKubernetesImage(a, runner, plan.Image, logPath, statusCb) {
 				return
 			}
 			args = append(args, k8s.HelmImageOverrides(*target.Kubernetes.Image, plan)...)
@@ -67,6 +74,7 @@ func (s *service) runKubernetesTarget(a *app.App, target resources.ActionTarget,
 		return
 	}
 	s.startKubernetesPortForwards(a.Ident, target, runner, statusCb)
+	s.setLastKubernetesTarget(a.Ident, target.Kubernetes)
 	s.SetLastRunRuntime(a.Ident, resources.ActionRuntimeKubernetes)
 	statusCb("run successful")
 	if s.OnComplete != nil {
@@ -90,24 +98,39 @@ func (s *service) StopKubernetesRun(a app.App, target resources.ActionTarget) er
 func (s *service) ensureKubernetesCluster(a *app.App, runner k8s.Runner, logPath string, statusCb func(string)) bool {
 	statusCb("checking kind cluster...")
 	get := runner.KindGetClustersCommand()
-	if err, output := s.executor.RunCommandSilent(get.Name, get.Args, get.Env, a.LocalDirectoryPath); err == nil {
+	err, output := s.executor.RunCommandSilent(get.Name, get.Args, get.Env, a.LocalDirectoryPath)
+	s.logSilentCommand(logPath, get.Name, get.Args, get.Env, a.LocalDirectoryPath, output, err)
+	if err == nil {
 		for _, line := range strings.Split(output, "\n") {
 			if strings.TrimSpace(line) == k8s.DefaultClusterName {
 				statusCb("using existing kind cluster")
+				s.refreshKindKubeconfig(a, runner, logPath)
 				return true
 			}
 		}
 	}
 	statusCb("creating kind cluster...")
 	create := runner.KindCreateClusterCommand()
-	if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, create.Name, create.Args, create.Env, a.LocalDirectoryPath, logPath); runErr != nil {
+	if runErr, output := s.executor.RunCommandWithLoggingToFile(a.Ident, create.Name, create.Args, create.Env, a.LocalDirectoryPath, logPath); runErr != nil {
+		if strings.Contains(output, "already exist") || strings.Contains(output, "already exists") {
+			statusCb("using existing kind cluster")
+			s.refreshKindKubeconfig(a, runner, logPath)
+			return true
+		}
 		statusCb("Error: " + runErr.Error())
 		return false
 	}
+	s.refreshKindKubeconfig(a, runner, logPath)
 	return true
 }
 
-func (s *service) applyKubernetesSecrets(a *app.App, target resources.ActionTarget, runner k8s.Runner, statusCb func(string)) bool {
+func (s *service) refreshKindKubeconfig(a *app.App, runner k8s.Runner, logPath string) {
+	cmd := runner.KindExportKubeconfigCommand()
+	err, output := s.executor.RunCommandSilent(cmd.Name, cmd.Args, cmd.Env, a.LocalDirectoryPath)
+	s.logSilentCommand(logPath, cmd.Name, cmd.Args, cmd.Env, a.LocalDirectoryPath, output, err)
+}
+
+func (s *service) applyKubernetesSecrets(a *app.App, target resources.ActionTarget, runner k8s.Runner, logPath string, statusCb func(string)) bool {
 	if target.Kubernetes == nil || len(target.Kubernetes.Secrets) == 0 {
 		return true
 	}
@@ -132,14 +155,18 @@ func (s *service) applyKubernetesSecrets(a *app.App, target resources.ActionTarg
 	for _, plan := range plans {
 		statusCb(fmt.Sprintf("creating Kubernetes Secret %s with keys %s...", plan.Name, strings.Join(plan.Keys, ",")))
 		deleteCmd := runner.KubectlCommandFor("delete", "secret", plan.Name, "--namespace", plan.Namespace, "--ignore-not-found")
-		if runErr, _ := s.executor.RunCommandSilent(deleteCmd.Name, deleteCmd.Args, deleteCmd.Env, a.LocalDirectoryPath); runErr != nil {
-			statusCb("Error: " + runErr.Error())
+		deleteErr, deleteOut := s.executor.RunCommandSilent(deleteCmd.Name, deleteCmd.Args, deleteCmd.Env, a.LocalDirectoryPath)
+		s.logSilentCommand(logPath, deleteCmd.Name, deleteCmd.Args, deleteCmd.Env, a.LocalDirectoryPath, deleteOut, deleteErr)
+		if deleteErr != nil {
+			statusCb("Error: " + deleteErr.Error())
 			return false
 		}
 		createCmd := plan.Command
 		createCmd.Args = secretCreateArgs(plan)
-		if runErr, _ := s.executor.RunCommandSilent(createCmd.Name, createCmd.Args, createCmd.Env, a.LocalDirectoryPath); runErr != nil {
-			statusCb("Error: " + runErr.Error())
+		createErr, createOut := s.executor.RunCommandSilent(createCmd.Name, createCmd.Args, createCmd.Env, a.LocalDirectoryPath)
+		s.logSilentCommand(logPath, createCmd.Name, k8s.RedactSecretCommand(plan).Args, createCmd.Env, a.LocalDirectoryPath, createOut, createErr)
+		if createErr != nil {
+			statusCb("Error: " + createErr.Error())
 			return false
 		}
 	}
@@ -199,4 +226,80 @@ func (s *service) stopKubernetesPortForwards(appIdent string) {
 			_, _ = cmd.Process.Wait()
 		}
 	}
+}
+
+func (s *service) logSilentCommand(logPath, command string, args []string, envVars []string, workingDir, output string, err error) {
+	if logPath == "" {
+		return
+	}
+	timestamp := func() string { return time.Now().Format("2006-01-02 15:04:05") }
+	s.appendOperationLog(logPath, "[%s] Command: %s\n", timestamp(), shellQuoteForActionLog(command, args))
+	if workingDir != "" {
+		s.appendOperationLog(logPath, "[%s] Working directory: %s\n", timestamp(), workingDir)
+	}
+	if len(envVars) > 0 {
+		s.appendOperationLog(logPath, "[%s] Environment overrides: %s\n", timestamp(), strings.Join(envVars, " "))
+	}
+	s.appendOperationLog(logPath, "[%s] Output:\n%s", timestamp(), output)
+	if output != "" && !strings.HasSuffix(output, "\n") {
+		s.appendOperationLog(logPath, "\n")
+	}
+	if err != nil {
+		s.appendOperationLog(logPath, "[%s] Exit: ERROR (%s)\n", timestamp(), err.Error())
+	} else {
+		s.appendOperationLog(logPath, "[%s] Exit: SUCCESS\n", timestamp())
+	}
+	s.appendOperationLog(logPath, "[%s] ---\n\n", timestamp())
+}
+
+func shellQuoteForActionLog(command string, args []string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, strconv.Quote(command))
+	for _, arg := range args {
+		parts = append(parts, strconv.Quote(arg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func (s *service) prepareKubernetesDockerfile(a *app.App, target resources.ActionTarget, statusCb func(string)) func() {
+	if target.Kubernetes == nil || target.Kubernetes.Image == nil || target.Kubernetes.Image.Build == nil {
+		return nil
+	}
+	dockerfile := target.Kubernetes.Image.Build.Dockerfile
+	if dockerfile == "" || !filepath.IsAbs(dockerfile) || strings.HasPrefix(filepath.Clean(dockerfile), filepath.Clean(a.LocalDirectoryPath)+string(os.PathSeparator)) {
+		return nil
+	}
+	localDockerfile := filepath.Join(a.LocalDirectoryPath, ".devenv-k8s.Dockerfile")
+	if err := s.resourceMgr.CopyFile(dockerfile, localDockerfile); err != nil {
+		statusCb("Error: " + err.Error())
+		return nil
+	}
+	target.Kubernetes.Image.Build.Dockerfile = localDockerfile
+	return func() {
+		_ = os.Remove(localDockerfile)
+	}
+}
+
+func (s *service) loadKubernetesImage(a *app.App, runner k8s.Runner, image, logPath string, statusCb func(string)) bool {
+	if docker.RuntimeName() == "podman" {
+		archive := filepath.Join(os.TempDir(), fmt.Sprintf("devenv-%s-%d.tar", strings.ReplaceAll(a.Ident, string(os.PathSeparator), "-"), time.Now().UnixNano()))
+		defer os.Remove(archive)
+		saveArgs := []string{"save", "-o", archive, image}
+		if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.RuntimeCommand(), saveArgs, []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
+			statusCb("Error: " + runErr.Error())
+			return false
+		}
+		load := runner.KindLoadImageArchiveCommand(archive)
+		if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, load.Name, load.Args, load.Env, a.LocalDirectoryPath, logPath); runErr != nil {
+			statusCb("Error: " + runErr.Error())
+			return false
+		}
+		return true
+	}
+	load := runner.KindLoadImageCommand(image)
+	if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, load.Name, load.Args, load.Env, a.LocalDirectoryPath, logPath); runErr != nil {
+		statusCb("Error: " + runErr.Error())
+		return false
+	}
+	return true
 }

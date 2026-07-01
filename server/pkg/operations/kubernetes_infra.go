@@ -1,6 +1,12 @@
 package operations
 
 import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
 	k8s "github.com/friendsfriend/devenv/pkg/kubernetes"
@@ -8,6 +14,20 @@ import (
 )
 
 func (s *service) StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error {
+	logPath, logErr := s.startOperationLog(infra.Ident, "start")
+	if logErr != nil {
+		callback := s.statusMgr.StartOperation(infra.Ident, status.OpStart)
+		callback("Error: " + logErr.Error())
+		return logErr
+	}
+	return s.startKubernetesInfrastructureService(infra, logPath)
+}
+
+func (s *service) StartKubernetesInfrastructureServiceWithLog(infra app.InfraService, logPath string) error {
+	return s.startKubernetesInfrastructureService(infra, logPath)
+}
+
+func (s *service) startKubernetesInfrastructureService(infra app.InfraService, logPath string) error {
 	callback := s.statusMgr.StartOperation(infra.Ident, status.OpStart)
 	callback("starting Kubernetes infrastructure...")
 	if infra.Kubernetes == nil {
@@ -19,10 +39,23 @@ func (s *service) StartKubernetesInfrastructureServiceWithStatus(infra app.Infra
 		callback("Error: " + err.Error())
 		return err
 	}
+	if err := s.ensureKubernetesInfraCluster(runner, logPath, callback); err != nil {
+		return err
+	}
 	statusCmd := runner.HelmCommandFor("status", infra.Kubernetes.Release, "--namespace", infra.Kubernetes.Namespace)
-	if err, _ := s.executor.RunCommandSilent(statusCmd.Name, statusCmd.Args, statusCmd.Env, ""); err == nil {
-		callback("already running")
-		return nil
+	statusErr, statusOut := s.executor.RunCommandSilent(statusCmd.Name, statusCmd.Args, statusCmd.Env, "")
+	appendCommandLog(logPath, statusCmd.Name, statusCmd.Args, statusCmd.Env, "", statusOut, statusErr)
+	if statusErr == nil {
+		if strings.HasPrefix(s.KubernetesInfrastructureStatus(infra), app.InfraStatusRunning) {
+			callback("start successful (already running)")
+			return nil
+		}
+		callback("resetting stale Kubernetes infrastructure release...")
+		uninstall := runner.HelmCommandFor("uninstall", infra.Kubernetes.Release, "--namespace", infra.Kubernetes.Namespace, "--ignore-not-found")
+		if err, _ := s.executor.RunCommandWithLoggingToFile(infra.Ident, uninstall.Name, uninstall.Args, uninstall.Env, "", logPath); err != nil {
+			callback("Error: " + err.Error())
+			return err
+		}
 	}
 	args := []string{"install", infra.Kubernetes.Release, infra.Kubernetes.ChartPath, "--namespace", infra.Kubernetes.Namespace, "--create-namespace"}
 	for _, values := range infra.Kubernetes.Values {
@@ -36,7 +69,7 @@ func (s *service) StartKubernetesInfrastructureServiceWithStatus(infra app.Infra
 		args = append(args, "--wait", "--timeout", timeout)
 	}
 	cmd := runner.HelmCommandFor(args...)
-	if err, _ := s.executor.RunCommandWithLogging(infra.Ident, cmd.Name, cmd.Args, cmd.Env, ""); err != nil {
+	if err, _ := s.executor.RunCommandWithLoggingToFile(infra.Ident, cmd.Name, cmd.Args, cmd.Env, "", logPath); err != nil {
 		callback("Error: " + err.Error())
 		return err
 	}
@@ -50,13 +83,18 @@ func (s *service) StartKubernetesInfrastructureServiceWithStatus(infra app.Infra
 func (s *service) StopKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error {
 	callback := s.statusMgr.StartOperation(infra.Ident, status.OpStop)
 	callback("stopping Kubernetes infrastructure...")
+	logPath, logErr := s.startOperationLog(infra.Ident, "stop")
+	if logErr != nil {
+		callback("Error: " + logErr.Error())
+		return logErr
+	}
 	if infra.Kubernetes == nil {
 		callback("Error: missing Kubernetes infrastructure config")
 		return nil
 	}
 	runner := k8s.NewRunner(docker.Runtime{Name: docker.RuntimeName(), Command: docker.RuntimeCommand()})
 	cmd := runner.HelmCommandFor("uninstall", infra.Kubernetes.Release, "--namespace", infra.Kubernetes.Namespace, "--ignore-not-found")
-	if err, _ := s.executor.RunCommandWithLogging(infra.Ident, cmd.Name, cmd.Args, cmd.Env, ""); err != nil {
+	if err, _ := s.executor.RunCommandWithLoggingToFile(infra.Ident, cmd.Name, cmd.Args, cmd.Env, "", logPath); err != nil {
 		callback("Error: " + err.Error())
 		return err
 	}
@@ -65,4 +103,112 @@ func (s *service) StopKubernetesInfrastructureServiceWithStatus(infra app.InfraS
 		s.OnComplete(infra.Ident)
 	}
 	return nil
+}
+
+func appendCommandLog(logPath, command string, args []string, envVars []string, workingDir, output string, err error) {
+	if logPath == "" {
+		return
+	}
+	file, openErr := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if openErr != nil {
+		return
+	}
+	defer file.Close()
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	_, _ = fmt.Fprintf(file, "[%s] Command: %s\n", timestamp, quoteCommand(command, args))
+	if workingDir != "" {
+		_, _ = fmt.Fprintf(file, "[%s] Working directory: %s\n", timestamp, workingDir)
+	}
+	if len(envVars) > 0 {
+		_, _ = fmt.Fprintf(file, "[%s] Environment overrides: %s\n", timestamp, strings.Join(envVars, " "))
+	}
+	_, _ = fmt.Fprintf(file, "[%s] Output:\n%s", timestamp, output)
+	if output != "" && !strings.HasSuffix(output, "\n") {
+		_, _ = fmt.Fprintln(file)
+	}
+	if err != nil {
+		_, _ = fmt.Fprintf(file, "[%s] Exit: ERROR (%s)\n", timestamp, err.Error())
+	} else {
+		_, _ = fmt.Fprintf(file, "[%s] Exit: SUCCESS\n", timestamp)
+	}
+	_, _ = fmt.Fprintf(file, "[%s] ---\n\n", timestamp)
+}
+
+func quoteCommand(command string, args []string) string {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, strconv.Quote(command))
+	for _, arg := range args {
+		parts = append(parts, strconv.Quote(arg))
+	}
+	return strings.Join(parts, " ")
+}
+
+func (s *service) ensureKubernetesInfraCluster(runner k8s.Runner, logPath string, callback func(string)) error {
+	callback("checking kind cluster...")
+	get := runner.KindGetClustersCommand()
+	getErr, getOut := s.executor.RunCommandSilent(get.Name, get.Args, get.Env, "")
+	appendCommandLog(logPath, get.Name, get.Args, get.Env, "", getOut, getErr)
+	if getErr == nil {
+		for _, line := range strings.Split(getOut, "\n") {
+			if strings.TrimSpace(line) == k8s.DefaultClusterName {
+				return s.exportKubernetesInfraKubeconfig(runner, logPath)
+			}
+		}
+	}
+	callback("creating kind cluster...")
+	create := runner.KindCreateClusterCommand()
+	createErr, createOut := s.executor.RunCommandWithLoggingToFile("kubernetes", create.Name, create.Args, create.Env, "", logPath)
+	if createErr != nil {
+		if strings.Contains(createOut, "already exist") || strings.Contains(createOut, "already exists") {
+			return s.exportKubernetesInfraKubeconfig(runner, logPath)
+		}
+		callback("Error: " + createErr.Error())
+		return createErr
+	}
+	return s.exportKubernetesInfraKubeconfig(runner, logPath)
+}
+
+func (s *service) exportKubernetesInfraKubeconfig(runner k8s.Runner, logPath string) error {
+	cmd := runner.KindExportKubeconfigCommand()
+	err, output := s.executor.RunCommandSilent(cmd.Name, cmd.Args, cmd.Env, "")
+	appendCommandLog(logPath, cmd.Name, cmd.Args, cmd.Env, "", output, err)
+	return err
+}
+
+func (s *service) KubernetesInfrastructureStatus(infra app.InfraService) string {
+	if infra.Kubernetes == nil {
+		return app.InfraStatusStopped + " (0 pods)"
+	}
+	runner := k8s.NewRunner(docker.Runtime{Name: docker.RuntimeName(), Command: docker.RuntimeCommand()})
+	selector := "app.kubernetes.io/instance=" + infra.Kubernetes.Release
+	cmd := runner.KubectlCommandFor("get", "pods", "--namespace", infra.Kubernetes.Namespace, "-l", selector, "--no-headers")
+	err, output := s.executor.RunCommandSilent(cmd.Name, cmd.Args, cmd.Env, "")
+	if err != nil || strings.TrimSpace(output) == "" {
+		return app.InfraStatusStopped + " (0 pods)"
+	}
+	running, total, failed := 0, 0, 0
+	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		total++
+		phase := strings.ToLower(fields[2])
+		if phase == "running" || phase == "succeeded" {
+			running++
+		}
+		if phase == "failed" || phase == "error" || strings.Contains(phase, "crash") {
+			failed++
+		}
+	}
+	if total == 0 {
+		return app.InfraStatusStopped + " (0 pods)"
+	}
+	if failed > 0 {
+		return fmt.Sprintf("%s (%d/%d pods)", app.InfraStatusFailed, running, total)
+	}
+	if running == total {
+		return fmt.Sprintf("%s (%d/%d pods)", app.InfraStatusRunning, running, total)
+	}
+	return fmt.Sprintf("starting (%d/%d pods)", running, total)
 }

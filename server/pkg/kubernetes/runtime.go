@@ -91,6 +91,16 @@ func (r Runner) KindLoadImageCommand(image string) Command {
 	return Command{Name: r.KindCommand, Args: []string{"load", "docker-image", image, "--name", r.ClusterName}, Env: r.kindEnv()}
 }
 
+func (r Runner) KindLoadImageArchiveCommand(path string) Command {
+	r = r.withDefaults()
+	return Command{Name: r.KindCommand, Args: []string{"load", "image-archive", path, "--name", r.ClusterName}, Env: r.kindEnv()}
+}
+
+func (r Runner) KindExportKubeconfigCommand() Command {
+	r = r.withDefaults()
+	return Command{Name: r.KindCommand, Args: []string{"export", "kubeconfig", "--name", r.ClusterName}, Env: r.kindEnv()}
+}
+
 func (r Runner) kindEnv() []string {
 	if r.Container.Name == "podman" {
 		return []string{"KIND_EXPERIMENTAL_PROVIDER=podman"}

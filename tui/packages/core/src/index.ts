@@ -53,6 +53,7 @@ import {
 	runApp,
 	startApp,
 	startContainer,
+	stopApp,
 	stopContainer,
 	streamContainerLogs,
 	streamContainerStats,
@@ -640,6 +641,9 @@ export class DevEnvClient {
 	}
 	runApp(appIdent: string, profile: string = "", targetId?: string): Promise<void> {
 		return runApp(this.deps, appIdent, profile, targetId);
+	}
+	stopApp(appIdent: string, targetId?: string): Promise<void> {
+		return stopApp(this.deps, appIdent, targetId);
 	}
 	startContainer(containerID: string): Promise<void> {
 		return startContainer(this.deps, containerID);

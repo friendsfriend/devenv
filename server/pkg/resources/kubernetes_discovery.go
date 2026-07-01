@@ -36,7 +36,9 @@ func (m *manager) discoverKubernetesRunTargets(appIdent, localDir string) ([]Act
 
 	configAppDir := filepath.Join(m.configDir, "apps", "k8s", appIdent)
 	cfgPath := filepath.Join(configAppDir, KubernetesConfigFileName)
+	hasExplicitConfig := false
 	if _, err := os.Stat(cfgPath); err == nil {
+		hasExplicitConfig = true
 		cfg, err := LoadKubernetesConfig(cfgPath, localDir, m.configDir)
 		if err != nil {
 			return nil, err
@@ -57,12 +59,14 @@ func (m *manager) discoverKubernetesRunTargets(appIdent, localDir string) ([]Act
 		return nil, err
 	}
 
-	if cfgChart, ok, err := discoverConfigDirChart(configAppDir); err != nil {
-		return nil, err
-	} else if ok {
-		profile := kubernetesProfileForChart(cfgChart)
-		cfg := KubernetesRunTargetConfig{Profile: profile, Chart: KubernetesHelmChartConfig{Path: cfgChart}, Release: defaultKubernetesRelease(appIdent, profile), Namespace: "default"}
-		add(kubernetesActionTarget(appIdent, cfg, cfgChart))
+	if !hasExplicitConfig {
+		if cfgChart, ok, err := discoverConfigDirChart(configAppDir); err != nil {
+			return nil, err
+		} else if ok {
+			profile := kubernetesProfileForChart(cfgChart)
+			cfg := KubernetesRunTargetConfig{Profile: profile, Chart: KubernetesHelmChartConfig{Path: cfgChart}, Release: defaultKubernetesRelease(appIdent, profile), Namespace: "default"}
+			add(kubernetesActionTarget(appIdent, cfg, cfgChart))
+		}
 	}
 
 	sort.SliceStable(targets, func(i, j int) bool { return targets[i].ID < targets[j].ID })

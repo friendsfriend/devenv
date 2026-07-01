@@ -64,6 +64,7 @@ export const KEYBINDS: KeybindDef[] = [
 	{ keys: ["e"], description: "Open app directory in $EDITOR", footerDescription: "Edit app", context: "table", category: "Actions" },
 	{ keys: ["E"], description: "Open editor picker", footerDescription: "Editors", context: "table", category: "Actions" },
 	{ keys: ["G"], description: "Open lazygit for selected app", footerDescription: "Lazygit", context: "table", category: "Actions" },
+	{ keys: ["9"], description: "Open k9s for managed Kubernetes cluster", footerDescription: "k9s", context: "table", category: "Actions" },
 	{ keys: ["d"], description: "Open lazydocker for selected app", footerDescription: "Lazydocker", context: "table", category: "Actions" },
 	{ keys: ["w"], description: "Open worktree manager", footerDescription: "Worktrees", context: "table", category: "Actions" },
 	{ keys: ["+"], description: "Add app or script", footerDescription: "Add", context: "table", category: "Actions" },

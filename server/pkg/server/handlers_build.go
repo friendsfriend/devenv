@@ -362,3 +362,29 @@ func (s *Server) handleGetProfiles(w http.ResponseWriter, r *http.Request) {
 		"hasDockerfile": hasDockerfile,
 	})
 }
+
+func (s *Server) handleStopApp(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+	var req struct {
+		Ident    string `json:"ident"`
+		TargetID string `json:"targetId"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondBadRequest(w, "Invalid request body")
+		return
+	}
+	if req.Ident == "" {
+		respondBadRequest(w, "ident field required")
+		return
+	}
+	targetApp := s.findAppByIdent(req.Ident)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+	go s.services.BuildService().StopAppWithStatus(targetApp, req.TargetID)
+	respondJSON(w, map[string]interface{}{"success": true, "message": fmt.Sprintf("Stop initiated for %s", targetApp.DisplayName)}, http.StatusOK)
+}

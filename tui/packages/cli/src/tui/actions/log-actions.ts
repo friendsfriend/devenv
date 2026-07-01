@@ -120,10 +120,6 @@ export function createLogActions(
   };
 
   const loadOperationLogs = async () => {
-    if (appStore.operationInProgressForApp()) {
-      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
-      return;
-    }
     const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
     if (!app) return;
     logStore.setLogs('');

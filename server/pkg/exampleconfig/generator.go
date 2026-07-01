@@ -63,8 +63,11 @@ func ensureEmpty(dir, label, root string) error {
 	}
 	for _, entry := range entries {
 		path := filepath.Join(dir, entry.Name())
+		if ignoredConfigPath(path, root) {
+			continue
+		}
 		if !entry.IsDir() {
-			if path == filepath.Join(root, ".env") {
+			if ignoredConfigPath(path, root) {
 				continue
 			}
 			return fmt.Errorf("%s %q is not empty; move existing files or choose a clean directory", label, dir)
@@ -74,6 +77,19 @@ func ensureEmpty(dir, label, root string) error {
 		}
 	}
 	return nil
+}
+
+func ignoredConfigPath(path, root string) bool {
+	for _, ignored := range []string{
+		filepath.Join(root, ".env"),
+		filepath.Join(root, "providers"),
+		filepath.Join(root, "tui.json"),
+	} {
+		if path == ignored {
+			return true
+		}
+	}
+	return false
 }
 
 func writeFile(path, content string, mode fs.FileMode) error {
@@ -108,10 +124,13 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "devenv.k8s.json"):                       bunKubernetesConfig,
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "values.yaml"):                           bunKubernetesValues,
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "Chart.yaml"):                   bunKubernetesChart,
+		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "values.yaml"):                  bunKubernetesValues,
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "templates", "deployment.yaml"): bunKubernetesDeployment,
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "templates", "service.yaml"):    bunKubernetesService,
 		filepath.Join(c, "infrastructure", "k8s", "postgres", "Chart.yaml"):                   postgresKubernetesChart,
 		filepath.Join(c, "infrastructure", "k8s", "postgres", "values.yaml"):                  postgresKubernetesValues,
+		filepath.Join(c, "infrastructure", "k8s", "postgres", "templates", "deployment.yaml"): postgresKubernetesDeployment,
+		filepath.Join(c, "infrastructure", "k8s", "postgres", "templates", "service.yaml"):    postgresKubernetesService,
 		filepath.Join(c, "apps", "build", "go-rest-postgres-build.Dockerfile"):                goBuildDockerfile,
 		filepath.Join(c, "apps", "build", "go-rest-postgres-test.Dockerfile"):                 goTestDockerfile,
 		filepath.Join(c, "apps", "build", "bhvr-site-build.Dockerfile"):                       bunBuildDockerfile,
@@ -424,7 +443,7 @@ COPY . .
 RUN bun run build
 
 FROM oven/bun:1
-LABEL devenv.artifacts="dist"
+LABEL devenv.artifacts="/src/client/dist"
 WORKDIR /src
 COPY --from=build /src /src
 CMD ["bun", "run", "dev"]
@@ -474,9 +493,8 @@ const bunKubernetesConfig = `{
       "namespace": "apps",
       "image": {
         "repository": "bhvr-site",
-        "tag": "dev",
+        "tag": "latest",
         "pullPolicy": "IfNotPresent",
-        "build": { "context": "$APP", "dockerfile": "$APP/Dockerfile" },
         "valuePaths": { "repository": "image.repository", "tag": "image.tag", "pullPolicy": "image.pullPolicy" }
       },
       "ports": [{ "name": "http", "resource": "svc/bhvr-site", "localPort": 3000, "remotePort": 3000 }],
@@ -489,7 +507,7 @@ const bunKubernetesConfig = `{
 
 const bunKubernetesValues = `image:
   repository: bhvr-site
-  tag: dev
+  tag: latest
   pullPolicy: IfNotPresent
 service:
   port: 3000
@@ -501,10 +519,66 @@ version: 0.1.0
 type: application
 `
 
-const postgresKubernetesValues = `postgresql:
-  auth:
-    username: devenv
-    database: devenv
+const postgresKubernetesValues = `image:
+  repository: postgres
+  tag: "16-alpine"
+service:
+  port: 5432
+env:
+  POSTGRES_USER: devenv
+  POSTGRES_PASSWORD: devenv
+  POSTGRES_DB: devenv
+`
+
+const postgresKubernetesDeployment = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.service.port }}
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.env.POSTGRES_USER | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.env.POSTGRES_PASSWORD | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.env.POSTGRES_DB | quote }}
+`
+
+const postgresKubernetesService = `apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: postgres
+      port: {{ .Values.service.port }}
+      targetPort: postgres
 `
 
 const bunKubernetesChart = `apiVersion: v2

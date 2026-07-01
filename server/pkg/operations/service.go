@@ -3,6 +3,7 @@ package operations
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -18,11 +19,14 @@ type Service interface {
 	StartInfrastructureServiceWithStatus(infra app.InfraService)
 	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
 	StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
+	StartKubernetesInfrastructureServiceWithLog(infra app.InfraService, logPath string) error
 	StopKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
+	KubernetesInfrastructureStatus(infra app.InfraService) string
 	StopScriptInfrastructureServiceWithStatus(ident string) error
 	ScriptInfrastructureStatus(ident string) (string, string)
 	ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle
 	RecoverScriptInfrastructureRuns(infra []app.InfraService)
+	ActiveOperationLogPath(ident string) (string, bool)
 	KillAndRemoveAllContainersForAppWithStatus(a *app.App)
 	KillAllRunningContainersWithStatus(apps []app.App)
 	SetOnComplete(callback func(appIdent string))
@@ -37,6 +41,8 @@ type service struct {
 	homeDir        string
 	scriptMu       sync.Mutex
 	scriptRuns     map[string]*scriptRunState
+	activeLogMu    sync.RWMutex
+	activeLogMap   map[string]string
 	scriptTerminal map[string]scriptTerminalState
 	OnComplete     func(appIdent string)
 }
@@ -50,6 +56,7 @@ func NewService(dockerClient docker.Client, exec *Executor, statusMgr status.Man
 		envFilePath:    envFilePath,
 		scriptRuns:     make(map[string]*scriptRunState),
 		scriptTerminal: make(map[string]scriptTerminalState),
+		activeLogMap:   make(map[string]string),
 	}
 }
 
@@ -72,8 +79,14 @@ func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
 	}
 	callback := s.statusMgr.StartOperation(infra.Ident, status.OpStart)
 	callback("starting...")
+	logPath, err := s.startOperationLog(infra.Ident, "start")
+	if err != nil {
+		callback("Error: " + err.Error())
+		return
+	}
 
 	composeFilePath, err := s.resourceMgr.ResolveInfrastructureComposeFile(infra.Ident)
+
 	if err != nil {
 		callback("Error: " + err.Error())
 		return
@@ -82,7 +95,7 @@ func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "-f", composeFilePath, "up", "-d")
 
-	err, _ = s.executor.RunCommandWithLogging(infra.Ident, docker.ComposeCommand(), composeArgs, []string{}, "")
+	err, _ = s.executor.RunCommandWithLoggingToFile(infra.Ident, docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
 	if err != nil {
 		callback("Error: " + err.Error())
 		return
@@ -104,11 +117,16 @@ func (s *service) KillAndRemoveAllContainersForAppWithStatus(a *app.App) {
 
 func (s *service) killAndRemoveContainersForAppInternal(a *app.App, statusCb func(string)) {
 	statusCb("killing containers...")
+	logPath, err := s.startOperationLog(a.Ident, "stop")
+	if err != nil {
+		statusCb("Error: " + err.Error())
+		return
+	}
 
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ := s.executor.RunCommandWithLogging(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, "")
+	err, _ = s.executor.RunCommandWithLoggingToFile(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -130,11 +148,16 @@ func (s *service) KillAllRunningContainersWithStatus(apps []app.App) {
 
 func (s *service) killAllRunningContainersInternal(apps []app.App, statusCb func(string)) {
 	statusCb("killing all containers...")
+	logPath, err := s.startOperationLog("all-apps", "stop")
+	if err != nil {
+		statusCb("Error: " + err.Error())
+		return
+	}
 
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ := s.executor.RunCommandWithLogging("all-apps", docker.ComposeCommand(), composeArgs, []string{}, "")
+	err, _ = s.executor.RunCommandWithLoggingToFile("all-apps", docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -353,5 +376,52 @@ func (s *service) ScriptInfrastructureStatus(ident string) (string, string) {
 			return app.InfraStatusStopped, st.logPath
 		}
 		return app.InfraStatusRunning, st.logPath
+	}
+}
+
+func (s *service) startOperationLog(ident, operation string) (string, error) {
+	logDir := filepath.Join(os.TempDir(), "devenv-action-logs")
+	cleanupOperationLogs(logDir, 24*time.Hour)
+	path := filepath.Join(logDir, fmt.Sprintf("%s-%s-%d.log", ident, operation, time.Now().UnixNano()))
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return "", err
+	}
+	now := time.Now().Format("2006-01-02 15:04:05")
+	if err := os.WriteFile(path, []byte(fmt.Sprintf("[%s] Operation log started: ident=%s operation=%s\n[%s] Retention: temporary log, auto-cleaned after 24h\n\n", now, ident, operation, now)), 0644); err != nil {
+		return "", err
+	}
+	s.activeLogMu.Lock()
+	if s.activeLogMap == nil {
+		s.activeLogMap = make(map[string]string)
+	}
+	s.activeLogMap[ident] = path
+	s.activeLogMu.Unlock()
+	return path, nil
+}
+
+func (s *service) ActiveOperationLogPath(ident string) (string, bool) {
+	s.activeLogMu.RLock()
+	defer s.activeLogMu.RUnlock()
+	path, ok := s.activeLogMap[ident]
+	return path, ok
+}
+
+func cleanupOperationLogs(logDir string, maxAge time.Duration) {
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-maxAge)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			_ = os.Remove(filepath.Join(logDir, entry.Name()))
+		}
 	}
 }

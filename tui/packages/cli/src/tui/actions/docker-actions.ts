@@ -8,6 +8,7 @@ export function createDockerActions(
   uiStore: UiStore,
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
+  showActionLog?: (appIdent: string, appName: string) => Promise<void>,
 ) {
   const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
 
@@ -48,9 +49,13 @@ export function createDockerActions(
         if ('type' in app) await client.startInfraService(appIdent);
         else await client.startApp(appIdent, profile || '', targetId);
       } else if (action === 'stop') {
-        const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;
-        if (!containerID) throw new Error('No container identifier available for stop operation');
-        await client.stopContainer(containerID, appIdent);
+        if ('type' in app) {
+          const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;
+          if (!containerID) throw new Error('No container identifier available for stop operation');
+          await client.stopContainer(containerID, appIdent);
+        } else {
+          await client.stopApp(appIdent);
+        }
       } else {
         const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;
         if (!containerID) throw new Error('No container identifier available for restart operation');
@@ -79,14 +84,18 @@ export function createDockerActions(
     }
   };
 
-  const requestDockerOperation = (action: 'start' | 'stop' | 'restart') => {
+  const requestDockerOperation = async (action: 'start' | 'stop' | 'restart') => {
     const app = getSelectedApp();
     if (!app) {
       showError('No Application Selected', 'Please select an application before performing this operation.');
       return;
     }
     if (appStore.operationInProgressForApp()) {
-      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      const activeIdent = appStore.operationInProgressForApp();
+      if (!activeIdent) return;
+      const active = appStore.apps().find((a) => a.ident === activeIdent) || appStore.infraServices().find((svc) => svc.ident === activeIdent) || app;
+      if (showActionLog) await showActionLog(activeIdent, active.displayName || active.ident);
+      else showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
       return;
     }
     void performDockerOperation(action, app);
@@ -158,11 +167,16 @@ export function createDockerActions(
 
     const currentApp = appStore.apps().find((a) => a.ident === app.ident) ?? app;
     if (currentApp.operationStatus?.status === 'active') {
-      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      if (showActionLog) await showActionLog(app.ident, app.displayName);
+      else showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
       return;
     }
     if (appStore.operationInProgressForApp()) {
-      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      const activeIdent = appStore.operationInProgressForApp();
+      if (!activeIdent) return;
+      const active = appStore.apps().find((a) => a.ident === activeIdent) || appStore.infraServices().find((svc) => svc.ident === activeIdent) || app;
+      if (showActionLog) await showActionLog(activeIdent, active.displayName || active.ident);
+      else showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
       return;
     }
 

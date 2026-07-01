@@ -69,7 +69,7 @@ export function ActionTargetPickerView(props: ActionTargetPickerProps) {
         { key: 'Enter', action: 'Select' },
         { key: 'Esc', action: 'Cancel' },
       ])}
-      widthPercent={0.42}
+      widthPercent={0.72}
       heightPercent={0.45}
       items={props.targets}
       selectedIndex={props.selectedIndex}
