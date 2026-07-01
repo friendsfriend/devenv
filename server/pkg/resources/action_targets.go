@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 )
@@ -26,9 +27,10 @@ const (
 type ActionRuntime string
 
 const (
-	ActionRuntimeDocker     ActionRuntime = "docker"
-	ActionRuntimeShell      ActionRuntime = "shell"
-	ActionRuntimePowerShell ActionRuntime = "powershell"
+	ActionRuntimeDocker      ActionRuntime = "docker"
+	ActionRuntimeShell       ActionRuntime = "shell"
+	ActionRuntimePowerShell  ActionRuntime = "powershell"
+	ActionRuntimeSystemShell ActionRuntime = "systemshell"
 )
 
 // LaunchMode identifies how a shell action target launches.
@@ -41,20 +43,30 @@ const (
 
 // ActionTarget is normalized action target data for clients.
 type ActionTarget struct {
-	ID         string        `json:"id"`
-	Action     AppAction     `json:"action"`
-	Runtime    ActionRuntime `json:"runtime"`
-	Label      string        `json:"label"`
-	Profile    string        `json:"profile,omitempty"`
-	LaunchMode LaunchMode    `json:"launchMode,omitempty"`
-	SourcePath string        `json:"sourcePath"`
-	Command    string        `json:"command,omitempty"`
-	Args       []string      `json:"args,omitempty"`
+	ID         string          `json:"id"`
+	Action     AppAction       `json:"action"`
+	Runtime    ActionRuntime   `json:"runtime"`
+	Label      string          `json:"label"`
+	Profile    string          `json:"profile,omitempty"`
+	LaunchMode LaunchMode      `json:"launchMode,omitempty"`
+	SourcePath string          `json:"sourcePath"`
+	Command    string          `json:"command,omitempty"`
+	Args       []string        `json:"args,omitempty"`
+	Requires   []DependencyRef `json:"requires,omitempty"`
+}
+
+// DependencyRef identifies app run or infrastructure dependency.
+type DependencyRef struct {
+	App     string `json:"app,omitempty"`
+	Runtime string `json:"runtime,omitempty"`
+	Profile string `json:"profile,omitempty"`
+	Infra   string `json:"infra,omitempty"`
 }
 
 type shellScriptMetadata struct {
-	Name string
-	Mode LaunchMode
+	Name     string
+	Mode     LaunchMode
+	Requires []DependencyRef
 }
 
 // DiscoverActionTargets returns configured action targets for app/action.
@@ -75,12 +87,12 @@ func (m *manager) DiscoverActionTargets(appIdent, localDir string, action AppAct
 			return nil, err
 		}
 		targets = append(targets, scriptTargets...)
-		rootTargets, err := m.discoverRootBuildToolTargets(localDir, action)
+		rootTargets, err := m.discoverRootBuildToolTargets(appIdent, localDir, action)
 		if err != nil {
 			return nil, err
 		}
 		targets = append(targets, rootTargets...)
-		languageTargets, err := m.discoverLanguageBuildToolTargets(localDir, action)
+		languageTargets, err := m.discoverLanguageBuildToolTargets(appIdent, localDir, action)
 		if err != nil {
 			return nil, err
 		}
@@ -96,12 +108,12 @@ func (m *manager) DiscoverActionTargets(appIdent, localDir string, action AppAct
 			return nil, err
 		}
 		targets = append(targets, scriptTargets...)
-		rootTargets, err := m.discoverRootBuildToolTargets(localDir, action)
+		rootTargets, err := m.discoverRootBuildToolTargets(appIdent, localDir, action)
 		if err != nil {
 			return nil, err
 		}
 		targets = append(targets, rootTargets...)
-		languageTargets, err := m.discoverLanguageBuildToolTargets(localDir, action)
+		languageTargets, err := m.discoverLanguageBuildToolTargets(appIdent, localDir, action)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +134,7 @@ func (m *manager) DiscoverActionTargets(appIdent, localDir string, action AppAct
 func (m *manager) discoverDockerBuildTestTarget(appIdent string, action AppAction) (ActionTarget, bool, error) {
 	path := filepath.Join(m.configDir, "apps", "build", fmt.Sprintf("%s-%s.Dockerfile", appIdent, action))
 	if _, err := os.Stat(path); err == nil {
-		return ActionTarget{ID: actionTargetID(action, ActionRuntimeDocker, ""), Action: action, Runtime: ActionRuntimeDocker, Label: "Docker", SourcePath: path}, true, nil
+		return ActionTarget{ID: actionTargetID(appIdent, action, ActionRuntimeDocker, ""), Action: action, Runtime: ActionRuntimeDocker, Label: "Docker", SourcePath: path}, true, nil
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		return ActionTarget{}, false, err
 	}
@@ -151,7 +163,7 @@ func (m *manager) discoverScriptBuildTestTargets(appIdent string, action AppActi
 			if label == "" {
 				label = candidate.label
 			}
-			targets = append(targets, ActionTarget{ID: actionTargetID(action, candidate.runtime, ""), Action: action, Runtime: candidate.runtime, Label: label, LaunchMode: meta.Mode, SourcePath: path, Command: candidate.command, Args: candidate.args(path)})
+			targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, action, candidate.runtime, ""), Action: action, Runtime: candidate.runtime, Label: label, LaunchMode: meta.Mode, SourcePath: path, Command: candidate.command, Args: candidate.args(path), Requires: meta.Requires})
 		} else if !errors.Is(err, fs.ErrNotExist) {
 			return nil, err
 		}
@@ -159,7 +171,7 @@ func (m *manager) discoverScriptBuildTestTargets(appIdent string, action AppActi
 	return targets, nil
 }
 
-func (m *manager) discoverRootBuildToolTargets(localDir string, action AppAction) ([]ActionTarget, error) {
+func (m *manager) discoverRootBuildToolTargets(appIdent, localDir string, action AppAction) ([]ActionTarget, error) {
 	if localDir == "" {
 		return nil, nil
 	}
@@ -205,14 +217,14 @@ func (m *manager) discoverRootBuildToolTargets(localDir string, action AppAction
 			if action == AppActionRun {
 				mode = LaunchModeTmux
 			}
-			targets = append(targets, ActionTarget{ID: actionTargetID(action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: candidate.label, LaunchMode: mode, SourcePath: path, Command: candidate.command, Args: candidate.args})
+			targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: candidate.label, LaunchMode: mode, SourcePath: path, Command: candidate.command, Args: candidate.args})
 			break
 		}
 	}
 	return targets, nil
 }
 
-func (m *manager) discoverLanguageBuildToolTargets(localDir string, action AppAction) ([]ActionTarget, error) {
+func (m *manager) discoverLanguageBuildToolTargets(appIdent, localDir string, action AppAction) ([]ActionTarget, error) {
 	if localDir == "" {
 		return nil, nil
 	}
@@ -222,7 +234,7 @@ func (m *manager) discoverLanguageBuildToolTargets(localDir string, action AppAc
 		if action == AppActionRun {
 			mode = LaunchModeTmux
 		}
-		targets = append(targets, ActionTarget{ID: actionTargetID(action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: label, LaunchMode: mode, SourcePath: sourcePath, Command: command, Args: args})
+		targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: label, LaunchMode: mode, SourcePath: sourcePath, Command: command, Args: args})
 	}
 
 	packageJSON := filepath.Join(localDir, "package.json")
@@ -449,13 +461,21 @@ func (m *manager) discoverDockerRunTargets(appIdent string) ([]ActionTarget, err
 		name := entry.Name()
 		path := filepath.Join(composeDir, name)
 		if defaultNames[name] {
-			targets = append(targets, ActionTarget{ID: actionTargetID(AppActionRun, ActionRuntimeDocker, "default"), Action: AppActionRun, Runtime: ActionRuntimeDocker, Label: "default", Profile: "", SourcePath: path})
+			requires, err := parseComposeRequires(path)
+			if err != nil {
+				return nil, err
+			}
+			targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, AppActionRun, ActionRuntimeDocker, "default"), Action: AppActionRun, Runtime: ActionRuntimeDocker, Label: "default", Profile: "", SourcePath: path, Requires: requires})
 			continue
 		}
 		for _, suffix := range []string{"-compose.yml", "-compose.yaml"} {
 			if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, suffix) && len(name) > len(prefix)+len(suffix) {
 				profile := name[len(prefix) : len(name)-len(suffix)]
-				targets = append(targets, ActionTarget{ID: actionTargetID(AppActionRun, ActionRuntimeDocker, profile), Action: AppActionRun, Runtime: ActionRuntimeDocker, Label: profile, Profile: profile, SourcePath: path})
+				requires, err := parseComposeRequires(path)
+				if err != nil {
+					return nil, err
+				}
+				targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, AppActionRun, ActionRuntimeDocker, profile), Action: AppActionRun, Runtime: ActionRuntimeDocker, Label: profile, Profile: profile, SourcePath: path, Requires: requires})
 			}
 		}
 	}
@@ -501,8 +521,57 @@ func (m *manager) discoverScriptRunTargets(appIdent string) ([]ActionTarget, err
 			if label == "" {
 				label = profile
 			}
-			targets = append(targets, ActionTarget{ID: actionTargetID(AppActionRun, candidate.runtime, profile), Action: AppActionRun, Runtime: candidate.runtime, Label: label, Profile: profile, LaunchMode: meta.Mode, SourcePath: path, Command: candidate.command, Args: candidate.args(path)})
+			targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, AppActionRun, candidate.runtime, profile), Action: AppActionRun, Runtime: candidate.runtime, Label: label, Profile: profile, LaunchMode: meta.Mode, SourcePath: path, Command: candidate.command, Args: candidate.args(path), Requires: meta.Requires})
 		}
+	}
+	systemshellTargets, err := m.discoverSystemShellRunTargets(appIdent)
+	if err != nil {
+		return nil, err
+	}
+	targets = append(targets, systemshellTargets...)
+	return targets, nil
+}
+
+func (m *manager) discoverSystemShellRunTargets(appIdent string) ([]ActionTarget, error) {
+	runDir := filepath.Join(m.configDir, "apps", "run")
+	ext := ".sh"
+	command := "sh"
+	args := func(path string) []string { return []string{path} }
+	labelPrefix := "System Shell"
+	if runtime.GOOS == "windows" {
+		ext = ".ps1"
+		command = powerShellCommand()
+		args = func(path string) []string { return []string{"-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path} }
+		labelPrefix = "System PowerShell"
+	}
+	entries, err := os.ReadDir(runDir)
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("reading run directory: %w", err)
+	}
+	prefix := appIdent + "-"
+	var targets []ActionTarget
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasPrefix(name, prefix) || !strings.HasSuffix(name, ext) || len(name) <= len(prefix)+len(ext) {
+			continue
+		}
+		profile := name[len(prefix) : len(name)-len(ext)]
+		path := filepath.Join(runDir, name)
+		meta, err := parseShellScriptMetadata(path, LaunchModeTmux)
+		if err != nil {
+			return nil, err
+		}
+		label := meta.Name
+		if label == "" {
+			label = labelPrefix + " " + profile
+		}
+		targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, AppActionRun, ActionRuntimeSystemShell, profile), Action: AppActionRun, Runtime: ActionRuntimeSystemShell, Label: label, Profile: profile, LaunchMode: meta.Mode, SourcePath: path, Command: command, Args: args(path), Requires: meta.Requires})
 	}
 	return targets, nil
 }
@@ -536,11 +605,80 @@ func parseShellScriptMetadata(path string, defaultMode LaunchMode) (shellScriptM
 		if strings.HasPrefix(comment, "devenv:mode=") {
 			meta.Mode = LaunchMode(strings.TrimSpace(strings.TrimPrefix(comment, "devenv:mode=")))
 		}
+		if strings.HasPrefix(comment, "devenv:requires=") {
+			requires, err := parseDependencyRefs(strings.TrimSpace(strings.TrimPrefix(comment, "devenv:requires=")))
+			if err != nil {
+				return shellScriptMetadata{}, fmt.Errorf("parse %s devenv:requires: %w", path, err)
+			}
+			meta.Requires = requires
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		return shellScriptMetadata{}, err
 	}
 	return meta, nil
+}
+
+func parseDependencyRefs(raw string) ([]DependencyRef, error) {
+	if strings.TrimSpace(raw) == "" {
+		return nil, nil
+	}
+	var refs []DependencyRef
+	if err := json.Unmarshal([]byte(raw), &refs); err != nil {
+		return nil, err
+	}
+	for i, ref := range refs {
+		if ref.App == "" && ref.Infra == "" {
+			return nil, fmt.Errorf("dependency %d requires app or infra", i)
+		}
+		if ref.App != "" && ref.Infra != "" {
+			return nil, fmt.Errorf("dependency %d cannot contain both app and infra", i)
+		}
+		if ref.App != "" {
+			if ref.Runtime == "" {
+				return nil, fmt.Errorf("dependency %d app %q requires runtime", i, ref.App)
+			}
+			if ref.Profile == "" {
+				return nil, fmt.Errorf("dependency %d app %q requires profile", i, ref.App)
+			}
+		}
+	}
+	return refs, nil
+}
+
+func parseComposeRequires(path string) ([]DependencyRef, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "x-devenv:") {
+			continue
+		}
+		for j := i + 1; j < len(lines); j++ {
+			child := strings.TrimSpace(lines[j])
+			if child == "" || strings.HasPrefix(child, "#") {
+				continue
+			}
+			if !strings.HasPrefix(lines[j], " ") && !strings.HasPrefix(lines[j], "\t") {
+				break
+			}
+			if strings.HasPrefix(child, "requires:") {
+				raw := strings.TrimSpace(strings.TrimPrefix(child, "requires:"))
+				if raw == "" {
+					return nil, fmt.Errorf("%s x-devenv.requires must be inline JSON array", path)
+				}
+				refs, err := parseDependencyRefs(raw)
+				if err != nil {
+					return nil, fmt.Errorf("parse %s x-devenv.requires: %w", path, err)
+				}
+				return refs, nil
+			}
+		}
+	}
+	return nil, nil
 }
 
 func powerShellCommand() string {
@@ -550,9 +688,15 @@ func powerShellCommand() string {
 	return "powershell"
 }
 
-func actionTargetID(action AppAction, runtime ActionRuntime, profile string) string {
-	if profile == "" {
-		return fmt.Sprintf("%s:%s", action, runtime)
+func actionTargetID(appIdent string, action AppAction, runtime ActionRuntime, profile string) string {
+	if appIdent == "" {
+		if profile == "" {
+			return fmt.Sprintf("%s:%s", action, runtime)
+		}
+		return fmt.Sprintf("%s:%s:%s", action, runtime, profile)
 	}
-	return fmt.Sprintf("%s:%s:%s", action, runtime, profile)
+	if profile == "" {
+		return fmt.Sprintf("app/%s/%s/%s", appIdent, action, runtime)
+	}
+	return fmt.Sprintf("app/%s/%s/%s/%s", appIdent, action, runtime, profile)
 }

@@ -99,13 +99,24 @@ type fakeCommandRunner struct {
 	silentErr error
 	lastCmd   string
 	lastArgs  []string
+	lastEnv   []string
 	lastDir   string
+	commands  []recordedCommand
 }
 
-func (f *fakeCommandRunner) RunCommandWithLogging(_, command string, args []string, _ []string, workingDir string) (error, string) {
+type recordedCommand struct {
+	command string
+	args    []string
+	envVars []string
+	dir     string
+}
+
+func (f *fakeCommandRunner) RunCommandWithLogging(_, command string, args []string, envVars []string, workingDir string) (error, string) {
 	f.lastCmd = command
 	f.lastArgs = args
+	f.lastEnv = envVars
 	f.lastDir = workingDir
+	f.commands = append(f.commands, recordedCommand{command: command, args: append([]string(nil), args...), envVars: append([]string(nil), envVars...), dir: workingDir})
 	return f.err, ""
 }
 
@@ -113,10 +124,12 @@ func (f *fakeCommandRunner) RunCommandWithLoggingToFile(appIdent, command string
 	return f.RunCommandWithLogging(appIdent, command, args, envVars, workingDir)
 }
 
-func (f *fakeCommandRunner) RunCommandSilent(command string, args []string, _ []string, workingDir string) (error, string) {
+func (f *fakeCommandRunner) RunCommandSilent(command string, args []string, envVars []string, workingDir string) (error, string) {
 	f.lastCmd = command
 	f.lastArgs = args
+	f.lastEnv = envVars
 	f.lastDir = workingDir
+	f.commands = append(f.commands, recordedCommand{command: command, args: append([]string(nil), args...), envVars: append([]string(nil), envVars...), dir: workingDir})
 	if f.silentErr != nil {
 		return f.silentErr, ""
 	}
@@ -171,6 +184,56 @@ func TestBuildAppCopyTemplates(t *testing.T) {
 				t.Fatalf("unexpected error status: %q", got)
 			}
 		})
+	}
+}
+
+func TestPodmanCacheRepositoryRemovesTagOrDigest(t *testing.T) {
+	tests := map[string]string{
+		"bhvr-site:latest":                          "bhvr-site",
+		"localhost/my-app:dev":                      "localhost/my-app",
+		"registry.example.com/team/my-app:20260701": "registry.example.com/team/my-app",
+		"registry.example.com:5000/team/my-app:v1":  "registry.example.com:5000/team/my-app",
+		"bhvr-site@sha256:abc":                      "bhvr-site",
+	}
+	for in, want := range tests {
+		if got := podmanCacheRepository(in); got != want {
+			t.Fatalf("podmanCacheRepository(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestBuildAppDockerUsesBuildKitAndCache(t *testing.T) {
+	appDir := t.TempDir()
+	runner := &fakeCommandRunner{silentOut: `{}`}
+	svc := &service{resourceMgr: &fakeResourceMgr{}, executor: runner}
+
+	svc.buildAppInternal(&app.App{
+		Ident:              "test-app",
+		LocalDirectoryPath: appDir,
+	}, "", func(string) {})
+
+	var buildCmd *recordedCommand
+	for i := range runner.commands {
+		if len(runner.commands[i].args) > 0 && runner.commands[i].args[0] == "build" {
+			buildCmd = &runner.commands[i]
+			break
+		}
+	}
+	if buildCmd == nil {
+		t.Fatalf("expected docker build command, got %#v", runner.commands)
+	}
+	args := strings.Join(buildCmd.args, " ")
+	if !strings.Contains(args, "--cache-from test-app:latest") {
+		t.Fatalf("expected docker build cache-from args, got %#v", buildCmd.args)
+	}
+	if !strings.Contains(args, "--build-arg BUILDKIT_INLINE_CACHE=1") {
+		t.Fatalf("expected inline cache build arg, got %#v", buildCmd.args)
+	}
+	if !strings.Contains(args, "--progress=plain") {
+		t.Fatalf("expected plain progress, got %#v", buildCmd.args)
+	}
+	if strings.Join(buildCmd.envVars, " ") != "DOCKER_BUILDKIT=1" {
+		t.Fatalf("expected BuildKit env, got %#v", buildCmd.envVars)
 	}
 }
 
@@ -426,5 +489,83 @@ func TestShellTmuxRunStoresWindowAndStopKillsIt(t *testing.T) {
 	}
 	if runner.lastCmd != "tmux" || len(runner.lastArgs) < 3 || runner.lastArgs[0] != "kill-window" || runner.lastArgs[2] != "%7" {
 		t.Fatalf("unexpected stop command: %s %v", runner.lastCmd, runner.lastArgs)
+	}
+}
+
+type fakeAppRegistry struct {
+	apps  []app.App
+	infra []app.InfraService
+}
+
+func (f fakeAppRegistry) GetApps() []app.App                   { return f.apps }
+func (f fakeAppRegistry) GetInfraServices() []app.InfraService { return f.infra }
+func (f fakeAppRegistry) GetAppByIdent(ident string) (app.App, bool) {
+	for _, a := range f.apps {
+		if a.Ident == ident {
+			return a, true
+		}
+	}
+	return app.App{}, false
+}
+
+type fakeInfraStarter struct {
+	started []string
+	err     error
+}
+
+func (f *fakeInfraStarter) StartInfrastructureServiceWithStatus(infra app.InfraService) {
+	f.started = append(f.started, infra.Ident)
+}
+func (f *fakeInfraStarter) StartScriptInfrastructureServiceWithStatus(infra app.InfraService, _ string) error {
+	f.started = append(f.started, infra.Ident)
+	return f.err
+}
+
+func TestRunAppStartsDependenciesBeforeRequestedTarget(t *testing.T) {
+	t.Setenv("TMUX", "")
+	frontendDir := t.TempDir()
+	backendDir := t.TempDir()
+	frontendID := resources.AppRunTargetID("frontend", resources.ActionRuntimeShell, "dev")
+	backendID := resources.AppRunTargetID("backend", resources.ActionRuntimeShell, "dev")
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{
+		{ID: frontendID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/config/apps/run/frontend-dev.sh", Requires: []resources.DependencyRef{{App: "backend", Runtime: string(resources.ActionRuntimeShell), Profile: "dev"}, {Infra: "postgres"}}},
+		{ID: backendID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/config/apps/run/backend-dev.sh"},
+	}}
+	runner := &fakeCommandRunner{}
+	infra := &fakeInfraStarter{}
+	svc := &service{resourceMgr: fake, executor: runner, tmuxRuns: map[string]ShellTmuxRunState{}, appRegistry: fakeAppRegistry{apps: []app.App{{Ident: "frontend", LocalDirectoryPath: frontendDir}, {Ident: "backend", LocalDirectoryPath: backendDir}}, infra: []app.InfraService{{Ident: "postgres"}}}, infraStarter: infra}
+
+	var statuses []string
+	svc.runAppInternal(&app.App{Ident: "frontend", LocalDirectoryPath: frontendDir}, "", frontendID, func(s string) { statuses = append(statuses, s) })
+	joined := strings.Join(statuses, "\n")
+	if !strings.Contains(joined, "starting dependency "+resources.InfraTargetID("postgres")) || !strings.Contains(joined, "starting dependency "+backendID) {
+		t.Fatalf("statuses = %#v", statuses)
+	}
+	if len(infra.started) != 1 || infra.started[0] != "postgres" {
+		t.Fatalf("started infra = %#v", infra.started)
+	}
+	if runner.lastArgs[0] != "/config/apps/run/frontend-dev.sh" || runner.lastDir != frontendDir {
+		t.Fatalf("last run = %s %v dir=%s", runner.lastCmd, runner.lastArgs, runner.lastDir)
+	}
+}
+
+func TestRunAppDependencyCyclePreventsStart(t *testing.T) {
+	appDir := t.TempDir()
+	aID := resources.AppRunTargetID("a", resources.ActionRuntimeShell, "dev")
+	bID := resources.AppRunTargetID("b", resources.ActionRuntimeShell, "dev")
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{
+		{ID: aID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/a.sh", Requires: []resources.DependencyRef{{App: "b", Runtime: string(resources.ActionRuntimeShell), Profile: "dev"}}},
+		{ID: bID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", LaunchMode: resources.LaunchModeTmux, SourcePath: "/b.sh", Requires: []resources.DependencyRef{{App: "a", Runtime: string(resources.ActionRuntimeShell), Profile: "dev"}}},
+	}}
+	runner := &fakeCommandRunner{}
+	svc := &service{resourceMgr: fake, executor: runner, tmuxRuns: map[string]ShellTmuxRunState{}, appRegistry: fakeAppRegistry{apps: []app.App{{Ident: "a", LocalDirectoryPath: appDir}, {Ident: "b", LocalDirectoryPath: appDir}}}, infraStarter: &fakeInfraStarter{}}
+
+	var got string
+	svc.runAppInternal(&app.App{Ident: "a", LocalDirectoryPath: appDir}, "", aID, func(s string) { got = s })
+	if !strings.Contains(got, "dependency cycle") {
+		t.Fatalf("status = %q", got)
+	}
+	if runner.lastCmd != "" {
+		t.Fatalf("runner called despite cycle: %s", runner.lastCmd)
 	}
 }

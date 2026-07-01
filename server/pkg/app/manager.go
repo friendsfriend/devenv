@@ -53,11 +53,42 @@ type App struct {
 	MainWorktreeBranch string `json:"mainWorktreeBranch,omitempty"`
 }
 
-// InfraService represents an infrastructure service
+// Infrastructure service types.
+const (
+	InfraServiceTypeDocker  = "docker"
+	InfraServiceTypeScript  = "script"
+	ScriptRunnerShell       = "shell"
+	ScriptRunnerPowerShell  = "powershell"
+	InfraStatusStopped      = "stopped"
+	InfraStatusRunning      = "running"
+	InfraStatusFailed       = "failed"
+)
+
+// InfraService represents an infrastructure service.
 type InfraService struct {
-	DisplayName       string `json:"displayName"`
-	Ident             string `json:"ident"`
-	ContainerBaseName string `json:"containerBaseName"`
+	DisplayName       string            `json:"displayName"`
+	Ident             string            `json:"ident"`
+	Type              string            `json:"type,omitempty"`
+	ContainerBaseName string            `json:"containerBaseName,omitempty"`
+	ShellPath         string            `json:"shellPath,omitempty"`
+	PowerShellPath    string            `json:"powerShellPath,omitempty"`
+	DefaultRunner     string            `json:"defaultRunner,omitempty"`
+	Cwd               string            `json:"cwd,omitempty"`
+	Args              []string          `json:"args,omitempty"`
+	Env               map[string]string `json:"env,omitempty"`
+	Status            string            `json:"status,omitempty"`
+	LogPath           string            `json:"logPath,omitempty"`
+	ExecutionHandle   *ExecutionHandle  `json:"executionHandle,omitempty"`
+}
+
+// ExecutionHandle tracks active script infrastructure execution.
+type ExecutionHandle struct {
+	Mode     string `json:"mode"`
+	PaneID   string `json:"paneId,omitempty"`
+	PID      int    `json:"pid,omitempty"`
+	Runner   string `json:"runner,omitempty"`
+	StartedAt string `json:"startedAt,omitempty"`
+	ExitCode int    `json:"exitCode,omitempty"`
 }
 
 // appConfigFile is the on-disk representation of a single application
@@ -731,10 +762,45 @@ func (am *appManager) loadInfraServicesFromDirectory() ([]InfraService, error) {
 		if svc.Ident == "" {
 			svc.Ident = strings.TrimSuffix(entry.Name(), ".json")
 		}
+		if err := normalizeInfraService(&svc); err != nil {
+			return nil, fmt.Errorf("invalid infra service file %s: %w", entry.Name(), err)
+		}
 		infraServices = append(infraServices, svc)
 	}
 
 	return infraServices, nil
+}
+
+func normalizeInfraService(svc *InfraService) error {
+	if strings.TrimSpace(svc.Ident) == "" {
+		return fmt.Errorf("infra service ident is required")
+	}
+	if strings.TrimSpace(svc.Type) == "" {
+		svc.Type = InfraServiceTypeDocker
+	}
+	switch svc.Type {
+	case InfraServiceTypeDocker:
+		return nil
+	case InfraServiceTypeScript:
+		if strings.TrimSpace(svc.ShellPath) == "" && strings.TrimSpace(svc.PowerShellPath) == "" {
+			return fmt.Errorf("script service %q requires shellPath or powerShellPath", svc.Ident)
+		}
+		if svc.DefaultRunner != "" && svc.DefaultRunner != ScriptRunnerShell && svc.DefaultRunner != ScriptRunnerPowerShell {
+			return fmt.Errorf("script service %q defaultRunner must be %q or %q", svc.Ident, ScriptRunnerShell, ScriptRunnerPowerShell)
+		}
+		if svc.DefaultRunner == ScriptRunnerShell && strings.TrimSpace(svc.ShellPath) == "" {
+			return fmt.Errorf("script service %q defaultRunner shell requires shellPath", svc.Ident)
+		}
+		if svc.DefaultRunner == ScriptRunnerPowerShell && strings.TrimSpace(svc.PowerShellPath) == "" {
+			return fmt.Errorf("script service %q defaultRunner powershell requires powerShellPath", svc.Ident)
+		}
+		if svc.Status == "" {
+			svc.Status = InfraStatusStopped
+		}
+		return nil
+	default:
+		return fmt.Errorf("unsupported infra service type %q", svc.Type)
+	}
 }
 
 func (am *appManager) saveAppFile(app App) error {
@@ -786,8 +852,8 @@ func (am *appManager) saveInfraServicesFile(infra []InfraService) error {
 
 	allowed := make(map[string]struct{}, len(infra))
 	for _, svc := range infra {
-		if svc.Ident == "" {
-			return fmt.Errorf("infra service ident is required")
+		if err := normalizeInfraService(&svc); err != nil {
+			return err
 		}
 
 		data, err := json.MarshalIndent(svc, "", "  ")

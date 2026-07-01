@@ -259,8 +259,13 @@ export async function handleGlobalKeys(
       if (target) {
         uiStore.setShowActionTargetPicker(false);
         const ident = uiStore.actionTargetPickerAppIdent();
-        const app = ident ? appStore.apps().find(a => a.ident === ident) : undefined;
-        if (app) void dockerActions.runSelectedTarget(app, uiStore.actionTargetPickerAction(), target);
+        const infra = ident ? appStore.infraServices().find(s => s.ident === ident) : undefined;
+        if (infra && target.id.startsWith('infra:runner:')) {
+          void dockerActions.performDockerOperation('start', infra, undefined, undefined, target.runtime as 'shell' | 'powershell');
+        } else {
+          const app = ident ? appStore.apps().find(a => a.ident === ident) : undefined;
+          if (app) void dockerActions.runSelectedTarget(app, uiStore.actionTargetPickerAction(), target);
+        }
       }
       return true;
     }

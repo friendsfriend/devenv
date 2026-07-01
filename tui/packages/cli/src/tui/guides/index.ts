@@ -15,6 +15,18 @@ export const guides: Guide[] = [
     import: () => import("./config-repository.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
+    key: "container-runtime",
+    title: "Container Runtime",
+    description: "Choose Docker or Podman via DEVENV_CONTAINER_RUNTIME",
+    import: () => import("./container-runtime.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
+    key: "effective-docker-builds",
+    title: "Effective Docker Builds",
+    description: "Write fast Dockerfiles for Docker and Podman build targets",
+    import: () => import("./effective-docker-builds.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
     key: "adding-apps",
     title: "Adding an App",
     description: "App definitions, Dockerfiles, Compose config, and infra linking",

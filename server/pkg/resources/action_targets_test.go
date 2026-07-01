@@ -36,11 +36,11 @@ func TestDiscoverActionTargets(t *testing.T) {
 		for _, target := range targets {
 			seen[target.ID] = target
 		}
-		if seen["build:docker"].SourcePath == "" {
+		if seen["app/my-app/build/docker"].SourcePath == "" {
 			t.Fatalf("missing docker build target: %#v", targets)
 		}
-		if seen["build:shell"].Label != "Local Build" || seen["build:shell"].LaunchMode != LaunchModeLogged {
-			t.Fatalf("bad shell build target: %#v", seen["build:shell"])
+		if seen["app/my-app/build/shell"].Label != "Local Build" || seen["app/my-app/build/shell"].LaunchMode != LaunchModeLogged {
+			t.Fatalf("bad shell build target: %#v", seen["app/my-app/build/shell"])
 		}
 	})
 
@@ -54,7 +54,7 @@ func TestDiscoverActionTargets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DiscoverActionTargets build error = %v", err)
 		}
-		if len(buildTargets) != 1 || buildTargets[0].ID != "build:powershell" || buildTargets[0].Label != "Windows Build" || buildTargets[0].Command == "" {
+		if len(buildTargets) != 1 || buildTargets[0].ID != "app/my-app/build/powershell" || buildTargets[0].Label != "Windows Build" || buildTargets[0].Command == "" {
 			t.Fatalf("buildTargets = %#v, want powershell build", buildTargets)
 		}
 
@@ -62,7 +62,7 @@ func TestDiscoverActionTargets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DiscoverActionTargets run error = %v", err)
 		}
-		if len(runTargets) != 1 || runTargets[0].ID != "run:powershell:dev" || runTargets[0].Label != "Windows Dev" || runTargets[0].LaunchMode != LaunchModeTmux {
+		if len(runTargets) != 1 || runTargets[0].ID != "app/my-app/run/powershell/dev" || runTargets[0].Label != "Windows Dev" || runTargets[0].LaunchMode != LaunchModeTmux {
 			t.Fatalf("runTargets = %#v, want powershell run", runTargets)
 		}
 	})
@@ -83,7 +83,7 @@ func TestDiscoverActionTargets(t *testing.T) {
 		for _, target := range targets {
 			seen[target.ID] = target
 		}
-		for _, id := range []string{"build:shell:make", "build:shell:just", "build:shell:task"} {
+		for _, id := range []string{"app/my-app/build/shell/make", "app/my-app/build/shell/just", "app/my-app/build/shell/task"} {
 			if seen[id].Command == "" || len(seen[id].Args) != 1 || seen[id].Args[0] != "build" {
 				t.Fatalf("missing root tool target %s: %#v", id, targets)
 			}
@@ -111,12 +111,12 @@ func TestDiscoverActionTargets(t *testing.T) {
 			seen[target.ID] = target
 		}
 		checks := map[string]string{
-			"build:shell:package-bun": "bun build (default for package.json)",
-			"build:shell:go":          "go build (default for go.mod)",
-			"build:shell:cargo":       "cargo build (default for Cargo.toml)",
-			"build:shell:maven":       "mvn package (default for pom.xml)",
-			"build:shell:gradle":      "./gradlew build (default for Gradle)",
-			"build:shell:uv":          "uv build (default for pyproject.toml)",
+			"app/my-app/build/shell/package-bun": "bun build (default for package.json)",
+			"app/my-app/build/shell/go":          "go build (default for go.mod)",
+			"app/my-app/build/shell/cargo":       "cargo build (default for Cargo.toml)",
+			"app/my-app/build/shell/maven":       "mvn package (default for pom.xml)",
+			"app/my-app/build/shell/gradle":      "./gradlew build (default for Gradle)",
+			"app/my-app/build/shell/uv":          "uv build (default for pyproject.toml)",
 		}
 		for id, label := range checks {
 			if seen[id].Label != label {
@@ -136,7 +136,7 @@ func TestDiscoverActionTargets(t *testing.T) {
 		if err != nil {
 			t.Fatalf("DiscoverActionTargets error = %v", err)
 		}
-		if len(targets) != 1 || targets[0].ID != "test:shell:package-bun" || targets[0].Command != "bun" || targets[0].Args[1] != "test" {
+		if len(targets) != 1 || targets[0].ID != "app/my-app/test/shell/package-bun" || targets[0].Command != "bun" || targets[0].Args[1] != "test" {
 			t.Fatalf("targets = %#v, want bun test target", targets)
 		}
 	})
@@ -156,7 +156,7 @@ func TestDiscoverActionTargets(t *testing.T) {
 		for _, target := range targets {
 			seen[target.ID] = target
 		}
-		if seen["test:shell"].SourcePath == "" || seen["test:shell:package-bun"].Label != "bun test (default for package.json)" {
+		if seen["app/my-app/test/shell"].SourcePath == "" || seen["app/my-app/test/shell/package-bun"].Label != "bun test (default for package.json)" {
 			t.Fatalf("targets = %#v, want shell script and bun default", targets)
 		}
 	})
@@ -181,11 +181,11 @@ func TestDiscoverActionTargets(t *testing.T) {
 			seen[target.ID] = target
 		}
 		checks := map[string]string{
-			"run:shell:make":        "make run (default for Makefile)",
-			"run:shell:package-bun": "bun dev (default for package.json)",
-			"run:shell:go":          "go run . (default for go.mod)",
-			"run:shell:cargo":       "cargo run (default for Cargo.toml)",
-			"run:shell:gradle":      "./gradlew run (default for Gradle)",
+			"app/my-app/run/shell/make":        "make run (default for Makefile)",
+			"app/my-app/run/shell/package-bun": "bun dev (default for package.json)",
+			"app/my-app/run/shell/go":          "go run . (default for go.mod)",
+			"app/my-app/run/shell/cargo":       "cargo run (default for Cargo.toml)",
+			"app/my-app/run/shell/gradle":      "./gradlew run (default for Gradle)",
 		}
 		for id, label := range checks {
 			if seen[id].Label != label || seen[id].LaunchMode != LaunchModeTmux {
@@ -210,17 +210,17 @@ func TestDiscoverActionTargets(t *testing.T) {
 		for _, target := range targets {
 			seen[target.ID] = target
 		}
-		if len(seen) != 3 {
-			t.Fatalf("got targets %#v, want 3 distinct targets", targets)
+		if len(seen) != 4 {
+			t.Fatalf("got targets %#v, want 4 distinct targets", targets)
 		}
-		if seen["run:docker:default"].Label != "default" {
+		if seen["app/my-app/run/docker/default"].Label != "default" {
 			t.Fatalf("missing default docker run target: %#v", targets)
 		}
-		if seen["run:docker:redis"].Profile != "redis" {
+		if seen["app/my-app/run/docker/redis"].Profile != "redis" {
 			t.Fatalf("missing redis docker run target: %#v", targets)
 		}
-		if seen["run:shell:dev"].Label != "Dev TUI" || seen["run:shell:dev"].LaunchMode != LaunchModeTmux {
-			t.Fatalf("bad shell run target: %#v", seen["run:shell:dev"])
+		if seen["app/my-app/run/shell/dev"].Label != "Dev TUI" || seen["app/my-app/run/shell/dev"].LaunchMode != LaunchModeTmux {
+			t.Fatalf("bad shell run target: %#v", seen["app/my-app/run/shell/dev"])
 		}
 	})
 
@@ -238,7 +238,7 @@ func TestDiscoverActionTargets(t *testing.T) {
 		for _, target := range targets {
 			seen[target.ID] = true
 		}
-		if !seen["run:docker:dev"] || !seen["run:shell:dev"] {
+		if !seen["app/my-app/run/docker/dev"] || !seen["app/my-app/run/shell/dev"] || !seen["app/my-app/run/systemshell/dev"] {
 			t.Fatalf("expected distinct docker/shell dev ids, got %#v", targets)
 		}
 	})
@@ -251,6 +251,68 @@ func TestDiscoverActionTargets(t *testing.T) {
 		}
 		if len(targets) != 0 {
 			t.Fatalf("got %#v, want no targets", targets)
+		}
+	})
+}
+
+func TestDependencyMetadataParsing(t *testing.T) {
+	t.Parallel()
+
+	writeFile := func(t *testing.T, path, content string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Run("parses shell powershell and compose requires", func(t *testing.T) {
+		t.Parallel()
+		configDir := t.TempDir()
+		writeFile(t, filepath.Join(configDir, "apps", "run", "frontend-dev.sh"), `#!/bin/sh
+# devenv:requires=[{"app":"backend","runtime":"systemshell","profile":"dev"},{"infra":"postgres"}]
+`)
+		writeFile(t, filepath.Join(configDir, "apps", "run", "frontend-win.ps1"), `# devenv:requires=[{"infra":"redis"}]
+`)
+		writeFile(t, filepath.Join(configDir, "apps", "compose", "frontend-docker-compose.yml"), `x-devenv:
+  requires: [{"app":"backend","runtime":"docker","profile":"dev"}]
+services:
+  frontend:
+    depends_on:
+      - ignored
+`)
+
+		targets, err := NewManager(configDir).DiscoverActionTargets("frontend", "", AppActionRun)
+		if err != nil {
+			t.Fatalf("DiscoverActionTargets error = %v", err)
+		}
+		seen := map[string]ActionTarget{}
+		for _, target := range targets {
+			seen[target.ID] = target
+		}
+		if got := seen["app/frontend/run/shell/dev"].Requires; len(got) != 2 || got[0].App != "backend" || got[1].Infra != "postgres" {
+			t.Fatalf("shell requires = %#v", got)
+		}
+		if got := seen["app/frontend/run/powershell/win"].Requires; len(got) != 1 || got[0].Infra != "redis" {
+			t.Fatalf("powershell requires = %#v", got)
+		}
+		if got := seen["app/frontend/run/docker/docker"].Requires; len(got) != 1 || got[0].Runtime != "docker" {
+			t.Fatalf("compose requires = %#v", got)
+		}
+	})
+
+	t.Run("validates malformed and missing app fields", func(t *testing.T) {
+		t.Parallel()
+		for _, raw := range []string{
+			`[{"app":"backend","profile":"dev"}]`,
+			`[{"app":"backend","runtime":"systemshell"}]`,
+			`not-json`,
+		} {
+			if _, err := parseDependencyRefs(raw); err == nil {
+				t.Fatalf("parseDependencyRefs(%q) expected error", raw)
+			}
 		}
 	})
 }

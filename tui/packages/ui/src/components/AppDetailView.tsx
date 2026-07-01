@@ -6,6 +6,7 @@ import { ContentFrame } from './ContentStack';
 import { DetailSection } from './DetailSection';
 import type { App, MergeRequest, ContainerStats } from '@devenv/types';
 import { ScrollableContent } from './ScrollableContent';
+import { getStatusStyle } from '../statusUtils';
 
 export type AppDetailKind = 'app' | 'library' | 'infra';
 
@@ -168,14 +169,20 @@ export function AppDetailView(props: AppDetailViewProps) {
               </box>
               <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
                 <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Status: </text>
-                <text fg={props.app.dockerInfo?.Status?.toLowerCase().startsWith('up') ? uiColors.success : uiColors.textMuted}>
-                  {props.app.dockerInfo?.Status || 'unknown'}
+                <text fg={getStatusStyle(props.app.status || props.app.dockerInfo?.Status || 'unknown').color}>
+                  {props.app.status || props.app.dockerInfo?.Status || 'unknown'}
                 </text>
               </box>
               <Show when={props.app.dockerInfo?.Ports}>
                 <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
                   <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Ports: </text>
                   <text fg={uiColors.textSecondary}>{props.app.dockerInfo?.Ports}</text>
+                </box>
+              </Show>
+              <Show when={(props.app as any).executionHandle?.pid}>
+                <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                  <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>PID: </text>
+                  <text fg={uiColors.textSecondary}>{(props.app as any).executionHandle?.pid}</text>
                 </box>
               </Show>
             </Show>

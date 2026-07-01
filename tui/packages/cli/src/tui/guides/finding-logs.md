@@ -16,15 +16,14 @@ All logs live under `$DEVENV_HOME/logs/` (default `~/devenv/logs/`):
 
 ## 2. Status log format
 
-The status log (`status.log`) records all operations with structured entries:
+The status log (`status.log`) records structured operation state changes. It is optimized for quick status history, not full command output.
 
 ```
-2026-06-24T10:30:00Z [INFO] Starting container: my-service
-2026-06-24T10:30:05Z [INFO] Container started: my-service (port 3000)
-2026-06-24T10:30:10Z [ERROR] Container crashed: my-service (exit code 1)
+2026-07-01 07:20:09|my-service|my-service|build|completed|building image...
+2026-07-01 07:20:09|my-service|my-service|build|failed|Error: exit status 125
 ```
 
-Each entry includes a timestamp, severity level, and descriptive message.
+Each entry includes timestamp, app ident, app name, operation, status, and message.
 
 ## 3. Per-app logs
 
@@ -34,7 +33,15 @@ Each app, library, and infrastructure service has its own log file:
 ~/devenv/logs/APP_IDENT.log
 ```
 
-These logs contain command output from Docker operations (build, test, start, stop), git operations (clone, pull, push), and script execution.
+These logs contain command input and full stdout/stderr from Docker/Podman operations (build, test, start, stop), git operations (clone, pull, push), and script execution.
+
+Each command block includes:
+
+- full quoted command line
+- working directory
+- environment overrides
+- full output
+- final exit status
 
 ## 4. Server log location
 

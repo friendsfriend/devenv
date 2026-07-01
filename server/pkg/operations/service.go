@@ -1,6 +1,12 @@
 package operations
 
 import (
+	"fmt"
+	"os"
+	"strings"
+	"sync"
+	"time"
+
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
 	"github.com/friendsfriend/devenv/pkg/resources"
@@ -10,27 +16,38 @@ import (
 // Service manages container lifecycle operations for applications.
 type Service interface {
 	StartInfrastructureServiceWithStatus(infra app.InfraService)
+	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
+	StopScriptInfrastructureServiceWithStatus(ident string) error
+	ScriptInfrastructureStatus(ident string) (string, string)
+	ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle
+	RecoverScriptInfrastructureRuns(infra []app.InfraService)
 	KillAndRemoveAllContainersForAppWithStatus(a *app.App)
 	KillAllRunningContainersWithStatus(apps []app.App)
 	SetOnComplete(callback func(appIdent string))
 }
 
 type service struct {
-	dockerClient docker.Client
-	executor     *Executor
-	statusMgr    status.Manager
-	resourceMgr  resources.Manager
-	envFilePath  string
-	OnComplete   func(appIdent string)
+	dockerClient   docker.Client
+	executor       *Executor
+	statusMgr      status.Manager
+	resourceMgr    resources.Manager
+	envFilePath    string
+	homeDir        string
+	scriptMu       sync.Mutex
+	scriptRuns     map[string]*scriptRunState
+	scriptTerminal map[string]scriptTerminalState
+	OnComplete     func(appIdent string)
 }
 
 func NewService(dockerClient docker.Client, exec *Executor, statusMgr status.Manager, resourceMgr resources.Manager, envFilePath string) Service {
 	return &service{
-		dockerClient: dockerClient,
-		executor:     exec,
-		statusMgr:    statusMgr,
-		resourceMgr:  resourceMgr,
-		envFilePath:  envFilePath,
+		dockerClient:   dockerClient,
+		executor:       exec,
+		statusMgr:      statusMgr,
+		resourceMgr:    resourceMgr,
+		envFilePath:    envFilePath,
+		scriptRuns:     make(map[string]*scriptRunState),
+		scriptTerminal: make(map[string]scriptTerminalState),
 	}
 }
 
@@ -39,7 +56,7 @@ func (s *service) SetOnComplete(callback func(appIdent string)) {
 }
 
 func (s *service) newComposeArgs() []string {
-	args := []string{"compose", "-p", "devenv"}
+	args := []string{"-p", "devenv"}
 	if s.envFilePath != "" {
 		args = append(args, "--env-file", s.envFilePath)
 	}
@@ -59,7 +76,7 @@ func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "-f", composeFilePath, "up", "-d")
 
-	err, _ = s.executor.RunCommandWithLogging(infra.Ident, "docker", composeArgs, []string{}, "")
+	err, _ = s.executor.RunCommandWithLogging(infra.Ident, docker.ComposeCommand(), composeArgs, []string{}, "")
 	if err != nil {
 		callback("Error: " + err.Error())
 		return
@@ -85,7 +102,7 @@ func (s *service) killAndRemoveContainersForAppInternal(a *app.App, statusCb fun
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ := s.executor.RunCommandWithLogging(a.Ident, "docker", composeArgs, []string{}, "")
+	err, _ := s.executor.RunCommandWithLogging(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, "")
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -111,7 +128,7 @@ func (s *service) killAllRunningContainersInternal(apps []app.App, statusCb func
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ := s.executor.RunCommandWithLogging("all-apps", "docker", composeArgs, []string{}, "")
+	err, _ := s.executor.RunCommandWithLogging("all-apps", docker.ComposeCommand(), composeArgs, []string{}, "")
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -120,4 +137,215 @@ func (s *service) killAllRunningContainersInternal(apps []app.App, statusCb func
 	s.dockerClient.InvalidateContainerCache()
 
 	statusCb("all containers stopped")
+}
+
+func (s *service) StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error {
+	if infra.Type != app.InfraServiceTypeScript {
+		return fmt.Errorf("infra service %s is not a script service", infra.Ident)
+	}
+	s.scriptMu.Lock()
+	if existing, ok := s.scriptRuns[infra.Ident]; ok {
+		if existing.mode == "tmux" {
+			s.scriptMu.Unlock()
+			if err, _ := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", existing.paneID, "#{window_id}"}, []string{}, ""); err == nil {
+				return nil
+			}
+			s.scriptMu.Lock()
+			delete(s.scriptRuns, infra.Ident)
+			s.scriptTerminal[infra.Ident] = scriptTerminalState{status: app.InfraStatusStopped}
+		} else {
+			select {
+			case err := <-existing.exitCh:
+				delete(s.scriptRuns, infra.Ident)
+				if err != nil {
+					break
+				}
+			default:
+				s.scriptMu.Unlock()
+				return nil
+			}
+		}
+	}
+	s.scriptMu.Unlock()
+
+	statusCb := s.statusMgr.StartOperation(infra.Ident, status.OpStart)
+	statusCb("starting script...")
+	selectedRunner, command, args, err := resolveScriptRunner(infra, runner)
+	if err != nil {
+		statusCb("Error: " + err.Error())
+		return err
+	}
+	logPath := infra.LogPath
+	if logPath == "" {
+		logPath = defaultScriptLogPath(s.resourceMgr.ConfigDir(), infra.Ident)
+	}
+
+	if strings.TrimSpace(os.Getenv("TMUX")) != "" {
+		windowName := fmt.Sprintf("devenv - infra - %s", infra.Ident)
+		cmdArgs := []string{"new-window", "-P", "-F", "#{window_id}:#{pane_pid}", "-n", windowName, "-c", infra.Cwd, command}
+		cmdArgs = append(cmdArgs, args...)
+		if err, output := s.executor.RunCommandSilent("tmux", cmdArgs, scriptEnv(infra.Env), infra.Cwd); err == nil {
+			windowID, panePID := parseTmuxWindowAndPID(output)
+			if windowID != "" {
+				s.scriptMu.Lock()
+				s.scriptRuns[infra.Ident] = &scriptRunState{service: infra, runner: selectedRunner, mode: "tmux", paneID: windowID, pid: panePID, logPath: logPath, startedAt: time.Now(), exitCh: make(chan error)}
+				s.scriptMu.Unlock()
+				statusCb("start successful")
+				if s.OnComplete != nil {
+					s.OnComplete(infra.Ident)
+				}
+				return nil
+			}
+		}
+		statusCb("tmux window unavailable; running logged")
+	}
+
+	cmd, exitCh, err := startLoggedProcess(infra, command, args, logPath)
+	if err != nil {
+		statusCb("Error: " + err.Error())
+		return err
+	}
+	s.scriptMu.Lock()
+	delete(s.scriptTerminal, infra.Ident)
+	s.scriptRuns[infra.Ident] = &scriptRunState{service: infra, runner: selectedRunner, mode: "logged", pid: cmd.Process.Pid, cmd: cmd, logPath: logPath, startedAt: time.Now(), exitCh: exitCh}
+	s.scriptMu.Unlock()
+	go s.watchScriptExit(infra.Ident, exitCh)
+	statusCb("start successful")
+	if s.OnComplete != nil {
+		s.OnComplete(infra.Ident)
+	}
+	return nil
+}
+
+func (s *service) watchScriptExit(ident string, exitCh chan error) {
+	err := <-exitCh
+	scriptStatus := app.InfraStatusStopped
+	if err != nil {
+		scriptStatus = app.InfraStatusFailed
+	}
+	s.scriptMu.Lock()
+	if st, ok := s.scriptRuns[ident]; ok {
+		st.service.Status = scriptStatus
+		st.service.ExecutionHandle = &app.ExecutionHandle{Mode: st.mode, PaneID: st.paneID, PID: st.pid, Runner: st.runner, ExitCode: exitCodeFromError(err), StartedAt: st.startedAt.Format(time.RFC3339)}
+		s.scriptTerminal[ident] = scriptTerminalState{status: scriptStatus, logPath: st.logPath}
+		delete(s.scriptRuns, ident)
+	}
+	s.scriptMu.Unlock()
+	if s.OnComplete != nil {
+		s.OnComplete(ident)
+	}
+}
+
+func (s *service) StopScriptInfrastructureServiceWithStatus(ident string) error {
+	statusCb := s.statusMgr.StartOperation(ident, status.OpStop)
+	s.scriptMu.Lock()
+	st, ok := s.scriptRuns[ident]
+	if ok {
+		delete(s.scriptRuns, ident)
+	}
+	s.scriptMu.Unlock()
+	if !ok {
+		statusCb("already stopped")
+		return nil
+	}
+	var err error
+	if st.mode == "tmux" {
+		err, _ = s.executor.RunCommandSilent("tmux", []string{"kill-window", "-t", st.paneID}, []string{}, "")
+	} else {
+		err = killProcessGroup(st.cmd)
+	}
+	if err != nil {
+		statusCb("Error: " + err.Error())
+		return err
+	}
+	statusCb("stop successful")
+	if s.OnComplete != nil {
+		s.OnComplete(ident)
+	}
+	return nil
+}
+
+func (s *service) RecoverScriptInfrastructureRuns(infra []app.InfraService) {
+	if strings.TrimSpace(os.Getenv("TMUX")) == "" {
+		return
+	}
+	err, output := s.executor.RunCommandSilent("tmux", []string{"list-windows", "-a", "-F", "#{window_id}:#{window_name}:#{pane_pid}"}, []string{}, "")
+	if err != nil {
+		return
+	}
+	known := make(map[string]app.InfraService, len(infra))
+	for _, svc := range infra {
+		if svc.Type == app.InfraServiceTypeScript {
+			known[svc.Ident] = svc
+		}
+	}
+	for _, line := range strings.Split(output, "\n") {
+		windowID, windowName, panePID := parseTmuxWindowLine(line)
+		if windowID == "" || !strings.HasPrefix(windowName, "devenv - infra - ") {
+			continue
+		}
+		ident := strings.TrimSpace(strings.TrimPrefix(windowName, "devenv - infra - "))
+		svc, ok := known[ident]
+		if !ok || (panePID > 0 && !processAlive(panePID)) {
+			continue
+		}
+		s.scriptMu.Lock()
+		if _, exists := s.scriptRuns[ident]; !exists {
+			s.scriptRuns[ident] = &scriptRunState{service: svc, runner: svc.DefaultRunner, mode: "tmux", paneID: windowID, pid: panePID, logPath: svc.LogPath, startedAt: time.Now(), exitCh: make(chan error)}
+		}
+		s.scriptMu.Unlock()
+	}
+}
+
+func (s *service) ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle {
+	s.scriptMu.Lock()
+	defer s.scriptMu.Unlock()
+	if st, ok := s.scriptRuns[ident]; ok {
+		return &app.ExecutionHandle{Mode: st.mode, PaneID: st.paneID, PID: st.pid, Runner: st.runner, StartedAt: st.startedAt.Format(time.RFC3339)}
+	}
+	return nil
+}
+
+func (s *service) ScriptInfrastructureStatus(ident string) (string, string) {
+	s.scriptMu.Lock()
+	defer s.scriptMu.Unlock()
+	st, ok := s.scriptRuns[ident]
+	if !ok {
+		if terminal, ok := s.scriptTerminal[ident]; ok {
+			return terminal.status, terminal.logPath
+		}
+		return app.InfraStatusStopped, ""
+	}
+	if st.mode == "tmux" {
+		if err, output := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", st.paneID, "#{window_id}:#{pane_pid}"}, []string{}, ""); err != nil {
+			delete(s.scriptRuns, ident)
+			s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped}
+			return app.InfraStatusStopped, ""
+		} else if _, panePID := parseTmuxWindowAndPID(output); panePID > 0 {
+			st.pid = panePID
+		}
+		if st.pid > 0 && !processAlive(st.pid) {
+			delete(s.scriptRuns, ident)
+			s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped}
+			return app.InfraStatusStopped, ""
+		}
+		return app.InfraStatusRunning, ""
+	}
+	select {
+	case err := <-st.exitCh:
+		delete(s.scriptRuns, ident)
+		if err != nil {
+			s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusFailed, logPath: st.logPath}
+			return app.InfraStatusFailed, st.logPath
+		}
+		s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped, logPath: st.logPath}
+		return app.InfraStatusStopped, st.logPath
+	default:
+		if st.pid > 0 && !processAlive(st.pid) {
+			delete(s.scriptRuns, ident)
+			s.scriptTerminal[ident] = scriptTerminalState{status: app.InfraStatusStopped, logPath: st.logPath}
+			return app.InfraStatusStopped, st.logPath
+		}
+		return app.InfraStatusRunning, st.logPath
+	}
 }

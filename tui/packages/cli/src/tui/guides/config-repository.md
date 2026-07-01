@@ -86,11 +86,12 @@ mv ~/.config/devenv ~/.config/devenv.backup.$(date +%Y%m%d%H%M%S)
 git clone YOUR_CONFIG_REPO_URL ~/.config/devenv
 ```
 
-Create a local `.env` file if needed:
+Create a local `.env` file if needed. Runtime choice is local; default is `docker`, use `podman` on Podman machines:
 
 ```bash
 cat > ~/.config/devenv/.env <<'EOF'
 DEVENV_HOME=$HOME/devenv
+DEVENV_CONTAINER_RUNTIME=docker
 EOF
 ```
 

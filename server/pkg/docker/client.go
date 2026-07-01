@@ -101,11 +101,22 @@ type containerCache struct {
 	mutex      sync.RWMutex
 }
 
-// NewClient creates a new Docker client
-func NewClient() (Client, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+// NewClient creates a Docker-compatible client (Docker or Podman).
+func NewClient(configuredRuntime string) (Client, error) {
+	rt, err := SelectRuntime(configuredRuntime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Docker client: %w", err)
+		return nil, err
+	}
+
+	opts := []client.Opt{client.WithAPIVersionNegotiation()}
+	if rt.Host != "" {
+		opts = append(opts, client.WithHost(rt.Host))
+	} else {
+		opts = append(opts, client.FromEnv)
+	}
+	cli, err := client.NewClientWithOpts(opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create %s client: %w", rt.Name, err)
 	}
 
 	return &dockerClient{
@@ -200,7 +211,7 @@ func (dc *dockerClient) SubscribeToEvents(ctx context.Context) (<-chan Container
 				// Invalidate cache so next GetInfo call fetches fresh data
 				dc.invalidateCache()
 
-				name := msg.Actor.Attributes["name"]
+				name := dc.containerNameFromEvent(msg.Actor.ID, msg.Actor.Attributes)
 				eventCh <- ContainerEvent{
 					ContainerID:   msg.Actor.ID,
 					ContainerName: name,
@@ -220,21 +231,19 @@ func (dc *dockerClient) GetInfo(app App) Info {
 		return Info{Status: "error"}
 	}
 
-	re := regexp.MustCompile("-\\d+$")
+	best := Info{Status: "not found"}
 	for _, ctr := range containers {
 		for _, name := range ctr.Names {
-			cleanName := strings.TrimPrefix(name, "/")
-			baseName := re.ReplaceAllString(cleanName, "")
-			if baseName == app.GetContainerBaseName() {
-				return Info{
+			if ContainerNameMatches(name, app.GetIdent(), app.GetContainerBaseName()) {
+				best = preferredContainerInfo(best, Info{
 					Status:      ctr.State,
 					ContainerID: ctr.ID,
 					Ports:       dc.getDockerPorts(ctr),
-				}
+				})
 			}
 		}
 	}
-	return Info{Status: "not found"}
+	return best
 }
 
 func (dc *dockerClient) GetInfoForInfra(infraService InfraService) Info {
@@ -243,21 +252,19 @@ func (dc *dockerClient) GetInfoForInfra(infraService InfraService) Info {
 		return Info{Status: "error"}
 	}
 
-	re := regexp.MustCompile("-\\d+$")
+	best := Info{Status: "not found"}
 	for _, ctr := range containers {
 		for _, name := range ctr.Names {
-			cleanName := strings.TrimPrefix(name, "/")
-			baseName := re.ReplaceAllString(cleanName, "")
-			if baseName == infraService.GetContainerBaseName() {
-				return Info{
+			if ContainerNameMatches(name, infraService.GetIdent(), infraService.GetContainerBaseName()) {
+				best = preferredContainerInfo(best, Info{
 					Status:      ctr.State,
 					ContainerID: ctr.ID,
 					Ports:       dc.getDockerPorts(ctr),
-				}
+				})
 			}
 		}
 	}
-	return Info{Status: "not found"}
+	return best
 }
 
 func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (map[string]Info, error) {
@@ -276,7 +283,6 @@ func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (
 	}
 
 	results := make(map[string]Info)
-	re := regexp.MustCompile("-\\d+$")
 
 	// Initialize all requested items as "not found"
 	for _, app := range apps {
@@ -289,28 +295,25 @@ func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (
 	// Single pass through all containers to match all requested apps/infra
 	for _, ctr := range containers {
 		for _, name := range ctr.Names {
-			cleanName := strings.TrimPrefix(name, "/")
-			baseName := re.ReplaceAllString(cleanName, "")
-
 			// Check against regular apps
 			for _, app := range apps {
-				if baseName == app.GetContainerBaseName() {
-					results[app.GetIdent()] = Info{
+				if ContainerNameMatches(name, app.GetIdent(), app.GetContainerBaseName()) {
+					results[app.GetIdent()] = preferredContainerInfo(results[app.GetIdent()], Info{
 						Status:      ctr.State,
 						ContainerID: ctr.ID,
 						Ports:       dc.getDockerPorts(ctr),
-					}
+					})
 				}
 			}
 
 			// Check against infrastructure services
 			for _, infraApp := range infraServices {
-				if baseName == infraApp.GetContainerBaseName() {
-					results[infraApp.GetIdent()] = Info{
+				if ContainerNameMatches(name, infraApp.GetIdent(), infraApp.GetContainerBaseName()) {
+					results[infraApp.GetIdent()] = preferredContainerInfo(results[infraApp.GetIdent()], Info{
 						Status:      ctr.State,
 						ContainerID: ctr.ID,
 						Ports:       dc.getDockerPorts(ctr),
-					}
+					})
 				}
 			}
 		}
@@ -326,15 +329,11 @@ func (dc *dockerClient) GetAllContainerIDsForApp(app App) []string {
 	}
 
 	var containerIDs []string
-	re := regexp.MustCompile("-\\d+$")
 
 	for _, ctr := range containers {
 		for _, name := range ctr.Names {
-			cleanName := strings.TrimPrefix(name, "/")
-			baseName := re.ReplaceAllString(cleanName, "")
-
 			// Check for main container
-			if baseName == app.GetContainerBaseName() {
+			if ContainerNameMatches(name, app.GetIdent(), app.GetContainerBaseName()) {
 				containerIDs = append(containerIDs, ctr.ID)
 			}
 		}
@@ -360,6 +359,78 @@ func (dc *dockerClient) getContainerInfo(containerID string) Info {
 		}
 	}
 	return Info{Status: "not found"}
+}
+
+func (dc *dockerClient) containerNameFromEvent(containerID string, attrs map[string]string) string {
+	for _, key := range []string{"name", "containerName", "io.kubernetes.container.name"} {
+		if attrs[key] != "" {
+			return attrs[key]
+		}
+	}
+	if containerID == "" {
+		return ""
+	}
+	containers, err := dc.getContainers()
+	if err != nil {
+		return containerID
+	}
+	for _, ctr := range containers {
+		if ctr.ID == containerID || strings.HasPrefix(ctr.ID, containerID) {
+			for _, name := range ctr.Names {
+				if name != "" {
+					return strings.TrimPrefix(name, "/")
+				}
+			}
+		}
+	}
+	return containerID
+}
+
+func preferredContainerInfo(current, candidate Info) Info {
+	if containerStatusRank(candidate.Status) > containerStatusRank(current.Status) {
+		return candidate
+	}
+	return current
+}
+
+func containerStatusRank(status string) int {
+	switch strings.ToLower(status) {
+	case "running":
+		return 100
+	case "restarting":
+		return 90
+	case "paused":
+		return 80
+	case "created":
+		return 70
+	case "exited", "dead", "removing":
+		return 10
+	case "not found", "":
+		return 0
+	case "error":
+		return -1
+	default:
+		return 50
+	}
+}
+
+func ContainerNameMatches(name, ident, containerBaseName string) bool {
+	cleanName := strings.TrimPrefix(name, "/")
+	baseName := regexp.MustCompile(`[-_]\d+$`).ReplaceAllString(cleanName, "")
+	matches := []string{containerBaseName, ident, "devenv-" + ident, "devenv_" + ident}
+	for _, match := range matches {
+		if match == "" {
+			continue
+		}
+		if cleanName == match || baseName == match || normalizeContainerName(cleanName) == normalizeContainerName(match) || normalizeContainerName(baseName) == normalizeContainerName(match) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeContainerName(name string) string {
+	return strings.ReplaceAll(name, "_", "-")
 }
 
 // getDockerPorts formats container port information

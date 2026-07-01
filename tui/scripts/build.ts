@@ -11,6 +11,26 @@ const dir = path.resolve(__dirname, "..")
 
 process.chdir(dir)
 
+function patchOpenTUISolidTransform() {
+  // Work around Bun 1.3.14 ESM/CJS interop for @opentui/solid's Babel module resolver import.
+  // babel-plugin-module-resolver is CommonJS and may not expose a synthetic default during Bun.build.
+  const solidTransformPath = path.resolve(dir, "./node_modules/@opentui/solid/scripts/solid-transform.js")
+  if (!fs.existsSync(solidTransformPath)) return
+  const source = fs.readFileSync(solidTransformPath, "utf8")
+  const oldImport = 'import moduleResolver from "babel-plugin-module-resolver";'
+  if (source.includes(oldImport) && !source.includes("createRequire(import.meta.url)")) {
+    fs.writeFileSync(
+      solidTransformPath,
+      source.replace(
+        oldImport,
+        'import { createRequire } from "module";\nconst require = createRequire(import.meta.url);\nconst moduleResolver = require("babel-plugin-module-resolver");',
+      ),
+    )
+  }
+}
+
+patchOpenTUISolidTransform()
+
 // Import solid plugin dynamically to avoid module resolution issues
 const solidPluginPath = path.resolve(dir, "./node_modules/@opentui/solid/scripts/solid-plugin.js")
 const solidPlugin = (await import(solidPluginPath)).default
@@ -105,6 +125,8 @@ const binaries: Record<string, string> = {}
 if (!skipInstall) {
   await $`bun install --os="*" --cpu="*" @opentui/core@${cliPkg.dependencies["@opentui/core"]}`
 }
+
+patchOpenTUISolidTransform()
 
 // Build Go server binaries for each platform first
 const projectRoot = path.resolve(dir, "..")

@@ -500,7 +500,7 @@ export async function handleTableKeys(
 				}
 				break;
 			}
-			// Start container — open profile picker
+			// Start selected app or infrastructure service.
 			if (appList.length > 0) {
 				const app = getSelectedApp();
 				if (!app) break;
@@ -511,7 +511,11 @@ export async function handleTableKeys(
 					);
 					break;
 				}
-				void dockerActions.performAppAction("run");
+				if (appStore.activeTab() === "infrastructure") {
+					void dockerActions.performDockerOperation("start", app as any);
+				} else {
+					void dockerActions.performAppAction("run");
+				}
 			}
 			break;
 		case "S":

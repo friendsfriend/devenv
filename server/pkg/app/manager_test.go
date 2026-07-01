@@ -163,7 +163,7 @@ func TestInfraServiceJSONRoundTrip(t *testing.T) {
 		t.Fatalf("unmarshal failed: %v", err)
 	}
 
-	if got != original {
+	if !reflect.DeepEqual(got, original) {
 		t.Fatalf("round trip mismatch: got %+v, want %+v", got, original)
 	}
 }
@@ -377,6 +377,75 @@ func TestRemoveAppDeletesSplitFile(t *testing.T) {
 
 	if _, err := os.Stat(configDir + "/libraries/lib-to-delete.json"); !os.IsNotExist(err) {
 		t.Fatalf("expected library file to be deleted, got err: %v", err)
+	}
+}
+
+func TestLoadConfigScriptInfraServices(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want InfraService
+	}{
+		{
+			name: "shell only",
+			body: `{"displayName":"API Shim","ident":"api-shim","type":"script","shellPath":"scripts/api.sh","cwd":"/tmp/app","args":["--dev"],"env":{"PORT":"8080"}}`,
+			want: InfraService{DisplayName: "API Shim", Ident: "api-shim", Type: InfraServiceTypeScript, ShellPath: "scripts/api.sh", Cwd: "/tmp/app", Args: []string{"--dev"}, Env: map[string]string{"PORT": "8080"}, Status: InfraStatusStopped},
+		},
+		{
+			name: "powershell only",
+			body: `{"displayName":"Win Shim","ident":"win-shim","type":"script","powerShellPath":"scripts/api.ps1","defaultRunner":"powershell"}`,
+			want: InfraService{DisplayName: "Win Shim", Ident: "win-shim", Type: InfraServiceTypeScript, PowerShellPath: "scripts/api.ps1", DefaultRunner: ScriptRunnerPowerShell, Status: InfraStatusStopped},
+		},
+		{
+			name: "dual runner",
+			body: `{"displayName":"Dual Shim","ident":"dual-shim","type":"script","shellPath":"scripts/api.sh","powerShellPath":"scripts/api.ps1","defaultRunner":"shell"}`,
+			want: InfraService{DisplayName: "Dual Shim", Ident: "dual-shim", Type: InfraServiceTypeScript, ShellPath: "scripts/api.sh", PowerShellPath: "scripts/api.ps1", DefaultRunner: ScriptRunnerShell, Status: InfraStatusStopped},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			homeDir := t.TempDir()
+			configDir := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(configDir, "infrastructure", "definitions"), 0755); err != nil {
+				t.Fatalf("mkdir infra definitions: %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(configDir, "infrastructure", "definitions", "svc.json"), []byte(tt.body), 0644); err != nil {
+				t.Fatalf("write infra file: %v", err)
+			}
+
+			mgr := NewManager(homeDir, configDir, nil)
+			if err := mgr.LoadConfig(); err != nil {
+				t.Fatalf("LoadConfig failed: %v", err)
+			}
+			got := mgr.GetInfraServices()
+			if len(got) != 1 {
+				t.Fatalf("expected one service, got %+v", got)
+			}
+			if !reflect.DeepEqual(got[0], tt.want) {
+				t.Fatalf("service = %+v, want %+v", got[0], tt.want)
+			}
+		})
+	}
+}
+
+func TestLoadConfigDockerInfraDefaultsType(t *testing.T) {
+	homeDir := t.TempDir()
+	configDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(configDir, "infrastructure", "definitions"), 0755); err != nil {
+		t.Fatalf("mkdir infra definitions: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configDir, "infrastructure", "definitions", "redis.json"), []byte(`{"displayName":"Redis","ident":"redis","containerBaseName":"redis"}`), 0644); err != nil {
+		t.Fatalf("write infra file: %v", err)
+	}
+
+	mgr := NewManager(homeDir, configDir, nil)
+	if err := mgr.LoadConfig(); err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	infra := mgr.GetInfraServices()
+	if len(infra) != 1 || infra[0].Type != InfraServiceTypeDocker || infra[0].ContainerBaseName != "redis" {
+		t.Fatalf("unexpected infra services: %+v", infra)
 	}
 }
 

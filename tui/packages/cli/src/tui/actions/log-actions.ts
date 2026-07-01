@@ -78,6 +78,24 @@ export function createLogActions(
     }
     const app = getSelectedApp();
     if (!app) return;
+    if ('type' in app && app.type === 'script') {
+      if (!app.logPath) {
+        showError('No Script Log', `${app.displayName} is running in tmux window mode. Open the tmux window to view logs.`);
+        return;
+      }
+      logStore.setLogs('');
+      logStore.setLogTitle(`Script Logs: ${app.displayName}`);
+      logStore.setLogType('operation');
+      logStore.setShowLogModal(true);
+      logStore.setLogRefreshParams({ type: null });
+      try {
+        logStore.setLogs(await client.getInfraServiceLogs(app.ident));
+        scrollToLogBottom();
+      } catch (e) {
+        logStore.setLogs(`Error fetching script logs: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
+      return;
+    }
     if (!app.dockerInfo?.ContainerID) {
       logStore.setLogs(`No running container found for ${app.displayName}`);
       logStore.setLogTitle(`Container Logs: ${app.displayName}`);
