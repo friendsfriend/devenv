@@ -223,7 +223,7 @@ func (s *service) dockerBuildCommandArgs(imageName, dockerfilePath, workingDir s
 			args = append(args, "--layers")
 		}
 		if s.containerBuildSupportsFlag("--cache-from", workingDir) {
-			args = append(args, "--cache-from", imageName)
+			args = append(args, "--cache-from", podmanCacheRepository(imageName))
 		}
 	}
 
@@ -237,6 +237,18 @@ func (s *service) containerBuildSupportsFlag(flag, workingDir string) bool {
 		return false
 	}
 	return strings.Contains(output, flag)
+}
+
+func podmanCacheRepository(imageName string) string {
+	if at := strings.Index(imageName, "@"); at >= 0 {
+		return imageName[:at]
+	}
+	lastSlash := strings.LastIndex(imageName, "/")
+	lastColon := strings.LastIndex(imageName, ":")
+	if lastColon > lastSlash {
+		return imageName[:lastColon]
+	}
+	return imageName
 }
 
 func (s *service) selectActionTarget(a *app.App, action resources.AppAction, targetID, profile string) (resources.ActionTarget, bool, error) {

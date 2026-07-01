@@ -187,6 +187,21 @@ func TestBuildAppCopyTemplates(t *testing.T) {
 	}
 }
 
+func TestPodmanCacheRepositoryRemovesTagOrDigest(t *testing.T) {
+	tests := map[string]string{
+		"bhvr-site:latest":                          "bhvr-site",
+		"localhost/my-app:dev":                      "localhost/my-app",
+		"registry.example.com/team/my-app:20260701": "registry.example.com/team/my-app",
+		"registry.example.com:5000/team/my-app:v1":  "registry.example.com:5000/team/my-app",
+		"bhvr-site@sha256:abc":                      "bhvr-site",
+	}
+	for in, want := range tests {
+		if got := podmanCacheRepository(in); got != want {
+			t.Fatalf("podmanCacheRepository(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestBuildAppDockerUsesBuildKitAndCache(t *testing.T) {
 	appDir := t.TempDir()
 	runner := &fakeCommandRunner{silentOut: `{}`}
