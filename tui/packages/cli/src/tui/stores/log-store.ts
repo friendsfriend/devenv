@@ -21,7 +21,7 @@ export function createLogStore() {
   const [logAiVisible, setLogAiVisible] = createSignal(false);
   const [logType, setLogType] = createSignal<'container' | 'operation' | 'action' | 'job' | null>(null);
   const [logRefreshParams, setLogRefreshParams] = createSignal<{
-    type: 'container' | 'operation' | 'action' | 'job' | null;
+    type: 'container' | 'kubernetes' | 'operation' | 'action' | 'job' | null;
     containerID?: string;
     appIdent?: string;
     jobId?: number;

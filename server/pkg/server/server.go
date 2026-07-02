@@ -149,6 +149,7 @@ func (s *Server) Start() error {
 	go s.startReconciliationPoller()
 	go s.startDockerEventListener()
 	go s.startScriptHealthPoller()
+	go s.startKubernetesStatusWatchers()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/apps", s.handleGetApps)
@@ -163,6 +164,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/docker/stop", s.handleDockerStop)
 	mux.HandleFunc("/api/docker/restart", s.handleDockerRestart)
 	mux.HandleFunc("/api/docker/logs", s.handleDockerLogs)
+	mux.HandleFunc("/api/kubernetes/logs", s.handleKubernetesLogs)
 	mux.HandleFunc("/api/docker/logs/stream", s.handleDockerLogsStream)
 	mux.HandleFunc("/api/docker/stats/stream", s.handleDockerStatsStream)
 	mux.HandleFunc("/api/logs/operation/", s.handleOperationLogs)
@@ -178,6 +180,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/actions/build", s.handleBuild)
 	mux.HandleFunc("/api/actions/test", s.handleTest)
 	mux.HandleFunc("/api/actions/run", s.handleRun)
+	mux.HandleFunc("/api/actions/stop", s.handleStopApp)
 	mux.HandleFunc("/api/gitlab/merge-requests", s.handleGitLabMergeRequests)
 	mux.HandleFunc("/api/gitlab/pipeline-jobs", s.handleGitLabPipelineJobs)
 	mux.HandleFunc("/api/gitlab/jobs", s.handleGitLabJobs)
@@ -656,6 +659,8 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 			props["status"] = statusValue
 			props["logPath"] = logPath
 			props["executionHandle"] = s.services.OperationsService().ScriptInfrastructureExecutionHandle(appIdent)
+		} else if targetInfraService.Type == app.InfraServiceTypeKubernetes {
+			props["status"] = s.services.OperationsService().KubernetesInfrastructureStatus(*targetInfraService)
 		} else {
 			adapter := &infraServiceAdapter{service: targetInfraService}
 			dockerInfo := dockerClient.GetInfoForInfra(adapter)
@@ -746,11 +751,18 @@ func (s *Server) appRuntimeStatus(appIdent string, dockerInfo docker.Info) strin
 		switch s.services.BuildService().LastRunRuntime(appIdent) {
 		case "docker":
 			return dockerRuntimeStatus(dockerInfo)
+		case "kubernetes":
+			return s.services.BuildService().KubernetesRunStatus(appIdent)
 		case "shell", "powershell", "systemshell":
 			if s.services.BuildService().IsShellTmuxRunActive(appIdent) {
 				return "running"
 			}
 			return "stopped"
+		}
+		if targetApp := s.findAppByIdent(appIdent); targetApp != nil {
+			if status := s.services.BuildService().DiscoverKubernetesRunStatus(appIdent, targetApp.LocalDirectoryPath); !strings.HasPrefix(status, "stopped") {
+				return status
+			}
 		}
 	}
 	return dockerRuntimeStatus(dockerInfo)

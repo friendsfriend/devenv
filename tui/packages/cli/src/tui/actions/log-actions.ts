@@ -96,6 +96,21 @@ export function createLogActions(
       }
       return;
     }
+    if (('type' in app && app.type === 'kubernetes') || (typeof app.status === 'string' && (app.status.includes('pods') || app.status.startsWith('running') && !app.dockerInfo?.ContainerID))) {
+      logStore.setLogs('');
+      logStore.setLogTitle(`Kubernetes Logs: ${app.displayName} (live)`);
+      logStore.setLogType('operation');
+      logStore.setShowLogModal(true);
+      logStore.setLogRefreshParams({ type: null });
+      try {
+        logStore.setLogs(await client.getKubernetesLogs(app.ident));
+        scrollToLogBottom();
+        logStore.setLogRefreshParams({ type: 'kubernetes', appIdent: app.ident });
+      } catch (e) {
+        logStore.setLogs(`Error fetching Kubernetes logs: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      }
+      return;
+    }
     if (!app.dockerInfo?.ContainerID) {
       logStore.setLogs(`No running container found for ${app.displayName}`);
       logStore.setLogTitle(`Container Logs: ${app.displayName}`);
@@ -120,10 +135,6 @@ export function createLogActions(
   };
 
   const loadOperationLogs = async () => {
-    if (appStore.operationInProgressForApp()) {
-      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
-      return;
-    }
     const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
     if (!app) return;
     logStore.setLogs('');

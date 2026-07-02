@@ -362,12 +362,12 @@ func (l *fileLogger) RunCommandWithLoggingToFile(appIdent, command string, args 
 	cmd.Env = append(os.Environ(), envVars...)
 	cmd.Dir = workingDir
 
-	logFile, closeLog := l.openCommandLog(appIdent, command, args, envVars, workingDir, logPath)
+	logFiles, closeLog := l.openCommandLogs(appIdent, command, args, envVars, workingDir, logPath)
 	defer closeLog()
 
 	var output bytes.Buffer
 	writer := &lockedMultiWriter{writers: []io.Writer{&output}}
-	if logFile != nil {
+	for _, logFile := range logFiles {
 		writer.writers = append(writer.writers, logFile)
 	}
 	cmd.Stdout = writer
@@ -375,14 +375,16 @@ func (l *fileLogger) RunCommandWithLoggingToFile(appIdent, command string, args 
 
 	err := cmd.Run()
 	out := output.String()
-	if logFile != nil {
+	if len(logFiles) > 0 {
 		timestamp := time.Now().Format("2006-01-02 15:04:05")
-		if err != nil {
-			_, _ = fmt.Fprintf(logFile, "\n[%s] Exit: ERROR (%s)\n", timestamp, err.Error())
-		} else {
-			_, _ = fmt.Fprintf(logFile, "\n[%s] Exit: SUCCESS\n", timestamp)
+		for _, logFile := range logFiles {
+			if err != nil {
+				_, _ = fmt.Fprintf(logFile, "\n[%s] Exit: ERROR (%s)\n", timestamp, err.Error())
+			} else {
+				_, _ = fmt.Fprintf(logFile, "\n[%s] Exit: SUCCESS\n", timestamp)
+			}
+			_, _ = fmt.Fprintf(logFile, "[%s] ---\n\n", timestamp)
 		}
-		_, _ = fmt.Fprintf(logFile, "[%s] ---\n\n", timestamp)
 	}
 
 	// Log summary to unified status log; full output is in the individual app log.
@@ -406,19 +408,25 @@ func (w *lockedMultiWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-func (l *fileLogger) openCommandLog(appIdent, command string, args []string, envVars []string, workingDir string, logPath string) (*os.File, func()) {
+func (l *fileLogger) openCommandLogs(appIdent, command string, args []string, envVars []string, workingDir string, logPath string) ([]*os.File, func()) {
+	var files []*os.File
 	if logPath != "" {
-		if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
-			return nil, func() {}
+		if err := os.MkdirAll(filepath.Dir(logPath), 0755); err == nil {
+			if logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644); err == nil {
+				l.writeCommandHeader(logFile, command, args, envVars, workingDir)
+				files = append(files, logFile)
+			}
 		}
-		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			return nil, func() {}
-		}
-		l.writeCommandHeader(logFile, command, args, envVars, workingDir)
-		return logFile, func() { _ = logFile.Close() }
 	}
-	return l.openIndividualAppLog(appIdent, command, args, envVars, workingDir)
+	if appLog, closeAppLog := l.openIndividualAppLog(appIdent, command, args, envVars, workingDir); appLog != nil {
+		_ = closeAppLog
+		files = append(files, appLog)
+	}
+	return files, func() {
+		for _, file := range files {
+			_ = file.Close()
+		}
+	}
 }
 
 func (l *fileLogger) openIndividualAppLog(appIdent, command string, args []string, envVars []string, workingDir string) (*os.File, func()) {

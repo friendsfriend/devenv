@@ -21,8 +21,29 @@ function targetText(target: ActionTarget): string {
   return `${targetBadge(target)} ${target.label}${profile}`;
 }
 
+function targetDetails(target: ActionTarget): string {
+  if (target.runtime !== 'kubernetes' || !target.kubernetes) return '';
+  const k = target.kubernetes;
+  const chart = k.chartPath.split(/[\\/]/).slice(-2).join('/');
+  const parts = [`chart ${chart}`, `release ${k.release}`, `ns ${k.namespace}`];
+  if (k.image?.repository) parts.push(`image ${k.image.repository}:${k.image.tag || 'dev'}`);
+  if (k.secrets?.length) parts.push(`secrets ${k.secrets.map((s) => s.name).join(',')}`);
+  if (k.ports?.length) parts.push(`ports ${k.ports.map((p) => `${p.localPort}:${p.remotePort}`).join(',')}`);
+  if (target.requires?.length) parts.push(`deps ${target.requires.length}`);
+  return parts.join(' · ');
+}
+
+function truncate(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, Math.max(0, max - 1))}…`;
+}
+
 function ActionTargetRow(props: { target: ActionTarget; isSelected: boolean }) {
   const cursor = () => props.isSelected ? '► ' : '  ';
+  const details = () => targetDetails(props.target);
+  const text = () => details()
+    ? `${targetText(props.target)} — ${details()}`
+    : targetText(props.target);
 
   return (
     <box
@@ -33,7 +54,7 @@ function ActionTargetRow(props: { target: ActionTarget; isSelected: boolean }) {
         fg={uiColors.textPrimary}
         attributes={props.isSelected ? TextAttributes.BOLD : undefined}
       >
-        {cursor()}{targetText(props.target)}
+        {cursor()}{truncate(text(), 120)}
       </text>
     </box>
   );
@@ -48,7 +69,7 @@ export function ActionTargetPickerView(props: ActionTargetPickerProps) {
         { key: 'Enter', action: 'Select' },
         { key: 'Esc', action: 'Cancel' },
       ])}
-      widthPercent={0.42}
+      widthPercent={0.72}
       heightPercent={0.45}
       items={props.targets}
       selectedIndex={props.selectedIndex}

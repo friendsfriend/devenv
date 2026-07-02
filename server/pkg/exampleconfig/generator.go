@@ -63,8 +63,11 @@ func ensureEmpty(dir, label, root string) error {
 	}
 	for _, entry := range entries {
 		path := filepath.Join(dir, entry.Name())
+		if ignoredConfigPath(path, root) {
+			continue
+		}
 		if !entry.IsDir() {
-			if path == filepath.Join(root, ".env") {
+			if ignoredConfigPath(path, root) {
 				continue
 			}
 			return fmt.Errorf("%s %q is not empty; move existing files or choose a clean directory", label, dir)
@@ -74,6 +77,19 @@ func ensureEmpty(dir, label, root string) error {
 		}
 	}
 	return nil
+}
+
+func ignoredConfigPath(path, root string) bool {
+	for _, ignored := range []string{
+		filepath.Join(root, ".env"),
+		filepath.Join(root, "providers"),
+		filepath.Join(root, "tui.json"),
+	} {
+		if path == ignored {
+			return true
+		}
+	}
+	return false
 }
 
 func writeFile(path, content string, mode fs.FileMode) error {
@@ -87,41 +103,52 @@ func (g Generator) files() map[string]string {
 	c, h, s := g.ConfigDir, g.HomeDir, filepath.Join(g.HomeDir, "scripts")
 	return map[string]string{
 		filepath.Join(c, ".env"): "DEVENV_HOME=" + h + "\n",
-		filepath.Join(c, "apps", "definitions", "go-rest-postgres.json"):        `{"ident":"go-rest-postgres","displayName":"Go REST Postgres","repositoryPath":"https://github.com/pauljamescleary/go-rest-postgres.git","appType":"APP","containerBaseName":"go-rest-postgres","sourceType":"git","gitMode":"BRANCH"}` + "\n",
-		filepath.Join(c, "apps", "definitions", "bhvr-site.json"):               `{"ident":"bhvr-site","displayName":"Bun TypeScript App","repositoryPath":"https://github.com/stevedylandev/bhvr-site.git","appType":"APP","containerBaseName":"bhvr-site","sourceType":"git","gitMode":"BRANCH"}` + "\n",
-		filepath.Join(c, "apps", "definitions", "event-worker.json"):            `{"ident":"event-worker","displayName":"Event Worker","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","appType":"APP","containerBaseName":"event-worker","sourceType":"git","gitMode":"BRANCH"}` + "\n",
-		filepath.Join(c, "libraries", "definitions", "bun-lib-starter.json"):    `{"ident":"bun-lib-starter","displayName":"Bun Library Starter","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","appType":"LIB","containerBaseName":"bun-lib-starter","sourceType":"git","gitMode":"BRANCH"}` + "\n",
-		filepath.Join(c, "infrastructure", "definitions", "postgres.json"):      `{"ident":"postgres","displayName":"Postgres","containerBaseName":"example-postgres"}` + "\n",
-		filepath.Join(c, "infrastructure", "definitions", "redis.json"):         `{"ident":"redis","displayName":"Redis","containerBaseName":"example-redis"}` + "\n",
-		filepath.Join(c, "infrastructure", "definitions", "mailpit.json"):       `{"ident":"mailpit","displayName":"Mailpit","containerBaseName":"example-mailpit"}` + "\n",
-		filepath.Join(c, "infrastructure", "definitions", "script-clock.json"):  `{"ident":"script-clock","displayName":"Script Clock","type":"script","shellPath":"` + filepath.Join(c, "infrastructure", "scripts", "script-clock.sh") + `","cwd":"` + c + `","args":["--interval","2"],"env":{"DEVENV_EXAMPLE":"true"}}` + "\n",
-		filepath.Join(c, "apps", "compose", "go-rest-postgres-compose.yml"):     goCompose,
-		filepath.Join(c, "apps", "compose", "bhvr-site-compose.yml"):            bunCompose,
-		filepath.Join(c, "apps", "compose", "bhvr-site-debug-compose.yml"):      bunDebugCompose,
-		filepath.Join(c, "apps", "compose", "bhvr-site-with-redis-compose.yml"): bunRedisCompose,
-		filepath.Join(c, "apps", "compose", "event-worker-compose.yml"):         eventWorkerCompose,
-		filepath.Join(c, "infrastructure", "compose", "postgres-compose.yml"):   postgresCompose,
-		filepath.Join(c, "infrastructure", "compose", "redis-compose.yml"):      redisCompose,
-		filepath.Join(c, "infrastructure", "compose", "mailpit-compose.yml"):    mailpitCompose,
-		filepath.Join(c, "infrastructure", "scripts", "script-clock.sh"):        scriptClockShellScript,
-		filepath.Join(c, "apps", "build", "go-rest-postgres-build.Dockerfile"):  goBuildDockerfile,
-		filepath.Join(c, "apps", "build", "go-rest-postgres-test.Dockerfile"):   goTestDockerfile,
-		filepath.Join(c, "apps", "build", "bhvr-site-build.Dockerfile"):         bunBuildDockerfile,
-		filepath.Join(c, "apps", "build", "bhvr-site-test.Dockerfile"):          bunTestDockerfile,
-		filepath.Join(c, "apps", "build", "bhvr-site-build.sh"):                 bunBuildShellScript,
-		filepath.Join(c, "apps", "build", "bhvr-site-test.sh"):                  bunTestShellScript,
-		filepath.Join(c, "apps", "build", "bhvr-site-build.ps1"):                bunBuildPowerShellScript,
-		filepath.Join(c, "apps", "build", "bhvr-site-test.ps1"):                 bunTestPowerShellScript,
-		filepath.Join(c, "apps", "run", "bhvr-site-dev.sh"):                     bunRunShellScript,
-		filepath.Join(c, "apps", "run", "bhvr-site-dev.ps1"):                    bunRunPowerShellScript,
-		filepath.Join(c, "apps", "run", "event-worker-dev.sh"):                  eventWorkerRunShellScript,
-		filepath.Join(c, "apps", "run", "event-worker-dev.ps1"):                 eventWorkerRunPowerShellScript,
-		filepath.Join(c, "apps", "build", "bun-lib-starter-build.Dockerfile"):   bunLibBuildDockerfile,
-		filepath.Join(c, "apps", "build", "bun-lib-starter-test.Dockerfile"):    bunLibTestDockerfile,
-		filepath.Join(s, "hello.sh"):                                            helloShellScript,
-		filepath.Join(s, "hello.ps1"):                                           helloPowerShellScript,
-		filepath.Join(s, "hello.py"):                                            helloPythonScript,
-		filepath.Join(s, "hello.ts"):                                            helloTypescriptScript,
+		filepath.Join(c, "apps", "definitions", "go-rest-postgres.json"):                      `{"ident":"go-rest-postgres","displayName":"Go REST Postgres","repositoryPath":"https://github.com/pauljamescleary/go-rest-postgres.git","appType":"APP","containerBaseName":"go-rest-postgres","sourceType":"git","gitMode":"BRANCH"}` + "\n",
+		filepath.Join(c, "apps", "definitions", "bhvr-site.json"):                             `{"ident":"bhvr-site","displayName":"Bun TypeScript App","repositoryPath":"https://github.com/stevedylandev/bhvr-site.git","appType":"APP","containerBaseName":"bhvr-site","sourceType":"git","gitMode":"BRANCH"}` + "\n",
+		filepath.Join(c, "apps", "definitions", "event-worker.json"):                          `{"ident":"event-worker","displayName":"Event Worker","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","appType":"APP","containerBaseName":"event-worker","sourceType":"git","gitMode":"BRANCH"}` + "\n",
+		filepath.Join(c, "libraries", "definitions", "bun-lib-starter.json"):                  `{"ident":"bun-lib-starter","displayName":"Bun Library Starter","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","appType":"LIB","containerBaseName":"bun-lib-starter","sourceType":"git","gitMode":"BRANCH"}` + "\n",
+		filepath.Join(c, "infrastructure", "definitions", "postgres.json"):                    `{"ident":"postgres","displayName":"Postgres","containerBaseName":"example-postgres"}` + "\n",
+		filepath.Join(c, "infrastructure", "definitions", "redis.json"):                       `{"ident":"redis","displayName":"Redis","containerBaseName":"example-redis"}` + "\n",
+		filepath.Join(c, "infrastructure", "definitions", "mailpit.json"):                     `{"ident":"mailpit","displayName":"Mailpit","containerBaseName":"example-mailpit"}` + "\n",
+		filepath.Join(c, "infrastructure", "definitions", "script-clock.json"):                `{"ident":"script-clock","displayName":"Script Clock","type":"script","shellPath":"` + filepath.Join(c, "infrastructure", "scripts", "script-clock.sh") + `","cwd":"` + c + `","args":["--interval","2"],"env":{"DEVENV_EXAMPLE":"true"}}` + "\n",
+		filepath.Join(c, "infrastructure", "definitions", "postgres-k8s.json"):                `{"ident":"postgres-k8s","displayName":"Postgres (Kubernetes)","type":"kubernetes","kubernetes":{"profile":"local","chartPath":"` + filepath.Join(c, "infrastructure", "k8s", "postgres") + `","release":"postgres-local","namespace":"infra","values":["` + filepath.Join(c, "infrastructure", "k8s", "postgres", "values.yaml") + `"],"wait":true,"timeout":"5m"}}` + "\n",
+		filepath.Join(c, "apps", "compose", "go-rest-postgres-compose.yml"):                   goCompose,
+		filepath.Join(c, "apps", "compose", "bhvr-site-compose.yml"):                          bunCompose,
+		filepath.Join(c, "apps", "compose", "bhvr-site-debug-compose.yml"):                    bunDebugCompose,
+		filepath.Join(c, "apps", "compose", "bhvr-site-with-redis-compose.yml"):               bunRedisCompose,
+		filepath.Join(c, "apps", "compose", "event-worker-compose.yml"):                       eventWorkerCompose,
+		filepath.Join(c, "infrastructure", "compose", "postgres-compose.yml"):                 postgresCompose,
+		filepath.Join(c, "infrastructure", "compose", "redis-compose.yml"):                    redisCompose,
+		filepath.Join(c, "infrastructure", "compose", "mailpit-compose.yml"):                  mailpitCompose,
+		filepath.Join(c, "infrastructure", "scripts", "script-clock.sh"):                      scriptClockShellScript,
+		filepath.Join(c, "apps", "k8s", "bhvr-site", "devenv.k8s.json"):                       bunKubernetesConfig,
+		filepath.Join(c, "apps", "k8s", "bhvr-site", "values.yaml"):                           bunKubernetesValues,
+		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "Chart.yaml"):                   bunKubernetesChart,
+		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "values.yaml"):                  bunKubernetesValues,
+		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "templates", "deployment.yaml"): bunKubernetesDeployment,
+		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "templates", "service.yaml"):    bunKubernetesService,
+		filepath.Join(c, "infrastructure", "k8s", "postgres", "Chart.yaml"):                   postgresKubernetesChart,
+		filepath.Join(c, "infrastructure", "k8s", "postgres", "values.yaml"):                  postgresKubernetesValues,
+		filepath.Join(c, "infrastructure", "k8s", "postgres", "templates", "deployment.yaml"): postgresKubernetesDeployment,
+		filepath.Join(c, "infrastructure", "k8s", "postgres", "templates", "service.yaml"):    postgresKubernetesService,
+		filepath.Join(c, "apps", "build", "go-rest-postgres-build.Dockerfile"):                goBuildDockerfile,
+		filepath.Join(c, "apps", "build", "go-rest-postgres-test.Dockerfile"):                 goTestDockerfile,
+		filepath.Join(c, "apps", "build", "bhvr-site-build.Dockerfile"):                       bunBuildDockerfile,
+		filepath.Join(c, "apps", "build", "bhvr-site-test.Dockerfile"):                        bunTestDockerfile,
+		filepath.Join(c, "apps", "build", "bhvr-site-build.sh"):                               bunBuildShellScript,
+		filepath.Join(c, "apps", "build", "bhvr-site-test.sh"):                                bunTestShellScript,
+		filepath.Join(c, "apps", "build", "bhvr-site-build.ps1"):                              bunBuildPowerShellScript,
+		filepath.Join(c, "apps", "build", "bhvr-site-test.ps1"):                               bunTestPowerShellScript,
+		filepath.Join(c, "apps", "run", "bhvr-site-dev.sh"):                                   bunRunShellScript,
+		filepath.Join(c, "apps", "run", "bhvr-site-dev.ps1"):                                  bunRunPowerShellScript,
+		filepath.Join(c, "apps", "run", "event-worker-dev.sh"):                                eventWorkerRunShellScript,
+		filepath.Join(c, "apps", "run", "event-worker-dev.ps1"):                               eventWorkerRunPowerShellScript,
+		filepath.Join(c, "apps", "build", "bun-lib-starter-build.Dockerfile"):                 bunLibBuildDockerfile,
+		filepath.Join(c, "apps", "build", "bun-lib-starter-test.Dockerfile"):                  bunLibTestDockerfile,
+		filepath.Join(s, "hello.sh"):                                                          helloShellScript,
+		filepath.Join(s, "hello.ps1"):                                                         helloPowerShellScript,
+		filepath.Join(s, "hello.py"):                                                          helloPythonScript,
+		filepath.Join(s, "hello.ts"):                                                          helloTypescriptScript,
 	}
 }
 
@@ -416,7 +443,7 @@ COPY . .
 RUN bun run build
 
 FROM oven/bun:1
-LABEL devenv.artifacts="dist"
+LABEL devenv.artifacts="/src/client/dist"
 WORKDIR /src
 COPY --from=build /src /src
 CMD ["bun", "run", "dev"]
@@ -453,4 +480,154 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 COPY . .
 RUN bun test
+`
+
+const bunKubernetesConfig = `{
+  "targets": [
+    {
+      "profile": "k8s-local",
+      "name": "Kubernetes Local (kind)",
+      "chart": { "path": "$CONFIG/apps/k8s/bhvr-site/chart" },
+      "values": ["$CONFIG/apps/k8s/bhvr-site/values.yaml"],
+      "release": "bhvr-site-local",
+      "namespace": "apps",
+      "image": {
+        "repository": "bhvr-site",
+        "tag": "latest",
+        "pullPolicy": "IfNotPresent",
+        "valuePaths": { "repository": "image.repository", "tag": "image.tag", "pullPolicy": "image.pullPolicy" }
+      },
+      "ports": [{ "name": "http", "resource": "svc/bhvr-site", "localPort": 3000, "remotePort": 3000 }],
+      "requires": [{ "infra": "postgres-k8s", "runtime": "kubernetes", "profile": "local" }],
+      "wait": { "timeout": "5m" }
+    }
+  ]
+}
+`
+
+const bunKubernetesValues = `image:
+  repository: bhvr-site
+  tag: latest
+  pullPolicy: IfNotPresent
+service:
+  port: 3000
+`
+
+const postgresKubernetesChart = `apiVersion: v2
+name: devenv-postgres
+version: 0.1.0
+type: application
+`
+
+const postgresKubernetesValues = `image:
+  repository: postgres
+  tag: "16-alpine"
+service:
+  port: 5432
+env:
+  POSTGRES_USER: devenv
+  POSTGRES_PASSWORD: devenv
+  POSTGRES_DB: devenv
+`
+
+const postgresKubernetesDeployment = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: postgres
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.service.port }}
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.env.POSTGRES_USER | quote }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.env.POSTGRES_PASSWORD | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.env.POSTGRES_DB | quote }}
+`
+
+const postgresKubernetesService = `apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: postgres
+      port: {{ .Values.service.port }}
+      targetPort: postgres
+`
+
+const bunKubernetesChart = `apiVersion: v2
+name: bhvr-site
+version: 0.1.0
+type: application
+`
+
+const bunKubernetesDeployment = `apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bhvr-site
+  labels:
+    app.kubernetes.io/name: bhvr-site
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: bhvr-site
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: bhvr-site
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: bhvr-site
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+`
+
+const bunKubernetesService = `apiVersion: v1
+kind: Service
+metadata:
+  name: bhvr-site
+  labels:
+    app.kubernetes.io/name: bhvr-site
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: bhvr-site
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
 `

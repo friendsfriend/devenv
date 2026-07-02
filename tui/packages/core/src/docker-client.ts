@@ -104,6 +104,25 @@ export async function testApp(deps: ClientDeps, appIdent: string, targetId?: str
   }
 }
 
+export async function stopApp(deps: ClientDeps, appIdent: string, targetId?: string): Promise<void> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/stop`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ident: appIdent, targetId }),
+  });
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+}
+
+export async function getKubernetesLogs(deps: ClientDeps, appIdent: string): Promise<string> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/kubernetes/logs?appIdent=${encodeURIComponent(appIdent)}`);
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+  return response.text();
+}
+
 export async function runApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string): Promise<void> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);

@@ -161,6 +161,23 @@ export function createUtilActions(
     }
   };
 
+  const launchK9s = () => {
+    const app = getSelectedApp();
+    const cwd = app?.localDirectoryPath || process.cwd();
+    const args = ['--context', 'kind-devenv'];
+    if (isTmuxSession()) {
+      spawnInTmuxWindow('k9s - kind-devenv', 'k9s', args, cwd);
+      return;
+    }
+    const { spawnSync } = require('child_process') as typeof import('child_process');
+    renderer.suspend();
+    try {
+      spawnSync('k9s', args, { stdio: 'inherit', shell: false, cwd });
+    } finally {
+      renderer.resume();
+    }
+  };
+
   const launchLazygitStatus = () => {
     const app = getSelectedApp();
     if (!app) return;
@@ -656,6 +673,7 @@ export function createUtilActions(
     openEditorPicker,
     openInEditorWith,
     launchLazygit,
+    launchK9s,
     launchLazygitBranchLog,
     launchLazygitStatus,
     launchLazydocker,

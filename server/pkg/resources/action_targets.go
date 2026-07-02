@@ -31,6 +31,7 @@ const (
 	ActionRuntimeShell       ActionRuntime = "shell"
 	ActionRuntimePowerShell  ActionRuntime = "powershell"
 	ActionRuntimeSystemShell ActionRuntime = "systemshell"
+	ActionRuntimeKubernetes  ActionRuntime = "kubernetes"
 )
 
 // LaunchMode identifies how a shell action target launches.
@@ -43,16 +44,35 @@ const (
 
 // ActionTarget is normalized action target data for clients.
 type ActionTarget struct {
-	ID         string          `json:"id"`
-	Action     AppAction       `json:"action"`
-	Runtime    ActionRuntime   `json:"runtime"`
-	Label      string          `json:"label"`
-	Profile    string          `json:"profile,omitempty"`
-	LaunchMode LaunchMode      `json:"launchMode,omitempty"`
-	SourcePath string          `json:"sourcePath"`
-	Command    string          `json:"command,omitempty"`
-	Args       []string        `json:"args,omitempty"`
-	Requires   []DependencyRef `json:"requires,omitempty"`
+	ID         string                    `json:"id"`
+	Action     AppAction                 `json:"action"`
+	Runtime    ActionRuntime             `json:"runtime"`
+	Label      string                    `json:"label"`
+	Profile    string                    `json:"profile,omitempty"`
+	LaunchMode LaunchMode                `json:"launchMode,omitempty"`
+	SourcePath string                    `json:"sourcePath"`
+	Command    string                    `json:"command,omitempty"`
+	Args       []string                  `json:"args,omitempty"`
+	Requires   []DependencyRef           `json:"requires,omitempty"`
+	Kubernetes *KubernetesTargetMetadata `json:"kubernetes,omitempty"`
+}
+
+// KubernetesTargetMetadata contains redacted Kubernetes target explanation data.
+type KubernetesTargetMetadata struct {
+	ChartPath   string                        `json:"chartPath"`
+	Release     string                        `json:"release"`
+	Namespace   string                        `json:"namespace"`
+	ValuesFiles []string                      `json:"valuesFiles,omitempty"`
+	Image       *KubernetesImageConfig        `json:"image,omitempty"`
+	Secrets     []KubernetesSecretSummary     `json:"secrets,omitempty"`
+	Ports       []KubernetesPortForwardConfig `json:"ports,omitempty"`
+	Wait        KubernetesWaitConfig          `json:"wait,omitempty"`
+	SourcePath  string                        `json:"sourcePath"`
+}
+
+type KubernetesSecretSummary struct {
+	Name string   `json:"name"`
+	Keys []string `json:"keys"`
 }
 
 // DependencyRef identifies app run or infrastructure dependency.
@@ -108,6 +128,11 @@ func (m *manager) DiscoverActionTargets(appIdent, localDir string, action AppAct
 			return nil, err
 		}
 		targets = append(targets, scriptTargets...)
+		kubernetesTargets, err := m.discoverKubernetesRunTargets(appIdent, localDir)
+		if err != nil {
+			return nil, err
+		}
+		targets = append(targets, kubernetesTargets...)
 		rootTargets, err := m.discoverRootBuildToolTargets(appIdent, localDir, action)
 		if err != nil {
 			return nil, err

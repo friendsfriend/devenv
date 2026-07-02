@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/resources"
@@ -520,6 +521,14 @@ func (f *fakeInfraStarter) StartScriptInfrastructureServiceWithStatus(infra app.
 	f.started = append(f.started, infra.Ident)
 	return f.err
 }
+func (f *fakeInfraStarter) StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error {
+	f.started = append(f.started, infra.Ident)
+	return f.err
+}
+func (f *fakeInfraStarter) StartKubernetesInfrastructureServiceWithLog(infra app.InfraService, _ string) error {
+	f.started = append(f.started, infra.Ident)
+	return f.err
+}
 
 func TestRunAppStartsDependenciesBeforeRequestedTarget(t *testing.T) {
 	t.Setenv("TMUX", "")
@@ -567,5 +576,28 @@ func TestRunAppDependencyCyclePreventsStart(t *testing.T) {
 	}
 	if runner.lastCmd != "" {
 		t.Fatalf("runner called despite cycle: %s", runner.lastCmd)
+	}
+}
+
+func TestCleanupOperationLogsRemovesOldTempLogs(t *testing.T) {
+	dir := t.TempDir()
+	oldPath := filepath.Join(dir, "old.log")
+	newPath := filepath.Join(dir, "new.log")
+	if err := os.WriteFile(oldPath, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newPath, []byte("new"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	oldTime := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(oldPath, oldTime, oldTime); err != nil {
+		t.Fatal(err)
+	}
+	cleanupOperationLogs(dir, 24*time.Hour)
+	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
+		t.Fatalf("old log still exists or stat failed: %v", err)
+	}
+	if _, err := os.Stat(newPath); err != nil {
+		t.Fatalf("new log missing: %v", err)
 	}
 }

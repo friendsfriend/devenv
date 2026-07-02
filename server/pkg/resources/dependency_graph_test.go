@@ -80,4 +80,57 @@ func TestTargetRegistryResolveStartPlan(t *testing.T) {
 			t.Fatalf("profile err = %v", err)
 		}
 	})
+
+	infraRuntime := func(id, runtime, profile string, running bool) RegistryTarget {
+		return RegistryTarget{ID: InfraRuntimeTargetID(id, runtime, profile), Kind: TargetKindInfra, Infra: id, Running: running}
+	}
+
+	t.Run("kubernetes app and infrastructure dependencies", func(t *testing.T) {
+		t.Parallel()
+		backendID := AppRunTargetID("backend", ActionRuntimeKubernetes, "local")
+		frontendID := AppRunTargetID("frontend", ActionRuntimeKubernetes, "local")
+		postgresID := InfraRuntimeTargetID("postgres", "kubernetes", "local")
+		registry := NewTargetRegistry([]RegistryTarget{
+			infraRuntime("postgres", "kubernetes", "local", false),
+			target(backendID),
+			target(frontendID,
+				DependencyRef{App: "backend", Runtime: string(ActionRuntimeKubernetes), Profile: "local"},
+				DependencyRef{Infra: "postgres", Runtime: "kubernetes", Profile: "local"},
+			),
+		})
+		plan, err := registry.ResolveStartPlan(frontendID)
+		if err != nil {
+			t.Fatalf("ResolveStartPlan error = %v", err)
+		}
+		ids := []string{}
+		for _, item := range plan {
+			ids = append(ids, item.ID)
+		}
+		want := []string{backendID, postgresID, frontendID}
+		if strings.Join(ids, ",") != strings.Join(want, ",") {
+			t.Fatalf("plan = %#v want %#v", ids, want)
+		}
+	})
+
+	t.Run("bare infrastructure remains supported", func(t *testing.T) {
+		t.Parallel()
+		id := AppRunTargetID("api", ActionRuntimeDocker, "dev")
+		registry := NewTargetRegistry([]RegistryTarget{infra("redis", false), target(id, DependencyRef{Infra: "redis"})})
+		plan, err := registry.ResolveStartPlan(id)
+		if err != nil {
+			t.Fatalf("ResolveStartPlan error = %v", err)
+		}
+		if plan[0].ID != InfraTargetID("redis") {
+			t.Fatalf("plan = %#v", plan)
+		}
+	})
+
+	t.Run("missing kubernetes infrastructure dependency", func(t *testing.T) {
+		t.Parallel()
+		registry := NewTargetRegistry([]RegistryTarget{})
+		_, err := registry.ResolveRef(DependencyRef{Infra: "postgres", Runtime: "kubernetes", Profile: "local"})
+		if err == nil || !strings.Contains(err.Error(), "unknown infrastructure target") {
+			t.Fatalf("err = %v", err)
+		}
+	})
 }
