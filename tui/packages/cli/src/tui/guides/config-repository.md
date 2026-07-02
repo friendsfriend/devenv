@@ -12,6 +12,8 @@ Commit the contents of:
 
 Do **not** commit the `.env` file. It can contain machine-specific paths and secrets.
 
+Script collections are not part of the config directory. They live under `$DEVENV_HOME/scripts` (default `~/devenv/scripts`). Sync them separately if your team wants shared scripts.
+
 Recommended `.gitignore`:
 
 ```gitignore
@@ -97,7 +99,7 @@ EOF
 
 ## 6. Restart DevEnv
 
-Quit and start DevEnv again. It will load applications, libraries, infrastructure, and scripts from the cloned config repository.
+Quit and start DevEnv again. It will load applications, libraries, and infrastructure from the cloned config repository. Script collections still load from `$DEVENV_HOME/scripts`; copy or sync that directory separately if needed.
 
 ## Updating shared config
 

@@ -2,27 +2,23 @@ import { TextAttributes } from "@opentui/core";
 import { uiColors } from "../colors";
 import { ListViewModal } from "./ListViewModal";
 import { formatHelpText } from "./HelpText";
+import type { IssueScope } from "@devenv/types";
+
+export interface IssueScopeOption {
+	label: string;
+	value: IssueScope;
+}
+
+export const ISSUE_SCOPE_OPTIONS: IssueScopeOption[] = [
+	{ label: "All issues", value: "all" },
+	{ label: "Assigned to me", value: "assigned-to-me" },
+	{ label: "Created by me", value: "created-by-me" },
+	{ label: "No assignee", value: "no-assignee" },
+];
 
 export interface IssueScopeModalProps {
 	selectedIndex: number;
-	onSelect: (index: number) => void;
-	onSubmit: (scope: string) => void;
-	onCancel: () => void;
 }
-
-const SCOPE_ITEMS: string[] = [
-	"All issues",
-	"Assigned to me",
-	"Created by me",
-	"No assignee",
-];
-
-const SCOPE_VALUES: string[] = [
-	"all",
-	"assigned-to-me",
-	"created-by-me",
-	"no-assignee",
-];
 
 function ScopeRow(props: { label: string; isSelected: boolean }) {
 	const cursor = () => (props.isSelected ? "► " : "  ");
@@ -59,7 +55,7 @@ export function IssueScopeModal(props: IssueScopeModalProps) {
 			])}
 			widthPercent={0.3}
 			heightPercent={0.4}
-			items={SCOPE_ITEMS}
+			items={ISSUE_SCOPE_OPTIONS.map((option) => option.label)}
 			selectedIndex={props.selectedIndex}
 			reservedHeight={3}
 			scrollIndicatorLabel="scopes"

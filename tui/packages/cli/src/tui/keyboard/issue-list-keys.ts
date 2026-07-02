@@ -1,3 +1,4 @@
+import { ISSUE_SCOPE_OPTIONS } from '@devenv/ui';
 import { isDownKey, isUpKey } from './nav-keys';
 import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 import type {
@@ -27,19 +28,6 @@ export async function handleIssueListKeys(
 
 	// Scope picker mode — j/k navigation + Enter/Esc
 	if (appStore.viewMode() === "issueScopePicker") {
-		const SCOPE_ITEMS = [
-			"All issues",
-			"Assigned to me",
-			"Created by me",
-			"No assignee",
-		];
-		const SCOPE_VALUES = [
-			"all",
-			"assigned-to-me",
-			"created-by-me",
-			"no-assignee",
-		];
-
 		if (event.name === "escape" || event.name === "q") {
 			appStore.setViewMode("table");
 			issueStore.setIssueScopePickerIndex(0);
@@ -47,7 +35,7 @@ export async function handleIssueListKeys(
 		}
 
 		if (isDownKey(event)) {
-			const max = Math.max(0, SCOPE_ITEMS.length - 1);
+			const max = Math.max(0, ISSUE_SCOPE_OPTIONS.length - 1);
 			issueStore.setIssueScopePickerIndex((prev: number) =>
 				Math.min(prev + 1, max),
 			);
@@ -63,8 +51,8 @@ export async function handleIssueListKeys(
 
 		if (event.name === "return" || event.name === "enter") {
 			const idx = issueStore.issueScopePickerIndex();
-			if (idx >= 0 && idx < SCOPE_VALUES.length) {
-				issueActions.selectScope(SCOPE_VALUES[idx] as any);
+			if (idx >= 0 && idx < ISSUE_SCOPE_OPTIONS.length) {
+				issueActions.selectScope(ISSUE_SCOPE_OPTIONS[idx].value);
 			}
 			return true;
 		}

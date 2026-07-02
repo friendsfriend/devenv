@@ -42,8 +42,8 @@ The Go backend uses dependency injection via `services.Container` — no global 
 
 ## Requirements
 
-- **Bun** 1.3.10+
-- **Go** 1.26+
+- **Bun** 1.3.14+
+- **Go** 1.26.4+
 - **Docker** or **Podman** (for container management features)
 - Optional Kubernetes runtime tools: `kind`, `kubectl`, `helm`, and `k9s` for Helm/kind app runs
 
@@ -176,7 +176,7 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 ├── templates/                           # Template files (copied into app directories)
 ```
 
-Script collections live under `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`), not in the config directory:
+Script collections live under `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`), not in the config directory. If you share `~/.config/devenv` as a config repository, sync scripts separately:
 
 ```
 ~/devenv/scripts/                       # Any executable file is a script

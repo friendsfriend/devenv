@@ -209,7 +209,7 @@ build:binaries:
 ---
 
 ## Code Style Guidelines
-- **Module**: `friendsfriend/devenv` (Go 1.26.1)
+- **Module**: `friendsfriend/devenv` (Go 1.26.4)
 - **Imports**: Use full module paths, group stdlib/external/internal imports
 - **Naming**: Use camelCase for unexported, PascalCase for exported identifiers
 - **Error Handling**: Use the status log to log errors and handle them gracefully. Never panic. Use `log.Printf` (not `fmt.Printf`) for server-side logging.

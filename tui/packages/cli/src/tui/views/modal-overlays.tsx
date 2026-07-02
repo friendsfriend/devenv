@@ -166,18 +166,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 			</Show>
 
 			<Show when={appStore.viewMode() === "issueScopePicker"}>
-				<IssueScopeModal
-					selectedIndex={issueStore.issueScopePickerIndex()}
-					onSelect={(idx) => issueStore.setIssueScopePickerIndex(idx)}
-					onSubmit={(scope: string) => {
-						const { issueActions } = props.actions;
-						issueActions.selectScope(scope as any);
-					}}
-					onCancel={() => {
-						appStore.setViewMode("table");
-						issueStore.setIssueScopePickerIndex(0);
-					}}
-				/>
+				<IssueScopeModal selectedIndex={issueStore.issueScopePickerIndex()} />
 			</Show>
 
 			<Show when={issueStore.showCommentModal()}>

@@ -1,26 +1,24 @@
 {
   "name": "devenv-cli",
   "version": "0.9.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/friendsfriend/devenv.git"
+  },
   "description": "DevEnv - Development Environment CLI with embedded Go server",
-  "private": true,
+  "engines": {
+    "bun": ">=1.3.14",
+    "go": ">=1.26.4"
+  },
+  "license": "PROPRIETARY",
   "packageManager": "bun@1.3.14",
+  "private": true,
   "scripts": {
     "build": "bun run build.ts",
     "build:single": "bun run build.ts --single",
     "install:bin": "sh install.sh",
     "dev": "cd tui && bun run dev",
-    "type-check": "cd tui && bun run type-check"
-  },
-  "engines": {
-    "bun": ">=1.3.5",
-    "go": ">=1.21"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/friendsfriend/devenv.git"
-  },
-  "license": "PROPRIETARY",
-  "dependencies": {
-    "bun": "^1.3.11"
+    "type-check": "cd tui && bun run type-check",
+    "test": "cd tui && bun run test"
   }
 }

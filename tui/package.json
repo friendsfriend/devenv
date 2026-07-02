@@ -13,10 +13,10 @@
   "scripts": {
     "dev": "bun run packages/cli/src/spawn.ts",
     "build": "bun run scripts/build.ts",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "bun test"
   },
   "devDependencies": {
-    "@tsconfig/bun": "^1.0.10",
     "@types/bun": "^1.3.14",
     "typescript": "^6.0.3"
   },
@@ -25,7 +25,18 @@
   },
   "dependencies": {
     "@opentui/core": "0.4.1",
-    "@opentui/solid": "0.4.1",
+    "@opentui/solid": "0.4.2",
     "opentui-spinner": "^0.0.7"
+  },
+  "knip": {
+    "ignoreBinaries": [
+      "clip",
+      "go",
+      "pbcopy",
+      "pbpaste",
+      "powershell",
+      "xclip",
+      "xsel"
+    ]
   }
 }
