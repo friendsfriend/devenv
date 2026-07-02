@@ -148,7 +148,7 @@ export function createProviderActions(
         return fetchedApps.map((a) => (statusMap.has(a.ident) ? { ...a, operationStatus: statusMap.get(a.ident) } : a));
       });
     } catch (e) {
-      providerStore.setAddAppError(e instanceof Error ? e.message : 'Failed to create app');
+      providerStore.setAddAppError(e instanceof Error ? e.message : 'Failed to create repository entry');
       providerStore.setAddAppLoading(false);
     }
   };

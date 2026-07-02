@@ -2,8 +2,8 @@ import type { KeyboardEvent, KeyboardStores, KeyboardActions } from './types';
 
 import { isDownKey, isUpKey } from './nav-keys';
 /**
- * Handles keyboard events for the Add App modal wizard flow:
- * selectProvider → selectAppType → findRepo → appName → selectBranch → confirm
+ * Handles keyboard events for the Add Repository modal wizard flow:
+ * selectProvider → selectDestination → findRepo → appName → selectBranch → confirm
  */
 export function handleAddAppModalKeys(
   event: KeyboardEvent,

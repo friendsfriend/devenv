@@ -46,7 +46,7 @@ const CONTEXT_TITLES: Record<string, string> = {
 	diffModal: "Diff Modal",
 	worktreeManager: "Worktree Manager",
 	connectProvider: "Provider Connect Modal",
-	addAppModal: "Add App Modal",
+	addAppModal: "Add Repository Modal",
 	scriptArgsModal: "Script Args Modal",
 	scriptAddModal: "Script Add Modal",
 	editorPicker: "Editor Picker",

@@ -293,9 +293,9 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Backspace", "Delete"], description: "Delete text while editing", context: "connectProvider", category: "Actions" },
 	{ keys: ["Esc"], description: "Go back / cancel", context: "connectProvider", category: "General" },
 
-	// ========== Add App Modal ==========
+	// ========== Add Repository Modal ==========
 	{ keys: ["j/k", "↑/↓"], description: "Navigate options/results/branches", context: "addAppModal", category: "Navigation" },
-	{ keys: ["Enter"], description: "Confirm step / search / create app", context: "addAppModal", category: "Actions" },
+	{ keys: ["Enter"], description: "Confirm step / search / create repository entry", context: "addAppModal", category: "Actions" },
 	{ keys: ["Backspace", "Delete"], description: "Delete text while editing", context: "addAppModal", category: "Actions" },
 	{ keys: ["Esc"], description: "Go back / cancel", context: "addAppModal", category: "General" },
 
@@ -537,7 +537,7 @@ const FOOTER_LABELS = new Map<string, string>([
 	["Delete text while editing", "Delete"],
 	["Go back / cancel", "Back"],
 	["Navigate options/results/branches", "Navigate"],
-	["Confirm step / search / create app", "Confirm"],
+	["Confirm step / search / create repository entry", "Confirm"],
 	["Navigate parameters / history", "Params"],
 	["Change boolean or enum value", "Change value"],
 	["Run script", "Run"],
