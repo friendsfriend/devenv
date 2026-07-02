@@ -107,6 +107,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 							key: g.key,
 							title: g.title,
 							description: g.description,
+							category: g.category,
 						}));
 					return (
 						<HelpView

@@ -6,7 +6,9 @@ import { GenericModal } from './GenericModal';
 import { ModalTabs } from './ModalTabs';
 import { focusSoon } from '../utils/focusSoon';
 import { ScrollableContent } from './ScrollableContent';
+import { ScrollableList } from './ScrollableList';
 import { RunningText } from './RunningText';
+import { WorkItemCard } from './WorkItemCard';
 
 export interface HelpSection {
   title: string;
@@ -20,6 +22,7 @@ export interface GuideEntry {
   key: string;
   title: string;
   description: string;
+  category: string;
 }
 
 export type HelpTab = 'keybinds' | 'guides';
@@ -62,6 +65,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
   const activeTab = () => props.activeTab ?? 'keybinds';
   const dimensions = useTerminalDimensions();
   const descriptionWidth = createMemo(() => Math.max(10, Math.floor(dimensions().width * 0.72) - 24));
+  const guideListLines = createMemo(() => Math.max(1, Math.floor(dimensions().height * 0.78) - 5));
 
   const filteredSections = createMemo(() => {
     const q = (props.searchQuery ?? '').toLowerCase().trim();
@@ -166,27 +170,26 @@ export function HelpView(props: HelpViewProps): JSX.Element {
         }
       >
         <box style={{ width: '100%', height: '100%', flexDirection: 'column', minHeight: 0 }}>
-          <ScrollableContent
-            onScrollBoxReady={(r: ScrollBoxRenderable) => props.onGuideScrollBoxReady?.(r)}
-                        style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
-          >
-            <For each={props.guides ?? []}>
-              {(guide, idx) => {
-                const selected = () => props.selectedGuideIndex === idx();
-                return (
-                  <box style={{ width: '98%', flexDirection: 'column', marginBottom: 1, flexShrink: 0 }}>
-                    <text
-                      fg={selected() ? uiColors.primary : uiColors.textPrimary}
-                      attributes={selected() ? TextAttributes.BOLD : undefined}
-                    >
-                      {`${selected() ? '› ' : '  '}${guide.title}`}
-                    </text>
-                    <RunningText text={`  ${guide.description}`} width={descriptionWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active={selected()} offset={props.runningTextOffset} />
-                  </box>
-                );
-              }}
-            </For>
-          </ScrollableContent>
+          <ScrollableList<GuideEntry>
+            items={props.guides ?? []}
+            selectedIndex={props.selectedGuideIndex ?? 0}
+            availableLines={guideListLines()}
+            estimatedItemHeight={4}
+            scrollIndicatorLabel="guides"
+            renderItem={(guide, isSelected, absoluteIndex) => (
+              <WorkItemCard
+                marker={`${absoluteIndex + 1}.`}
+                title={guide.title}
+                statusText={guide.category}
+                statusColor={uiColors.primary}
+                metadata={guide.description}
+                selected={isSelected()}
+                onMouseUp={() => props.onGuideSelect?.(guide.key)}
+                runningTextEnabled={props.runningTextEnabled}
+                runningTextOffset={props.runningTextOffset}
+              />
+            )}
+          />
         </box>
       </Show>
     </GenericModal>

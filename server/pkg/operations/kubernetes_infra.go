@@ -212,3 +212,39 @@ func (s *service) KubernetesInfrastructureStatus(infra app.InfraService) string 
 	}
 	return fmt.Sprintf("starting (%d/%d pods)", running, total)
 }
+
+func (s *service) KubernetesInfrastructureLogs(infra app.InfraService) (string, error) {
+	if infra.Kubernetes == nil {
+		return "", fmt.Errorf("infrastructure %s has no Kubernetes config", infra.Ident)
+	}
+	runner := k8s.NewRunner(docker.Runtime{Name: docker.RuntimeName(), Command: docker.RuntimeCommand()})
+	selector := "app.kubernetes.io/instance=" + infra.Kubernetes.Release
+	list := runner.KubectlCommandFor("get", "pods", "--namespace", infra.Kubernetes.Namespace, "-l", selector, "-o", "jsonpath={range .items[*]}{.metadata.name}{\"\\n\"}{end}")
+	err, output := s.executor.RunCommandSilent(list.Name, list.Args, list.Env, "")
+	if err != nil {
+		return "", err
+	}
+	pods := strings.Fields(output)
+	if len(pods) == 0 {
+		return fmt.Sprintf("No pods found for release %s in namespace %s", infra.Kubernetes.Release, infra.Kubernetes.Namespace), nil
+	}
+	var combined strings.Builder
+	for _, pod := range pods {
+		cmd := runner.KubectlCommandFor("logs", "--namespace", infra.Kubernetes.Namespace, pod, "--all-containers", "--tail", "500")
+		logErr, podOutput := s.executor.RunCommandSilent(cmd.Name, cmd.Args, cmd.Env, "")
+		if logErr != nil {
+			podOutput = "Error fetching logs: " + logErr.Error()
+		}
+		for _, line := range strings.Split(strings.TrimRight(podOutput, "\n"), "\n") {
+			if line == "" {
+				continue
+			}
+			combined.WriteString("[")
+			combined.WriteString(pod)
+			combined.WriteString("] ")
+			combined.WriteString(line)
+			combined.WriteString("\n")
+		}
+	}
+	return combined.String(), nil
+}

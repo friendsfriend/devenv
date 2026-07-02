@@ -641,45 +641,36 @@ export async function handleMiscModalKeys(
       }
     }
 
-    // Guides tab: j/k move selection; arrows and page/top/bottom keys scroll vertically.
+    // Guides tab: selection drives virtual scrolling.
     if (!appStore.helpSearchActive() && appStore.helpActiveTab() === 'guides') {
-      const sb = uiStore.helpGuideScrollBoxRef;
-      if (event.name === 'down' || event.name === 'Down') {
-        sb?.scrollBy(1);
+      const maxIdx = allGuides.length - 1;
+      const current = () => appStore.helpGuideIndex() < 0 ? 0 : appStore.helpGuideIndex();
+      const moveGuide = (next: number) => {
+        if (maxIdx >= 0) appStore.setHelpGuideIndex(Math.max(0, Math.min(next, maxIdx)));
+      };
+
+      if (isDownKey(event)) {
+        moveGuide(current() + 1);
         return true;
       }
-      if (event.name === 'up' || event.name === 'Up') {
-        sb?.scrollBy(-1);
+      if (isUpKey(event)) {
+        moveGuide(current() - 1);
         return true;
       }
       if (event.name === 'd' || event.sequence === 'd') {
-        const half = Math.max(1, Math.floor((sb?.viewport.height ?? 10) / 2));
-        sb?.scrollBy(half);
+        moveGuide(current() + 5);
         return true;
       }
       if (event.name === 'u' || event.sequence === 'u') {
-        const half = Math.max(1, Math.floor((sb?.viewport.height ?? 10) / 2));
-        sb?.scrollBy(-half);
+        moveGuide(current() - 5);
         return true;
       }
       if ((event.name === 'g' || event.sequence === 'g') && !event.shift) {
-        sb?.scrollTo(0);
+        moveGuide(0);
         return true;
       }
       if (event.name === 'G' || event.sequence === 'G' || (event.name === 'g' && event.shift)) {
-        sb?.scrollTo(sb?.scrollHeight ?? 0);
-        return true;
-      }
-
-      if (isDownKey(event) || isUpKey(event)) {
-        const maxIdx = allGuides.length - 1;
-        if (maxIdx >= 0) {
-          const current = appStore.helpGuideIndex() < 0 ? 0 : appStore.helpGuideIndex();
-          appStore.setHelpGuideIndex(isDownKey(event)
-            ? Math.min(current + 1, maxIdx)
-            : Math.max(current - 1, 0)
-          );
-        }
+        moveGuide(maxIdx);
         return true;
       }
       // Enter: open selected guide

@@ -96,7 +96,7 @@ export function createLogActions(
       }
       return;
     }
-    if (typeof app.status === 'string' && (app.status.includes('pods') || app.status.startsWith('running') && !app.dockerInfo?.ContainerID)) {
+    if (('type' in app && app.type === 'kubernetes') || (typeof app.status === 'string' && (app.status.includes('pods') || app.status.startsWith('running') && !app.dockerInfo?.ContainerID))) {
       logStore.setLogs('');
       logStore.setLogTitle(`Kubernetes Logs: ${app.displayName} (live)`);
       logStore.setLogType('operation');

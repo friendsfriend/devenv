@@ -22,6 +22,7 @@ type Service interface {
 	StartKubernetesInfrastructureServiceWithLog(infra app.InfraService, logPath string) error
 	StopKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
 	KubernetesInfrastructureStatus(infra app.InfraService) string
+	KubernetesInfrastructureLogs(infra app.InfraService) (string, error)
 	StopScriptInfrastructureServiceWithStatus(ident string) error
 	ScriptInfrastructureStatus(ident string) (string, string)
 	ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle

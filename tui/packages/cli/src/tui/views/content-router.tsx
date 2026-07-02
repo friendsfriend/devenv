@@ -430,6 +430,7 @@ export function ContentRouter(props: ContentRouterProps) {
 										key: g.key,
 										title: g.title,
 										description: g.description,
+										category: g.category,
 									}));
 								return (
 									<HelpView

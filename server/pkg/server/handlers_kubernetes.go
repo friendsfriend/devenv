@@ -13,11 +13,16 @@ func (s *Server) handleKubernetesLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	appObj := s.findAppByIdent(appIdent)
-	if appObj == nil {
-		respondNotFound(w, "App not found")
+	var logs string
+	var err error
+	if appObj != nil {
+		logs, err = s.services.BuildService().KubernetesRunLogs(appIdent, appObj.LocalDirectoryPath)
+	} else if infra := s.findInfraServiceByIdent(appIdent); infra != nil && infra.Type == "kubernetes" {
+		logs, err = s.services.OperationsService().KubernetesInfrastructureLogs(*infra)
+	} else {
+		respondNotFound(w, "Kubernetes app or infrastructure not found")
 		return
 	}
-	logs, err := s.services.BuildService().KubernetesRunLogs(appIdent, appObj.LocalDirectoryPath)
 	if err != nil {
 		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
 		return

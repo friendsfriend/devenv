@@ -1,32 +1,34 @@
 /**
  * Markdown syntax style for OpenTUI's <code filetype="markdown"> element.
  *
- * Follows the same approach as OpenCode (github.com/sst/opencode):
- * - Uses SyntaxStyle.fromTheme() with tree-sitter scope rules
- * - Maps Catppuccin Mocha colors to markdown grammar scopes
- * - Returns a lazily-created singleton to avoid re-allocating the native style object
+ * Uses active OpenCode-compatible theme tokens instead of fixed Catppuccin
+ * values. SyntaxStyle objects are cached per active theme because native style
+ * instances are immutable after creation.
  */
 
 import { SyntaxStyle } from '@opentui/core';
-import { colors } from './colors';
+import { uiColors } from './colors';
+import { getActiveThemeName } from './theme';
 
-let _markdownSyntaxStyle: SyntaxStyle | null = null;
+const markdownSyntaxStyleCache = new Map<string, SyntaxStyle>();
 
 /**
  * Returns a SyntaxStyle suitable for <code filetype="markdown">.
- * The instance is created once and cached.
+ * Cached per active theme so theme switching updates markdown colors.
  */
 export function getMarkdownSyntaxStyle(): SyntaxStyle {
-  if (_markdownSyntaxStyle) return _markdownSyntaxStyle;
+  const themeName = getActiveThemeName();
+  const cached = markdownSyntaxStyleCache.get(themeName);
+  if (cached) return cached;
 
-  _markdownSyntaxStyle = SyntaxStyle.fromTheme([
+  const style = SyntaxStyle.fromTheme([
     // Default text
     {
       scope: ['default'],
-      style: { foreground: colors.text },
+      style: { foreground: uiColors.textPrimary },
     },
 
-    // Headings — blue, bold
+    // Headings — primary, bold
     {
       scope: [
         'markup.heading',
@@ -37,69 +39,70 @@ export function getMarkdownSyntaxStyle(): SyntaxStyle {
         'markup.heading.5',
         'markup.heading.6',
       ],
-      style: { foreground: colors.blue, bold: true },
+      style: { foreground: uiColors.primary, bold: true },
     },
 
-    // Bold / strong — peach, bold
+    // Bold / strong — accent, bold
     {
       scope: ['markup.bold', 'markup.strong'],
-      style: { foreground: colors.peach, bold: true },
+      style: { foreground: uiColors.accent, bold: true },
     },
 
-    // Italic / emphasis — mauve, italic
+    // Italic / emphasis — highlight, italic
     {
       scope: ['markup.italic', 'markup.emph'],
-      style: { foreground: colors.mauve, italic: true },
+      style: { foreground: uiColors.highlight, italic: true },
     },
 
-    // Lists — subtext1
+    // Lists — secondary text
     {
       scope: ['markup.list'],
-      style: { foreground: colors.subtext1 },
+      style: { foreground: uiColors.textSecondary },
     },
 
-    // Block quotes — teal, italic
+    // Block quotes — info, italic
     {
       scope: ['markup.quote'],
-      style: { foreground: colors.teal, italic: true },
+      style: { foreground: uiColors.info, italic: true },
     },
 
-    // Inline code — green
+    // Inline code — success
     {
       scope: ['markup.raw', 'markup.raw.inline'],
-      style: { foreground: colors.green },
+      style: { foreground: uiColors.success },
     },
 
-    // Code blocks — green
+    // Code blocks — success
     {
       scope: ['markup.raw.block'],
-      style: { foreground: colors.green },
+      style: { foreground: uiColors.success },
     },
 
-    // Links — sky, underline
+    // Links — primary dim, underline
     {
       scope: ['markup.link', 'markup.link.url'],
-      style: { foreground: colors.sky, underline: true },
+      style: { foreground: uiColors.primaryDim, underline: true },
     },
 
-    // Link text labels — lavender, underline
+    // Link text labels — accent, underline
     {
       scope: ['markup.link.label'],
-      style: { foreground: colors.lavender, underline: true },
+      style: { foreground: uiColors.accent, underline: true },
     },
 
-    // Horizontal rule — overlay1
+    // Horizontal rule — muted text
     {
       scope: ['markup.thematic_break'],
-      style: { foreground: colors.overlay1 },
+      style: { foreground: uiColors.textMuted },
     },
 
     // Comments / muted
     {
       scope: ['conceal'],
-      style: { foreground: colors.overlay2 },
+      style: { foreground: uiColors.textMuted },
     },
   ]);
 
-  return _markdownSyntaxStyle;
+  markdownSyntaxStyleCache.set(themeName, style);
+  return style;
 }
