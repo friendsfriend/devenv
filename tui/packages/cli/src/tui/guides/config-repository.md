@@ -12,16 +12,17 @@ Commit the contents of:
 
 Do **not** commit the `.env` file. It can contain machine-specific paths and secrets.
 
+Provider definitions in `providers/*.json` can be committed when they contain `${...}` placeholders for `username` and `token`. DevEnv-managed providers store actual credentials in `.env` and write placeholders into provider JSON. Do not commit legacy provider JSON files that contain clear-text credentials.
+
 Script collections are not part of the config directory. They live under `$DEVENV_HOME/scripts` (default `~/devenv/scripts`). Sync them separately if your team wants shared scripts.
 
 Recommended `.gitignore`:
 
 ```gitignore
 .env
-providers/*.json
 ```
 
-Provider credentials are stored outside normal app definitions and should stay local unless you intentionally manage them another secure way.
+Provider credentials stay local in `.env`; provider metadata can be shared through `providers/*.json`.
 
 ## 1. Create the repository
 
@@ -66,7 +67,6 @@ Create `.gitignore`:
 ```bash
 cat > .gitignore <<'EOF'
 .env
-providers/*.json
 EOF
 ```
 

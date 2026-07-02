@@ -137,7 +137,7 @@ export function createProviderActions(
         repositoryURL: repoUrl,
         branch,
         provider: providers[providerIdx].name,
-        appType: providerStore.addAppAppType(),
+        definitionLocation: providerStore.addAppAppType() === 'LIB' ? 'libraries' : 'apps',
       };
       const newApp = await client.createApp(request);
       resetAddAppModal();

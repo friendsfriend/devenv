@@ -68,7 +68,7 @@ export const guides: Guide[] = [
   {
     key: "adding-libraries",
     title: "Adding Libraries",
-    description: "Library definitions, appType: LIB, build and test Dockerfiles",
+    description: "Library definitions, build and test Dockerfiles",
     category: "Authoring",
     import: () => import("./adding-libraries.md", { with: { type: "text" } }).then((m) => m.default),
   },

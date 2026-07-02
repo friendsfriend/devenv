@@ -11,7 +11,6 @@ Create a JSON file at `~/.config/devenv/apps/definitions/IDENT.json`:
   "ident": "my-service",
   "displayName": "My Service",
   "repositoryPath": "https://github.com/org/my-service.git",
-  "appType": "APP",
   "containerBaseName": "my-service",
   "sourceType": "github",
   "provider": "my-github",
@@ -23,7 +22,6 @@ Key fields:
 
 - `ident` — unique identifier, becomes the directory name under `$DEVENV_HOME`
 - `repositoryPath` — Git remote URL (HTTPS or SSH)
-- `appType` — `"APP"` for applications, `"LIB"` for libraries
 - `sourceType` — `"github"` or `"gitlab"` for MR/PR features
 - `provider` — name of the provider from `providers/` for authenticated API access
 - `gitMode` — `"BRANCH"` (default) or `"WORKTREE"` for parallel worktrees

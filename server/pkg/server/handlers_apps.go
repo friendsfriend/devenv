@@ -622,8 +622,8 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		DisplayName   string `json:"displayName"`
 		RepositoryURL string `json:"repositoryURL"`
 		Branch        string `json:"branch"`
-		Provider      string `json:"provider"`
-		AppType       string `json:"appType"`
+		Provider           string `json:"provider"`
+		DefinitionLocation string `json:"definitionLocation"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -647,9 +647,9 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appType := req.AppType
-	if appType != app.TypeAPP && appType != app.TypeLIB {
-		appType = app.TypeAPP
+	appType := app.TypeAPP
+	if req.DefinitionLocation == "libraries" {
+		appType = app.TypeLIB
 	}
 
 	ident := slugify(req.DisplayName)

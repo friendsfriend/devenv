@@ -79,7 +79,7 @@ Task-focused guides are available from the TUI Help view (`?`) and linked below:
 - [Adding an App](tui/packages/cli/src/tui/guides/adding-apps.md) — App definitions, Dockerfiles, Compose config, and infra linking
 - [Adding a Script](tui/packages/cli/src/tui/guides/adding-scripts.md) — Script discovery, --devenv-metadata convention, parameter types
 - [Adding Infrastructure](tui/packages/cli/src/tui/guides/adding-infrastructure.md) — Infra definitions, Compose placement, sharing between apps
-- [Adding Libraries](tui/packages/cli/src/tui/guides/adding-libraries.md) — Library definitions, appType: LIB, build and test Dockerfiles
+- [Adding Libraries](tui/packages/cli/src/tui/guides/adding-libraries.md) — Library definitions, build and test Dockerfiles
 - [Using Worktrees](tui/packages/cli/src/tui/guides/using-worktrees.md) — Single checkout vs worktrees, worktrunk, IDE setup
 - [Using AI Features](tui/packages/cli/src/tui/guides/using-ai-features.md) — AI agent view, sessions, pi agent integration
 - [Using Git Integrations](tui/packages/cli/src/tui/guides/using-git-integrations.md) — Providers, MR/PR browsing, diff, discussions, approvals, AI review, pipelines, test results
@@ -153,7 +153,7 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 ~/.config/devenv/
 ├── .env                                 # Optional — variable substitution for compose/providers/templates
 ├── opencode.json                        # OpenCode configuration (optional)
-├── providers/                           # Git provider credentials
+├── providers/                           # Git provider definitions (credentials via .env placeholders)
 │   └── <name>.json                      # Individual provider definitions
 ├── themes/                              # Custom TUI themes
 │   └── <theme-name>.json                # OpenCode-compatible theme JSON
@@ -257,7 +257,7 @@ See Help → Guides → Custom Themes for full field guidance.
 
 ### `providers/`
 
-Git provider credentials are stored as individual JSON files in `~/.config/devenv/providers/`. File permissions are set to `0600` for security.
+Git provider definitions are stored as individual JSON files in `~/.config/devenv/providers/`. DevEnv-managed providers store actual credentials in `.env` and write `${...}` placeholders into provider JSON, making provider metadata safe to share in a config repository. Legacy clear-text provider JSON still loads, but should not be committed.
 
 **Schema:**
 
@@ -265,8 +265,8 @@ Git provider credentials are stored as individual JSON files in `~/.config/deven
 {
   "name": "my-github",
   "type": "github",
-  "username": "john",
-  "token": "ghp_..."
+  "username": "${DEVENV_PROVIDER_MY_GITHUB_USERNAME}",
+  "token": "${DEVENV_PROVIDER_MY_GITHUB_TOKEN}"
 }
 ```
 
@@ -274,8 +274,8 @@ Git provider credentials are stored as individual JSON files in `~/.config/deven
 |---|---|---|
 | `name` | string | Unique identifier for the provider |
 | `type` | string | `github` or `gitlab` |
-| `username` | string | Git platform username |
-| `token` | string | Personal Access Token (PAT) |
+| `username` | string | Git platform username or `${...}` placeholder backed by `.env` |
+| `token` | string | Personal Access Token (PAT) or `${...}` placeholder backed by `.env` |
 
 A default `github-public` provider (type: github, no credentials) is auto-created for public GitHub repositories.
 
@@ -321,7 +321,6 @@ Each deployable application is defined by a single JSON file in `apps/definition
   "ident": "my-service",
   "displayName": "My Service",
   "repositoryPath": "https://github.com/org/my-service.git",
-  "appType": "APP",
   "containerBaseName": "my-service",
   "sourceType": "github",
   "provider": "my-github",
@@ -334,7 +333,6 @@ Each deployable application is defined by a single JSON file in `apps/definition
 | `ident` | string | Unique identifier (required, becomes the directory name under `$DEVENV_HOME`) |
 | `displayName` | string | Human-readable name shown in the TUI |
 | `repositoryPath` | string | Git remote URL (HTTPS or SSH) |
-| `appType` | string | Must be `"APP"` |
 | `containerBaseName` | string | Docker container base name (optional, defaults to ident) |
 | `sourceType` | string | `"github"` or `"gitlab"` — enables MR/PR integration (optional) |
 | `provider` | string | Name of the provider from `providers/` (optional, used for authenticated API access) |
@@ -548,7 +546,7 @@ Shared infrastructure Docker Compose files. One file per service placed under `{
 
 #### `libraries/definitions/`
 
-Libraries use the same schema as apps with `appType: "LIB"`. They appear in the **Libraries** tab of the TUI. Libraries have a subset of capabilities focused on building and testing:
+Libraries use the same schema as apps, but their type is derived from their definition location under `libraries/definitions/`. They appear in the **Libraries** tab of the TUI. Libraries have a subset of capabilities focused on building and testing:
 
 - **Git operations** — clone, pull, push, fetch, branch switching, worktree management
 - **Docker lifecycle** — build (`B`), test
@@ -565,7 +563,6 @@ Libraries do **not** support running containers (`s`/`S`/`R`), container logs, o
   "ident": "shared-lib",
   "displayName": "Shared Library",
   "repositoryPath": "https://github.com/org/shared-lib.git",
-  "appType": "LIB",
   "provider": "my-github"
 }
 ```
@@ -845,7 +842,6 @@ The three worktree fields in an app's JSON definition (`~/.config/devenv/apps/de
   "localDirectoryPath": "my-app",
   "repositoryPath": "https://github.com/org/my-app.git",
   "branch": "feature/login",
-  "appType": "APP",
   "containerBaseName": "my-app",
   "provider": "my-github",
   "worktreeMode": true,

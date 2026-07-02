@@ -525,7 +525,7 @@ export interface CreateAppRequest {
 	repositoryURL: string;
 	branch: string;
 	provider: string;
-	appType: "APP" | "LIB";
+	definitionLocation: "apps" | "libraries";
 }
 
 export interface WorktreeInfo {

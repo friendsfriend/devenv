@@ -1,6 +1,6 @@
 # Adding Libraries
 
-Libraries use the same definition schema as apps but with `appType: "LIB"`. They appear in the **Libraries** tab of the TUI.
+Libraries use the same definition schema as apps, but their type is derived from their definition location under `libraries/definitions/`. They appear in the **Libraries** tab of the TUI.
 
 ## 1. Create the library definition
 
@@ -11,7 +11,6 @@ Create a JSON file at `~/.config/devenv/libraries/definitions/IDENT.json`:
   "ident": "shared-lib",
   "displayName": "Shared Library",
   "repositoryPath": "https://github.com/org/shared-lib.git",
-  "appType": "LIB",
   "provider": "my-github"
 }
 ```
