@@ -11,7 +11,7 @@ import { applyTheme, saveThemeName } from '../theme-settings';
  * - Error dialog (copy + dismiss)
  * - Confirm dialog (y/n)
  * - Profile picker navigation
- * - AI backend picker navigation
+ * - Theme picker navigation
  * - Ctrl+C to exit
  * - Ctrl+Shift+C to copy selection
  */

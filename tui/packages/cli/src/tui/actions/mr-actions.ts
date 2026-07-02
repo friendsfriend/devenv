@@ -542,7 +542,6 @@ export function createMrActions(
 
 		const { buildMrReviewPrompt } = await import("./mr-ai-utils");
 		const reviewPrompt = prompt ?? buildMrReviewPrompt(mr);
-		const backend: "pi" = "pi";
 
 		mrStore.setMrAiVisible(true);
 		mrStore.setMrAiLoading(true);
@@ -560,7 +559,6 @@ export function createMrActions(
 				mr.source_branch,
 				mr.target_branch,
 				reviewPrompt,
-				backend,
 			)) {
 				if (firstDelta) {
 					mrStore.setMrAiLoading(false);

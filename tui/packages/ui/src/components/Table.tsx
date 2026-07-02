@@ -1,6 +1,6 @@
 import { For, Show, type JSX } from "solid-js";
 import { TextAttributes } from "@opentui/core";
-import type { App } from "@devenv/types";
+import type { TableRow } from "@devenv/types";
 import { uiColors } from "../colors";
 import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
@@ -12,12 +12,12 @@ export interface TableColumn {
 	key: string;
 	header: string;
 	width: number | string;
-	render?: (app: App) => string;
+	render?: (app: TableRow) => string;
 	renderParts?: (
-		app: App,
+		app: TableRow,
 		isSelected: boolean,
 	) => Array<{ text: string; color?: string }>;
-	color?: (app: App) => string; // Optional color function for styled rendering
+	color?: (app: TableRow) => string; // Optional color function for styled rendering
 }
 
 export interface TableTab<T = string> {
@@ -27,7 +27,7 @@ export interface TableTab<T = string> {
 }
 
 export interface TableProps<T = string> {
-	apps: App[];
+	apps: TableRow[];
 	columns: TableColumn[];
 	selectedIndex: number;
 	onSelect?: (index: number) => void;
@@ -65,8 +65,9 @@ export interface TableProps<T = string> {
  * - Keyboard navigation support
  * - / search: filters rows (no highlighting)
  */
-export function Table<T = string>(props: TableProps<T>) {
-	const providerIcon = (app: App) => {
+function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: string; runningLabel?: string }) {
+	const providerIcon = (app: TableRow) => {
+		if (app.rowKind !== "app") return "";
 		if (app.sourceType === "github") return "";
 		if (app.sourceType === "gitlab") return "";
 		return "?";
@@ -75,43 +76,41 @@ export function Table<T = string>(props: TableProps<T>) {
 	const activeTabLabel = () =>
 		props.tabs?.find((tab) => tab.id === props.activeTab)?.label ?? "Applications";
 
-	const isRunning = (app: App) => {
+	const isRunning = (app: TableRow) => {
 		if (app.operationStatus?.status === "active") return true;
 		const status = (app.status || app.dockerInfo?.Status || "").toLowerCase();
 		return status.includes("up") || status.includes("running") || status.includes("healthy");
 	};
 
-	const runningSummary = () => `${props.apps.filter(isRunning).length}/${props.apps.length} running`;
+	const runningSummary = () => props.runningLabel ?? `${props.apps.filter(isRunning).length}/${props.apps.length} running`;
 
-	const appKind = (app: App) => {
-		if (app.resourceType === "script-folder") return "Folder";
-		if (app.resourceType === "script-file") return "Script";
-		if (!app.localDirectoryPath && app.containerBaseName) return "Infra";
+	const appKind = (app: TableRow) => {
+		if (app.rowKind === "script") return app.nodeType === "folder" ? "Folder" : "Script";
+		if (app.rowKind === "infra") return "Infra";
 		return app.appType === "APP" ? "App" : "Lib";
 	};
 
-	const appMarker = (app: App) => {
-		if (app.resourceType === "script-folder") return app.scriptExpanded ? "▾" : "▸";
-		if (app.resourceType === "script-file") return "󱆃";
-		if (!app.localDirectoryPath && app.containerBaseName) return "▣";
+	const appMarker = (app: TableRow) => {
+		if (app.rowKind === "script") return app.nodeType === "folder" ? (app.scriptExpanded ? "▾" : "▸") : "󱆃";
+		if (app.rowKind === "infra") return "▣";
 		return app.appType === "APP" ? "◆" : "◇";
 	};
 
-	const appStatus = (app: App) => {
+	const appStatus = (app: TableRow) => {
 		if (app.operationStatus?.status && app.operationStatus.message) {
 			if (app.operationStatus.status === "active" && props.spinnerFrames && props.spinnerFrame) {
 				return `${props.spinnerFrames[props.spinnerFrame()]} ${app.operationStatus.message}`;
 			}
 			return app.operationStatus.message;
 		}
-		if (app.resourceType === "script-folder") return "folder";
-		if (app.resourceType === "script-file") return app.scriptExecutable ? "executable" : "script";
+		if (app.rowKind === "script" && app.nodeType === "folder") return "folder";
+		if (app.rowKind === "script") return app.scriptExecutable ? "executable" : "script";
 		return formatStatus(app.status || app.dockerInfo?.Status || "not found");
 	};
 
-	const gitStatus = (app: App) => app.gitStatus?.trim() || "...";
+	const gitStatus = (app: TableRow) => app.rowKind === "app" ? app.gitStatus?.trim() || "..." : "";
 
-	const gitStatusText = (app: App) => {
+	const gitStatusText = (app: TableRow) => {
 		const status = gitStatus(app);
 		if (status === "✓") return "git clean";
 		if (status === "x") return "git unavailable";
@@ -120,15 +119,15 @@ export function Table<T = string>(props: TableProps<T>) {
 		return `git ${status}`;
 	};
 
-	const appStatusSuffix = (app: App) => {
-		if (app.resourceType === "script-folder" || app.resourceType === "script-file") {
+	const appStatusSuffix = (app: TableRow) => {
+		if (app.rowKind === "script") {
 			return app.interpreter ? ` • ${app.interpreter}` : "";
 		}
-		const details = [gitStatusText(app), app.branch ? `branch ${app.branch}` : undefined, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
+		const details = [gitStatusText(app), app.rowKind === "app" && app.branch ? `branch ${app.branch}` : undefined, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
 		return details ? ` • ${details}` : "";
 	};
 
-	const appStatusColor = (app: App) => {
+	const appStatusColor = (app: TableRow) => {
 		if (app.operationStatus?.status) {
 			switch (app.operationStatus.status) {
 				case "active": return uiColors.primary;
@@ -138,17 +137,16 @@ export function Table<T = string>(props: TableProps<T>) {
 				default: return uiColors.textPrimary;
 			}
 		}
-		if (app.resourceType === "script-folder" || app.resourceType === "script-file") return uiColors.textSecondary;
+		if (app.rowKind === "script") return uiColors.textSecondary;
 		return getStatusStyle(app.status || app.dockerInfo?.Status || "not found").color;
 	};
 
-	const appMetadata = (app: App) => {
-		if (app.resourceType === "script-folder") return app.scriptRelativePath || app.localDirectoryPath;
-		if (app.resourceType === "script-file") {
+	const appMetadata = (app: TableRow) => {
+		if (app.rowKind === "script") {
 			const params = app.scriptParameters?.length ?? 0;
-			return `${app.scriptRelativePath || app.localDirectoryPath}${params ? ` • ${params} params` : ""}`;
+			return `${app.scriptRelativePath}${app.nodeType === "script" && params ? ` • ${params} params` : ""}`;
 		}
-		if (!app.localDirectoryPath && app.containerBaseName) {
+		if (app.rowKind === "infra") {
 			return [app.containerBaseName, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
 		}
 
@@ -257,13 +255,13 @@ export function Table<T = string>(props: TableProps<T>) {
 				when={props.apps.length > 0}
 				fallback={
 					<CenteredState
-						message={hasSearch() ? "No results" : "No applications in this tab"}
+						message={hasSearch() ? "No results" : props.emptyMessage ?? "No rows in this tab"}
 						height="auto"
 						style={{ flexGrow: 1 }}
 					/>
 				}
 			>
-				<ScrollableList<App>
+				<ScrollableList<TableRow>
 					items={props.apps}
 					selectedIndex={props.selectedIndex}
 					availableLines={scrollableLines()}
@@ -276,7 +274,7 @@ export function Table<T = string>(props: TableProps<T>) {
 						<WorkItemCard
 							marker={appMarker(app)}
 							prefix={`[${appKind(app)}] `}
-							prefixColor={app.appType === "APP" ? uiColors.primary : uiColors.textSecondary}
+							prefixColor={app.rowKind === "app" && app.appType === "APP" ? uiColors.primary : uiColors.textSecondary}
 							title={app.displayName}
 							statusText={appStatus(app)}
 							statusColor={appStatusColor(app)}
@@ -311,4 +309,20 @@ export function Table<T = string>(props: TableProps<T>) {
 			{tableContent()}
 		</box>
 	);
+}
+export function RepositoryTable<T = string>(props: TableProps<T>) {
+	return <WorkItemTable {...props} emptyMessage="No repositories in this tab" />;
+}
+
+export function InfrastructureTable<T = string>(props: TableProps<T>) {
+	return <WorkItemTable {...props} emptyMessage="No infrastructure services" />;
+}
+
+export function ScriptTable<T = string>(props: TableProps<T>) {
+	return <WorkItemTable {...props} emptyMessage="No scripts" runningLabel={`${props.apps.length} scripts`} />;
+}
+
+/** @deprecated Use RepositoryTable, InfrastructureTable, or ScriptTable. */
+export function Table<T = string>(props: TableProps<T>) {
+	return <RepositoryTable {...props} />;
 }

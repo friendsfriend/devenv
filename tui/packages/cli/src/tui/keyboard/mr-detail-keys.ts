@@ -9,7 +9,7 @@ import { handleHorizontalScrollKey } from "./horizontal-scroll";
 
 /**
  * Handles keyboard events for the MR detail view.
- * Shift+A opens the AI backend picker → global-keys confirms → overlay opens in prompt mode.
+ * Shift+A starts the pi-powered AI review overlay.
  * While the overlay is open all keys are forwarded to it.
  */
 export async function handleMrDetailKeys(

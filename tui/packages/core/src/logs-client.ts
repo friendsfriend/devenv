@@ -93,10 +93,8 @@ export async function* analyzeLogsWithAIStream(
   logs: string,
   prompt?: string,
   onSessionId?: (sessionId: string) => void,
-  backend?: 'opencode' | 'pi'
 ): AsyncGenerator<string> {
   const body: Record<string, string> = { logs, prompt: prompt ?? '' };
-  if (backend) body.backend = backend;
   const response = await deps.sseFetchFn(`${deps.baseUrl}/api/ai/analyze-logs-stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -149,8 +147,8 @@ export async function* analyzeLogsWithAIStream(
 /**
  * Streams an AI code review for a merge request.
  * The server creates a temporary git worktree with the MR's source branch,
- * spawns the chosen AI agent (pi or opencode) inside that worktree so it can
- * run `git diff` and browse files autonomously, and streams the output back.
+ * spawns pi inside that worktree so it can run `git diff` and browse files
+ * autonomously, and streams the output back.
  */
 export async function* analyzeMRWithAIStream(
   deps: ClientDeps,
@@ -158,11 +156,9 @@ export async function* analyzeMRWithAIStream(
   mrIID: number,
   sourceBranch: string,
   targetBranch: string,
-  prompt: string,
-  backend?: 'opencode' | 'pi'
+  prompt: string
 ): AsyncGenerator<string> {
   const body: Record<string, string | number> = { appIdent, mrIID, sourceBranch, targetBranch, prompt };
-  if (backend) body.backend = backend;
 
   const response = await deps.sseFetchFn(`${deps.baseUrl}/api/ai/mr-review-stream`, {
     method: 'POST',

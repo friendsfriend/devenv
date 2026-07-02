@@ -28,7 +28,7 @@ export interface App {
 	localDirectoryPath: string;
 	repositoryPath: string;
 	branch: string;
-	appType: "APP" | "LIB";
+	appType: "APP" | "LIB" | "INFRA" | "SCRIPT";
 	containerBaseName: string;
 	sourceType?: ProviderType;
 	provider?: string;
@@ -52,6 +52,21 @@ export interface App {
 	interpreter?: string | null;
 	scriptParameters?: ScriptParameter[];
 }
+
+export interface AppTableRow extends App {
+	rowKind: "app";
+}
+
+export interface InfraTableRow extends App {
+	rowKind: "infra";
+}
+
+export interface ScriptTableRow extends App {
+	rowKind: "script";
+	nodeType: "folder" | "script";
+}
+
+export type TableRow = AppTableRow | InfraTableRow | ScriptTableRow;
 
 export type AppAction = "build" | "test" | "run";
 export type ActionRuntime = "docker" | "shell" | "powershell" | "systemshell" | "kubernetes";

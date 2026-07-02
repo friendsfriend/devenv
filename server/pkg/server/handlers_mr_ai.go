@@ -200,7 +200,6 @@ func (s *Server) handleAIMRReviewStream(w http.ResponseWriter, r *http.Request) 
 		SourceBranch string `json:"sourceBranch"`
 		TargetBranch string `json:"targetBranch"`
 		Prompt       string `json:"prompt"`
-		Backend      string `json:"backend"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -221,10 +220,6 @@ func (s *Server) handleAIMRReviewStream(w http.ResponseWriter, r *http.Request) 
 		respondBadRequest(w, "prompt field required")
 		return
 	}
-	if req.Backend == "" {
-		req.Backend = "opencode"
-	}
-
 	targetApp := s.findAppByIdent(req.AppIdent)
 	if targetApp == nil {
 		respondErrorMessage(w, fmt.Sprintf("app not found: %s", req.AppIdent), http.StatusNotFound)
@@ -280,13 +275,13 @@ func (s *Server) handleAIMRReviewStream(w http.ResponseWriter, r *http.Request) 
 		}
 	}()
 
-	log.Printf("[MR AI Review] worktree ready at %s (branch: %s, backend: %s)", worktreePath, req.SourceBranch, req.Backend)
+	log.Printf("[MR AI Review] worktree ready at %s (branch: %s, agent: pi)", worktreePath, req.SourceBranch)
 
 	// --- Build the full prompt with callback instructions appended ---
 	callbackURL := fmt.Sprintf("http://127.0.0.1:%d/api/ai/mr-comment-callback/%s", s.port, token)
 	fullPrompt := req.Prompt + buildCallbackInstructions(callbackURL, req.MRIID > 0)
 
-	// --- Spawn agent and stream (pi only) ---
+	// --- Spawn pi and stream ---
 	streamMRReviewPi(ctx, w, flusher, worktreePath, fullPrompt, sendError)
 }
 

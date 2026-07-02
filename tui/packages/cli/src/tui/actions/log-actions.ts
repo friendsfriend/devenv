@@ -243,7 +243,7 @@ export function createLogActions(
     let fullResponse = '';
     try {
       let firstDelta = true;
-      for await (const delta of client.analyzeLogsWithAIStream(logsOverride ?? logStore.logs(), prompt, undefined, 'pi')) {
+      for await (const delta of client.analyzeLogsWithAIStream(logsOverride ?? logStore.logs(), prompt)) {
         if (firstDelta) {
           logStore.setLogAiLoading(false);
           logStore.setLogAiStreaming(true);

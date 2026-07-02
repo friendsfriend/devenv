@@ -283,7 +283,10 @@ Custom reusable components live in `tui/packages/ui/src/components` and are expo
 
 - `ScrollableContent` — thin `scrollbox` wrapper with standard scrollbar options, axis toggles, sticky scroll, and ref callback. It intentionally does not set `flexDirection`.
 - `ScrollableList<T>` — virtualized selectable list with optional filter bar, empty/loading states, scrollbar, and scroll indicator. Use for reusable list views; caller owns selection and keyboard logic.
-- `Table` — app table with columns, optional tabs, search header, and `ScrollableList` body. Use for app/library/script-style tabular lists.
+- `RepositoryTable` — repository-oriented table for Applications/Libraries. Built on shared work-item table chrome with tabs, search header, and `ScrollableList` body.
+- `InfrastructureTable` — infrastructure-oriented table wrapper with infra-specific empty state. Use for infrastructure services instead of coercing services into repository rows.
+- `ScriptTable` — script-oriented table wrapper with script-specific empty/running summary. Use for script collections instead of coercing scripts into app/library rows.
+- `Table` — deprecated compatibility alias for `RepositoryTable`; new code should choose the domain-specific table wrapper.
 - `ListViewModal<T>` — `GenericModal` + `ScrollableList`; use for picker/list modals before writing modal-specific scrolling code.
 - `SearchHeader` — 1-line header that switches between column/header content and `/query` search display.
 - `FilterModal` — standard list filtering modal. Use `F` to open; model filters as parameter → values (e.g. status → running/exited). Keep filter state per list/tab where applicable.

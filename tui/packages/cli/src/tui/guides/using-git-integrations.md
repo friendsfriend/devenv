@@ -31,7 +31,7 @@ From the MR detail view:
 | Key | Action |
 |---|---|
 | `a` | Toggle approval |
-| `Shift+A` | AI review — streams review via opencode or pi, then posts as comment |
+| `Shift+A` | AI review — streams review via pi, then posts as comment |
 | `r` | Rebase merge request |
 | `C` | View changed files |
 | `D` | View discussions/comments |

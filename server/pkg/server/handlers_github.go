@@ -523,65 +523,41 @@ func (s *Server) handleAIAnalyzeLogs(w http.ResponseWriter, r *http.Request) {
 		prompt = "Analyze these logs. Summarize errors, warnings, and any notable events concisely."
 	}
 
-	baseURL, err := s.ensureOpencodeServer()
-	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("opencode not available: %v", err), http.StatusServiceUnavailable)
+	if _, err := exec.LookPath("pi"); err != nil {
+		respondErrorMessage(w, "pi not found in PATH", http.StatusServiceUnavailable)
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	const maxLogBytes = 100 * 1024
+	logs := req.Logs
+	if len(logs) > maxLogBytes {
+		logs = logs[len(logs)-maxLogBytes:]
+		prompt += "\n[Note: log was truncated to the most recent 100 KB]"
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
 
-	// Create a fresh session for this analysis
-	sessBody, _ := json.Marshal(map[string]string{"title": "log-analysis"})
-	sessResp, err := ctxPost(ctx, baseURL+"/session", sessBody)
-	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("opencode session create failed: %v", err), http.StatusBadGateway)
-		return
-	}
-	var sessData struct {
-		ID string `json:"id"`
-	}
-	if err := json.Unmarshal(sessResp, &sessData); err != nil || sessData.ID == "" {
-		respondErrorMessage(w, "opencode session create: unexpected response", http.StatusBadGateway)
-		return
-	}
-
-	// Send prompt with logs inlined as text
-	fullText := prompt + "\n\n" + req.Logs
-	msgBody, _ := json.Marshal(map[string]interface{}{
-		"parts": []map[string]string{{"type": "text", "text": fullText}},
-	})
-	msgResp, err := ctxPost(ctx, baseURL+"/session/"+sessData.ID+"/message", msgBody)
-	if err != nil {
+	cmd := exec.CommandContext(ctx, "pi", "--print", "--no-session", "--no-tools", prompt+"\n\n"+logs)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			respondErrorMessage(w, "AI analysis timed out", http.StatusGatewayTimeout)
 			return
 		}
-		respondErrorMessage(w, fmt.Sprintf("opencode message failed: %v", err), http.StatusBadGateway)
-		return
-	}
-
-	var msgData struct {
-		Parts []struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		} `json:"parts"`
-	}
-	if err := json.Unmarshal(msgResp, &msgData); err != nil {
-		respondErrorMessage(w, "opencode message: unexpected response", http.StatusBadGateway)
-		return
-	}
-
-	var sb strings.Builder
-	for _, p := range msgData.Parts {
-		if p.Type == "text" {
-			sb.WriteString(p.Text)
+		errMsg := strings.TrimSpace(stderr.String())
+		if errMsg == "" {
+			errMsg = err.Error()
 		}
+		respondErrorMessage(w, fmt.Sprintf("pi analysis failed: %s", errMsg), http.StatusBadGateway)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"summary": sb.String()})
+	json.NewEncoder(w).Encode(map[string]string{"summary": stdout.String()})
 }
 
 func (s *Server) handleAIAnalyzeLogsStream(w http.ResponseWriter, r *http.Request) {
@@ -591,9 +567,8 @@ func (s *Server) handleAIAnalyzeLogsStream(w http.ResponseWriter, r *http.Reques
 	}
 
 	var req struct {
-		Logs    string `json:"logs"`
-		Prompt  string `json:"prompt"`
-		Backend string `json:"backend"`
+		Logs   string `json:"logs"`
+		Prompt string `json:"prompt"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -609,44 +584,7 @@ func (s *Server) handleAIAnalyzeLogsStream(w http.ResponseWriter, r *http.Reques
 		prompt = "Analyze these logs. Summarize errors, warnings, and any notable events concisely."
 	}
 
-	// Dispatch to pi backend when requested
-	if req.Backend == "pi" {
-		s.handlePiAnalyzeLogsStream(w, r, req.Logs, prompt)
-		return
-	}
-
-	baseURL, err := s.ensureOpencodeServer()
-	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("opencode not available: %v", err), http.StatusServiceUnavailable)
-		return
-	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "streaming not supported", http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-
-	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
-	defer cancel()
-
-	sessID, evtResp, err := s.createOpencodeSession(ctx, baseURL)
-	if err != nil {
-		fmt.Fprintf(w, "data: {\"error\":\"%s\"}\n\n", jsonEscape(err.Error()))
-		flusher.Flush()
-		return
-	}
-	defer evtResp.Body.Close()
-
-	fmt.Fprintf(w, "data: {\"sessionId\":\"%s\"}\n\n", jsonEscape(sessID))
-	flusher.Flush()
-
-	go sendLogsToSession(req.Logs, prompt, baseURL, sessID)
-
-	relayOpencodeSSE(ctx, r, w, flusher, sessID, evtResp.Body)
+	s.handlePiAnalyzeLogsStream(w, r, req.Logs, prompt)
 }
 
 func (s *Server) createOpencodeSession(ctx context.Context, baseURL string) (string, *http.Response, error) {

@@ -1,6 +1,8 @@
 import { Show } from "solid-js";
 import {
-	Table,
+	RepositoryTable,
+	InfrastructureTable,
+	ScriptTable,
 	StatusLogView,
 	IssueView,
 	IssueDetailView,
@@ -491,24 +493,31 @@ export function ContentRouter(props: ContentRouterProps) {
 										overflow: "hidden",
 									}}
 								>
-									<Table
-										apps={appStore.tableFilteredApps()}
-										columns={tableColumns()}
-										selectedIndex={appStore.selectedIndex()}
-										onSelect={appStore.setSelectedIndex}
-										showBorder={true}
-										availableLines={availableTableLines}
-										tabs={appStore.tableTabs()}
-										activeTab={appStore.activeTab()}
-										onTabChange={appStore.setActiveTab}
-										getTabBorderColor={props.getTabBorderColor}
-										searchMode={appStore.tableSearchMode()}
-										searchQuery={appStore.tableSearchQuery()}
-										spinnerFrames={props.spinnerFrames}
-										spinnerFrame={appStore.spinnerFrame}
-									runningTextEnabled={props.runningTextEnabled}
-									runningTextOffset={props.runningTextOffset}
-									/>
+									{(() => {
+										const TableComponent = appStore.activeTab() === "scripts"
+											? ScriptTable
+											: appStore.activeTab() === "infrastructure"
+												? InfrastructureTable
+												: RepositoryTable;
+										return <TableComponent
+											apps={appStore.tableFilteredApps()}
+											columns={tableColumns()}
+											selectedIndex={appStore.selectedIndex()}
+											onSelect={appStore.setSelectedIndex}
+											showBorder={true}
+											availableLines={availableTableLines}
+											tabs={appStore.tableTabs()}
+											activeTab={appStore.activeTab()}
+											onTabChange={appStore.setActiveTab}
+											getTabBorderColor={props.getTabBorderColor}
+											searchMode={appStore.tableSearchMode()}
+											searchQuery={appStore.tableSearchQuery()}
+											spinnerFrames={props.spinnerFrames}
+											spinnerFrame={appStore.spinnerFrame}
+											runningTextEnabled={props.runningTextEnabled}
+											runningTextOffset={props.runningTextOffset}
+										/>;
+									})()}
 								</box>,
 								<box style={{ flexShrink: 0 }}>
 									<StatusLogView

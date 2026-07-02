@@ -556,14 +556,12 @@ export class DevEnvClient {
 		logs: string,
 		prompt?: string,
 		onSessionId?: (sessionId: string) => void,
-		backend?: "opencode" | "pi",
 	): AsyncGenerator<string> {
 		return analyzeLogsWithAIStream(
 			this.deps,
 			logs,
 			prompt,
 			onSessionId,
-			backend,
 		);
 	}
 	analyzeMRWithAIStream(
@@ -572,7 +570,6 @@ export class DevEnvClient {
 		sourceBranch: string,
 		targetBranch: string,
 		prompt: string,
-		backend?: "opencode" | "pi",
 	): AsyncGenerator<string> {
 		return analyzeMRWithAIStream(
 			this.deps,
@@ -581,7 +578,6 @@ export class DevEnvClient {
 			sourceBranch,
 			targetBranch,
 			prompt,
-			backend,
 		);
 	}
 	searchRepos(

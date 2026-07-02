@@ -4,7 +4,7 @@ export type { RunningTextProps } from "./components/RunningText";
 export { StatusBar } from "./components/StatusBar";
 export { Layout } from "./components/Layout";
 export { ContentFrame, ContentStack, ContentPanel, GridLayout } from "./components/ContentStack";
-export { Table } from "./components/Table";
+export { Table, RepositoryTable, InfrastructureTable, ScriptTable } from "./components/Table";
 export { LogView } from "./components/LogView";
 export { LogModal } from "./components/LogModal";
 export type { LogModalProps } from "./components/LogModal";
