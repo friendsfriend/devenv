@@ -65,6 +65,7 @@ type Service interface {
 	ActiveOperationLogPath(appIdent string) (string, bool)
 	LastRunRuntime(appIdent string) string
 	KubernetesRunStatus(appIdent string) string
+	KubernetesRunLogs(appIdent, localDir string) (string, error)
 	DiscoverKubernetesRunStatus(appIdent, localDir string) string
 	SetLastRunRuntime(appIdent string, runtime resources.ActionRuntime)
 	SetOnComplete(callback func(appIdent string))

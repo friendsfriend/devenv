@@ -49,6 +49,7 @@ import {
 	createShellActionScript,
 	getActionTargets,
 	getContainerLogs,
+	getKubernetesLogs,
 	restartContainer,
 	runApp,
 	startApp,
@@ -624,6 +625,9 @@ export class DevEnvClient {
 		request: import("@devenv/types").ShellActionScriptRequest,
 	): Promise<import("@devenv/types").ShellActionScriptResponse> {
 		return createShellActionScript(this.deps, request);
+	}
+	getKubernetesLogs(appIdent: string): Promise<string> {
+		return getKubernetesLogs(this.deps, appIdent);
 	}
 	getProfiles(
 		appIdent: string,

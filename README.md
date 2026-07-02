@@ -45,6 +45,7 @@ The Go backend uses dependency injection via `services.Container` — no global 
 - **Bun** 1.3.10+
 - **Go** 1.26+
 - **Docker** or **Podman** (for container management features)
+- Optional Kubernetes runtime tools: `kind`, `kubectl`, `helm`, and `k9s` for Helm/kind app runs
 
 ## Quick Start
 
@@ -73,6 +74,8 @@ Task-focused guides are available from the TUI Help view (`?`) and linked below:
 
 - [Configuration Repository](tui/packages/cli/src/tui/guides/config-repository.md) — Share DevEnv config across machines or with a team
 - [Container Runtime](tui/packages/cli/src/tui/guides/container-runtime.md) — Choose Docker or Podman via `DEVENV_CONTAINER_RUNTIME`
+- [Kubernetes Runtime](tui/packages/cli/src/tui/guides/kubernetes-runtime.md) — Run Helm app and infrastructure targets on managed kind
+- [Choosing a Runtime](tui/packages/cli/src/tui/guides/choosing-runtime.md) — When to use Docker Compose, Kubernetes, shell, or script infrastructure
 - [Adding an App](tui/packages/cli/src/tui/guides/adding-apps.md) — App definitions, Dockerfiles, Compose config, and infra linking
 - [Adding a Script](tui/packages/cli/src/tui/guides/adding-scripts.md) — Script discovery, --devenv-metadata convention, parameter types
 - [Adding Infrastructure](tui/packages/cli/src/tui/guides/adding-infrastructure.md) — Infra definitions, Compose placement, sharing between apps

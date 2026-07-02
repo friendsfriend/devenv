@@ -27,6 +27,12 @@ export const guides: Guide[] = [
     import: () => import("./kubernetes-runtime.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
+    key: "choosing-runtime",
+    title: "Choosing a Runtime",
+    description: "When to use Docker Compose, Kubernetes, shell, or script infrastructure",
+    import: () => import("./choosing-runtime.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
     key: "effective-docker-builds",
     title: "Effective Docker Builds",
     description: "Write fast Dockerfiles for Docker and Podman build targets",

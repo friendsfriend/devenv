@@ -164,6 +164,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/docker/stop", s.handleDockerStop)
 	mux.HandleFunc("/api/docker/restart", s.handleDockerRestart)
 	mux.HandleFunc("/api/docker/logs", s.handleDockerLogs)
+	mux.HandleFunc("/api/kubernetes/logs", s.handleKubernetesLogs)
 	mux.HandleFunc("/api/docker/logs/stream", s.handleDockerLogsStream)
 	mux.HandleFunc("/api/docker/stats/stream", s.handleDockerStatsStream)
 	mux.HandleFunc("/api/logs/operation/", s.handleOperationLogs)
