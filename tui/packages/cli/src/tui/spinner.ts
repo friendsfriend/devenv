@@ -1,2 +1,1 @@
-export { createFrames, createColors, deriveTrailColors, deriveInactiveColor } from '@devenv/ui';
-export type { KnightRiderOptions, KnightRiderStyle } from '@devenv/ui';
+export { createFrames } from '@devenv/ui';

@@ -1,5 +1,4 @@
 export type {
-	KeyboardEvent,
 	KeyboardStores,
 	KeyboardActions,
 	KeyboardContext,
@@ -24,4 +23,3 @@ export { handleMiscModalKeys } from "./misc-modal-keys";
 export { handleWorktreeManagerKeys } from "./worktree-manager-keys";
 export { handleTableKeys } from "./table-keys";
 export { handlePaste } from "./paste-handler";
-export { computeInitialSplitView } from "./diff-modal-utils";

@@ -22,7 +22,7 @@ export const getTabName = (tab: TabType): string => {
 	}
 };
 
-export function hasRunningAppInTab(tab: TabType, appStore: AppStore): boolean {
+function hasRunningAppInTab(tab: TabType, appStore: AppStore): boolean {
 	const allApps = appStore.apps();
 	if (tab === "scripts") return false;
 
@@ -153,7 +153,7 @@ export function getHeaderInfo(deps: HeaderSubtitleDeps): HeaderInfo {
 	return { title: getTabName(appStore.activeTab()), detail: headerText(`${selectedApp?.displayName ?? "No selection"}${branch}`), right: live };
 }
 
-export function getHeaderSubtitle(deps: HeaderSubtitleDeps): string {
+function getHeaderSubtitle(deps: HeaderSubtitleDeps): string {
 	const {
 		appStore,
 		issueStore,

@@ -11,7 +11,7 @@ import type { Discussion, MRChange, IssueComment, NotePosition } from '@devenv/t
 
 // ── Normalized timeline item shared by MR discussions and issue comments ──
 
-export interface TimelineNote {
+interface TimelineNote {
   id: number;
   type: string;
   body: string;

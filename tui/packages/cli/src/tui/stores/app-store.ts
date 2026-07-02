@@ -36,8 +36,8 @@ export type TabType =
 	| "libraries"
 	| "scripts";
 
-export type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
-export type TableSortDirection = "asc" | "desc" | "none";
+type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
+type TableSortDirection = "asc" | "desc" | "none";
 export interface TableSortRule {
 	key: TableSortKey;
 	label: string;

@@ -17,7 +17,7 @@ const SCOPE_ITEMS: string[] = [
 	"No assignee",
 ];
 
-export const SCOPE_VALUES: string[] = [
+const SCOPE_VALUES: string[] = [
 	"all",
 	"assigned-to-me",
 	"created-by-me",

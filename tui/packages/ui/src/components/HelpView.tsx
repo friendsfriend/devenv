@@ -18,14 +18,14 @@ export interface HelpSection {
   }>;
 }
 
-export interface GuideEntry {
+interface GuideEntry {
   key: string;
   title: string;
   description: string;
   category: string;
 }
 
-export type HelpTab = 'keybinds' | 'guides';
+type HelpTab = 'keybinds' | 'guides';
 
 export interface HelpViewProps {
   sections: HelpSection[];

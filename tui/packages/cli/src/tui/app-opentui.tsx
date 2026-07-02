@@ -82,11 +82,11 @@ import {
 import type { ViewStores, ViewActions } from "./views";
 import { applyTheme, loadCustomThemes, loadSystemTheme, loadThemeName, queryTerminalThemeColors } from "./theme-settings";
 
-export interface TUIAppProps {
+interface TUIAppProps {
 	serverUrl: string;
 }
 
-export function TUIApp(props: TUIAppProps) {
+function TUIApp(props: TUIAppProps) {
 	const dimensions = useTerminalDimensions();
 	const renderer = useRenderer();
 
