@@ -152,13 +152,10 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 ```
 ~/.config/devenv/
 ├── .env                                 # Optional — variable substitution for compose/providers/templates
-├── opencode.json                        # OpenCode configuration (optional)
 ├── providers/                           # Git provider definitions (credentials via .env placeholders)
 │   └── <name>.json                      # Individual provider definitions
 ├── themes/                              # Custom TUI themes
 │   └── <theme-name>.json                # OpenCode-compatible theme JSON
-├── agents/                              # Agent space definitions
-│   └── agent-<space-id>.md              # Per-agent markdown files
 ├── apps/
 │   ├── compose/                         # Per-app Compose files
 │   │   ├── <app-ident>-compose.yml          # Per-app compose files
@@ -208,10 +205,6 @@ DEVENV_CONTAINER_RUNTIME=docker
 ```
 
 Docker runtime uses `docker` plus `docker-compose`. Podman runtime uses `podman` plus `podman-compose`.
-
-### `opencode.json`
-
-OpenCode configuration file. Referenced by the server for OpenCode integration features.
 
 ### `themes/`
 
@@ -294,10 +287,6 @@ Providers can be managed through the TUI Providers view (`c`) using keybinds:
 | `/api/providers/{name}` | GET | Get provider details |
 | `/api/providers/{name}` | PUT | Update an existing provider |
 | `/api/providers/{name}` | DELETE | Delete a provider |
-
-### `agents/`
-
-Agent spaces are discovered dynamically from the configured OpenCode agents directory. The server scans for `agent-*.md` files and exposes them to the TUI. No hardcoded agent definitions exist in the codebase.
 
 ---
 
@@ -868,14 +857,14 @@ The three worktree fields in an app's JSON definition (`~/.config/devenv/apps/de
 - Convention-based Docker build/test/run with artifact extraction
 - Real-time status broadcasting via SSE
 - Multi-provider credential management
-- Agent Spaces with OpenCode session integration
+- pi session integration
 
 ## TUI Features
 
 - Real-time container status dashboard
 - Merge request management and diff viewer
 - CI/CD pipeline viewer
-- Agent Spaces (AI agent contexts with session history)
+- pi sessions (AI coding sessions with history)
 - Provider management (add, edit, delete providers)
 - Interactive terminal UI (SolidJS + OpenTUI)
 

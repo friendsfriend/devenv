@@ -24,10 +24,6 @@ type Manager interface {
 	WriteShellActionScript(appIdent string, action AppAction, profile string, command string) (string, error)
 	WritePowerShellActionScript(appIdent string, action AppAction, profile string, command string) (string, error)
 	EnvFilePath() (string, bool)
-	AgentFilePath(spaceID string) (string, error)
-	AgentsDir() string
-	DiscoverAgentSpaces() ([]AgentSpaceID, error)
-	OpencodeConfigPath() (string, error)
 	CopyTemplatesDir(destDir string) ([]string, error)
 	CopyFile(src, dst string) error
 }
@@ -201,69 +197,6 @@ func (m *manager) EnvFilePath() (string, bool) {
 		return "", false
 	}
 	return p, true
-}
-
-func (m *manager) AgentFilePath(spaceID string) (string, error) {
-	agentFile := filepath.Join(m.configDir, "agents", "agent-"+spaceID+".md")
-	if _, err := os.Stat(agentFile); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return "", fmt.Errorf("no agent definition for space %q: %w", spaceID, fs.ErrNotExist)
-		}
-		return "", err
-	}
-	return agentFile, nil
-}
-
-func (m *manager) AgentsDir() string {
-	return filepath.Join(m.configDir, "agents")
-}
-
-// AgentSpaceID represents a discovered agent space from the agents config directory.
-type AgentSpaceID struct {
-	ID       string
-	FilePath string
-}
-
-// DiscoverAgentSpaces scans the agents directory for files matching agent-<id>.md
-// and returns the list of discovered agent space IDs.
-func (m *manager) DiscoverAgentSpaces() ([]AgentSpaceID, error) {
-	agentsDir := m.AgentsDir()
-	entries, err := os.ReadDir(agentsDir)
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, nil // no agents dir = no agents
-		}
-		return nil, fmt.Errorf("reading agents directory: %w", err)
-	}
-
-	var spaces []AgentSpaceID
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasPrefix(name, "agent-") && strings.HasSuffix(name, ".md") {
-			id := strings.TrimSuffix(strings.TrimPrefix(name, "agent-"), ".md")
-			if id != "" {
-				spaces = append(spaces, AgentSpaceID{
-					ID:       id,
-					FilePath: filepath.Join(agentsDir, name),
-				})
-			}
-		}
-	}
-	return spaces, nil
-}
-
-func (m *manager) OpencodeConfigPath() (string, error) {
-	p := filepath.Join(m.configDir, "opencode.json")
-	if _, err := os.Stat(p); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return "", fmt.Errorf("opencode.json not found in %s: %w", m.configDir, fs.ErrNotExist)
-		}
-		return "", err
-	}
-	return p, nil
 }
 
 func (m *manager) CopyTemplatesDir(destDir string) ([]string, error) {

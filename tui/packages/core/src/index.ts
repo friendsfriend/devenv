@@ -14,14 +14,7 @@ import type {
 	StatusLogEntry,
 } from "@devenv/types";
 import type { ClientDeps, FetchFunction } from "./client-types";
-import {
-	getAgentSessions,
-	getAgentSpaces,
-	getOpencodeAgents,
-	getPiSessions,
-	resolveAgentFile,
-	resolveOpencodeConfig,
-} from "./agent-client";
+import { getPiSessions } from "./agent-client";
 import {
 	getApps,
 	getDockerInfo,
@@ -706,25 +699,8 @@ export class DevEnvClient {
 	health(): Promise<boolean> {
 		return health(this.deps);
 	}
-	getAgentSpaces(): Promise<import("@devenv/types").AgentSpace[]> {
-		return getAgentSpaces(this.deps);
-	}
-	getAgentSessions(): Promise<import("@devenv/types").AgentGroup[]> {
-		return getAgentSessions(this.deps);
-	}
 	getPiSessions(): Promise<import("@devenv/types").AgentGroup[]> {
 		return getPiSessions(this.deps);
-	}
-	getOpencodeAgents(): Promise<string[]> {
-		return getOpencodeAgents(this.deps);
-	}
-	resolveAgentFile(
-		spaceId: string,
-	): Promise<{ agentsDir: string; agentId: string }> {
-		return resolveAgentFile(this.deps, spaceId);
-	}
-	resolveOpencodeConfig(): Promise<{ configPath: string }> {
-		return resolveOpencodeConfig(this.deps);
 	}
 }
 

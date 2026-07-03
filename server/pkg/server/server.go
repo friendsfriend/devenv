@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"sync"
@@ -30,11 +29,6 @@ type Server struct {
 	listenerMu    sync.RWMutex
 	opStatus      map[string]*OperationStatus
 	opStatusMu    sync.RWMutex
-
-	opencodeOnce      sync.Once
-	opencodeServerURL string
-	opencodeServerErr error
-	opencodeServerCmd *exec.Cmd
 
 	// MR review sessions: token → session (created per review, cleaned up on stream close)
 	mrSessions   map[string]*mrReviewSession
@@ -255,11 +249,6 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/scripts/delete", s.handleDeleteScript)
 	mux.HandleFunc("/api/scripts/history", s.handleScriptArgsHistory)
 	mux.HandleFunc("/api/scripts/metadata", s.handleScriptMetadataRoute)
-	mux.HandleFunc("/api/agent-spaces", s.handleGetAgentSpaces)
-	mux.HandleFunc("/api/agent-spaces/{id}/extract-agent", s.handleExtractAgentFile)
-	mux.HandleFunc("/api/agent-sessions", s.handleGetAgentSessions)
-	mux.HandleFunc("/api/opencode-agents", s.handleGetOpencodeAgents)
-	mux.HandleFunc("/api/opencode-config/extract", s.handleExtractOpencodeConfig)
 	mux.HandleFunc("/api/pi-sessions", s.handleGetPiSessions)
 	mux.HandleFunc("/api/events", s.handleEvents)
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -285,14 +274,12 @@ func (s *Server) Start() error {
 		log.Printf("Received signal %s, shutting down", sig)
 	case err := <-errCh:
 		if err != nil && err != http.ErrServerClosed {
-			s.stopOpencodeServer()
 			return err
 		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	s.stopOpencodeServer()
 	return httpSrv.Shutdown(ctx)
 }
 
