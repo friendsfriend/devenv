@@ -14,14 +14,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/gitlab"
-	"github.com/friendsfriend/devenv/pkg/mr"
 )
 
-// Client is the GitHub-specific implementation of mr.Client.
+// Client is the GitHub-specific implementation of changerequest.Client.
 // It provides merge/pull request operations for GitHub repositories.
 type Client interface {
-	mr.Client
+	changerequest.Client
 }
 
 type client struct {
@@ -58,22 +58,22 @@ type RepoInfo struct {
 	Repo  string
 }
 
-// ToMR converts github.RepoInfo to mr.RepoInfo.
-func (r *RepoInfo) ToMR() *mr.RepoInfo {
-	return &mr.RepoInfo{
+// ToChangeRequest converts github.RepoInfo to changerequest.RepoInfo.
+func (r *RepoInfo) ToChangeRequest() *changerequest.RepoInfo {
+	return &changerequest.RepoInfo{
 		Owner: r.Owner,
 		Repo:  r.Repo,
 		Host:  "github.com",
 	}
 }
 
-// FromMR converts mr.RepoInfo to github.RepoInfo.
-func FromMR(info *mr.RepoInfo) (*RepoInfo, error) {
+// FromChangeRequest converts changerequest.RepoInfo to github.RepoInfo.
+func FromChangeRequest(info *changerequest.RepoInfo) (*RepoInfo, error) {
 	if info == nil {
 		return nil, fmt.Errorf("repo info is nil")
 	}
 	if info.Owner == "" || info.Repo == "" {
-		return nil, fmt.Errorf("mr.RepoInfo missing Owner or Repo fields")
+		return nil, fmt.Errorf("changerequest.RepoInfo missing Owner or Repo fields")
 	}
 	return &RepoInfo{
 		Owner: info.Owner,
@@ -225,10 +225,10 @@ type ghTimelineEvent struct {
 
 // --- Canonical types (matching what the server returns to the TUI) ---
 
-// MergeRequest is the canonical merge/pull request shape returned by the server.
-// Field names and JSON tags are identical to the GitLab client's MergeRequest struct
+// ChangeRequest is the canonical merge/pull request shape returned by the server.
+// Field names and JSON tags are identical to the GitLab client's ChangeRequest struct
 // so the TUI can consume both sources transparently.
-type MergeRequest struct {
+type ChangeRequest struct {
 	ID           int       `json:"id"`
 	IID          int       `json:"iid"`
 	Title        string    `json:"title"`
@@ -262,11 +262,11 @@ type MergeRequest struct {
 	RebaseInProgress            bool   `json:"rebase_in_progress"` // always false for GitHub
 	MergeError                  string `json:"merge_error"`
 
-	Approvals *MRApprovals `json:"approvals,omitempty"`
+	Approvals *MergeRequestApprovals `json:"approvals,omitempty"`
 }
 
-// MRApprovals mirrors the GitLab approvals shape consumed by the TUI.
-type MRApprovals struct {
+// MergeRequestApprovals mirrors the GitLab approvals shape consumed by the TUI.
+type MergeRequestApprovals struct {
 	ApprovalsRequired int `json:"approvals_required"` // 1 (GitHub requires at least 1 review — we report 1)
 	ApprovalsLeft     int `json:"approvals_left"`
 	ApprovedBy        []struct {
@@ -277,8 +277,8 @@ type MRApprovals struct {
 	} `json:"approved_by"`
 }
 
-// MRChange mirrors the GitLab MRChange shape.
-type MRChange struct {
+// ChangeRequestChange mirrors the GitLab ChangeRequestChange shape.
+type ChangeRequestChange struct {
 	OldPath      string     `json:"old_path"`
 	NewPath      string     `json:"new_path"`
 	AMode        string     `json:"a_mode"`
@@ -356,7 +356,7 @@ func readBody(resp *http.Response) ([]byte, error) {
 
 // --- Conversion helpers ---
 
-func prStateToMRState(pr ghPR) string {
+func prStateToChangeRequestState(pr ghPR) string {
 	if pr.Merged {
 		return "merged"
 	}
@@ -366,7 +366,7 @@ func prStateToMRState(pr ghPR) string {
 	return "opened"
 }
 
-func mergeableToMRStatus(pr ghPR) (mergeStatus, detailedMergeStatus string, hasConflicts bool) {
+func mergeableToChangeRequestStatus(pr ghPR) (mergeStatus, detailedMergeStatus string, hasConflicts bool) {
 	if pr.Mergeable == nil {
 		// GitHub hasn't computed it yet
 		return "checking", "checking", false
@@ -381,11 +381,11 @@ func mergeableToMRStatus(pr ghPR) (mergeStatus, detailedMergeStatus string, hasC
 	return "cannot_be_merged", pr.MergeableState, false
 }
 
-func convertPR(pr ghPR, approvals *MRApprovals, latestRun *ghWorkflowRun) MergeRequest {
-	mergeStatus, detailedMergeStatus, hasConflicts := mergeableToMRStatus(pr)
-	state := prStateToMRState(pr)
+func convertPR(pr ghPR, approvals *MergeRequestApprovals, latestRun *ghWorkflowRun) ChangeRequest {
+	mergeStatus, detailedMergeStatus, hasConflicts := mergeableToChangeRequestStatus(pr)
+	state := prStateToChangeRequestState(pr)
 
-	mr := MergeRequest{
+	mr := ChangeRequest{
 		ID:                          pr.ID,
 		IID:                         pr.Number,
 		Title:                       pr.Title,
@@ -423,12 +423,12 @@ func convertPR(pr ghPR, approvals *MRApprovals, latestRun *ghWorkflowRun) MergeR
 	return mr
 }
 
-// convertPRToMR converts a GitHub PR to the unified mr.MergeRequest format.
-func convertPRToMR(pr ghPR, approvals *MRApprovals, latestRun *ghWorkflowRun) mr.MergeRequest {
-	mergeStatus, detailedMergeStatus, hasConflicts := mergeableToMRStatus(pr)
-	state := prStateToMRState(pr)
+// convertPRToChangeRequest converts a GitHub PR to the unified changerequest.ChangeRequest format.
+func convertPRToChangeRequest(pr ghPR, approvals *MergeRequestApprovals, latestRun *ghWorkflowRun) changerequest.ChangeRequest {
+	mergeStatus, detailedMergeStatus, hasConflicts := mergeableToChangeRequestStatus(pr)
+	state := prStateToChangeRequestState(pr)
 
-	result := mr.MergeRequest{
+	result := changerequest.ChangeRequest{
 		ID:                          pr.ID,
 		IID:                         pr.Number,
 		Title:                       pr.Title,
@@ -448,7 +448,7 @@ func convertPRToMR(pr ghPR, approvals *MRApprovals, latestRun *ghWorkflowRun) mr
 		RebaseInProgress:            false,
 	}
 	if approvals != nil {
-		result.ApproveStatus = &mr.ApproveStatus{
+		result.ApproveStatus = &changerequest.ApproveStatus{
 			ApprovalsRequired: approvals.ApprovalsRequired,
 			ApprovalsLeft:     approvals.ApprovalsLeft,
 			ApprovedBy:        approvals.ApprovedBy,
@@ -458,7 +458,7 @@ func convertPRToMR(pr ghPR, approvals *MRApprovals, latestRun *ghWorkflowRun) mr
 	result.Author.Username = pr.User.Login
 
 	if latestRun != nil {
-		result.HeadPipeline = &mr.PipelineRef{
+		result.HeadPipeline = &changerequest.PipelineRef{
 			ID:     latestRun.ID,
 			Status: mapRunStatusToGitLab(*latestRun),
 			WebURL: latestRun.HTMLURL,
@@ -480,8 +480,8 @@ type SearchResult struct {
 
 // --- Public API methods ---
 
-// Search implements mr.Client.Search.
-func (c *client) Search(info *mr.RepoInfo, query string, limit int) ([]mr.SearchResult, error) {
+// Search implements changerequest.Client.Search.
+func (c *client) Search(info *changerequest.RepoInfo, query string, limit int) ([]changerequest.SearchResult, error) {
 	if limit <= 0 {
 		limit = 20
 	}
@@ -520,9 +520,9 @@ func (c *client) Search(info *mr.RepoInfo, query string, limit int) ([]mr.Search
 		return nil, fmt.Errorf("failed to parse search response: %w", err)
 	}
 
-	results := make([]mr.SearchResult, 0, len(searchResp.Items))
+	results := make([]changerequest.SearchResult, 0, len(searchResp.Items))
 	for _, item := range searchResp.Items {
-		results = append(results, mr.SearchResult{
+		results = append(results, changerequest.SearchResult{
 			Name:          item.Name,
 			FullPath:      item.FullName,
 			HTTPURL:       item.CloneURL,
@@ -533,7 +533,7 @@ func (c *client) Search(info *mr.RepoInfo, query string, limit int) ([]mr.Search
 	return results, nil
 }
 
-// GetMRs implements mr.Client.GetMRs.
+// GetChangeRequests implements changerequest.Client.GetChangeRequests.
 func normalizeGithubPRSort(sortBy string) string {
 	switch sortBy {
 	case "created", "updated", "popularity", "long-running":
@@ -543,8 +543,8 @@ func normalizeGithubPRSort(sortBy string) string {
 	}
 }
 
-func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRListResult, error) {
-	ghInfo, err := FromMR(info)
+func (c *client) GetChangeRequests(info *changerequest.RepoInfo, options *changerequest.ChangeRequestListOptions) (*changerequest.ChangeRequestListResult, error) {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -585,13 +585,13 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 	// When search is provided, use the GitHub search/issues endpoint
 	// since the pulls list endpoint doesn't support search.
 	if search != "" || len(labels) > 0 {
-		return c.searchMRs(ghInfo, search, page, perPage, state, skipDetails, sortBy, order, labels)
+		return c.searchPullRequests(ghInfo, search, page, perPage, state, skipDetails, sortBy, order, labels)
 	}
 
 	// GitHub API doesn't have a native "merged" state. Merged PRs have state=closed + merged=true.
 	// Map our state values to GitHub API values:
 	//   "opened" → "open"
-	//   "closed" → "closed" (GitHub returns all closed PRs — merged ones are filtered in prStateToMRState)
+	//   "closed" → "closed" (GitHub returns all closed PRs — merged ones are filtered in prStateToChangeRequestState)
 	//   "all"    → "all"
 	apiState := state
 	switch state {
@@ -642,9 +642,9 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 		return nil, fmt.Errorf("failed to parse pull requests: %w", err)
 	}
 
-	results := make([]mr.MergeRequest, 0, len(prs))
+	results := make([]changerequest.ChangeRequest, 0, len(prs))
 	for _, pr := range prs {
-		var approvals *MRApprovals
+		var approvals *MergeRequestApprovals
 		var latestRun *ghWorkflowRun
 
 		if !skipDetails {
@@ -659,25 +659,25 @@ func (c *client) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRLis
 			}
 		}
 
-		mrResult := convertPRToMR(pr, approvals, latestRun)
+		mrResult := convertPRToChangeRequest(pr, approvals, latestRun)
 		results = append(results, mrResult)
 	}
 
-	return &mr.MRListResult{
-		MergeRequests: results,
-		TotalCount:    -1,
-		TotalPages:    totalPages,
-		CurrentPage:   currentPage,
-		PerPage:       perPage,
+	return &changerequest.ChangeRequestListResult{
+		ChangeRequests: results,
+		TotalCount:     -1,
+		TotalPages:     totalPages,
+		CurrentPage:    currentPage,
+		PerPage:        perPage,
 	}, nil
 }
 
-// searchMRs searches pull requests via GitHub's /search/issues endpoint.
+// searchPullRequests searches pull requests via GitHub's /search/issues endpoint.
 // GitHub's REST API treats PRs as a type of issue; the qualifier "type:pr"
 // in the search query filters out regular issues, returning PRs only.
 // This is the documented GitHub API approach — the pulls list endpoint
 // (/repos/{owner}/{repo}/pulls) does not support free-text search.
-func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, state string, skipDetails bool, sortBy, order string, labels []string) (*mr.MRListResult, error) {
+func (c *client) searchPullRequests(ghInfo *RepoInfo, query string, page, perPage int, state string, skipDetails bool, sortBy, order string, labels []string) (*changerequest.ChangeRequestListResult, error) {
 	// Build search query with state qualifier.
 	// GitHub search API values: state:open, state:closed, state:all
 	labelQuery := ""
@@ -733,13 +733,13 @@ func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, st
 	linkHeader := resp.Header.Get("Link")
 	_, totalPages := parseLinkHeaderForPagination(linkHeader, page)
 
-	results := make([]mr.MergeRequest, 0, len(searchResp.Items))
+	results := make([]changerequest.ChangeRequest, 0, len(searchResp.Items))
 	for _, item := range searchResp.Items {
 		// If not SkipDetails, fetch full PR details which includes all fields
 		if !skipDetails {
 			fullPR, err := c.GetPullRequest(ghInfo, item.Number)
 			if err == nil && fullPR != nil {
-				mrResult := convertPRToMR(ghPR{
+				mrResult := convertPRToChangeRequest(ghPR{
 					Number:    fullPR.IID,
 					Title:     fullPR.Title,
 					Body:      fullPR.Description,
@@ -753,7 +753,7 @@ func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, st
 				}, fullPR.Approvals, nil)
 				// Copy pipeline from fullPR if available
 				if fullPR.HeadPipeline != nil {
-					mrResult.HeadPipeline = &mr.PipelineRef{
+					mrResult.HeadPipeline = &changerequest.PipelineRef{
 						ID:     fullPR.HeadPipeline.ID,
 						Status: fullPR.HeadPipeline.Status,
 						WebURL: fullPR.HeadPipeline.WebURL,
@@ -765,7 +765,7 @@ func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, st
 		}
 
 		// Fallback: build minimal MR from search result
-		mrResult := mr.MergeRequest{
+		mrResult := changerequest.ChangeRequest{
 			IID:                         item.Number,
 			Title:                       item.Title,
 			Description:                 item.Body,
@@ -787,17 +787,17 @@ func (c *client) searchMRs(ghInfo *RepoInfo, query string, page, perPage int, st
 	// Calculate total pages from total count
 	totalPages = (searchResp.TotalCount + perPage - 1) / perPage
 
-	return &mr.MRListResult{
-		MergeRequests: results,
-		TotalCount:    searchResp.TotalCount,
-		TotalPages:    totalPages,
-		CurrentPage:   page,
-		PerPage:       perPage,
+	return &changerequest.ChangeRequestListResult{
+		ChangeRequests: results,
+		TotalCount:     searchResp.TotalCount,
+		TotalPages:     totalPages,
+		CurrentPage:    page,
+		PerPage:        perPage,
 	}, nil
 }
 
 // GetPullRequest fetches a single pull request by number with full details.
-func (c *client) GetPullRequest(info *RepoInfo, prNumber int) (*MergeRequest, error) {
+func (c *client) GetPullRequest(info *RepoInfo, prNumber int) (*ChangeRequest, error) {
 	if info == nil {
 		return nil, fmt.Errorf("repo info is nil")
 	}
@@ -839,8 +839,8 @@ func (c *client) GetPullRequest(info *RepoInfo, prNumber int) (*MergeRequest, er
 }
 
 // GetPRApprovals fetches review-based approvals for a pull request and returns
-// an MRApprovals struct compatible with the GitLab shape.
-func (c *client) GetPRApprovals(info *RepoInfo, prNumber int) (*MRApprovals, error) {
+// an MergeRequestApprovals struct compatible with the GitLab shape.
+func (c *client) GetPRApprovals(info *RepoInfo, prNumber int) (*MergeRequestApprovals, error) {
 	if info == nil {
 		return nil, fmt.Errorf("repo info is nil")
 	}
@@ -877,7 +877,7 @@ func (c *client) GetPRApprovals(info *RepoInfo, prNumber int) (*MRApprovals, err
 		latestByUser[r.User.Login] = r.State
 	}
 
-	approvals := &MRApprovals{
+	approvals := &MergeRequestApprovals{
 		ApprovalsRequired: 1, // sensible default — GitHub enforces this at repo level
 		ApprovedBy: []struct {
 			User struct {
@@ -910,9 +910,9 @@ func (c *client) GetPRApprovals(info *RepoInfo, prNumber int) (*MRApprovals, err
 	return approvals, nil
 }
 
-// GetMRChanges implements mr.Client.GetMRChanges.
-func (c *client) GetMRChanges(info *mr.RepoInfo, mrNumber int) ([]mr.MRChange, error) {
-	ghInfo, err := FromMR(info)
+// GetChangeRequestChanges implements changerequest.Client.GetChangeRequestChanges.
+func (c *client) GetChangeRequestChanges(info *changerequest.RepoInfo, mrNumber int) ([]changerequest.ChangeRequestChange, error) {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -939,9 +939,9 @@ func (c *client) GetMRChanges(info *mr.RepoInfo, mrNumber int) ([]mr.MRChange, e
 		return nil, fmt.Errorf("failed to parse PR files: %w", err)
 	}
 
-	changes := make([]mr.MRChange, 0, len(files))
+	changes := make([]changerequest.ChangeRequestChange, 0, len(files))
 	for _, f := range files {
-		ch := mr.MRChange{
+		ch := changerequest.ChangeRequestChange{
 			NewPath:      f.Filename,
 			OldPath:      f.Filename,
 			AMode:        "100644",
@@ -966,7 +966,7 @@ func (c *client) GetMRChanges(info *mr.RepoInfo, mrNumber int) ([]mr.MRChange, e
 		}
 
 		if f.Patch != "" {
-			ch.DiffLines = parseDiffLinesToMR(f.Patch, f.Filename)
+			ch.DiffLines = parseDiffLinesToChangeRequest(f.Patch, f.Filename)
 		}
 
 		changes = append(changes, ch)
@@ -1120,9 +1120,9 @@ func timelineEventToBody(event *ghTimelineEvent) string {
 	}
 }
 
-// GetDiscussions implements mr.Client.GetDiscussions.
-func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussion, error) {
-	ghInfo, err := FromMR(info)
+// GetDiscussions implements changerequest.Client.GetDiscussions.
+func (c *client) GetDiscussions(info *changerequest.RepoInfo, mrNumber int) ([]changerequest.Discussion, error) {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -1150,20 +1150,20 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 		issueCommentIDs[ic.ID] = true
 	}
 
-	var discussions []mr.Discussion
+	var discussions []changerequest.Discussion
 
 	// 1. Build discussion threads from review comments (inline code review)
-	rootByID := make(map[int]*mr.Discussion)
+	rootByID := make(map[int]*changerequest.Discussion)
 	var orderedRoots []int
 
 	for i := range reviewComments {
 		rc := &reviewComments[i]
 		if rc.InReplyToID == nil {
-			d := mr.Discussion{
+			d := changerequest.Discussion{
 				ID:             strconv.Itoa(rc.ID),
 				IndividualNote: false,
-				Notes: []mr.Note{
-					convertReviewCommentToMR(rc),
+				Notes: []changerequest.Note{
+					convertReviewCommentToChangeRequest(rc),
 				},
 			}
 			discussions = append(discussions, d)
@@ -1177,7 +1177,7 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 		if rc.InReplyToID != nil {
 			parentID := *rc.InReplyToID
 			if d, ok := rootByID[parentID]; ok {
-				d.Notes = append(d.Notes, convertReviewCommentToMR(rc))
+				d.Notes = append(d.Notes, convertReviewCommentToChangeRequest(rc))
 			}
 		}
 	}
@@ -1187,15 +1187,15 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 	// 2. Add issue comments (general PR comments)
 	for i := range issueComments {
 		ic := &issueComments[i]
-		d := mr.Discussion{
+		d := changerequest.Discussion{
 			ID:             strconv.Itoa(ic.ID),
 			IndividualNote: true,
-			Notes: []mr.Note{
+			Notes: []changerequest.Note{
 				{
 					ID:   ic.ID,
 					Type: "DiscussionNote",
 					Body: ic.Body,
-					Author: mr.NoteAuthor{
+					Author: changerequest.NoteAuthor{
 						Username: ic.User.Login,
 						Name:     ic.User.Login,
 					},
@@ -1218,10 +1218,10 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 		}
 
 		body := timelineEventToBody(e)
-		d := mr.Discussion{
+		d := changerequest.Discussion{
 			ID:             fmt.Sprintf("timeline-%d", e.ID),
 			IndividualNote: true,
-			Notes: []mr.Note{
+			Notes: []changerequest.Note{
 				{
 					ID:        e.ID,
 					Type:      "TimelineEvent",
@@ -1229,7 +1229,7 @@ func (c *client) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussio
 					System:    true,
 					CreatedAt: e.CreatedAt,
 					UpdatedAt: e.CreatedAt,
-					Author: mr.NoteAuthor{
+					Author: changerequest.NoteAuthor{
 						Username: e.Actor.Login,
 						Name:     e.Actor.Login,
 					},
@@ -1310,12 +1310,12 @@ func convertReviewComment(rc *ghPRReviewComment) Note {
 	}
 }
 
-func convertReviewCommentToMR(rc *ghPRReviewComment) mr.Note {
-	return mr.Note{
+func convertReviewCommentToChangeRequest(rc *ghPRReviewComment) changerequest.Note {
+	return changerequest.Note{
 		ID:   rc.ID,
 		Type: "DiffNote",
 		Body: rc.Body,
-		Author: mr.NoteAuthor{
+		Author: changerequest.NoteAuthor{
 			Username: rc.User.Login,
 			Name:     rc.User.Login,
 		},
@@ -1326,9 +1326,9 @@ func convertReviewCommentToMR(rc *ghPRReviewComment) mr.Note {
 	}
 }
 
-// Approve implements mr.Client.Approve.
-func (c *client) Approve(info *mr.RepoInfo, mrNumber int) error {
-	ghInfo, err := FromMR(info)
+// Approve implements changerequest.Client.Approve.
+func (c *client) Approve(info *changerequest.RepoInfo, mrNumber int) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -1366,9 +1366,9 @@ func (c *client) approvePRInternal(info *RepoInfo, prNumber int) error {
 	return nil
 }
 
-// Unapprove implements mr.Client.Unapprove.
-func (c *client) Unapprove(info *mr.RepoInfo, mrNumber int) error {
-	ghInfo, err := FromMR(info)
+// Unapprove implements changerequest.Client.Unapprove.
+func (c *client) Unapprove(info *changerequest.RepoInfo, mrNumber int) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -1442,9 +1442,9 @@ func (c *client) unapprovePRInternal(info *RepoInfo, prNumber int) error {
 	return nil
 }
 
-// ToggleApproval implements mr.Client.ToggleApproval.
-func (c *client) ToggleApproval(info *mr.RepoInfo, mrNumber int) error {
-	ghInfo, err := FromMR(info)
+// ToggleApproval implements changerequest.Client.ToggleApproval.
+func (c *client) ToggleApproval(info *changerequest.RepoInfo, mrNumber int) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -1591,8 +1591,8 @@ func (c *client) GetLatestRunForSHA(info *RepoInfo, sha string) (*ghWorkflowRun,
 	return &run, nil
 }
 
-func (c *client) GetActionJob(info *mr.RepoInfo, jobID int) (*ghActionJob, error) {
-	ghInfo, err := FromMR(info)
+func (c *client) GetActionJob(info *changerequest.RepoInfo, jobID int) (*ghActionJob, error) {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -1657,9 +1657,9 @@ func (c *client) GetRunJobs(info *RepoInfo, runID int) ([]ghActionJob, error) {
 	return result.Jobs, nil
 }
 
-// GetJobLogs implements mr.Client.GetJobLogs.
-func (c *client) GetJobLogs(info *mr.RepoInfo, jobID int) (string, error) {
-	ghInfo, err := FromMR(info)
+// GetJobLogs implements changerequest.Client.GetJobLogs.
+func (c *client) GetJobLogs(info *changerequest.RepoInfo, jobID int) (string, error) {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return "", err
 	}
@@ -1797,12 +1797,12 @@ func parseDiffLines(patch, filePath string) []DiffLine {
 	return diffLines
 }
 
-func parseDiffLinesToMR(patch, filePath string) []mr.DiffLine {
+func parseDiffLinesToChangeRequest(patch, filePath string) []changerequest.DiffLine {
 	if patch == "" {
 		return nil
 	}
 
-	var diffLines []mr.DiffLine
+	var diffLines []changerequest.DiffLine
 	lines := strings.Split(patch, "\n")
 
 	var currentOldLine int
@@ -1826,7 +1826,7 @@ func parseDiffLinesToMR(patch, filePath string) []mr.DiffLine {
 			continue
 		}
 
-		var dl mr.DiffLine
+		var dl changerequest.DiffLine
 		dl.Text = line
 
 		if strings.HasPrefix(line, "+") {
@@ -1940,8 +1940,8 @@ func generateLineCode(filePath string, newLine *int, oldLine *int) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-// ValidateConnection implements mr.Client.ValidateConnection.
-func (c *client) ValidateConnection(info *mr.RepoInfo) error {
+// ValidateConnection implements changerequest.Client.ValidateConnection.
+func (c *client) ValidateConnection(info *changerequest.RepoInfo) error {
 	apiURL := "https://api.github.com/user"
 	resp, err := c.doRequest("GET", apiURL, nil)
 	if err != nil {
@@ -1956,9 +1956,9 @@ func (c *client) ValidateConnection(info *mr.RepoInfo) error {
 	return nil
 }
 
-// GetPipelines implements mr.Client.GetPipelines.
-func (c *client) GetPipelines(info *mr.RepoInfo, limit int) ([]mr.Pipeline, error) {
-	ghInfo, err := FromMR(info)
+// GetPipelines implements changerequest.Client.GetPipelines.
+func (c *client) GetPipelines(info *changerequest.RepoInfo, limit int) ([]changerequest.Pipeline, error) {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -1996,9 +1996,9 @@ func (c *client) GetPipelines(info *mr.RepoInfo, limit int) ([]mr.Pipeline, erro
 		return nil, fmt.Errorf("failed to parse workflow runs: %w", err)
 	}
 
-	pipelines := make([]mr.Pipeline, 0, len(result.WorkflowRuns))
+	pipelines := make([]changerequest.Pipeline, 0, len(result.WorkflowRuns))
 	for _, run := range result.WorkflowRuns {
-		pipelines = append(pipelines, mr.Pipeline{
+		pipelines = append(pipelines, changerequest.Pipeline{
 			ID:     run.ID,
 			Status: mapRunStatusToGitLab(run),
 			Ref:    run.HeadBranch,
@@ -2010,9 +2010,9 @@ func (c *client) GetPipelines(info *mr.RepoInfo, limit int) ([]mr.Pipeline, erro
 	return pipelines, nil
 }
 
-// GetPipelineJobs implements mr.Client.GetPipelineJobs.
-func (c *client) GetPipelineJobs(info *mr.RepoInfo, pipelineID int) ([]mr.Job, error) {
-	ghInfo, err := FromMR(info)
+// GetPipelineJobs implements changerequest.Client.GetPipelineJobs.
+func (c *client) GetPipelineJobs(info *changerequest.RepoInfo, pipelineID int) ([]changerequest.Job, error) {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -2043,17 +2043,17 @@ func (c *client) GetPipelineJobs(info *mr.RepoInfo, pipelineID int) ([]mr.Job, e
 		return nil, fmt.Errorf("failed to parse jobs: %w", err)
 	}
 
-	jobs := make([]mr.Job, 0, len(result.Jobs))
+	jobs := make([]changerequest.Job, 0, len(result.Jobs))
 	for _, j := range result.Jobs {
-		job := convertActionJobToMR(j)
+		job := convertActionJobToChangeRequest(j)
 		job.Pipeline.ID = pipelineID
 		jobs = append(jobs, job)
 	}
 	return jobs, nil
 }
 
-func (c *client) RestartJob(info *mr.RepoInfo, jobID int) error {
-	ghInfo, err := FromMR(info)
+func (c *client) RestartJob(info *changerequest.RepoInfo, jobID int) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -2075,8 +2075,8 @@ func (c *client) RestartJob(info *mr.RepoInfo, jobID int) error {
 	return nil
 }
 
-func (c *client) CancelJob(info *mr.RepoInfo, jobID int) error {
-	ghInfo, err := FromMR(info)
+func (c *client) CancelJob(info *changerequest.RepoInfo, jobID int) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -2103,7 +2103,7 @@ func (c *client) CancelJob(info *mr.RepoInfo, jobID int) error {
 	return nil
 }
 
-func convertActionJobToMR(job ghActionJob) mr.Job {
+func convertActionJobToChangeRequest(job ghActionJob) changerequest.Job {
 	startedAt := job.StartedAt
 	finishedAt := job.CompletedAt
 
@@ -2113,7 +2113,7 @@ func convertActionJobToMR(job ghActionJob) mr.Job {
 		duration = &d
 	}
 
-	return mr.Job{
+	return changerequest.Job{
 		ID:         job.ID,
 		Name:       job.Name,
 		Stage:      "build",
@@ -2147,8 +2147,8 @@ func mapJobStatusToGitLab(job ghActionJob) string {
 	}
 }
 
-func (c *client) Close(info *mr.RepoInfo, mrNumber int) error {
-	ghInfo, err := FromMR(info)
+func (c *client) Close(info *changerequest.RepoInfo, mrNumber int) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -2176,12 +2176,12 @@ func (c *client) Close(info *mr.RepoInfo, mrNumber int) error {
 	return nil
 }
 
-func (c *client) Rebase(info *mr.RepoInfo, mrNumber int) error {
+func (c *client) Rebase(info *changerequest.RepoInfo, mrNumber int) error {
 	return fmt.Errorf("server-side rebase is not supported on GitHub")
 }
 
-func (c *client) CreateDiffComment(info *mr.RepoInfo, mrNumber int, body string, position *mr.DiffPosition) error {
-	ghInfo, err := FromMR(info)
+func (c *client) CreateDiffComment(info *changerequest.RepoInfo, mrNumber int, body string, position *changerequest.DiffPosition) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -2227,8 +2227,8 @@ func (c *client) CreateDiffComment(info *mr.RepoInfo, mrNumber int, body string,
 	return nil
 }
 
-func (c *client) ReplyToDiscussion(info *mr.RepoInfo, mrNumber int, discussionID string, body string) error {
-	ghInfo, err := FromMR(info)
+func (c *client) ReplyToDiscussion(info *changerequest.RepoInfo, mrNumber int, discussionID string, body string) error {
+	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -2265,15 +2265,15 @@ func (c *client) ReplyToDiscussion(info *mr.RepoInfo, mrNumber int, discussionID
 	return nil
 }
 
-func (c *client) ResolveDiscussion(info *mr.RepoInfo, mrNumber int, discussionID string, resolved bool) error {
+func (c *client) ResolveDiscussion(info *changerequest.RepoInfo, mrNumber int, discussionID string, resolved bool) error {
 	return fmt.Errorf("resolving discussions is not supported on GitHub")
 }
 
-func (c *client) GetTestSummary(info *mr.RepoInfo, pipelineID int) (*mr.TestSummary, error) {
+func (c *client) GetTestSummary(info *changerequest.RepoInfo, pipelineID int) (*changerequest.TestSummary, error) {
 	return nil, nil
 }
 
-func (c *client) StreamJobLogs(ctx context.Context, info *mr.RepoInfo, jobID int) (chan string, error) {
+func (c *client) StreamJobLogs(ctx context.Context, info *changerequest.RepoInfo, jobID int) (chan string, error) {
 	logs, err := c.GetJobLogs(info, jobID)
 	if err != nil {
 		return nil, err

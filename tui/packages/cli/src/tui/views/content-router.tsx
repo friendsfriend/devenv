@@ -2,14 +2,14 @@ import { Show } from "solid-js";
 import {
 	RepositoryTable,
 	InfrastructureTable,
-	ScriptTable,
+	TaskTable,
 	StatusLogView,
 	IssueView,
 	IssueDetailView,
-	LinkedMRsView,
+	LinkedCRsView,
 	ReferencesView,
-	MergeRequestView,
-	MergeRequestDetailView,
+	ChangeRequestView,
+	ChangeRequestDetailView,
 	ChangedFilesView,
 	DiscussionsView,
 	TimelineView,
@@ -27,9 +27,9 @@ import type { ContentRouterProps } from "./types";
 import { StartupSplash } from "./startup-splash";
 
 export function ContentRouter(props: ContentRouterProps) {
-	const { appStore, issueStore, mrStore, providerStore, appDetailStore } =
+	const { appStore, issueStore, changeRequestStore, providerStore, appDetailStore } =
 		props.stores;
-	const { helpActions, issueActions, pipelineActions, logActions, mrActions } =
+	const { helpActions, issueActions, pipelineActions, logActions, crActions } =
 		props.actions;
 
 	// Table shares content area with StatusLogView (6 lines below it).
@@ -56,31 +56,31 @@ export function ContentRouter(props: ContentRouterProps) {
 					references={issueStore.references()}
 					selectedIndex={issueStore.selectedReferenceIndex()}
 					loading={
-						issueStore.linkedMRsLoading() ||
+						issueStore.linkedChangeRequestsLoading() ||
 						issueStore.referencedIssuesLoading()
 					}
 					error={
-						issueStore.linkedMRsError() || issueStore.referencedIssuesError()
+						issueStore.linkedChangeRequestsError() || issueStore.referencedIssuesError()
 					}
 					onClose={() => issueActions.backToIssueDetailFromReferences()}
 				runningTextEnabled={props.runningTextEnabled}
 				runningTextOffset={props.runningTextOffset}
 				/>
-			) : appStore.viewMode() === "mrLinkedIssues" ? (
+			) : appStore.viewMode() === "changeRequestLinkedIssues" ? (
 				<IssueView
-					issues={mrStore.mrLinkedIssues()}
-					selectedIndex={mrStore.selectedMrLinkedIssueIndex()}
+					issues={changeRequestStore.changeRequestLinkedIssues()}
+					selectedIndex={changeRequestStore.selectedChangeRequestLinkedIssueIndex()}
 					runningTextEnabled={props.runningTextEnabled}
 					runningTextOffset={props.runningTextOffset}
-					loading={mrStore.mrLinkedIssuesLoading()}
-					error={mrStore.mrLinkedIssuesError()}
+					loading={changeRequestStore.changeRequestLinkedIssuesLoading()}
+					error={changeRequestStore.changeRequestLinkedIssuesError()}
 					currentPage={1}
 					totalPages={1}
-					totalCount={mrStore.mrLinkedIssues().length}
+					totalCount={changeRequestStore.changeRequestLinkedIssues().length}
 					scope={"all"}
 					onClose={() => {
-						mrStore.setSelectedMrLinkedIssueIndex(0);
-						appStore.setViewMode("mergeRequestDetail");
+						changeRequestStore.setSelectedMrLinkedIssueIndex(0);
+						appStore.setViewMode("changeRequestDetail");
 					}}
 				/>
 			) : appStore.viewMode() === "referencedIssues" ? (
@@ -97,12 +97,12 @@ export function ContentRouter(props: ContentRouterProps) {
 					scope={"all"}
 					onClose={() => issueActions.backToIssueDetailFromReferences()}
 				/>
-			) : appStore.viewMode() === "linkedMRs" ? (
-				<LinkedMRsView
-					mergeRequests={issueStore.linkedMRs()}
-					selectedIndex={issueStore.selectedLinkedMRIndex()}
-					loading={issueStore.linkedMRsLoading()}
-					error={issueStore.linkedMRsError()}
+			) : appStore.viewMode() === "linkedChangeRequests" ? (
+				<LinkedCRsView
+					changeRequests={issueStore.linkedChangeRequests()}
+					selectedIndex={issueStore.selectedLinkedCRIndex()}
+					loading={issueStore.linkedChangeRequestsLoading()}
+					error={issueStore.linkedChangeRequestsError()}
 					onClose={() => {}}
 					runningTextEnabled={props.runningTextEnabled}
 					runningTextOffset={props.runningTextOffset}
@@ -134,12 +134,12 @@ export function ContentRouter(props: ContentRouterProps) {
 											when={appStore.viewMode() === "issueDetail" && issueStore.selectedIssue() || appStore.viewMode() === "issueTimeline"}
 											fallback={
 												<Show
-													when={appStore.viewMode() === "mergeRequests"}
+													when={appStore.viewMode() === "changeRequests"}
 													fallback={
 														<Show
 															when={
-																appStore.viewMode() === "mergeRequestDetail" &&
-																mrStore.selectedMR()
+																appStore.viewMode() === "changeRequestDetail" &&
+																changeRequestStore.selectedChangeRequest()
 															}
 															fallback={
 																<Show
@@ -209,29 +209,29 @@ export function ContentRouter(props: ContentRouterProps) {
 																										}
 																										kind={appDetailStore.appDetailKind()}
 																										gitInfo={appDetailStore.appDetailGitInfo()}
-																										mergeRequests={appDetailStore.appDetailMRs()}
+																										changeRequests={appDetailStore.appDetailChangeRequests()}
 																										logs={appDetailStore.appDetailLogs()}
 																										statsHistory={appDetailStore.appDetailStatsHistory()}
 																										memHistory={appDetailStore.appDetailMemHistory()}
 																										latestStats={appDetailStore.appDetailLatestStats()}
 																										loading={appDetailStore.appDetailLoading()}
-																										mrsLoading={appDetailStore.appDetailMRsLoading()}
+																										changeRequestsLoading={appDetailStore.appDetailChangeRequestsLoading()}
 																									/>
 																								</Show>
 																							}
 																						>
 																							<JobsDetailView
-																								jobs={mrStore.jobs()}
+																								jobs={changeRequestStore.jobs()}
 																								pipelineId={
-																									mrStore.currentPipelineId() ||
+																									changeRequestStore.currentPipelineId() ||
 																									0
 																								}
-																								loading={mrStore.jobsLoading()}
-																								error={mrStore.jobsError()}
-																								selectedStageIndex={mrStore.selectedJobStageIndex()}
-																								selectedJobIndex={mrStore.selectedJobIndex()}
+																								loading={changeRequestStore.jobsLoading()}
+																								error={changeRequestStore.jobsError()}
+																								selectedStageIndex={changeRequestStore.selectedJobStageIndex()}
+																								selectedJobIndex={changeRequestStore.selectedJobIndex()}
 																								onClose={
-																									pipelineActions.backToMRDetail
+																									pipelineActions.backToCRDetail
 																								}
 																								onViewJobLogs={
 																									logActions.loadJobLogs
@@ -242,48 +242,48 @@ export function ContentRouter(props: ContentRouterProps) {
 																								onCancelJob={
 																									pipelineActions.cancelJob
 																								}
-																								searchMode={mrStore.jobsSearchMode()}
-																								searchQuery={mrStore.jobsSearchQuery()}
+																								searchMode={changeRequestStore.jobsSearchMode()}
+																								searchQuery={changeRequestStore.jobsSearchQuery()}
 																							/>
 																						</Show>
 																					}
 																				>
 																					<TestResultsDetailView
 																						testSuites={
-																							mrStore.mrTestSummary()
+																							changeRequestStore.crTestSummary()
 																								?.test_suites
 																						}
-																						loading={mrStore.mrTestLoading()}
-																						error={mrStore.mrTestError()}
-																						selectedIndex={mrStore.selectedTestIndex()}
+																						loading={changeRequestStore.crTestLoading()}
+																						error={changeRequestStore.crTestError()}
+																						selectedIndex={changeRequestStore.selectedTestIndex()}
 																						onClose={() =>
 																							appStore.setViewMode(
-																								"mergeRequestDetail",
+																								"changeRequestDetail",
 																							)
 																						}
-																						searchMode={mrStore.testSearchMode()}
-																						searchQuery={mrStore.testSearchQuery()}
+																						searchMode={changeRequestStore.testSearchMode()}
+																						searchQuery={changeRequestStore.testSearchQuery()}
 																					/>
 																				</Show>
 																			}
 																		>
 																			<DiscussionsView
-																				discussions={mrStore.mrDiscussions()}
-																				selectedIndex={mrStore.selectedDiscussionIndex()}
+																				discussions={changeRequestStore.crDiscussions()}
+																				selectedIndex={changeRequestStore.selectedDiscussionIndex()}
 																				currentHeadSHA={
-																					mrStore.selectedMR()?.head_pipeline
+																					changeRequestStore.selectedChangeRequest()?.head_pipeline
 																						?.sha
 																				}
-																				changes={mrStore.mrChanges()}
-																				loading={mrStore.mrDiscussionsLoading()}
-																				error={mrStore.mrDiscussionsError()}
-																				replyModeDiscussionId={mrStore.replyMode()}
-																				replyText={mrStore.replyText()}
-																				showOnlyComments={mrStore.discussionsShowOnlyComments()}
+																				changes={changeRequestStore.crChanges()}
+																				loading={changeRequestStore.crDiscussionsLoading()}
+																				error={changeRequestStore.crDiscussionsError()}
+																				replyModeDiscussionId={changeRequestStore.replyMode()}
+																				replyText={changeRequestStore.replyText()}
+																				showOnlyComments={changeRequestStore.discussionsShowOnlyComments()}
 																				onClose={() => {
-																					mrStore.setSelectedDiscussionIndex(0);
+																					changeRequestStore.setSelectedDiscussionIndex(0);
 																					appStore.setViewMode(
-																						"mergeRequestDetail",
+																						"changeRequestDetail",
 																					);
 																				}}
 																			/>
@@ -291,65 +291,65 @@ export function ContentRouter(props: ContentRouterProps) {
 																	}
 																>
 																	<ChangedFilesView
-																		changes={mrStore.changedFilesFiltered()}
-																		selectedIndex={mrStore.selectedChangedFileIndex()}
-																		loading={mrStore.mrChangesLoading()}
-																		error={mrStore.mrChangesError()}
+																		changes={changeRequestStore.changedFilesFiltered()}
+																		selectedIndex={changeRequestStore.selectedChangedFileIndex()}
+																		loading={changeRequestStore.crChangesLoading()}
+																		error={changeRequestStore.crChangesError()}
 																		onClose={() => {
-																			mrStore.setSelectedChangedFileIndex(0);
+																			changeRequestStore.setSelectedChangedFileIndex(0);
 																			appStore.setViewMode(
-																				"mergeRequestDetail",
+																				"changeRequestDetail",
 																			);
 																		}}
-																		searchMode={mrStore.changedFilesSearchMode()}
-																		searchQuery={mrStore.changedFilesSearchQuery()}
+																		searchMode={changeRequestStore.changedFilesSearchMode()}
+																		searchQuery={changeRequestStore.changedFilesSearchQuery()}
 																	/>
 																</Show>
 															}
 														>
-															<MergeRequestDetailView
-																mergeRequest={mrStore.selectedMR()!}
-																jobs={mrStore.mrJobsForDetail()}
-																jobsLoading={mrStore.mrJobsForDetailLoading()}
+															<ChangeRequestDetailView
+																changeRequest={changeRequestStore.selectedChangeRequest()!}
+																jobs={changeRequestStore.crJobsForDetail()}
+																jobsLoading={changeRequestStore.crJobsForDetailLoading()}
 																testSummary={
-																	mrStore.mrTestSummary() || undefined
+																	changeRequestStore.crTestSummary() || undefined
 																}
-																testLoading={mrStore.mrTestLoading()}
-																testError={mrStore.mrTestError()}
-																changes={mrStore.mrChanges()}
-																changesLoading={mrStore.mrChangesLoading()}
-																changesError={mrStore.mrChangesError()}
-																discussions={mrStore.mrDiscussions()}
-																discussionsLoading={mrStore.mrDiscussionsLoading()}
-																discussionsError={mrStore.mrDiscussionsError()}
-																linkedIssues={mrStore.mrLinkedIssues()}
-																linkedIssuesLoading={mrStore.mrLinkedIssuesLoading()}
-																linkedIssuesError={mrStore.mrLinkedIssuesError()}
+																testLoading={changeRequestStore.crTestLoading()}
+																testError={changeRequestStore.crTestError()}
+																changes={changeRequestStore.crChanges()}
+																changesLoading={changeRequestStore.crChangesLoading()}
+																changesError={changeRequestStore.crChangesError()}
+																discussions={changeRequestStore.crDiscussions()}
+																discussionsLoading={changeRequestStore.crDiscussionsLoading()}
+																discussionsError={changeRequestStore.crDiscussionsError()}
+																linkedIssues={changeRequestStore.changeRequestLinkedIssues()}
+																linkedIssuesLoading={changeRequestStore.changeRequestLinkedIssuesLoading()}
+																linkedIssuesError={changeRequestStore.changeRequestLinkedIssuesError()}
 																runningTextEnabled={props.runningTextEnabled}
 																runningTextOffset={props.runningTextOffset}
-																onClose={mrActions.backToMRList}
+																onClose={crActions.backToCRList}
 															/>
 														</Show>
 													}
 												>
-													<MergeRequestView
-														mergeRequests={mrStore.mergeRequests()}
-														selectedIndex={mrStore.selectedMRIndex()}
+													<ChangeRequestView
+														changeRequests={changeRequestStore.changeRequests()}
+														selectedIndex={changeRequestStore.selectedChangeRequestIndex()}
 														onClose={() => {
 															appStore.setViewMode("table");
-															mrStore.setMergeRequests([]);
-															mrStore.setMrError("");
-															mrStore.setSelectedMR(null);
-															mrStore.setSelectedMRIndex(0);
+															changeRequestStore.setChangeRequests([]);
+															changeRequestStore.setMrError("");
+															changeRequestStore.setSelectedCR(null);
+															changeRequestStore.setSelectedCRIndex(0);
 														}}
-														onSelectMR={mrActions.showMRDetail}
-														loading={mrStore.mrLoading()}
-														error={mrStore.mrError()}
-														searchMode={mrStore.mrSearchMode()}
-														searchQuery={mrStore.mrSearchQuery()}
-														currentPage={mrStore.currentPage()}
-														totalPages={mrStore.totalPages()}
-														state={mrStore.mrState()}
+														onSelectCR={crActions.showCRDetail}
+														loading={changeRequestStore.crLoading()}
+														error={changeRequestStore.crError()}
+														searchMode={changeRequestStore.crSearchMode()}
+														searchQuery={changeRequestStore.crSearchQuery()}
+														currentPage={changeRequestStore.currentPage()}
+														totalPages={changeRequestStore.totalPages()}
+														state={changeRequestStore.crState()}
 													runningTextEnabled={props.runningTextEnabled}
 													runningTextOffset={props.runningTextOffset}
 													/>
@@ -362,9 +362,9 @@ export function ContentRouter(props: ContentRouterProps) {
 												comments={issueStore.issueComments()}
 												issueCommentsLoading={issueStore.issueCommentsLoading()}
 												error={issueStore.issueDetailError()}
-												linkedMRs={issueStore.linkedMRs()}
-												linkedMRsLoading={issueStore.linkedMRsLoading()}
-												linkedMRsError={issueStore.linkedMRsError()}
+												linkedChangeRequests={issueStore.linkedChangeRequests()}
+												linkedChangeRequestsLoading={issueStore.linkedChangeRequestsLoading()}
+												linkedChangeRequestsError={issueStore.linkedChangeRequestsError()}
 												referencedIssues={issueStore.referencedIssues()}
 												referencedIssuesLoading={issueStore.referencedIssuesLoading()}
 												referencedIssuesError={issueStore.referencedIssuesError()}
@@ -495,7 +495,7 @@ export function ContentRouter(props: ContentRouterProps) {
 								>
 									{(() => {
 										const TableComponent = appStore.activeTab() === "scripts"
-											? ScriptTable
+											? TaskTable
 											: appStore.activeTab() === "infrastructure"
 												? InfrastructureTable
 												: RepositoryTable;

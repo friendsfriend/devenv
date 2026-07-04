@@ -2,7 +2,7 @@ import type {
 	AppStore,
 	IssueStore,
 	LogStore,
-	MrStore,
+	ChangeRequestStore,
 	ProviderStore,
 	UiStore,
 	AgentStore,
@@ -27,7 +27,7 @@ export interface ViewStores {
 	appStore: AppStore;
 	issueStore: IssueStore;
 	logStore: LogStore;
-	mrStore: MrStore;
+	changeRequestStore: ChangeRequestStore;
 	providerStore: ProviderStore;
 	uiStore: UiStore;
 	agentStore: AgentStore;
@@ -38,7 +38,7 @@ export interface ViewActions {
 	appActions: AppActions;
 	issueActions: IssueActions;
 	logActions: LogActions;
-	mrActions: MrActions;
+	crActions: MrActions;
 	dockerActions: DockerActions;
 	gitActions: GitActions;
 	providerActions: ProviderActions;

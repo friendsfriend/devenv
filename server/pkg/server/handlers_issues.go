@@ -1090,7 +1090,7 @@ func (s *Server) handleGitHubIssueLinkedMRs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	mrs, err := issuesClient.GetIssueLinkedMRs(nil, number)
+	mrs, err := issuesClient.GetIssueLinkedChangeRequests(nil, number)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked MRs: %v", err), http.StatusInternalServerError)
 		return
@@ -1133,7 +1133,7 @@ func (s *Server) handleGitLabIssueLinkedMRs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	mrs, err := issuesClient.GetIssueLinkedMRs(nil, number)
+	mrs, err := issuesClient.GetIssueLinkedChangeRequests(nil, number)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked MRs: %v", err), http.StatusInternalServerError)
 		return
@@ -1229,14 +1229,14 @@ func (s *Server) handleGitHubMRLinkedIssues(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Cast to concrete type to access GetMRLinkedIssues
+	// Cast to concrete type to access GetChangeRequestLinkedIssues
 	ghIssuesClient, ok := issuesClient.(*github.IssuesClient)
 	if !ok {
 		respondErrorMessage(w, "Failed to resolve GitHub issues client", http.StatusInternalServerError)
 		return
 	}
 
-	issues, err := ghIssuesClient.GetMRLinkedIssues(repoInfo, number)
+	issues, err := ghIssuesClient.GetChangeRequestLinkedIssues(repoInfo, number)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked issues: %v", err), http.StatusInternalServerError)
 		return
@@ -1279,14 +1279,14 @@ func (s *Server) handleGitLabMRLinkedIssues(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Cast to concrete type to access GetMRLinkedIssues
+	// Cast to concrete type to access GetChangeRequestLinkedIssues
 	glIssuesClient, ok := issuesClient.(*gitlab.IssuesClient)
 	if !ok {
 		respondErrorMessage(w, "Failed to resolve GitLab issues client", http.StatusInternalServerError)
 		return
 	}
 
-	issues, err := glIssuesClient.GetMRLinkedIssues(projectInfo, number)
+	issues, err := glIssuesClient.GetChangeRequestLinkedIssues(projectInfo, number)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked issues: %v", err), http.StatusInternalServerError)
 		return

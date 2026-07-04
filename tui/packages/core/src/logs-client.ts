@@ -146,21 +146,21 @@ export async function* analyzeLogsWithAIStream(
 
 /**
  * Streams an AI code review for a merge request.
- * The server creates a temporary git worktree with the MR's source branch,
+ * The server creates a temporary git worktree with the CR's source branch,
  * spawns pi inside that worktree so it can run `git diff` and browse files
  * autonomously, and streams the output back.
  */
-export async function* analyzeMRWithAIStream(
+export async function* analyzeCRWithAIStream(
   deps: ClientDeps,
   appIdent: string,
-  mrIID: number,
+  crIID: number,
   sourceBranch: string,
   targetBranch: string,
   prompt: string
 ): AsyncGenerator<string> {
-  const body: Record<string, string | number> = { appIdent, mrIID, sourceBranch, targetBranch, prompt };
+  const body: Record<string, string | number> = { appIdent, crIID, sourceBranch, targetBranch, prompt };
 
-  const response = await deps.sseFetchFn(`${deps.baseUrl}/api/ai/mr-review-stream`, {
+  const response = await deps.sseFetchFn(`${deps.baseUrl}/api/ai/cr-review-stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

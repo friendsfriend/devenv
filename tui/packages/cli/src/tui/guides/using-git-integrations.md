@@ -1,6 +1,6 @@
 # Using Git Integrations
 
-DevEnv integrates with GitLab and GitHub for merge request management, code review, and CI/CD workflows.
+DevEnv integrates with GitLab and GitHub for change request management, code review, and CI/CD workflows.
 
 ## 1. Provider setup
 
@@ -13,31 +13,31 @@ Before using git integrations, add at least one provider:
 
 Provider credentials are stored in `~/.config/devenv/providers/NAME.json` with `0600` permissions.
 
-## 2. Merge request browsing
+## 2. Change request browsing
 
 | Key | Action |
 |---|---|
-| `m` | View MR for the current branch (opens detail directly) |
-| `M` | View all open MRs (full list) |
-| `j`/`k` | Navigate MR list |
-| `g`/`G` | Go to first/last MR |
-| `Enter` | Open selected MR detail |
+| `m` | View CR for the current branch (opens detail directly) |
+| `M` | View all open CRs (full list) |
+| `j`/`k` | Navigate CR list |
+| `g`/`G` | Go to first/last CR |
+| `Enter` | Open selected CR detail |
 | `[`/`]` or `Shift+K`/`Shift+J` | Previous/next page |
 
-## 3. Merge request detail
+## 3. Change request detail
 
-From the MR detail view:
+From the CR detail view:
 
 | Key | Action |
 |---|---|
 | `a` | Toggle approval |
 | `Shift+A` | AI review — streams review via pi, then posts as comment |
-| `r` | Rebase merge request |
+| `r` | Rebase change request |
 | `C` | View changed files |
 | `D` | View discussions/comments |
 | `J` | View pipeline jobs |
 | `T` | View detailed test results |
-| `Esc` | Return to MR list |
+| `Esc` | Return to CR list |
 
 ## 4. Diff viewer
 
@@ -57,7 +57,7 @@ From the changed files view, press `Enter` on a file to open the diff modal:
 
 ## 5. Discussions
 
-Press `D` from MR detail to view discussions:
+Press `D` from CR detail to view discussions:
 
 | Key | Action |
 |---|---|
@@ -70,11 +70,11 @@ Press `D` from MR detail to view discussions:
 
 ## 6. Approvals
 
-Press `a` on an MR detail to toggle approval/unapproval. The approval state is reflected in the MR detail view.
+Press `a` on a CR detail to toggle approval/unapproval. The approval state is reflected in the CR detail view.
 
 ## 7. Pipeline jobs
 
-Press `J` from MR detail to view pipeline jobs:
+Press `J` from CR detail to view pipeline jobs:
 
 | Key | Action |
 |---|---|
@@ -85,7 +85,7 @@ Press `J` from MR detail to view pipeline jobs:
 
 ## 8. Test results
 
-Press `T` from MR detail to view test results:
+Press `T` from CR detail to view test results:
 
 | Key | Action |
 |---|---|

@@ -253,8 +253,8 @@ export function createAppActions(
     appDetailStore.setAppDetailApp(app);
     appDetailStore.setAppDetailLoading(true);
     appDetailStore.setAppDetailGitInfo(undefined);
-    appDetailStore.setAppDetailMRs([]);
-    appDetailStore.setAppDetailMRsLoading(kind !== 'infra');
+    appDetailStore.setAppDetailCRs([]);
+    appDetailStore.setAppDetailCRsLoading(kind !== 'infra');
     appDetailStore.setAppDetailLogs('');
     appDetailStore.setAppDetailStatsHistory([]);
     appDetailStore.setAppDetailMemHistory([]);
@@ -269,17 +269,17 @@ export function createAppActions(
       }
 
       try {
-        const result = await client.getMergeRequests(app.ident, 'opened', 'current', app.sourceType);
-        if (result.items.length > 0) appDetailStore.setAppDetailMRs(result.items.slice(0, 5));
-        else appDetailStore.setAppDetailMRs((await client.getMergeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
+        const result = await client.getChangeRequests(app.ident, 'opened', 'current', app.sourceType);
+        if (result.items.length > 0) appDetailStore.setAppDetailCRs(result.items.slice(0, 5));
+        else appDetailStore.setAppDetailCRs((await client.getChangeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
       } catch {
         try {
-          appDetailStore.setAppDetailMRs((await client.getMergeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
+          appDetailStore.setAppDetailCRs((await client.getChangeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
         } catch {
-          appDetailStore.setAppDetailMRs([]);
+          appDetailStore.setAppDetailCRs([]);
         }
       }
-      appDetailStore.setAppDetailMRsLoading(false);
+      appDetailStore.setAppDetailCRsLoading(false);
     }
 
     appDetailStore.setAppDetailLoading(false);

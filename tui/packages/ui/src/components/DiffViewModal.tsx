@@ -22,7 +22,7 @@ interface DiffViewModalProps {
   commentMode: boolean;  // Is comment input mode active
   commentText: string;  // Current comment text being typed
   discussions?: Discussion[];  // NEW: Comment threads to display inline
-  currentHeadSHA?: string;  // NEW: Current MR head SHA for outdated detection
+  currentHeadSHA?: string;  // NEW: Current CR head SHA for outdated detection
   replyModeDiscussionId?: string | null;  // NEW: Discussion ID being replied to
   replyText?: string;  // NEW: Current reply text being typed
   collapsedThreads?: Set<string>;  // NEW: Set of collapsed thread IDs

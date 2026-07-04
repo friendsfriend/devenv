@@ -7,8 +7,8 @@
   "dependencies": {
     "@devenv/core": "workspace:*",
     "@devenv/types": "workspace:*",
-    "@opentui/core": "0.4.1",
-    "@opentui/solid": "0.4.1",
+    "@opentui/core": "0.4.2",
+    "@opentui/solid": "0.4.2",
     "opentui-spinner": "^0.0.7",
     "solid-js": "^1.9.12"
   }

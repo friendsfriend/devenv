@@ -3,7 +3,7 @@ import { KEYBINDS } from "../keyboard/registry";
 import type { AppStore } from "../stores/app-store";
 import type { IssueStore } from "../stores/issue-store";
 import type { LogStore } from "../stores/log-store";
-import type { MrStore } from "../stores/mr-store";
+import type { ChangeRequestStore } from "../stores/cr-store";
 import type { UiStore } from "../stores/ui-store";
 
 const COMMON_NAVIGATION_ITEMS: HelpSection["items"] = [
@@ -21,8 +21,8 @@ const COMMON_NAVIGATION_ITEMS: HelpSection["items"] = [
 const CONTEXT_TITLES: Record<string, string> = {
 	global: "Global",
 	table: "Application Table",
-	mergeRequests: "Merge Request List",
-	mergeRequestDetail: "Merge Request Detail",
+	changeRequests: "Merge Request List",
+	changeRequestDetail: "Merge Request Detail",
 	jobs: "Pipeline Jobs",
 	testResults: "Test Results",
 	changedFiles: "Changed Files",
@@ -33,9 +33,9 @@ const CONTEXT_TITLES: Record<string, string> = {
 	issueDetail: "Issue Detail",
 	issueTimeline: "Issue Timeline",
 	issueScopePicker: "Issue Scope Picker",
-	linkedMRs: "Linked Merge Requests",
+	linkedChangeRequests: "Linked Merge Requests",
 	referencedIssues: "Referenced Issues",
-	mrLinkedIssues: "MR Linked Issues",
+	changeRequestLinkedIssues: "CR Linked Issues",
 	references: "References",
 	agentView: "AI Agent",
 	sshPicker: "SSH Host Picker",
@@ -123,7 +123,7 @@ export function createHelpActions(
 	appStore: AppStore,
 	issueStore: IssueStore,
 	logStore: LogStore,
-	mrStore: MrStore,
+	changeRequestStore: ChangeRequestStore,
 	uiStore: UiStore,
 ) {
 	const showHelp = () => {
@@ -174,7 +174,7 @@ export function createHelpActions(
 			]);
 		if (appStore.viewMode() === "help") return getFooterKeybindsForContext("help");
 		if (appStore.viewMode() === "discussionsView") {
-			if (mrStore.replyMode())
+			if (changeRequestStore.replyMode())
 				return filterFooterKeybinds([
 					{ key: "Ctrl+Enter", action: "Submit Reply" },
 					{ key: "Esc", action: "Cancel Reply" },

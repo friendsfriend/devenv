@@ -99,7 +99,7 @@ DevEnv starts missing infrastructure dependencies before the requested app run t
 Infrastructure services do **not** have:
 - Git operations (clone, pull, branch switching)
 - Build/test workflows
-- MR/PR integration
+- Change Request integration
 - CI/CD pipeline features
 
 See [Adding an App](adding-apps.md) for full application definitions.

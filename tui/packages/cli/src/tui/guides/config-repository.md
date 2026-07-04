@@ -12,9 +12,9 @@ Commit the contents of:
 
 Do **not** commit the `.env` file. It can contain machine-specific paths and secrets.
 
-Provider definitions in `providers/*.json` can be committed when they contain `${...}` placeholders for `username` and `token`. DevEnv-managed providers store actual credentials in `.env` and write placeholders into provider JSON. Do not commit legacy provider JSON files that contain clear-text credentials.
+Provider definitions in `providers/*.json` can be committed when they contain `${...}` placeholders for `username` and `token`. DevEnv-managed providers store actual credentials in `.env` and write placeholders into provider JSON. Clear-text credentials in provider JSON are rejected.
 
-Script collections are not part of the config directory. They live under `$DEVENV_HOME/scripts` (default `~/devenv/scripts`). Sync them separately if your team wants shared scripts.
+Task collections are not part of the config directory. They live under `$DEVENV_HOME/scripts` (default `~/devenv/scripts`). Sync them separately if your team wants shared tasks.
 
 Recommended `.gitignore`:
 
@@ -99,7 +99,7 @@ EOF
 
 ## 6. Restart DevEnv
 
-Quit and start DevEnv again. It will load applications, libraries, and infrastructure from the cloned config repository. Script collections still load from `$DEVENV_HOME/scripts`; copy or sync that directory separately if needed.
+Quit and start DevEnv again. It will load applications, libraries, and infrastructure from the cloned config repository. Task collections still load from `$DEVENV_HOME/scripts`; copy or sync that directory separately if needed.
 
 ## Updating shared config
 

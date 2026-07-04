@@ -10,7 +10,7 @@ import { setExitRenderer } from "./exit";
 import { onMount, createEffect, on, onCleanup } from "solid-js";
 import "opentui-spinner/solid";
 import { APP_VERSION } from "../version";
-import { createClient } from "@devenv/core";
+import { createClient, registerFatalCleanup } from "@devenv/core";
 import type { App } from "@devenv/types";
 import {
 	Header,
@@ -25,7 +25,7 @@ import {
 	createAppStore,
 	createIssueStore,
 	createLogStore,
-	createMrStore,
+	createChangeRequestStore,
 	createProviderStore,
 	createUiStore,
 	createAgentStore,
@@ -64,7 +64,7 @@ import {
 	handleWorktreeManagerKeys,
 	handleIssueListKeys,
 	handleIssueDetailKeys,
-	handleLinkedMRsKeys,
+	handleLinkedCRsKeys,
 	handleReferencesKeys,
 	handleTableKeys,
 	handlePaste,
@@ -94,7 +94,7 @@ function TUIApp(props: TUIAppProps) {
 	const appStore = createAppStore();
 	const issueStore = createIssueStore();
 	const logStore = createLogStore();
-	const mrStore = createMrStore();
+	const changeRequestStore = createChangeRequestStore();
 	const providerStore = createProviderStore();
 	const uiStore = createUiStore();
 	const agentStore = createAgentStore();
@@ -122,9 +122,9 @@ function TUIApp(props: TUIAppProps) {
 		showError,
 	);
 	const logActions = createLogActions(logStore, appStore, client, showError);
-	const mrActions = createMrActions(
+	const crActions = createMrActions(
 		appStore,
-		mrStore,
+		changeRequestStore,
 		uiStore,
 		client,
 		showError,
@@ -147,7 +147,7 @@ function TUIApp(props: TUIAppProps) {
 	);
 	const pipelineActions = createPipelineActions(
 		appStore,
-		mrStore,
+		changeRequestStore,
 		client,
 		showError,
 	);
@@ -155,7 +155,7 @@ function TUIApp(props: TUIAppProps) {
 		appStore,
 		issueStore,
 		logStore,
-		mrStore,
+		changeRequestStore,
 		uiStore,
 	);
 
@@ -217,7 +217,7 @@ function TUIApp(props: TUIAppProps) {
 		appStore,
 		issueStore,
 		logStore,
-		mrStore,
+		changeRequestStore,
 		providerStore,
 		uiStore,
 		agentStore,
@@ -227,7 +227,7 @@ function TUIApp(props: TUIAppProps) {
 		appActions,
 		issueActions,
 		logActions,
-		mrActions,
+		crActions,
 		dockerActions,
 		gitActions,
 		providerActions,
@@ -258,7 +258,7 @@ function TUIApp(props: TUIAppProps) {
 		if (await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueTimelineKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleLinkedMRsKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleLinkedCRsKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleReferencesKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleChangedFilesKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleTestResultsKeys(event, kbStores, kbActions, kbCtx)) return;
@@ -276,7 +276,7 @@ function TUIApp(props: TUIAppProps) {
 		appStore,
 		issueStore,
 		logStore,
-		mrStore,
+		changeRequestStore,
 		providerStore,
 		uiStore,
 		agentStore,
@@ -286,7 +286,7 @@ function TUIApp(props: TUIAppProps) {
 		appActions,
 		issueActions,
 		logActions,
-		mrActions,
+		crActions,
 		dockerActions,
 		gitActions,
 		providerActions,
@@ -299,7 +299,7 @@ function TUIApp(props: TUIAppProps) {
 	const headerDeps = {
 		appStore,
 		issueStore,
-		mrStore,
+		changeRequestStore,
 		appDetailStore,
 		helpActions,
 		getSelectedApp,
@@ -340,10 +340,10 @@ function TUIApp(props: TUIAppProps) {
 							appStore.viewMode() === "providers"
 								? "Providers"
 								: appStore.viewMode() === "jobs"
-									? `Pipeline #${mrStore.currentPipelineId() || "N/A"} \u2022 ${mrStore.jobs().length} jobs`
-									: appStore.viewMode() === "mergeRequestDetail"
+									? `Pipeline #${changeRequestStore.currentPipelineId() || "N/A"} \u2022 ${changeRequestStore.jobs().length} jobs`
+									: appStore.viewMode() === "changeRequestDetail"
 										? `Branch: ${appStore.filteredApps()[appStore.selectedIndex()]?.branch || "unknown"}`
-										: appStore.viewMode() === "mergeRequests"
+										: appStore.viewMode() === "changeRequests"
 											? `Branch: ${appStore.filteredApps()[appStore.selectedIndex()]?.branch || "unknown"}`
 											: appStore.viewMode() !== "table"
 												? "Viewing Logs"
@@ -411,13 +411,21 @@ export async function startTUI(serverUrl: string) {
 		process.on("SIGINT", cleanup);
 		process.on("SIGTERM", cleanup);
 		process.on("SIGHUP", cleanup);
+		const unregisterFatalCleanup = registerFatalCleanup(cleanup);
+
+		const rendererDestroyed = new Promise<void>((resolve) => {
+			renderer.once("destroy", resolve);
+		});
 
 		try {
 			await render(() => <TUIApp serverUrl={serverUrl} />, renderer);
+			await rendererDestroyed;
 		} finally {
+			unregisterFatalCleanup();
 			process.off("SIGINT", cleanup);
 			process.off("SIGTERM", cleanup);
 			process.off("SIGHUP", cleanup);
+			cleanup();
 		}
 	} catch (error) {
 		console.error("Fatal error in TUI:", error);

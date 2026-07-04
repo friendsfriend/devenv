@@ -53,8 +53,8 @@ export const guides: Guide[] = [
   },
   {
     key: "adding-scripts",
-    title: "Adding a Script",
-    description: "Script discovery, --devenv-metadata convention, parameter types",
+    title: "Adding a Task",
+    description: "Task discovery, --devenv-metadata convention, parameter types",
     category: "Authoring",
     import: () => import("./adding-scripts.md", { with: { type: "text" } }).then((m) => m.default),
   },
@@ -96,7 +96,7 @@ export const guides: Guide[] = [
   {
     key: "using-git-integrations",
     title: "Using Git Integrations",
-    description: "Providers, MR/PR browsing, diff, discussions, approvals, AI review, pipelines, test results",
+    description: "Providers, Change Request browsing, diff, discussions, approvals, AI review, pipelines, test results",
     category: "Git",
     import: () => import("./using-git-integrations.md", { with: { type: "text" } }).then((m) => m.default),
   },

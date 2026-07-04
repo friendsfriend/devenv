@@ -22,7 +22,7 @@ Key fields:
 
 - `ident` — unique identifier, becomes the directory name under `$DEVENV_HOME`
 - `repositoryPath` — Git remote URL (HTTPS or SSH)
-- `sourceType` — `"github"` or `"gitlab"` for MR/PR features
+- `sourceType` — `"github"` or `"gitlab"` for Change Request features
 - `provider` — name of the provider from `providers/` for authenticated API access
 - `gitMode` — `"BRANCH"` (default) or `"WORKTREE"` for parallel worktrees
 

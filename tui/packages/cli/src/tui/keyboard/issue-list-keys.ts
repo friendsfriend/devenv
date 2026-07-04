@@ -14,14 +14,14 @@ export async function handleIssueListKeys(
 	actions: KeyboardActions,
 	_ctx: KeyboardContext,
 ): Promise<boolean> {
-	const { appStore, issueStore, mrStore } = stores;
+	const { appStore, issueStore, changeRequestStore } = stores;
 	const { issueActions } = actions;
 
 	if (
 		appStore.viewMode() !== "issues" &&
 		appStore.viewMode() !== "issueScopePicker" &&
 		appStore.viewMode() !== "referencedIssues" &&
-		appStore.viewMode() !== "mrLinkedIssues"
+		appStore.viewMode() !== "changeRequestLinkedIssues"
 	) {
 		return false;
 	}
@@ -60,30 +60,30 @@ export async function handleIssueListKeys(
 		return true; // Eat all other keys in scope picker
 	}
 
-	// MR linked issues sub-view
-	if (appStore.viewMode() === "mrLinkedIssues") {
-		const linkedIssues = mrStore.mrLinkedIssues();
-		const selectedIdx = mrStore.selectedMrLinkedIssueIndex();
+	// CR linked issues sub-view
+	if (appStore.viewMode() === "changeRequestLinkedIssues") {
+		const linkedIssues = changeRequestStore.changeRequestLinkedIssues();
+		const selectedIdx = changeRequestStore.selectedChangeRequestLinkedIssueIndex();
 
 		if (isDownKey(event)) {
-			mrStore.setSelectedMrLinkedIssueIndex(
+			changeRequestStore.setSelectedMrLinkedIssueIndex(
 				Math.min(selectedIdx + 1, linkedIssues.length - 1),
 			);
 			return true;
 		}
 		if (isUpKey(event)) {
-			mrStore.setSelectedMrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
+			changeRequestStore.setSelectedMrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
 			return true;
 		}
 		if (event.name === "g" && !event.ctrl) {
-			mrStore.setSelectedMrLinkedIssueIndex(0);
+			changeRequestStore.setSelectedMrLinkedIssueIndex(0);
 			return true;
 		}
 		if (
 			(event.name === "G" || (event.name === "g" && event.shift)) &&
 			!event.ctrl
 		) {
-			mrStore.setSelectedMrLinkedIssueIndex(
+			changeRequestStore.setSelectedMrLinkedIssueIndex(
 				Math.max(0, linkedIssues.length - 1),
 			);
 			return true;
@@ -96,8 +96,8 @@ export async function handleIssueListKeys(
 			return true;
 		}
 		if (event.name === "escape" || event.name === "q") {
-			mrStore.setSelectedMrLinkedIssueIndex(0);
-			appStore.setViewMode("mergeRequestDetail");
+			changeRequestStore.setSelectedMrLinkedIssueIndex(0);
+			appStore.setViewMode("changeRequestDetail");
 			return true;
 		}
 		return true;

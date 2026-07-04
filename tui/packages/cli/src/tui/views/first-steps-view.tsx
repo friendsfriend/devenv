@@ -9,7 +9,8 @@ export function FirstStepsView(props: {
 }) {
 	const dimensions = useTerminalDimensions();
 	const dialogWidth = () => Math.min(86, Math.max(40, dimensions().width - 4));
-	const hasProvider = () => props.providerStore.providers().length > 0;
+	const hasProvider = () => props.providerStore.providers().some((p) => !p.invalid);
+	const invalidProviderCount = () => props.providerStore.providers().filter((p) => p.invalid).length;
 	const hasWorkspaceResource = () => props.appStore.apps().length > 0 || props.appStore.infraServices().length > 0 || props.appStore.scriptVisibleRows().length > 0;
 	const selected = (idx: number) => props.appStore.firstStepsSelectedIndex() === idx;
 	const cursor = (idx: number) => selected(idx) ? "► " : "  ";
@@ -98,6 +99,9 @@ export function FirstStepsView(props: {
 				) : null}
 				{props.providerStore.providersError() ? (
 					<text fg={uiColors.error}>{props.providerStore.providersError()}</text>
+				) : null}
+				{invalidProviderCount() > 0 ? (
+					<text fg={uiColors.warning}>{invalidProviderCount()} provider(s) blocked: clear-text credentials found. Press c to open Providers, then edit or delete.</text>
 				) : null}
 				<text fg={uiColors.textMuted}>j/k rows    h/l or ←/→ options    enter selects    esc closes</text>
 			</box>

@@ -15,27 +15,27 @@ import (
 	"strings"
 	"time"
 
-	"github.com/friendsfriend/devenv/pkg/mr"
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 )
 
 // Client is the GitLab API client used internally.
 type Client interface {
 	Username() string
-	GetMergeRequests(projectInfo *ProjectInfo, sourceBranch, targetBranch string) ([]MergeRequest, error)
-	GetMergeRequestsWithOptions(projectInfo *ProjectInfo, opts *mr.MRListOptions) (*mr.MRListResult, error)
+	GetChangeRequests(projectInfo *ProjectInfo, sourceBranch, targetBranch string) ([]ChangeRequest, error)
+	GetChangeRequestsWithOptions(projectInfo *ProjectInfo, opts *changerequest.ChangeRequestListOptions) (*changerequest.ChangeRequestListResult, error)
 	GetPipelineJobs(projectInfo *ProjectInfo, pipelineID int) ([]Job, error)
 	GetTestSummary(projectInfo *ProjectInfo, pipelineID int) (*TestSummary, error)
-	GetMRChanges(projectInfo *ProjectInfo, mrIID int) ([]MRChange, error)
+	GetChangeRequestChanges(projectInfo *ProjectInfo, mrIID int) ([]ChangeRequestChange, error)
 	GetMRVersions(projectInfo *ProjectInfo, mrIID int) ([]map[string]interface{}, error)
 	CreateMRDiffComment(projectInfo *ProjectInfo, mrIID int, body string, position *DiffPosition) error
 	GetMRDiscussions(projectInfo *ProjectInfo, mrIID int) ([]Discussion, error)
 	ReplyToDiscussion(projectInfo *ProjectInfo, mrIID int, discussionID string, body string) error
 	ResolveDiscussion(projectInfo *ProjectInfo, mrIID int, discussionID string, resolved bool) error
-	ApproveMergeRequest(projectInfo *ProjectInfo, mrIID int) error
-	UnapproveMergeRequest(projectInfo *ProjectInfo, mrIID int) error
+	ApproveChangeRequest(projectInfo *ProjectInfo, mrIID int) error
+	UnapproveChangeRequest(projectInfo *ProjectInfo, mrIID int) error
 	ToggleMRApproval(projectInfo *ProjectInfo, mrIID int, username string) error
-	RebaseMergeRequest(projectInfo *ProjectInfo, mrIID int) error
-	CloseMergeRequest(projectInfo *ProjectInfo, mrIID int) error
+	RebaseChangeRequest(projectInfo *ProjectInfo, mrIID int) error
+	CloseChangeRequest(projectInfo *ProjectInfo, mrIID int) error
 	GetJobLogs(projectInfo *ProjectInfo, jobID int) (string, error)
 	StreamJobLogs(ctx context.Context, projectInfo *ProjectInfo, jobID int) (chan string, error)
 	SearchProjects(query string, limit int) ([]SearchResult, error)
@@ -170,8 +170,8 @@ type TestSummary struct {
 	FailedTestGroups []FailedTestGroup `json:"-"` // New grouped failed tests by class
 }
 
-// MRApprovals represents the approval information for a merge request
-type MRApprovals struct {
+// MergeRequestApprovals represents the approval information for a change request
+type MergeRequestApprovals struct {
 	ApprovalsRequired int `json:"approvals_required"`
 	ApprovalsLeft     int `json:"approvals_left"`
 	ApprovedBy        []struct {
@@ -182,8 +182,8 @@ type MRApprovals struct {
 	} `json:"approved_by"`
 }
 
-// MergeRequest represents a GitLab merge request from the API
-type MergeRequest struct {
+// ChangeRequest represents a GitLab change request from the API
+type ChangeRequest struct {
 	ID           int       `json:"id"`
 	IID          int       `json:"iid"`
 	Title        string    `json:"title"`
@@ -205,19 +205,19 @@ type MergeRequest struct {
 		WebURL string `json:"web_url"`
 	} `json:"head_pipeline,omitempty"`
 	// Approval and mergability status
-	MergeStatus                 string       `json:"merge_status"`                  // can_be_merged, cannot_be_merged, unchecked, checking, cannot_be_merged_recheck
-	DetailedMergeStatus         string       `json:"detailed_merge_status"`         // more detailed merge status (includes need_rebase, not_open, checking, mergeable, etc)
-	Draft                       bool         `json:"draft"`                         // whether MR is marked as draft
-	WorkInProgress              bool         `json:"work_in_progress"`              // legacy field for draft status
-	HasConflicts                bool         `json:"has_conflicts"`                 // whether MR has merge conflicts
-	BlockingDiscussionsResolved bool         `json:"blocking_discussions_resolved"` // whether all blocking discussions are resolved
-	RebaseInProgress            bool         `json:"rebase_in_progress"`            // whether a rebase operation is currently in progress
-	MergeError                  string       `json:"merge_error"`                   // error message if merge/rebase failed
-	Approvals                   *MRApprovals `json:"approvals,omitempty"`
+	MergeStatus                 string                 `json:"merge_status"`                  // can_be_merged, cannot_be_merged, unchecked, checking, cannot_be_merged_recheck
+	DetailedMergeStatus         string                 `json:"detailed_merge_status"`         // more detailed merge status (includes need_rebase, not_open, checking, mergeable, etc)
+	Draft                       bool                   `json:"draft"`                         // whether MR is marked as draft
+	WorkInProgress              bool                   `json:"work_in_progress"`              // legacy field for draft status
+	HasConflicts                bool                   `json:"has_conflicts"`                 // whether MR has merge conflicts
+	BlockingDiscussionsResolved bool                   `json:"blocking_discussions_resolved"` // whether all blocking discussions are resolved
+	RebaseInProgress            bool                   `json:"rebase_in_progress"`            // whether a rebase operation is currently in progress
+	MergeError                  string                 `json:"merge_error"`                   // error message if merge/rebase failed
+	Approvals                   *MergeRequestApprovals `json:"approvals,omitempty"`
 }
 
-// MRChange represents a changed file in a merge request
-type MRChange struct {
+// ChangeRequestChange represents a changed file in a change request
+type ChangeRequestChange struct {
 	OldPath      string     `json:"old_path"`
 	NewPath      string     `json:"new_path"`
 	AMode        string     `json:"a_mode"`
@@ -300,7 +300,7 @@ type NotePosition struct {
 }
 
 // calculateLineStats calculates lines added and deleted from the diff
-func (c *MRChange) calculateLineStats() {
+func (c *ChangeRequestChange) calculateLineStats() {
 	if c.Diff == "" {
 		return
 	}
@@ -327,7 +327,7 @@ func (c *MRChange) calculateLineStats() {
 // parseDiffLines parses the unified diff and generates line codes for each line
 // Note: We generate line_code but GitLab requires it to match their internal codes
 // For now, we parse the structure but don't use line_code in API calls
-func (c *MRChange) parseDiffLines(baseSHA string) {
+func (c *ChangeRequestChange) parseDiffLines(baseSHA string) {
 	if c.Diff == "" {
 		log.Printf("[DEBUG] parseDiffLines: Empty diff for %s", c.NewPath)
 		return
@@ -405,7 +405,7 @@ func (c *MRChange) parseDiffLines(baseSHA string) {
 // generateLineCode generates a GitLab-compatible line_code
 // Format: SHA1("<base_sha>:<old_path>:<old_line>:<new_path>:<new_line>")
 // Note: GitLab validates these strictly, so we generate them but don't use them in API calls
-func (c *MRChange) generateLineCode(baseSHA string, newLine *int, oldLine *int) string {
+func (c *ChangeRequestChange) generateLineCode(baseSHA string, newLine *int, oldLine *int) string {
 	oldLineStr := ""
 	if oldLine != nil {
 		oldLineStr = strconv.Itoa(*oldLine)
@@ -431,22 +431,22 @@ type ProjectInfo struct {
 	Project   string // Project name
 }
 
-// ToMR converts gitlab.ProjectInfo to mr.RepoInfo.
-func (p *ProjectInfo) ToMR() *mr.RepoInfo {
-	return &mr.RepoInfo{
+// ToChangeRequest converts gitlab.ProjectInfo to changerequest.RepoInfo.
+func (p *ProjectInfo) ToChangeRequest() *changerequest.RepoInfo {
+	return &changerequest.RepoInfo{
 		Host:      p.Host,
 		Namespace: p.Namespace,
 		Project:   p.Project,
 	}
 }
 
-// FromMR converts mr.RepoInfo to gitlab.ProjectInfo.
-func FromMR(info *mr.RepoInfo) (*ProjectInfo, error) {
+// FromChangeRequest converts changerequest.RepoInfo to gitlab.ProjectInfo.
+func FromChangeRequest(info *changerequest.RepoInfo) (*ProjectInfo, error) {
 	if info == nil {
 		return nil, fmt.Errorf("project info is nil")
 	}
 	if info.Namespace == "" || info.Project == "" {
-		return nil, fmt.Errorf("mr.RepoInfo missing Namespace or Project fields")
+		return nil, fmt.Errorf("changerequest.RepoInfo missing Namespace or Project fields")
 	}
 	return &ProjectInfo{
 		Host:      info.Host,
@@ -488,49 +488,49 @@ func NewClient(baseURL, token, username string) Client {
 	}
 }
 
-// --- mr.Client implementations ---
+// --- changerequest.Client implementations ---
 
-// MRClient implements mr.Client by wrapping a Client.
+// MRClient implements changerequest.Client by wrapping a Client.
 type MRClient struct {
 	client Client
 }
 
-// NewMRClient creates a new MRClient that implements mr.Client.
-func NewMRClient(client Client) mr.Client {
+// NewMRClient creates a new MRClient that implements changerequest.Client.
+func NewMRClient(client Client) changerequest.Client {
 	return &MRClient{client: client}
 }
 
-func (c *MRClient) Search(info *mr.RepoInfo, query string, limit int) ([]mr.SearchResult, error) {
+func (c *MRClient) Search(info *changerequest.RepoInfo, query string, limit int) ([]changerequest.SearchResult, error) {
 	results, err := c.client.SearchProjects(query, limit)
 	if err != nil {
 		return nil, err
 	}
-	return convertSearchResultsToMR(results), nil
+	return convertSearchResultsToChangeRequest(results), nil
 }
 
-func (c *MRClient) GetMRs(info *mr.RepoInfo, options *mr.MRListOptions) (*mr.MRListResult, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) GetChangeRequests(info *changerequest.RepoInfo, options *changerequest.ChangeRequestListOptions) (*changerequest.ChangeRequestListResult, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
 
-	return c.client.GetMergeRequestsWithOptions(projectInfo, options)
+	return c.client.GetChangeRequestsWithOptions(projectInfo, options)
 }
 
-func (c *MRClient) GetMRChanges(info *mr.RepoInfo, mrNumber int) ([]mr.MRChange, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) GetChangeRequestChanges(info *changerequest.RepoInfo, mrNumber int) ([]changerequest.ChangeRequestChange, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
-	changes, err := c.client.GetMRChanges(projectInfo, mrNumber)
+	changes, err := c.client.GetChangeRequestChanges(projectInfo, mrNumber)
 	if err != nil {
 		return nil, err
 	}
-	return convertMRChangesToMR(changes), nil
+	return convertChangeRequestChangesToChangeRequest(changes), nil
 }
 
-func (c *MRClient) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discussion, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) GetDiscussions(info *changerequest.RepoInfo, mrNumber int) ([]changerequest.Discussion, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -538,47 +538,47 @@ func (c *MRClient) GetDiscussions(info *mr.RepoInfo, mrNumber int) ([]mr.Discuss
 	if err != nil {
 		return nil, err
 	}
-	return convertDiscussionsToMR(discussions), nil
+	return convertDiscussionsToChangeRequest(discussions), nil
 }
 
-func (c *MRClient) Approve(info *mr.RepoInfo, mrNumber int) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) Approve(info *changerequest.RepoInfo, mrNumber int) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
-	return c.client.ApproveMergeRequest(projectInfo, mrNumber)
+	return c.client.ApproveChangeRequest(projectInfo, mrNumber)
 }
 
-func (c *MRClient) Unapprove(info *mr.RepoInfo, mrNumber int) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) Unapprove(info *changerequest.RepoInfo, mrNumber int) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
-	return c.client.UnapproveMergeRequest(projectInfo, mrNumber)
+	return c.client.UnapproveChangeRequest(projectInfo, mrNumber)
 }
 
-func (c *MRClient) ToggleApproval(info *mr.RepoInfo, mrNumber int) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) ToggleApproval(info *changerequest.RepoInfo, mrNumber int) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
 	return c.client.ToggleMRApproval(projectInfo, mrNumber, c.client.Username())
 }
 
-func (c *MRClient) GetJobLogs(info *mr.RepoInfo, jobID int) (string, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) GetJobLogs(info *changerequest.RepoInfo, jobID int) (string, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return "", err
 	}
 	return c.client.GetJobLogs(projectInfo, jobID)
 }
 
-func (c *MRClient) ValidateConnection(info *mr.RepoInfo) error {
+func (c *MRClient) ValidateConnection(info *changerequest.RepoInfo) error {
 	return c.client.ValidateConnection()
 }
 
-func (c *MRClient) GetPipelines(info *mr.RepoInfo, limit int) ([]mr.Pipeline, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) GetPipelines(info *changerequest.RepoInfo, limit int) ([]changerequest.Pipeline, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -586,11 +586,11 @@ func (c *MRClient) GetPipelines(info *mr.RepoInfo, limit int) ([]mr.Pipeline, er
 	if err != nil {
 		return nil, err
 	}
-	return convertPipelinesToMR(pipelines), nil
+	return convertPipelinesToChangeRequest(pipelines), nil
 }
 
-func (c *MRClient) GetPipelineJobs(info *mr.RepoInfo, pipelineID int) ([]mr.Job, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) GetPipelineJobs(info *changerequest.RepoInfo, pipelineID int) ([]changerequest.Job, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -598,43 +598,43 @@ func (c *MRClient) GetPipelineJobs(info *mr.RepoInfo, pipelineID int) ([]mr.Job,
 	if err != nil {
 		return nil, err
 	}
-	return convertJobsToMR(jobs), nil
+	return convertJobsToChangeRequest(jobs), nil
 }
 
-func (c *MRClient) RestartJob(info *mr.RepoInfo, jobID int) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) RestartJob(info *changerequest.RepoInfo, jobID int) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
 	return c.client.RestartJob(projectInfo, jobID)
 }
 
-func (c *MRClient) CancelJob(info *mr.RepoInfo, jobID int) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) CancelJob(info *changerequest.RepoInfo, jobID int) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
 	return c.client.CancelJob(projectInfo, jobID)
 }
 
-func (c *MRClient) Close(info *mr.RepoInfo, mrNumber int) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) Close(info *changerequest.RepoInfo, mrNumber int) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
-	return c.client.CloseMergeRequest(projectInfo, mrNumber)
+	return c.client.CloseChangeRequest(projectInfo, mrNumber)
 }
 
-func (c *MRClient) Rebase(info *mr.RepoInfo, mrNumber int) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) Rebase(info *changerequest.RepoInfo, mrNumber int) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
-	return c.client.RebaseMergeRequest(projectInfo, mrNumber)
+	return c.client.RebaseChangeRequest(projectInfo, mrNumber)
 }
 
-func (c *MRClient) CreateDiffComment(info *mr.RepoInfo, mrNumber int, body string, position *mr.DiffPosition) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) CreateDiffComment(info *changerequest.RepoInfo, mrNumber int, body string, position *changerequest.DiffPosition) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
@@ -654,24 +654,24 @@ func (c *MRClient) CreateDiffComment(info *mr.RepoInfo, mrNumber int, body strin
 	return c.client.CreateMRDiffComment(projectInfo, mrNumber, body, pos)
 }
 
-func (c *MRClient) ReplyToDiscussion(info *mr.RepoInfo, mrNumber int, discussionID string, body string) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) ReplyToDiscussion(info *changerequest.RepoInfo, mrNumber int, discussionID string, body string) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
 	return c.client.ReplyToDiscussion(projectInfo, mrNumber, discussionID, body)
 }
 
-func (c *MRClient) ResolveDiscussion(info *mr.RepoInfo, mrNumber int, discussionID string, resolved bool) error {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) ResolveDiscussion(info *changerequest.RepoInfo, mrNumber int, discussionID string, resolved bool) error {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return err
 	}
 	return c.client.ResolveDiscussion(projectInfo, mrNumber, discussionID, resolved)
 }
 
-func (c *MRClient) GetTestSummary(info *mr.RepoInfo, pipelineID int) (*mr.TestSummary, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) GetTestSummary(info *changerequest.RepoInfo, pipelineID int) (*changerequest.TestSummary, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -682,11 +682,11 @@ func (c *MRClient) GetTestSummary(info *mr.RepoInfo, pipelineID int) (*mr.TestSu
 	if summary == nil {
 		return nil, nil
 	}
-	return convertTestSummaryToMR(summary), nil
+	return convertTestSummaryToChangeRequest(summary), nil
 }
 
-func (c *MRClient) StreamJobLogs(ctx context.Context, info *mr.RepoInfo, jobID int) (chan string, error) {
-	projectInfo, err := FromMR(info)
+func (c *MRClient) StreamJobLogs(ctx context.Context, info *changerequest.RepoInfo, jobID int) (chan string, error) {
+	projectInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return nil, err
 	}
@@ -695,10 +695,10 @@ func (c *MRClient) StreamJobLogs(ctx context.Context, info *mr.RepoInfo, jobID i
 
 // --- Conversion helpers for mr types ---
 
-func convertSearchResultsToMR(results []SearchResult) []mr.SearchResult {
-	mrResults := make([]mr.SearchResult, len(results))
+func convertSearchResultsToChangeRequest(results []SearchResult) []changerequest.SearchResult {
+	mrResults := make([]changerequest.SearchResult, len(results))
 	for i, r := range results {
-		mrResults[i] = mr.SearchResult{
+		mrResults[i] = changerequest.SearchResult{
 			Name:          r.Name,
 			FullPath:      r.FullPath,
 			HTTPURL:       r.HTTPURL,
@@ -708,16 +708,16 @@ func convertSearchResultsToMR(results []SearchResult) []mr.SearchResult {
 	return mrResults
 }
 
-func convertMRsToMR(mrs []MergeRequest) []mr.MergeRequest {
-	result := make([]mr.MergeRequest, len(mrs))
+func convertMRsToChangeRequest(mrs []ChangeRequest) []changerequest.ChangeRequest {
+	result := make([]changerequest.ChangeRequest, len(mrs))
 	for i, m := range mrs {
-		result[i] = convertMRToMR(m)
+		result[i] = convertMRToChangeRequest(m)
 	}
 	return result
 }
 
-func convertMRToMR(m MergeRequest) mr.MergeRequest {
-	result := mr.MergeRequest{
+func convertMRToChangeRequest(m ChangeRequest) changerequest.ChangeRequest {
+	result := changerequest.ChangeRequest{
 		ID:                          m.ID,
 		IID:                         m.IID,
 		Title:                       m.Title,
@@ -739,14 +739,14 @@ func convertMRToMR(m MergeRequest) mr.MergeRequest {
 		MergeError:                  m.MergeError,
 	}
 	if m.HeadPipeline != nil {
-		result.HeadPipeline = &mr.PipelineRef{
+		result.HeadPipeline = &changerequest.PipelineRef{
 			ID:     m.HeadPipeline.ID,
 			Status: m.HeadPipeline.Status,
 			WebURL: m.HeadPipeline.WebURL,
 		}
 	}
 	if m.Approvals != nil {
-		result.ApproveStatus = &mr.ApproveStatus{
+		result.ApproveStatus = &changerequest.ApproveStatus{
 			ApprovalsRequired: m.Approvals.ApprovalsRequired,
 			ApprovalsLeft:     m.Approvals.ApprovalsLeft,
 			ApprovedBy:        m.Approvals.ApprovedBy,
@@ -755,10 +755,10 @@ func convertMRToMR(m MergeRequest) mr.MergeRequest {
 	return result
 }
 
-func convertMRChangesToMR(changes []MRChange) []mr.MRChange {
-	result := make([]mr.MRChange, len(changes))
+func convertChangeRequestChangesToChangeRequest(changes []ChangeRequestChange) []changerequest.ChangeRequestChange {
+	result := make([]changerequest.ChangeRequestChange, len(changes))
 	for i, ch := range changes {
-		result[i] = mr.MRChange{
+		result[i] = changerequest.ChangeRequestChange{
 			OldPath:      ch.OldPath,
 			NewPath:      ch.NewPath,
 			AMode:        ch.AMode,
@@ -771,9 +771,9 @@ func convertMRChangesToMR(changes []MRChange) []mr.MRChange {
 			LinesDeleted: ch.LinesDeleted,
 		}
 		if len(ch.DiffLines) > 0 {
-			result[i].DiffLines = make([]mr.DiffLine, len(ch.DiffLines))
+			result[i].DiffLines = make([]changerequest.DiffLine, len(ch.DiffLines))
 			for j, dl := range ch.DiffLines {
-				result[i].DiffLines[j] = mr.DiffLine{
+				result[i].DiffLines[j] = changerequest.DiffLine{
 					LineCode: dl.LineCode,
 					Type:     dl.Type,
 					OldLine:  dl.OldLine,
@@ -787,20 +787,20 @@ func convertMRChangesToMR(changes []MRChange) []mr.MRChange {
 	return result
 }
 
-func convertDiscussionsToMR(discussions []Discussion) []mr.Discussion {
-	result := make([]mr.Discussion, len(discussions))
+func convertDiscussionsToChangeRequest(discussions []Discussion) []changerequest.Discussion {
+	result := make([]changerequest.Discussion, len(discussions))
 	for i, d := range discussions {
-		result[i] = mr.Discussion{
+		result[i] = changerequest.Discussion{
 			ID:             d.ID,
 			IndividualNote: d.IndividualNote,
-			Notes:          make([]mr.Note, len(d.Notes)),
+			Notes:          make([]changerequest.Note, len(d.Notes)),
 		}
 		for j, n := range d.Notes {
-			result[i].Notes[j] = mr.Note{
+			result[i].Notes[j] = changerequest.Note{
 				ID:         n.ID,
 				Type:       n.Type,
 				Body:       n.Body,
-				Author:     mr.NoteAuthor(n.Author),
+				Author:     changerequest.NoteAuthor(n.Author),
 				CreatedAt:  n.CreatedAt,
 				UpdatedAt:  n.UpdatedAt,
 				System:     n.System,
@@ -812,10 +812,10 @@ func convertDiscussionsToMR(discussions []Discussion) []mr.Discussion {
 	return result
 }
 
-func convertPipelinesToMR(pipelines []Pipeline) []mr.Pipeline {
-	result := make([]mr.Pipeline, len(pipelines))
+func convertPipelinesToChangeRequest(pipelines []Pipeline) []changerequest.Pipeline {
+	result := make([]changerequest.Pipeline, len(pipelines))
 	for i, p := range pipelines {
-		result[i] = mr.Pipeline{
+		result[i] = changerequest.Pipeline{
 			ID:        p.ID,
 			IID:       p.IID,
 			ProjectID: p.ProjectID,
@@ -832,10 +832,10 @@ func convertPipelinesToMR(pipelines []Pipeline) []mr.Pipeline {
 	return result
 }
 
-func convertJobsToMR(jobs []Job) []mr.Job {
-	result := make([]mr.Job, len(jobs))
+func convertJobsToChangeRequest(jobs []Job) []changerequest.Job {
+	result := make([]changerequest.Job, len(jobs))
 	for i, j := range jobs {
-		result[i] = mr.Job{
+		result[i] = changerequest.Job{
 			ID:             j.ID,
 			Name:           j.Name,
 			Stage:          j.Stage,
@@ -852,11 +852,11 @@ func convertJobsToMR(jobs []Job) []mr.Job {
 	return result
 }
 
-func convertTestSummaryToMR(summary *TestSummary) *mr.TestSummary {
+func convertTestSummaryToChangeRequest(summary *TestSummary) *changerequest.TestSummary {
 	if summary == nil {
 		return nil
 	}
-	result := &mr.TestSummary{
+	result := &changerequest.TestSummary{
 		Total:   summary.Total,
 		Success: summary.Success,
 		Failed:  summary.Failed,
@@ -864,15 +864,15 @@ func convertTestSummaryToMR(summary *TestSummary) *mr.TestSummary {
 		Error:   summary.Error,
 	}
 	if len(summary.TestSuites) > 0 {
-		result.TestSuites = make([]mr.TestSuite, len(summary.TestSuites))
+		result.TestSuites = make([]changerequest.TestSuite, len(summary.TestSuites))
 		for i, ts := range summary.TestSuites {
-			result.TestSuites[i] = mr.TestSuite{
+			result.TestSuites[i] = changerequest.TestSuite{
 				Name: ts.Name,
 			}
 			if len(ts.TestCases) > 0 {
-				result.TestSuites[i].TestCases = make([]mr.TestCase, len(ts.TestCases))
+				result.TestSuites[i].TestCases = make([]changerequest.TestCase, len(ts.TestCases))
 				for j, tc := range ts.TestCases {
-					result.TestSuites[i].TestCases[j] = mr.TestCase{
+					result.TestSuites[i].TestCases[j] = changerequest.TestCase{
 						Name:      tc.Name,
 						Classname: tc.Classname,
 						Status:    tc.Status,
@@ -885,9 +885,9 @@ func convertTestSummaryToMR(summary *TestSummary) *mr.TestSummary {
 		}
 	}
 	if len(summary.FailedTestGroups) > 0 {
-		result.FailedTestGroups = make([]mr.FailedTestGroup, len(summary.FailedTestGroups))
+		result.FailedTestGroups = make([]changerequest.FailedTestGroup, len(summary.FailedTestGroups))
 		for i, fg := range summary.FailedTestGroups {
-			result.FailedTestGroups[i] = mr.FailedTestGroup{
+			result.FailedTestGroups[i] = changerequest.FailedTestGroup{
 				ClassName:   fg.ClassName,
 				TestMethods: fg.TestMethods,
 			}
@@ -1024,8 +1024,8 @@ func (c *client) GetPipelines(projectInfo *ProjectInfo, limit int) ([]Pipeline, 
 	return pipelines, nil
 }
 
-// GetMergeRequests fetches merge requests for the project (used for MR pipeline detection)
-func (c *client) GetMergeRequests(projectInfo *ProjectInfo, sourceBranch, targetBranch string) ([]MergeRequest, error) {
+// GetChangeRequests fetches change requests for the project (used for MR pipeline detection)
+func (c *client) GetChangeRequests(projectInfo *ProjectInfo, sourceBranch, targetBranch string) ([]ChangeRequest, error) {
 	if projectInfo == nil {
 		return nil, fmt.Errorf("project info is nil")
 	}
@@ -1081,25 +1081,25 @@ func (c *client) GetMergeRequests(projectInfo *ProjectInfo, sourceBranch, target
 	}
 
 	// Parse JSON response
-	var mergeRequests []MergeRequest
-	if err := json.Unmarshal(body, &mergeRequests); err != nil {
+	var changeRequests []ChangeRequest
+	if err := json.Unmarshal(body, &changeRequests); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
 	// For each MR, fetch the full details to get head_pipeline
 	// This is necessary because the list endpoint doesn't always populate head_pipeline
-	for i := range mergeRequests {
-		fullMR, err := c.GetMergeRequest(projectInfo, mergeRequests[i].IID)
+	for i := range changeRequests {
+		fullMR, err := c.GetChangeRequest(projectInfo, changeRequests[i].IID)
 		if err == nil && fullMR != nil {
-			mergeRequests[i] = *fullMR
+			changeRequests[i] = *fullMR
 		}
 		// If fetching full details fails, we still have basic MR info
 	}
 
-	return mergeRequests, nil
+	return changeRequests, nil
 }
 
-// GetMergeRequestsWithOptions fetches merge requests with pagination and filter options.
+// GetChangeRequestsWithOptions fetches change requests with pagination and filter options.
 func normalizeGitLabMRSort(sortBy string) string {
 	switch sortBy {
 	case "created", "created_at":
@@ -1113,7 +1113,7 @@ func normalizeGitLabMRSort(sortBy string) string {
 	}
 }
 
-func (c *client) GetMergeRequestsWithOptions(projectInfo *ProjectInfo, opts *mr.MRListOptions) (*mr.MRListResult, error) {
+func (c *client) GetChangeRequestsWithOptions(projectInfo *ProjectInfo, opts *changerequest.ChangeRequestListOptions) (*changerequest.ChangeRequestListResult, error) {
 	if projectInfo == nil {
 		return nil, fmt.Errorf("project info is nil")
 	}
@@ -1217,8 +1217,8 @@ func (c *client) GetMergeRequestsWithOptions(projectInfo *ProjectInfo, opts *mr.
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	var mergeRequests []MergeRequest
-	if err := json.Unmarshal(body, &mergeRequests); err != nil {
+	var changeRequests []ChangeRequest
+	if err := json.Unmarshal(body, &changeRequests); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
@@ -1227,26 +1227,26 @@ func (c *client) GetMergeRequestsWithOptions(projectInfo *ProjectInfo, opts *mr.
 
 	if !skipDetails {
 		// For each MR, fetch full details to get head_pipeline.
-		// GetMergeRequest already fetches approval info internally.
-		for i := range mergeRequests {
-			fullMR, err := c.GetMergeRequest(projectInfo, mergeRequests[i].IID)
+		// GetChangeRequest already fetches approval info internally.
+		for i := range changeRequests {
+			fullMR, err := c.GetChangeRequest(projectInfo, changeRequests[i].IID)
 			if err == nil && fullMR != nil {
-				mergeRequests[i] = *fullMR
+				changeRequests[i] = *fullMR
 			}
 		}
 	}
 
-	return &mr.MRListResult{
-		MergeRequests: convertMRsToMR(mergeRequests),
-		TotalCount:    totalCount,
-		TotalPages:    totalPages,
-		CurrentPage:   currentPage,
-		PerPage:       perPage,
+	return &changerequest.ChangeRequestListResult{
+		ChangeRequests: convertMRsToChangeRequest(changeRequests),
+		TotalCount:     totalCount,
+		TotalPages:     totalPages,
+		CurrentPage:    currentPage,
+		PerPage:        perPage,
 	}, nil
 }
 
-// GetMergeRequest fetches a single merge request by IID with full details including pipeline
-func (c *client) GetMergeRequest(projectInfo *ProjectInfo, mrIID int) (*MergeRequest, error) {
+// GetChangeRequest fetches a single change request by IID with full details including pipeline
+func (c *client) GetChangeRequest(projectInfo *ProjectInfo, mrIID int) (*ChangeRequest, error) {
 	if projectInfo == nil {
 		return nil, fmt.Errorf("project info is nil")
 	}
@@ -1288,13 +1288,13 @@ func (c *client) GetMergeRequest(projectInfo *ProjectInfo, mrIID int) (*MergeReq
 	}
 
 	// Parse JSON response
-	var mergeRequest MergeRequest
+	var mergeRequest ChangeRequest
 	if err := json.Unmarshal(body, &mergeRequest); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
 
 	// Fetch approval information separately
-	approvals, err := c.GetMRApprovals(projectInfo, mrIID)
+	approvals, err := c.GetMergeRequestApprovals(projectInfo, mrIID)
 	if err == nil && approvals != nil {
 		mergeRequest.Approvals = approvals
 	}
@@ -1303,8 +1303,8 @@ func (c *client) GetMergeRequest(projectInfo *ProjectInfo, mrIID int) (*MergeReq
 	return &mergeRequest, nil
 }
 
-// GetMRApprovals fetches approval information for a merge request
-func (c *client) GetMRApprovals(projectInfo *ProjectInfo, mrIID int) (*MRApprovals, error) {
+// GetMergeRequestApprovals fetches approval information for a change request
+func (c *client) GetMergeRequestApprovals(projectInfo *ProjectInfo, mrIID int) (*MergeRequestApprovals, error) {
 	if projectInfo == nil {
 		return nil, fmt.Errorf("project info is nil")
 	}
@@ -1347,7 +1347,7 @@ func (c *client) GetMRApprovals(projectInfo *ProjectInfo, mrIID int) (*MRApprova
 	}
 
 	// Parse JSON response
-	var approvals MRApprovals
+	var approvals MergeRequestApprovals
 	if err := json.Unmarshal(body, &approvals); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON response: %w", err)
 	}
@@ -2176,8 +2176,8 @@ func (c *client) CancelJob(projectInfo *ProjectInfo, jobID int) error {
 	}
 }
 
-// GetMRChanges fetches the list of changed files in a merge request
-func (c *client) GetMRChanges(projectInfo *ProjectInfo, mrIID int) ([]MRChange, error) {
+// GetChangeRequestChanges fetches the list of changed files in a change request
+func (c *client) GetChangeRequestChanges(projectInfo *ProjectInfo, mrIID int) ([]ChangeRequestChange, error) {
 	if projectInfo == nil {
 		return nil, fmt.Errorf("project info is nil")
 	}
@@ -2217,7 +2217,7 @@ func (c *client) GetMRChanges(projectInfo *ProjectInfo, mrIID int) ([]MRChange, 
 
 		// The API returns a single MR object with changes array and diff_refs
 		var mrWithChanges struct {
-			Changes  []MRChange `json:"changes"`
+			Changes  []ChangeRequestChange `json:"changes"`
 			DiffRefs struct {
 				BaseSHA  string `json:"base_sha"`
 				HeadSHA  string `json:"head_sha"`
@@ -2241,19 +2241,19 @@ func (c *client) GetMRChanges(projectInfo *ProjectInfo, mrIID int) ([]MRChange, 
 
 		return mrWithChanges.Changes, nil
 	case http.StatusNotFound:
-		return nil, fmt.Errorf("merge request not found")
+		return nil, fmt.Errorf("change request not found")
 	case http.StatusUnauthorized:
 		return nil, fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		return nil, fmt.Errorf("access forbidden - you may not have permission to view this merge request")
+		return nil, fmt.Errorf("access forbidden - you may not have permission to view this change request")
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("GitLab API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 }
 
-// CloseMergeRequest closes a merge request
-func (c *client) CloseMergeRequest(projectInfo *ProjectInfo, mrIID int) error {
+// CloseChangeRequest closes a change request
+func (c *client) CloseChangeRequest(projectInfo *ProjectInfo, mrIID int) error {
 	if projectInfo == nil {
 		return fmt.Errorf("project info is nil")
 	}
@@ -2292,22 +2292,22 @@ func (c *client) CloseMergeRequest(projectInfo *ProjectInfo, mrIID int) error {
 		// MR successfully closed
 		return nil
 	case http.StatusNotFound:
-		return fmt.Errorf("merge request not found")
+		return fmt.Errorf("change request not found")
 	case http.StatusUnauthorized:
 		return fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		return fmt.Errorf("access forbidden - you may not have permission to close this merge request")
+		return fmt.Errorf("access forbidden - you may not have permission to close this change request")
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("cannot close merge request: %s", string(body))
+		return fmt.Errorf("cannot close change request: %s", string(body))
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("GitLab API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 }
 
-// RebaseMergeRequest triggers a rebase operation on a merge request
-func (c *client) RebaseMergeRequest(projectInfo *ProjectInfo, mrIID int) error {
+// RebaseChangeRequest triggers a rebase operation on a change request
+func (c *client) RebaseChangeRequest(projectInfo *ProjectInfo, mrIID int) error {
 	if projectInfo == nil {
 		return fmt.Errorf("project info is nil")
 	}
@@ -2342,14 +2342,14 @@ func (c *client) RebaseMergeRequest(projectInfo *ProjectInfo, mrIID int) error {
 		// Rebase successfully triggered (202 Accepted means it's queued)
 		return nil
 	case http.StatusNotFound:
-		return fmt.Errorf("merge request not found")
+		return fmt.Errorf("change request not found")
 	case http.StatusUnauthorized:
 		return fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		return fmt.Errorf("access forbidden - you may not have permission to rebase this merge request")
+		return fmt.Errorf("access forbidden - you may not have permission to rebase this change request")
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("cannot rebase merge request: %s", string(body))
+		return fmt.Errorf("cannot rebase change request: %s", string(body))
 	case http.StatusConflict:
 		return fmt.Errorf("rebase already in progress")
 	default:
@@ -2358,8 +2358,8 @@ func (c *client) RebaseMergeRequest(projectInfo *ProjectInfo, mrIID int) error {
 	}
 }
 
-// ApproveMergeRequest approves a merge request
-func (c *client) ApproveMergeRequest(projectInfo *ProjectInfo, mrIID int) error {
+// ApproveChangeRequest approves a change request
+func (c *client) ApproveChangeRequest(projectInfo *ProjectInfo, mrIID int) error {
 	if projectInfo == nil {
 		return fmt.Errorf("project info is nil")
 	}
@@ -2394,25 +2394,25 @@ func (c *client) ApproveMergeRequest(projectInfo *ProjectInfo, mrIID int) error 
 		// Approval successfully added
 		return nil
 	case http.StatusNotFound:
-		return fmt.Errorf("merge request not found")
+		return fmt.Errorf("change request not found")
 	case http.StatusUnauthorized:
 		return fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		return fmt.Errorf("access forbidden - you may not have permission to approve this merge request")
+		return fmt.Errorf("access forbidden - you may not have permission to approve this change request")
 	case http.StatusConflict:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("cannot approve merge request: %s", string(body))
+		return fmt.Errorf("cannot approve change request: %s", string(body))
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("cannot approve merge request: %s", string(body))
+		return fmt.Errorf("cannot approve change request: %s", string(body))
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("GitLab API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 }
 
-// UnapproveMergeRequest removes an approval from a merge request
-func (c *client) UnapproveMergeRequest(projectInfo *ProjectInfo, mrIID int) error {
+// UnapproveChangeRequest removes an approval from a change request
+func (c *client) UnapproveChangeRequest(projectInfo *ProjectInfo, mrIID int) error {
 	if projectInfo == nil {
 		return fmt.Errorf("project info is nil")
 	}
@@ -2445,33 +2445,33 @@ func (c *client) UnapproveMergeRequest(projectInfo *ProjectInfo, mrIID int) erro
 	switch resp.StatusCode {
 	case http.StatusOK, http.StatusCreated:
 		// Approval successfully removed
-		log.Printf("[DEBUG] UnapproveMergeRequest: Success (status %d)", resp.StatusCode)
+		log.Printf("[DEBUG] UnapproveChangeRequest: Success (status %d)", resp.StatusCode)
 		return nil
 	case http.StatusNotFound:
-		log.Printf("[DEBUG] UnapproveMergeRequest: NotFound (status 404)")
-		return fmt.Errorf("merge request not found")
+		log.Printf("[DEBUG] UnapproveChangeRequest: NotFound (status 404)")
+		return fmt.Errorf("change request not found")
 	case http.StatusUnauthorized:
-		log.Printf("[DEBUG] UnapproveMergeRequest: Unauthorized (status 401)")
+		log.Printf("[DEBUG] UnapproveChangeRequest: Unauthorized (status 401)")
 		return fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		log.Printf("[DEBUG] UnapproveMergeRequest: Forbidden (status 403)")
-		return fmt.Errorf("access forbidden - you may not have permission to unapprove this merge request")
+		log.Printf("[DEBUG] UnapproveChangeRequest: Forbidden (status 403)")
+		return fmt.Errorf("access forbidden - you may not have permission to unapprove this change request")
 	case http.StatusConflict:
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[DEBUG] UnapproveMergeRequest: Conflict (status 409): %s", string(body))
-		return fmt.Errorf("cannot unapprove merge request: %s", string(body))
+		log.Printf("[DEBUG] UnapproveChangeRequest: Conflict (status 409): %s", string(body))
+		return fmt.Errorf("cannot unapprove change request: %s", string(body))
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[DEBUG] UnapproveMergeRequest: BadRequest (status 400): %s", string(body))
-		return fmt.Errorf("cannot unapprove merge request: %s", string(body))
+		log.Printf("[DEBUG] UnapproveChangeRequest: BadRequest (status 400): %s", string(body))
+		return fmt.Errorf("cannot unapprove change request: %s", string(body))
 	default:
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[DEBUG] UnapproveMergeRequest: Unknown status %d: %s", resp.StatusCode, string(body))
+		log.Printf("[DEBUG] UnapproveChangeRequest: Unknown status %d: %s", resp.StatusCode, string(body))
 		return fmt.Errorf("GitLab API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 }
 
-// ToggleMRApproval toggles the approval status of a merge request
+// ToggleMRApproval toggles the approval status of a change request
 // If the user has already approved, it removes the approval; otherwise it adds it
 func (c *client) ToggleMRApproval(projectInfo *ProjectInfo, mrIID int, currentUsername string) error {
 	if projectInfo == nil {
@@ -2479,9 +2479,9 @@ func (c *client) ToggleMRApproval(projectInfo *ProjectInfo, mrIID int, currentUs
 	}
 
 	// Get current MR details to check approval status
-	mr, err := c.GetMergeRequest(projectInfo, mrIID)
+	mr, err := c.GetChangeRequest(projectInfo, mrIID)
 	if err != nil {
-		return fmt.Errorf("failed to get merge request details: %w", err)
+		return fmt.Errorf("failed to get change request details: %w", err)
 	}
 
 	// Debug: Log approval details
@@ -2513,11 +2513,11 @@ func (c *client) ToggleMRApproval(projectInfo *ProjectInfo, mrIID int, currentUs
 
 	// Toggle based on current state
 	if alreadyApproved {
-		log.Printf("[DEBUG] Calling UnapproveMergeRequest")
-		return c.UnapproveMergeRequest(projectInfo, mrIID)
+		log.Printf("[DEBUG] Calling UnapproveChangeRequest")
+		return c.UnapproveChangeRequest(projectInfo, mrIID)
 	}
-	log.Printf("[DEBUG] Calling ApproveMergeRequest")
-	return c.ApproveMergeRequest(projectInfo, mrIID)
+	log.Printf("[DEBUG] Calling ApproveChangeRequest")
+	return c.ApproveChangeRequest(projectInfo, mrIID)
 }
 
 // DiffPosition represents the position information for a diff comment
@@ -2532,7 +2532,7 @@ type DiffPosition struct {
 	OldLine      *int   `json:"old_line,omitempty"` // For removed or context lines
 }
 
-// CreateMRDiffComment creates a new diff comment on a merge request
+// CreateMRDiffComment creates a new diff comment on a change request
 func (c *client) CreateMRDiffComment(projectInfo *ProjectInfo, mrIID int, body string, position *DiffPosition) error {
 	if projectInfo == nil {
 		return fmt.Errorf("project info is nil")
@@ -2599,11 +2599,11 @@ func (c *client) CreateMRDiffComment(projectInfo *ProjectInfo, mrIID int, body s
 		// Comment successfully created
 		return nil
 	case http.StatusNotFound:
-		return fmt.Errorf("merge request not found")
+		return fmt.Errorf("change request not found")
 	case http.StatusUnauthorized:
 		return fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		return fmt.Errorf("access forbidden - you may not have permission to comment on this merge request")
+		return fmt.Errorf("access forbidden - you may not have permission to comment on this change request")
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("cannot create comment: %s", string(body))
@@ -2613,7 +2613,7 @@ func (c *client) CreateMRDiffComment(projectInfo *ProjectInfo, mrIID int, body s
 	}
 }
 
-// GetMRDiscussions fetches all discussions (comment threads) for a merge request
+// GetMRDiscussions fetches all discussions (comment threads) for a change request
 func (c *client) GetMRDiscussions(projectInfo *ProjectInfo, mrIID int) ([]Discussion, error) {
 	if projectInfo == nil {
 		return nil, fmt.Errorf("project info is nil")
@@ -2774,7 +2774,7 @@ func (c *client) ResolveDiscussion(projectInfo *ProjectInfo, mrIID int, discussi
 	return nil
 }
 
-// GetMRVersions fetches the diff versions for a merge request (needed for getting SHAs)
+// GetMRVersions fetches the diff versions for a change request (needed for getting SHAs)
 // Falls back to MR details if versions endpoint is not available
 func (c *client) GetMRVersions(projectInfo *ProjectInfo, mrIID int) ([]map[string]interface{}, error) {
 	if projectInfo == nil {
@@ -2826,7 +2826,7 @@ func (c *client) GetMRVersions(projectInfo *ProjectInfo, mrIID int) ([]map[strin
 	case http.StatusUnauthorized:
 		return nil, fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		return nil, fmt.Errorf("access forbidden - you may not have permission to view this merge request")
+		return nil, fmt.Errorf("access forbidden - you may not have permission to view this change request")
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("GitLab API request failed with status %d: %s", resp.StatusCode, string(body))

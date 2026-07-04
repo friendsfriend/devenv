@@ -5,6 +5,6 @@ export function setExitRenderer(r: { destroy(): void }) {
 }
 
 export function exitApp() {
+  process.exitCode = 0;
   renderer?.destroy();
-  process.exit(0);
 }

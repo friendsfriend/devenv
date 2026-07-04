@@ -7,7 +7,7 @@ import { isDownKey, isUpKey } from './nav-keys';
  * Handles keyboard events for the Discussions view:
  * - q to quit (works even in reply mode)
  * - Reply mode: ESC to cancel, Ctrl+Enter to submit, text input
- * - ESC to go back to MR detail
+ * - ESC to go back to CR detail
  * - Shift+D to open diff for selected discussion's file
  * - Shift+C to switch to changed files view
  * - c to toggle comments-only filter
@@ -20,13 +20,13 @@ export async function handleDiscussionsKeys(
   actions: KeyboardActions,
   ctx: KeyboardContext,
 ): Promise<boolean> {
-  const { appStore, mrStore } = stores;
-  const { appActions, mrActions } = actions;
+  const { appStore, changeRequestStore } = stores;
+  const { appActions, crActions } = actions;
   const { showError } = ctx;
 
   if (appStore.viewMode() !== 'discussionsView') return false;
 
-  const discussions = mrStore.mrDiscussions();
+  const discussions = changeRequestStore.crDiscussions();
 
   // q to quit (handle before reply mode check so it works in both modes)
   if (event.name === 'q' || event.name === 'Q') {
@@ -35,47 +35,47 @@ export async function handleDiscussionsKeys(
   }
 
   // CHECK REPLY MODE FIRST (takes precedence over navigation)
-  if (mrStore.replyMode()) {
+  if (changeRequestStore.replyMode()) {
 
     // ESC to cancel reply
     if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
-      mrStore.setReplyMode(null);
-      mrStore.setReplyText('');
+      changeRequestStore.setReplyMode(null);
+      changeRequestStore.setReplyText('');
       getLogger().write('INFO', 'Reply mode cancelled in discussions view');
       return true;
     }
 
     // Ctrl+Enter to submit reply
     if (event.ctrl && (event.name === 'return' || event.name === 'enter' || event.name === 'Return' || event.name === 'Enter')) {
-      const discussionId = mrStore.replyMode();
-      const text = mrStore.replyText().trim();
+      const discussionId = changeRequestStore.replyMode();
+      const text = changeRequestStore.replyText().trim();
 
       if (!text) {
         showError('Empty Reply', 'Please enter a reply');
         return true;
       }
 
-      mrActions.replyToDiscussion(discussionId!, text);
-      mrStore.setReplyMode(null);
-      mrStore.setReplyText('');
+      crActions.replyToDiscussion(discussionId!, text);
+      changeRequestStore.setReplyMode(null);
+      changeRequestStore.setReplyText('');
       return true;
     }
 
     // Backspace to delete last character
     if (event.name === 'backspace' || event.name === 'Backspace') {
-      mrStore.setReplyText(mrStore.replyText().slice(0, -1));
+      changeRequestStore.setReplyText(changeRequestStore.replyText().slice(0, -1));
       return true;
     }
 
     // Regular text input (printable characters)
     if (event.name && event.name.length === 1 && !event.ctrl && !event.meta) {
-      mrStore.setReplyText(mrStore.replyText() + event.name);
+      changeRequestStore.setReplyText(changeRequestStore.replyText() + event.name);
       return true;
     }
 
     // Space key
     if (event.name === 'space' || event.name === ' ') {
-      mrStore.setReplyText(mrStore.replyText() + ' ');
+      changeRequestStore.setReplyText(changeRequestStore.replyText() + ' ');
       return true;
     }
 
@@ -83,7 +83,7 @@ export async function handleDiscussionsKeys(
   }
 
   // IMPORTANT: Sort and filter discussions the same way DiscussionsView does
-  const filteredDiscussions = mrStore.discussionsShowOnlyComments()
+  const filteredDiscussions = changeRequestStore.discussionsShowOnlyComments()
     ? discussions.filter(d => !(d.notes.length > 0 && d.notes[0].system))
     : discussions;
   const sortedDiscussions = [...filteredDiscussions].sort((a, b) => {
@@ -103,7 +103,7 @@ export async function handleDiscussionsKeys(
   // Debug: Log all keypresses in discussions view
   getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Key: name="${event.name}", sequence="${event.sequence}", shift=${event.shift}, ctrl=${event.ctrl}`);
 
-  // ESC to go back to MR detail
+  // ESC to go back to CR detail
   if (
     event.name === 'escape' ||
     event.name === 'Escape' ||
@@ -111,15 +111,15 @@ export async function handleDiscussionsKeys(
     event.sequence === '\x1b' ||
     event.raw === '\x1b'
   ) {
-    appStore.setViewMode('mergeRequestDetail');
-    mrStore.setSelectedDiscussionIndex(0);
+    appStore.setViewMode('changeRequestDetail');
+    changeRequestStore.setSelectedDiscussionIndex(0);
     return true;
   }
 
   // Shift+D to view full diff for the selected discussion's file
   if (event.sequence === 'D' || event.name === 'D' || (event.name === 'd' && event.shift)) {
-    getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Shift+D detected! selectedIndex=${mrStore.selectedDiscussionIndex()}, totalDiscussions=${totalDiscussions}`);
-    const discussion = sortedDiscussions[mrStore.selectedDiscussionIndex()];
+    getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Shift+D detected! selectedIndex=${changeRequestStore.selectedDiscussionIndex()}, totalDiscussions=${totalDiscussions}`);
+    const discussion = sortedDiscussions[changeRequestStore.selectedDiscussionIndex()];
     if (discussion) {
       getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Discussion found: ${discussion.id}`);
       getLogger().write('DEBUG', `[DISCUSSIONS VIEW] discussion.position: ${JSON.stringify(discussion.position)}`);
@@ -135,16 +135,16 @@ export async function handleDiscussionsKeys(
         getLogger().write('DEBUG', `[DISCUSSIONS VIEW] File path: ${filePath}`);
         if (filePath) {
           // Find the corresponding change
-          const changes = mrStore.mrChanges();
+          const changes = changeRequestStore.crChanges();
           getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Total changes: ${changes.length}`);
           const change = changes.find(c => c.new_path === filePath || c.old_path === filePath);
           if (change) {
             getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Change found! Opening diff modal...`);
-            mrStore.setCurrentDiffFile(change);
-            mrStore.setDiffModalSelectedLine(0);
-            mrStore.setDiffModalVisualMode(false);
-            mrStore.setDiffModalForceSplitView(computeInitialSplitView(change.diff ?? '', ctx.renderer.width, change.new_file || change.deleted_file));
-            mrStore.setShowDiffModal(true);
+            changeRequestStore.setCurrentDiffFile(change);
+            changeRequestStore.setDiffModalSelectedLine(0);
+            changeRequestStore.setDiffModalVisualMode(false);
+            changeRequestStore.setDiffModalForceSplitView(computeInitialSplitView(change.diff ?? '', ctx.renderer.width, change.new_file || change.deleted_file));
+            changeRequestStore.setShowDiffModal(true);
             appStore.setPreviousViewMode('discussionsView'); // Remember to return to discussions view
             getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Diff modal should be open now`);
           } else {
@@ -157,7 +157,7 @@ export async function handleDiscussionsKeys(
         getLogger().write('DEBUG', `[DISCUSSIONS VIEW] No position found in discussion - this is a general comment, silently ignoring Shift+D`);
       }
     } else {
-      getLogger().write('DEBUG', `[DISCUSSIONS VIEW] No discussion at index ${mrStore.selectedDiscussionIndex()}`);
+      getLogger().write('DEBUG', `[DISCUSSIONS VIEW] No discussion at index ${changeRequestStore.selectedDiscussionIndex()}`);
     }
     return true;
   }
@@ -166,22 +166,22 @@ export async function handleDiscussionsKeys(
   if (event.sequence === 'C' || event.name === 'C' || (event.name === 'c' && event.shift)) {
     getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Shift+C detected! Switching to changedFiles view`);
     appStore.setViewMode('changedFiles');
-    mrStore.setSelectedChangedFileIndex(0);
+    changeRequestStore.setSelectedChangedFileIndex(0);
     return true;
   }
 
   // c to toggle comments-only filter (hides system notes)
   if (event.name === 'c' && !event.shift && !event.ctrl) {
     getLogger().write('DEBUG', `[DISCUSSIONS VIEW] c key pressed - toggling comments filter`);
-    mrStore.setDiscussionsShowOnlyComments(prev => !prev);
-    mrStore.setSelectedDiscussionIndex(0);
+    changeRequestStore.setDiscussionsShowOnlyComments(prev => !prev);
+    changeRequestStore.setSelectedDiscussionIndex(0);
     return true;
   }
 
   // r to reply to the selected discussion
   if (event.name === 'r' && !event.shift && !event.ctrl) {
     getLogger().write('DEBUG', `[DISCUSSIONS VIEW] r key pressed for reply`);
-    const discussion = sortedDiscussions[mrStore.selectedDiscussionIndex()];
+    const discussion = sortedDiscussions[changeRequestStore.selectedDiscussionIndex()];
     if (discussion) {
       // Don't allow replies to system notes
       const isSystemNote = discussion.notes.length > 0 && discussion.notes[0].system;
@@ -190,11 +190,11 @@ export async function handleDiscussionsKeys(
         return true;
       }
 
-      mrStore.setReplyMode(discussion.id);
-      mrStore.setReplyText('');
+      changeRequestStore.setReplyMode(discussion.id);
+      changeRequestStore.setReplyText('');
       getLogger().write('INFO', `Entering reply mode for discussion ${discussion.id}`);
     } else {
-      getLogger().write('DEBUG', `[DISCUSSIONS VIEW] No discussion at index ${mrStore.selectedDiscussionIndex()}`);
+      getLogger().write('DEBUG', `[DISCUSSIONS VIEW] No discussion at index ${changeRequestStore.selectedDiscussionIndex()}`);
     }
     return true;
   }
@@ -202,7 +202,7 @@ export async function handleDiscussionsKeys(
   // x to toggle resolve/unresolve the selected discussion
   if (event.name === 'x' && !event.shift && !event.ctrl) {
     getLogger().write('DEBUG', `[DISCUSSIONS VIEW] x key pressed for resolve toggle`);
-    const discussion = sortedDiscussions[mrStore.selectedDiscussionIndex()];
+    const discussion = sortedDiscussions[changeRequestStore.selectedDiscussionIndex()];
     if (discussion) {
       const isSystemNote = discussion.notes.length > 0 && discussion.notes[0].system;
       if (isSystemNote) {
@@ -216,38 +216,38 @@ export async function handleDiscussionsKeys(
       }
       const currentlyResolved = resolvableNotes.every(n => n.resolved);
       getLogger().write('INFO', `Toggling discussion ${discussion.id} resolved state from ${currentlyResolved} to ${!currentlyResolved}`);
-      mrActions.resolveDiscussion(discussion.id, currentlyResolved ? 'unresolve' : 'resolve');
+      crActions.resolveDiscussion(discussion.id, currentlyResolved ? 'unresolve' : 'resolve');
     } else {
-      getLogger().write('DEBUG', `[DISCUSSIONS VIEW] No discussion at index ${mrStore.selectedDiscussionIndex()}`);
+      getLogger().write('DEBUG', `[DISCUSSIONS VIEW] No discussion at index ${changeRequestStore.selectedDiscussionIndex()}`);
     }
     return true;
   }
 
   // j or Down to move down
   if (isDownKey(event)) {
-    if (mrStore.selectedDiscussionIndex() < totalDiscussions - 1) {
-      mrStore.setSelectedDiscussionIndex(prev => prev + 1);
+    if (changeRequestStore.selectedDiscussionIndex() < totalDiscussions - 1) {
+      changeRequestStore.setSelectedDiscussionIndex(prev => prev + 1);
     }
     return true;
   }
 
   // k or Up to move up
   if (isUpKey(event)) {
-    if (mrStore.selectedDiscussionIndex() > 0) {
-      mrStore.setSelectedDiscussionIndex(prev => prev - 1);
+    if (changeRequestStore.selectedDiscussionIndex() > 0) {
+      changeRequestStore.setSelectedDiscussionIndex(prev => prev - 1);
     }
     return true;
   }
 
   // g to go to first
   if (event.name === 'g' || event.sequence === 'g') {
-    mrStore.setSelectedDiscussionIndex(0);
+    changeRequestStore.setSelectedDiscussionIndex(0);
     return true;
   }
 
   // G to go to last
   if (event.name === 'G' || event.sequence === 'G') {
-    mrStore.setSelectedDiscussionIndex(Math.max(0, totalDiscussions - 1));
+    changeRequestStore.setSelectedDiscussionIndex(Math.max(0, totalDiscussions - 1));
     return true;
   }
 

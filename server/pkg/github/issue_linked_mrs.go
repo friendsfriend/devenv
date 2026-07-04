@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strconv"
 
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/issues"
-	"github.com/friendsfriend/devenv/pkg/mr"
 )
 
 // closingRefPatterns matches GitHub closing keyword patterns in issue bodies.
@@ -119,15 +119,15 @@ func (ic *IssuesClient) fetchCrossReferencedPRs(ghInfo *RepoInfo, issueNumber in
 	return refs
 }
 
-// fetchPRDetails fetches a single PR and converts to mr.MergeRequest.
-func (ic *IssuesClient) fetchPRDetails(ghInfo *RepoInfo, prNum int) *mr.MergeRequest {
+// fetchPRDetails fetches a single PR and converts to changerequest.ChangeRequest.
+func (ic *IssuesClient) fetchPRDetails(ghInfo *RepoInfo, prNum int) *changerequest.ChangeRequest {
 	pr, err := ic.c.GetPullRequest(ghInfo, prNum)
 	if err != nil {
-		log.Printf("[WARN] GitHub GetIssueLinkedMRs: failed to fetch PR #%d: %v", prNum, err)
+		log.Printf("[WARN] GitHub GetIssueLinkedChangeRequests: failed to fetch PR #%d: %v", prNum, err)
 		return nil
 	}
 
-	result := mr.MergeRequest{
+	result := changerequest.ChangeRequest{
 		ID:                          pr.ID,
 		IID:                         pr.IID,
 		Title:                       pr.Title,
@@ -152,7 +152,7 @@ func (ic *IssuesClient) fetchPRDetails(ghInfo *RepoInfo, prNum int) *mr.MergeReq
 	result.Author.Username = pr.Author.Username
 
 	if pr.HeadPipeline != nil {
-		result.HeadPipeline = &mr.PipelineRef{
+		result.HeadPipeline = &changerequest.PipelineRef{
 			ID:     pr.HeadPipeline.ID,
 			Status: pr.HeadPipeline.Status,
 			WebURL: pr.HeadPipeline.WebURL,
@@ -162,12 +162,12 @@ func (ic *IssuesClient) fetchPRDetails(ghInfo *RepoInfo, prNum int) *mr.MergeReq
 	return &result
 }
 
-// GetIssueLinkedMRs implements issues.Client.GetIssueLinkedMRs for GitHub.
+// GetIssueLinkedChangeRequests implements issues.Client.GetIssueLinkedChangeRequests for GitHub.
 // It combines results from three sources:
 //  1. Closing keywords in the issue body (closes/fixes/resolves #123)
 //  2. Bare #123 references in the issue body
 //  3. Cross-referenced events from the issue timeline (PRs that reference this issue)
-func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]mr.MergeRequest, error) {
+func (ic *IssuesClient) GetIssueLinkedChangeRequests(info *issues.RepoInfo, number int) ([]changerequest.ChangeRequest, error) {
 	ghInfo := ic.info
 	if info != nil {
 		if info.Owner != "" && info.Repo != "" {
@@ -176,13 +176,13 @@ func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]
 	}
 
 	seen := make(map[int]bool)
-	var results []mr.MergeRequest
+	var results []changerequest.ChangeRequest
 
 	// Source 1: Parse issue body for closing keywords and bare # references
 	issue, err := ic.GetIssue(info, number)
 	if err == nil {
 		bodyRefs := parseClosingReferences(issue.Description)
-		log.Printf("[DEBUG] GitHub GetIssueLinkedMRs(#%d): %d references from body parsing", number, len(bodyRefs))
+		log.Printf("[DEBUG] GitHub GetIssueLinkedChangeRequests(#%d): %d references from body parsing", number, len(bodyRefs))
 
 		for _, prNum := range bodyRefs {
 			if seen[prNum] {
@@ -194,13 +194,13 @@ func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]
 			}
 		}
 	} else {
-		log.Printf("[WARN] GitHub GetIssueLinkedMRs: failed to fetch issue #%d body: %v", number, err)
+		log.Printf("[WARN] GitHub GetIssueLinkedChangeRequests: failed to fetch issue #%d body: %v", number, err)
 	}
 
 	// Source 2: Issue timeline cross-referenced events
 	// Catches PRs that reference this issue via PR body keywords or "Development" link
 	timelineRefs := ic.fetchCrossReferencedPRs(ghInfo, number)
-	log.Printf("[DEBUG] GitHub GetIssueLinkedMRs(#%d): %d references from timeline", number, len(timelineRefs))
+	log.Printf("[DEBUG] GitHub GetIssueLinkedChangeRequests(#%d): %d references from timeline", number, len(timelineRefs))
 
 	for _, prNum := range timelineRefs {
 		if seen[prNum] {

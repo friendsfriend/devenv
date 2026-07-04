@@ -14,12 +14,14 @@ interface ProvidersViewProps {
 }
 
 export function ProvidersView(props: ProvidersViewProps) {
-  const renderSecret = (hasValue: boolean): string => {
-    return hasValue ? '••••••••' : 'Not configured';
+  const renderSecret = (provider: Provider): string => {
+    if (provider.invalid) return 'Blocked';
+    return provider.has_token ? '••••••••' : 'Not configured';
   };
 
-  const getSecretColor = (hasValue: boolean) => {
-    return hasValue ? uiColors.success : uiColors.error;
+  const getSecretColor = (provider: Provider) => {
+    if (provider.invalid) return uiColors.warning;
+    return provider.has_token ? uiColors.success : uiColors.error;
   };
 
   return (
@@ -55,6 +57,13 @@ export function ProvidersView(props: ProvidersViewProps) {
             </box>
           </Show>
 
+          <Show when={props.providers.some((p) => p.invalid)}>
+            <box style={{ width: '100%', flexDirection: 'column', flexShrink: 0, marginBottom: 1 }}>
+              <text fg={uiColors.warning} attributes={TextAttributes.BOLD}>Provider credentials need migration</text>
+              <text fg={uiColors.textMuted}>Clear-text credentials in provider JSON are blocked. Move username/token to .env and use ${'{...}'} placeholders, or edit provider here to save secure placeholders.</text>
+            </box>
+          </Show>
+
           <For each={props.providers}>
             {(provider: Provider, idx) => {
               const isSelected = () => (props.selectedProviderIndex ?? -1) === idx();
@@ -74,15 +83,15 @@ export function ProvidersView(props: ProvidersViewProps) {
                     </text>
                   </box>
                   <box style={{ width: 10 }}>
-                    <text fg={uiColors.textSecondary}>{typeLabel}</text>
+                    <text fg={provider.invalid ? uiColors.warning : uiColors.textSecondary}>{provider.invalid ? 'Invalid' : typeLabel}</text>
                   </box>
                   <box style={{ width: 20 }}>
                     <text fg={uiColors.textSecondary}>
-                      {provider.username || '(no user)'}
+                      {provider.invalid ? '(blocked)' : provider.username || '(no user)'}
                     </text>
                   </box>
-                  <text fg={getSecretColor(provider.has_token)}>
-                    {renderSecret(provider.has_token)}
+                  <text fg={getSecretColor(provider)}>
+                    {renderSecret(provider)}
                   </text>
                 </box>
               );

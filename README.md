@@ -77,12 +77,12 @@ Task-focused guides are available from the TUI Help view (`?`) and linked below:
 - [Kubernetes Runtime](tui/packages/cli/src/tui/guides/kubernetes-runtime.md) — Run Helm app and infrastructure targets on managed kind
 - [Choosing a Runtime](tui/packages/cli/src/tui/guides/choosing-runtime.md) — When to use Docker Compose, Kubernetes, shell, or script infrastructure
 - [Adding an App](tui/packages/cli/src/tui/guides/adding-apps.md) — App definitions, Dockerfiles, Compose config, and infra linking
-- [Adding a Script](tui/packages/cli/src/tui/guides/adding-scripts.md) — Script discovery, --devenv-metadata convention, parameter types
+- [Adding a Task](tui/packages/cli/src/tui/guides/adding-scripts.md) — Task discovery, --devenv-metadata convention, parameter types
 - [Adding Infrastructure](tui/packages/cli/src/tui/guides/adding-infrastructure.md) — Infra definitions, Compose placement, sharing between apps
 - [Adding Libraries](tui/packages/cli/src/tui/guides/adding-libraries.md) — Library definitions, build and test Dockerfiles
 - [Using Worktrees](tui/packages/cli/src/tui/guides/using-worktrees.md) — Single checkout vs worktrees, worktrunk, IDE setup
 - [Using AI Features](tui/packages/cli/src/tui/guides/using-ai-features.md) — AI agent view, sessions, pi agent integration
-- [Using Git Integrations](tui/packages/cli/src/tui/guides/using-git-integrations.md) — Providers, MR/PR browsing, diff, discussions, approvals, AI review, pipelines, test results
+- [Using Git Integrations](tui/packages/cli/src/tui/guides/using-git-integrations.md) — Providers, Change Request browsing, diff, discussions, approvals, AI review, pipelines, test results
 - [Using the Log Viewer](tui/packages/cli/src/tui/guides/using-log-viewer.md) — Container logs, operation logs, search, visual mode, keyboard shortcuts
 - [Finding Logs](tui/packages/cli/src/tui/guides/finding-logs.md) — Log directory structure, status log format, per-app logs, server log
 
@@ -142,7 +142,7 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 
 | Variable | Default | Description |
 |---|---|---|
-| `DEVENV_HOME` | `~/devenv` | Root directory for cloned repositories, logs, and script collections |
+| `DEVENV_HOME` | `~/devenv` | Root directory for cloned repositories, logs, and task collections |
 | `DEVENV_CONFIG_DIR` | `~/.config/devenv` | Config directory override |
 | `DEVENV_CONTAINER_RUNTIME` | `docker` | Container runtime for Docker-compatible features. Set to `docker` or `podman` in `~/.config/devenv/.env` |
 | `DEVENV_PODMAN_HOST` | unset | Optional Podman Docker API socket override, e.g. `unix:///run/user/501/podman/podman.sock` |
@@ -161,7 +161,7 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 │   │   ├── <app-ident>-compose.yml          # Per-app compose files
 │   │   └── <app-ident>-<profile>-compose.yml # Per-app profile variants
 │   ├── definitions/                     # Per-app JSON definitions (split files)
-│   └── build/                           # Custom Dockerfiles (formerly dockerfiles/)
+│   └── build/                           # Custom Dockerfiles
 │       ├── <app-ident>-build.Dockerfile     # App-specific build Dockerfile
 │       └── <app-ident>-test.Dockerfile      # App-specific test Dockerfile
 ├── infrastructure/
@@ -173,7 +173,7 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 ├── templates/                           # Template files (copied into app directories)
 ```
 
-Script collections live under `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`), not in the config directory. If you share `~/.config/devenv` as a config repository, sync scripts separately:
+Task collections live under `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`), not in the config directory. If you share `~/.config/devenv` as a config repository, sync tasks separately:
 
 ```
 ~/devenv/scripts/                       # Any executable file is a script
@@ -191,7 +191,7 @@ Optional local file for machine-specific DevEnv settings and `${VAR}` substituti
 
 | Variable | Description |
 |---|---|
-| `DEVENV_HOME` | Root directory for cloned repositories, logs, and script collections |
+| `DEVENV_HOME` | Root directory for cloned repositories, logs, and task collections |
 | `DEVENV_CONTAINER_RUNTIME` | Container runtime: `docker` (default) or `podman` |
 | `DEVENV_PODMAN_HOST` | Optional Podman Docker API socket override |
 | `CUSTOM_ENV_VAR` | Available as `${CUSTOM_ENV_VAR}` in compose files, provider JSON, and templates |
@@ -250,7 +250,7 @@ See Help → Guides → Custom Themes for full field guidance.
 
 ### `providers/`
 
-Git provider definitions are stored as individual JSON files in `~/.config/devenv/providers/`. DevEnv-managed providers store actual credentials in `.env` and write `${...}` placeholders into provider JSON, making provider metadata safe to share in a config repository. Legacy clear-text provider JSON still loads, but should not be committed.
+Git provider definitions are stored as individual JSON files in `~/.config/devenv/providers/`. Actual credentials live in `.env`; provider JSON must use `${...}` placeholders for `username` and `token`, making provider metadata safe to share in a config repository. Clear-text credentials in provider JSON are rejected.
 
 **Schema:**
 
@@ -299,7 +299,7 @@ Each deployable application is defined by a single JSON file in `apps/definition
 - **Git operations** — clone, pull, push, fetch, branch switching (`g`), worktree management (`w`)
 - **Docker lifecycle** — start (`s`), stop (`S`), restart (`R`), build (`B`), test
 - **Status dashboard** — real-time container status via SSE, port mapping, resource stats
-- **Merge requests / Pull requests** — browse, diff, discuss, approve, rebase (`m` / `M`)
+- **Change requests** — browse, diff, discuss, approve, rebase (`m` / `M`)
 - **CI/CD pipelines** — view pipeline jobs, logs, test results
 - **Logs** — container logs (`l`), operation logs (`o`)
 
@@ -323,7 +323,7 @@ Each deployable application is defined by a single JSON file in `apps/definition
 | `displayName` | string | Human-readable name shown in the TUI |
 | `repositoryPath` | string | Git remote URL (HTTPS or SSH) |
 | `containerBaseName` | string | Docker container base name (optional, defaults to ident) |
-| `sourceType` | string | `"github"` or `"gitlab"` — enables MR/PR integration (optional) |
+| `sourceType` | string | `"github"` or `"gitlab"` — enables Change Request integration (optional) |
 | `provider` | string | Name of the provider from `providers/` (optional, used for authenticated API access) |
 | `gitMode` | string | `"BRANCH"` (single checkout, default) or `"WORKTREE"` (parallel worktrees via worktrunk) |
 
@@ -507,7 +507,7 @@ Infrastructure services (databases, message queues, caches, etc.) appear in the 
 - **Status dashboard** — real-time container status via SSE
 - **Container logs** (`l`)
 
-Infrastructure services do **not** have git operations, build/test workflows, MR/PR integration, or CI/CD pipeline features.
+Infrastructure services do **not** have git operations, build/test workflows, Change Request integration, or CI/CD pipeline features.
 
 **Schema (`infrastructure/definitions/<ident>.json`):**
 
@@ -539,7 +539,7 @@ Libraries use the same schema as apps, but their type is derived from their defi
 
 - **Git operations** — clone, pull, push, fetch, branch switching, worktree management
 - **Docker lifecycle** — build (`B`), test
-- **Merge requests / Pull requests** — full MR/PR workflow
+- **Change requests** — full Change Request workflow
 - **CI/CD pipelines** — pipeline jobs, logs, test results
 - **Logs** — operation logs
 
@@ -568,7 +568,7 @@ Template files that are copied into app directories during initialization. All f
 
 ### `scripts/`
 
-Script collections for the Scripts tab in the TUI. Scripts are discovered recursively from `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`) and support both flat and nested layouts.
+Task collections for the Tasks tab in the TUI. Tasks are executable script files discovered recursively from `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`) and support both flat and nested layouts.
 
 **Discovery rules:**
 - **Unix:** Any executable file (`+x`) is treated as a script, regardless of extension. The OS handles interpreter selection via the shebang (`#!`) line.
@@ -585,13 +585,13 @@ scripts/
 └── cleanup                # Binary executable (no extension, +x)
 ```
 
-From the Scripts tab you can browse folders, run scripts, and open script files in your editor.
+From the Tasks tab you can browse folders, run tasks, and open task files in your editor.
 
 #### Parameter Metadata (`--devenv-metadata`)
 
-Scripts can declare their parameter schema via the `--devenv-metadata` convention. When DevEnv needs to know a script's parameters (before showing the input modal), it runs `./script --devenv-metadata`, captures stdout, and parses the JSON output.
+Tasks can declare their parameter schema via the `--devenv-metadata` convention. When DevEnv needs to know a task's parameters (before showing the input modal), it runs the task file with `--devenv-metadata`, captures stdout, and parses the JSON output.
 
-If the script exits with code 0 and prints valid JSON, the parsed parameters are used. If it fails, times out (3s), or prints invalid JSON, the script is treated as having no parameters (silent fallback, no error shown). Results are cached per-file and invalidated when the file's mtime changes.
+If the task exits with code 0 and prints valid JSON, the parsed parameters are used. If it fails, times out (3s), or prints invalid JSON, the task is treated as having no parameters (silent fallback, no error shown). Results are cached per-file and invalidated when the file's mtime changes.
 
 **JSON schema (printed to stdout on `--devenv-metadata`):**
 
@@ -690,7 +690,7 @@ Both foreground (interactive TUI via `spawnSync`) and server-side (background vi
 #### TUI interaction
 
 In the parameter modal:
-- `Enter` / `s` — Run the script (shows args modal first if metadata declares parameters)
+- `Enter` / `s` — Run the task (shows args modal first if metadata declares parameters)
 - `j/k` selects a parameter field
 - `Type` / `Backspace` edits text values
 - `←/→` cycles through enum choices
@@ -852,7 +852,7 @@ The three worktree fields in an app's JSON definition (`~/.config/devenv/apps/de
 ## Server Features
 
 - Docker container management (build, test, run, stop, status via SSE)
-- GitLab / GitHub API integration (merge requests, pipelines, branches)
+- GitLab / GitHub API integration (change requests, pipelines, branches)
 - Repository operations (clone, checkout, pull, push)
 - Convention-based Docker build/test/run with artifact extraction
 - Real-time status broadcasting via SSE

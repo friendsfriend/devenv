@@ -1,11 +1,11 @@
-import type { Discussion, MRChange } from '@devenv/types';
+import type { Discussion, ChangeRequestChange } from '@devenv/types';
 import { TimelineView, toTimelineItems } from './TimelineView';
 
 interface DiscussionsViewProps {
   discussions: Discussion[];
   selectedIndex: number;
   currentHeadSHA?: string;
-  changes?: MRChange[];
+  changes?: ChangeRequestChange[];
   onClose: () => void;
   loading?: boolean;
   error?: string;
@@ -15,8 +15,8 @@ interface DiscussionsViewProps {
 }
 
 /**
- * DiscussionsView — thin wrapper around TimelineView for MR discussions.
- * Normalizes Discussion[] → TimelineItem[] and passes MR-specific props.
+ * DiscussionsView — thin wrapper around TimelineView for CR discussions.
+ * Normalizes Discussion[] → TimelineItem[] and passes CR-specific props.
  */
 export function DiscussionsView(props: DiscussionsViewProps) {
   return (

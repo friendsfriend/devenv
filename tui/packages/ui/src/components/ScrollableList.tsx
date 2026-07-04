@@ -255,7 +255,7 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
   const visibleItems = createMemo(() => {
     if (props.items.length === 0) return [];
 
-    // Hot path for uniform-height lists (tables, issues, MRs): depend on the
+    // Hot path for uniform-height lists (tables, issues, CRs): depend on the
     // page window, not the exact selected index, so holding j/k only updates
     // selection styling and does not recreate every visible row.
     if (!props.itemHeights) {

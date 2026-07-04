@@ -25,7 +25,7 @@ export async function handleTableKeys(
 		appActions,
 		issueActions,
 		logActions,
-		mrActions,
+		crActions,
 		dockerActions,
 		gitActions,
 		providerActions,
@@ -470,14 +470,14 @@ export async function handleTableKeys(
 				logActions.loadOperationLogs();
 			break;
 		case "m":
-			// Show MR detail for current branch (lowercase m)
+			// Show CR detail for current branch (lowercase m)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				mrActions.loadMergeRequestForCurrentBranch();
+				crActions.loadChangeRequestForCurrentBranch();
 			break;
 		case "M":
-			// Show all open MRs list (uppercase M / Shift+M)
+			// Show all open CRs list (uppercase M / Shift+M)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				mrActions.loadAllMergeRequests();
+				crActions.loadAllChangeRequests();
 			break;
 		case "i":
 			// Open issue scope picker (lowercase i)

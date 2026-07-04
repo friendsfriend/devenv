@@ -11,8 +11,8 @@ import type { TableTab } from "@devenv/ui";
 
 export type ViewMode =
 	| "table"
-	| "mergeRequests"
-	| "mergeRequestDetail"
+	| "changeRequests"
+	| "changeRequestDetail"
 	| "changedFiles"
 	| "discussionsView"
 	| "testResults"
@@ -26,9 +26,9 @@ export type ViewMode =
 	| "issueDetail"
 	| "issueTimeline"
 	| "issueScopePicker"
-	| "linkedMRs"
+	| "linkedChangeRequests"
 	| "referencedIssues"
-	| "mrLinkedIssues"
+	| "changeRequestLinkedIssues"
 	| "references";
 
 export type TabType =
@@ -369,7 +369,7 @@ export function createAppStore() {
 				label: "Libraries",
 				count: allApps.filter((app) => app.appType === "LIB").length,
 			},
-			{ id: "scripts", label: "Scripts", count: scriptVisibleRows().length },
+			{ id: "scripts", label: "Tasks", count: scriptVisibleRows().length },
 		];
 	});
 

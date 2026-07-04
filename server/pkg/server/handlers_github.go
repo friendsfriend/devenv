@@ -16,9 +16,9 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/github"
 	"github.com/friendsfriend/devenv/pkg/gitlab"
-	"github.com/friendsfriend/devenv/pkg/mr"
 )
 
 func (s *Server) resolveGitHubClient(targetApp *app.App) (github.Client, *github.RepoInfo, string, error) {
@@ -38,7 +38,7 @@ func (s *Server) resolveGitHubClient(targetApp *app.App) (github.Client, *github
 	return client, repoInfo, username, nil
 }
 
-// resolveGitHubMRClient returns a GitHub client with the repo info converted to mr.RepoInfo.
+// resolveGitHubMRClient returns a GitHub client with the repo info converted to changerequest.RepoInfo.
 func (s *Server) resolveGitHubMRClient(targetApp *app.App) (github.Client, *github.RepoInfo, error) {
 	repoInfo, err := github.ExtractRepoInfo(targetApp.RepositoryPath)
 	if err != nil {
@@ -134,7 +134,7 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		state = "opened"
 	}
 
-	result, err := ghClient.GetMRs(repoInfo.ToMR(), &mr.MRListOptions{
+	result, err := ghClient.GetChangeRequests(repoInfo.ToChangeRequest(), &changerequest.ChangeRequestListOptions{
 		SourceBranch:  sourceBranchFilter,
 		State:         state,
 		Page:          page,
@@ -150,7 +150,7 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if len(result.MergeRequests) == 0 {
+	if len(result.ChangeRequests) == 0 {
 		var errorMsg string
 		if sourceBranchFilter != "" {
 			errorMsg = fmt.Sprintf("No open pull request found for branch '%s'", currentBranch)
@@ -199,7 +199,7 @@ func (s *Server) handleGitHubPRChanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	changes, err := ghClient.GetMRChanges(repoInfo.ToMR(), prNumber)
+	changes, err := ghClient.GetChangeRequestChanges(repoInfo.ToChangeRequest(), prNumber)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch PR changes: %v", err), http.StatusInternalServerError)
 		return
@@ -243,7 +243,7 @@ func (s *Server) handleGitHubPRDiscussions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	discussions, err := ghClient.GetDiscussions(repoInfo.ToMR(), prNumber)
+	discussions, err := ghClient.GetDiscussions(repoInfo.ToChangeRequest(), prNumber)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch PR discussions: %v", err), http.StatusInternalServerError)
 		return
@@ -287,7 +287,7 @@ func (s *Server) handleGitHubPRApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := ghClient.Approve(repoInfo.ToMR(), prNumber); err != nil {
+	if err := ghClient.Approve(repoInfo.ToChangeRequest(), prNumber); err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to approve pull request: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -330,7 +330,7 @@ func (s *Server) handleGitHubPRUnapprove(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := ghClient.Unapprove(repoInfo.ToMR(), prNumber); err != nil {
+	if err := ghClient.Unapprove(repoInfo.ToChangeRequest(), prNumber); err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to unapprove pull request: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -373,7 +373,7 @@ func (s *Server) handleGitHubPRToggleApproval(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := ghClient.ToggleApproval(repoInfo.ToMR(), prNumber); err != nil {
+	if err := ghClient.ToggleApproval(repoInfo.ToChangeRequest(), prNumber); err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to toggle pull request approval: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -416,7 +416,7 @@ func (s *Server) handleGitHubActionsJobs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	jobs, err := ghClient.GetPipelineJobs(repoInfo.ToMR(), runID)
+	jobs, err := ghClient.GetPipelineJobs(repoInfo.ToChangeRequest(), runID)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch actions jobs: %v", err), http.StatusInternalServerError)
 		return
@@ -487,7 +487,7 @@ func (s *Server) handleGitHubActionsJobLogs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	logs, err := ghClient.GetJobLogs(repoInfo.ToMR(), jobID)
+	logs, err := ghClient.GetJobLogs(repoInfo.ToChangeRequest(), jobID)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch job logs: %v", err), http.StatusInternalServerError)
 		return

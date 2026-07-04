@@ -7,9 +7,9 @@ import { gitlabHtmlToMarkdown, containsHtml } from '../utils/gitlabHtml';
 import { calculateVisibleItems } from '../utils/virtualScroll';
 import { LAYOUT_CHROME_LINES } from './ScrollableList';
 import { ContentPanel } from './ContentStack';
-import type { Discussion, MRChange, IssueComment, NotePosition } from '@devenv/types';
+import type { Discussion, ChangeRequestChange, IssueComment, NotePosition } from '@devenv/types';
 
-// ── Normalized timeline item shared by MR discussions and issue comments ──
+// ── Normalized timeline item shared by CR discussions and issue comments ──
 
 interface TimelineNote {
   id: number;
@@ -26,11 +26,11 @@ interface TimelineNote {
 export interface TimelineItem {
   id: string;
   notes: TimelineNote[];
-  /** MR-only: position in diff */
+  /** CR-only: position in diff */
   position?: NotePosition;
-  /** MR-only: resolvable thread */
+  /** CR-only: resolvable thread */
   resolvable?: boolean;
-  /** MR-only: thread is resolved */
+  /** CR-only: thread is resolved */
   resolved?: boolean;
 }
 
@@ -42,9 +42,9 @@ export interface TimelineViewProps {
   loading?: boolean;
   error?: string;
 
-  // MR-specific features (optional — only wired when viewing MR discussions)
+  // CR-specific features (optional — only wired when viewing CR discussions)
   currentHeadSHA?: string;
-  changes?: MRChange[];
+  changes?: ChangeRequestChange[];
   replyModeId?: string | null;
   replyText?: string;
   showOnlyComments?: boolean;
@@ -61,7 +61,7 @@ export interface TimelineViewProps {
 
 // ── Normalizers ──────────────────────────────────────────────────────────
 
-/** Normalize a Discussion (MR) into a TimelineItem. */
+/** Normalize a Discussion (CR) into a TimelineItem. */
 function discussionToItem(d: Discussion): TimelineItem {
   const resolvableNotes = d.notes.filter(n => n.resolvable);
   const allResolved = resolvableNotes.length > 0 && resolvableNotes.every(n => n.resolved);
@@ -129,7 +129,7 @@ export function toTimelineItems(
 // ── Component ────────────────────────────────────────────────────────────
 
 /**
- * TimelineView — unified timeline display for MR discussions and issue comments.
+ * TimelineView — unified timeline display for CR discussions and issue comments.
  *
  * Two-column layout:
  *   Left  (60%) — vertical timeline list
@@ -227,7 +227,7 @@ export function TimelineView(props: TimelineViewProps) {
     return containsHtml(body) ? gitlabHtmlToMarkdown(body) : body;
   };
 
-  // ── MR-specific helpers ───────────────────────────────────────────────
+  // ── CR-specific helpers ───────────────────────────────────────────────
 
   const isItemOutdated = (item: TimelineItem): boolean => {
     if (!props.currentHeadSHA) return false;
@@ -254,7 +254,7 @@ export function TimelineView(props: TimelineViewProps) {
     return resolvableNotes.every(n => n.resolved);
   };
 
-  // ── Diff snippet (MR only) ────────────────────────────────────────────
+  // ── Diff snippet (CR only) ────────────────────────────────────────────
 
   interface DiffLine {
     type: 'added' | 'removed' | 'context' | 'header';
@@ -477,7 +477,7 @@ export function TimelineView(props: TimelineViewProps) {
               <Show when={selectedItem()}>
                 {(item) => (
                   <>
-                    {/* MR-only: Diff snippet */}
+                    {/* CR-only: Diff snippet */}
                     <Show when={!props.isIssueTimeline && getDiffSnippet(item())}>
                       {(snippet) => (
                         <box style={{ width: '100%', flexDirection: 'column', flexShrink: 0, marginBottom: 2 }}>
@@ -572,7 +572,7 @@ export function TimelineView(props: TimelineViewProps) {
                         }}
                       </For>
 
-                      {/* MR-only: Reply area */}
+                      {/* CR-only: Reply area */}
                       <Show when={!props.isIssueTimeline && selectedItem() && !isSystemItem(selectedItem()!)}>
                         <box style={{ width: '100%', flexDirection: 'column', flexShrink: 0, paddingTop: 1 }}>
                           <Show when={replyMode() === selectedItem()!.id}>

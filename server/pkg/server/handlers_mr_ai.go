@@ -448,16 +448,16 @@ func streamMRReviewPi(ctx context.Context, w http.ResponseWriter, flusher http.F
 			}
 
 			var e struct {
-				Type string `json:"type"`
+				Type                  string `json:"type"`
 				AssistantMessageEvent *struct {
 					Type  string `json:"type"`
 					Delta string `json:"delta"`
 				} `json:"assistantMessageEvent"`
-				ToolName string `json:"toolName"`
+				ToolName string          `json:"toolName"`
 				Args     json.RawMessage `json:"args"`
-				Command  string `json:"command"`
-				Success  *bool  `json:"success"`
-				Error    string `json:"error"`
+				Command  string          `json:"command"`
+				Success  *bool           `json:"success"`
+				Error    string          `json:"error"`
 			}
 			if err := json.Unmarshal(evt.data, &e); err != nil {
 				continue

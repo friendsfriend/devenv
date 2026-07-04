@@ -1,14 +1,14 @@
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
 import { uiColors } from '../colors';
-import type { MRChange } from '@devenv/types';
+import type { ChangeRequestChange } from '@devenv/types';
 import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
 
 interface ChangedFilesViewProps {
-  changes: MRChange[];
+  changes: ChangeRequestChange[];
   selectedIndex: number;
   onClose: () => void;
   loading?: boolean;
@@ -18,7 +18,7 @@ interface ChangedFilesViewProps {
 }
 
 /**
- * ChangedFilesView Component - Displays changed files in a merge request
+ * ChangedFilesView Component - Displays changed files in a change request
  * Shows file paths, change types, and diff statistics
  * 
  * PATTERN: Parent-controlled navigation (OpenTUI limitation)
@@ -28,7 +28,7 @@ interface ChangedFilesViewProps {
  */
 export function ChangedFilesView(props: ChangedFilesViewProps) {
   // Get change type and color
-  const getChangeType = (change: MRChange) => {
+  const getChangeType = (change: ChangeRequestChange) => {
     if (change.new_file) {
       return { type: 'Added', color: uiColors.success, icon: '+' };
     } else if (change.deleted_file) {
@@ -41,7 +41,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   };
 
   // Get file path (show new_path for renamed/new, old_path for deleted)
-  const getFilePath = (change: MRChange) => {
+  const getFilePath = (change: ChangeRequestChange) => {
     if (change.renamed_file) {
       return `${change.old_path} → ${change.new_path}`;
     }
@@ -125,7 +125,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
         </Show>
 
         {/* Table Rows — rendered via ScrollableList for correct virtual windowing */}
-        <ScrollableList<MRChange>
+        <ScrollableList<ChangeRequestChange>
           items={props.changes}
           selectedIndex={props.selectedIndex}
           reservedLines={RESERVED_LINES}

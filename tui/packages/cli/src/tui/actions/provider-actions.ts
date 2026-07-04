@@ -71,8 +71,13 @@ export function createProviderActions(
     providerStore.setShowAddAppModal(true);
     try {
       const providers = await client.getProviders();
-      providerStore.setAddAppProviders(providers.map((p) => ({ name: p.name, type: p.type })));
-      if (providers.length === 0) providerStore.setAddAppError('No providers configured. Add a provider first.');
+      const usableProviders = providers.filter((p) => !p.invalid);
+      providerStore.setAddAppProviders(usableProviders.map((p) => ({ name: p.name, type: p.type })));
+      if (usableProviders.length === 0) {
+        providerStore.setAddAppError(providers.length === 0
+          ? 'No providers configured. Add a provider first.'
+          : 'All providers are invalid. Open providers view and move clear-text credentials to .env placeholders.');
+      }
     } catch (e) {
       providerStore.setAddAppError(e instanceof Error ? e.message : 'Failed to load providers');
     } finally {
@@ -164,6 +169,10 @@ export function createProviderActions(
     if (idx < 0 || idx >= list.length) return;
     const provider = list[idx];
     if (!provider) return;
+    if (provider.type !== 'github' && provider.type !== 'gitlab') {
+      showError('Cannot Edit Provider', 'Provider type is missing or invalid. Delete and recreate this provider.');
+      return;
+    }
     resetConnectProviderModal();
     providerStore.setConnectProviderEditMode(true);
     providerStore.setConnectProviderType(provider.type);

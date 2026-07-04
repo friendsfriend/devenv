@@ -10,11 +10,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/issues"
-	"github.com/friendsfriend/devenv/pkg/mr"
 )
 
-// glClosedByMR represents a GitLab merge request returned by the closed_by endpoint.
+// glClosedByMR represents a GitLab change request returned by the closed_by endpoint.
 type glClosedByMR struct {
 	ID          int    `json:"id"`
 	IID         int    `json:"iid"`
@@ -42,9 +42,9 @@ type glClosedByMR struct {
 	BlockingDiscussionsResolved bool `json:"blocking_discussions_resolved"`
 }
 
-// convertGLClosedByMR converts a GitLab closed_by MR to the unified mr.MergeRequest format.
-func convertGLClosedByMR(glMR glClosedByMR) mr.MergeRequest {
-	result := mr.MergeRequest{
+// convertGLClosedByMR converts a GitLab closed_by MR to the unified changerequest.ChangeRequest format.
+func convertGLClosedByMR(glMR glClosedByMR) changerequest.ChangeRequest {
+	result := changerequest.ChangeRequest{
 		ID:                          glMR.ID,
 		IID:                         glMR.IID,
 		Title:                       glMR.Title,
@@ -66,7 +66,7 @@ func convertGLClosedByMR(glMR glClosedByMR) mr.MergeRequest {
 	result.Author.Username = glMR.Author.Username
 
 	if glMR.HeadPipeline != nil {
-		result.HeadPipeline = &mr.PipelineRef{
+		result.HeadPipeline = &changerequest.PipelineRef{
 			ID:     glMR.HeadPipeline.ID,
 			Status: glMR.HeadPipeline.Status,
 			WebURL: glMR.HeadPipeline.WebURL,
@@ -105,7 +105,7 @@ type glIssueLink struct {
 
 // fetchLinkedMRs calls the GitLab issue links API to find MRs linked to an issue
 // via GitLab's UI linking feature (not just closing references).
-func (ic *IssuesClient) fetchLinkedMRs(proj *ProjectInfo, issueIID int) ([]mr.MergeRequest, error) {
+func (ic *IssuesClient) fetchLinkedMRs(proj *ProjectInfo, issueIID int) ([]changerequest.ChangeRequest, error) {
 	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d/links",
 		ic.c.baseURL, projectPath, issueIID)
@@ -124,13 +124,13 @@ func (ic *IssuesClient) fetchLinkedMRs(proj *ProjectInfo, issueIID int) ([]mr.Me
 		return nil, fmt.Errorf("failed to parse issue links: %w", err)
 	}
 
-	var results []mr.MergeRequest
+	var results []changerequest.ChangeRequest
 	for _, link := range links {
 		if link.Target == nil || link.Target.Type != "merge_request" {
 			continue
 		}
-		// Convert to mr.MergeRequest — the link API returns basic info
-		result := mr.MergeRequest{
+		// Convert to changerequest.ChangeRequest — the link API returns basic info
+		result := changerequest.ChangeRequest{
 			ID:                          link.Target.ID,
 			IID:                         link.Target.IID,
 			Title:                       link.Target.Title,
@@ -183,7 +183,7 @@ func parseInlineMRReferences(body string) []int {
 }
 
 // fetchClosedByMRs calls the GitLab closed_by API endpoint for an issue.
-func (ic *IssuesClient) fetchClosedByMRs(proj *ProjectInfo, issueIID int) ([]mr.MergeRequest, error) {
+func (ic *IssuesClient) fetchClosedByMRs(proj *ProjectInfo, issueIID int) ([]changerequest.ChangeRequest, error) {
 	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/issues/%d/closed_by",
 		ic.c.baseURL, projectPath, issueIID)
@@ -202,7 +202,7 @@ func (ic *IssuesClient) fetchClosedByMRs(proj *ProjectInfo, issueIID int) ([]mr.
 		return nil, fmt.Errorf("failed to parse closed_by MRs: %w", err)
 	}
 
-	results := make([]mr.MergeRequest, 0, len(glMRs))
+	results := make([]changerequest.ChangeRequest, 0, len(glMRs))
 	for _, glMR := range glMRs {
 		results = append(results, convertGLClosedByMR(glMR))
 	}
@@ -212,7 +212,7 @@ func (ic *IssuesClient) fetchClosedByMRs(proj *ProjectInfo, issueIID int) ([]mr.
 
 // fetchMRByIID fetches a single MR by IID using the existing MR client infrastructure.
 // We reuse the project's MR client via the underlying GitLab http client.
-func (ic *IssuesClient) fetchMRByIID(proj *ProjectInfo, mrIID int) (*mr.MergeRequest, error) {
+func (ic *IssuesClient) fetchMRByIID(proj *ProjectInfo, mrIID int) (*changerequest.ChangeRequest, error) {
 	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d",
 		ic.c.baseURL, projectPath, mrIID)
@@ -235,10 +235,10 @@ func (ic *IssuesClient) fetchMRByIID(proj *ProjectInfo, mrIID int) (*mr.MergeReq
 	return &result, nil
 }
 
-// GetIssueLinkedMRs implements issues.Client.GetIssueLinkedMRs for GitLab.
+// GetIssueLinkedChangeRequests implements issues.Client.GetIssueLinkedChangeRequests for GitLab.
 // It calls the GitLab closed_by API endpoint for closing MRs and also parses
 // the issue description for !{n} inline references, merging and deduplicating results.
-func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]mr.MergeRequest, error) {
+func (ic *IssuesClient) GetIssueLinkedChangeRequests(info *issues.RepoInfo, number int) ([]changerequest.ChangeRequest, error) {
 	proj := ic.project
 	if info != nil && info.Namespace != "" && info.Project != "" {
 		proj = &ProjectInfo{
@@ -251,7 +251,7 @@ func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]
 	// 1. Fetch closed_by MRs
 	closedByMRs, err := ic.fetchClosedByMRs(proj, number)
 	if err != nil {
-		log.Printf("[WARN] GitLab GetIssueLinkedMRs: failed to fetch closed_by MRs for issue #%d: %v", number, err)
+		log.Printf("[WARN] GitLab GetIssueLinkedChangeRequests: failed to fetch closed_by MRs for issue #%d: %v", number, err)
 		closedByMRs = nil
 	}
 
@@ -264,7 +264,7 @@ func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]
 	// 1b. Also fetch issue links (catches draft MRs linked via GitLab UI)
 	linkedMRs, err := ic.fetchLinkedMRs(proj, number)
 	if err != nil {
-		log.Printf("[WARN] GitLab GetIssueLinkedMRs: failed to fetch linked MRs for issue #%d: %v", number, err)
+		log.Printf("[WARN] GitLab GetIssueLinkedChangeRequests: failed to fetch linked MRs for issue #%d: %v", number, err)
 	}
 	for _, mr := range linkedMRs {
 		if !seen[mr.IID] {
@@ -276,16 +276,16 @@ func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]
 	// 2. Fetch the issue description and parse !{n} references
 	issue, err := ic.GetIssue(info, number)
 	if err != nil {
-		log.Printf("[WARN] GitLab GetIssueLinkedMRs: failed to fetch issue #%d for inline refs: %v", number, err)
+		log.Printf("[WARN] GitLab GetIssueLinkedChangeRequests: failed to fetch issue #%d for inline refs: %v", number, err)
 		// Return closed_by results even if we can't get the issue body
 		if closedByMRs == nil {
-			return []mr.MergeRequest{}, nil
+			return []changerequest.ChangeRequest{}, nil
 		}
 		return closedByMRs, nil
 	}
 
 	inlineRefs := parseInlineMRReferences(issue.Description)
-	log.Printf("[DEBUG] GitLab GetIssueLinkedMRs(#%d): %d closed_by MRs, %d inline refs", number, len(closedByMRs), len(inlineRefs))
+	log.Printf("[DEBUG] GitLab GetIssueLinkedChangeRequests(#%d): %d closed_by MRs, %d inline refs", number, len(closedByMRs), len(inlineRefs))
 
 	if len(inlineRefs) > 0 {
 		for _, refIID := range inlineRefs {
@@ -294,7 +294,7 @@ func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]
 			}
 			mrResult, err := ic.fetchMRByIID(proj, refIID)
 			if err != nil {
-				log.Printf("[WARN] GitLab GetIssueLinkedMRs: failed to fetch inline MR !%d: %v", refIID, err)
+				log.Printf("[WARN] GitLab GetIssueLinkedChangeRequests: failed to fetch inline MR !%d: %v", refIID, err)
 				continue
 			}
 			seen[refIID] = true
@@ -303,7 +303,7 @@ func (ic *IssuesClient) GetIssueLinkedMRs(info *issues.RepoInfo, number int) ([]
 	}
 
 	if closedByMRs == nil {
-		return []mr.MergeRequest{}, nil
+		return []changerequest.ChangeRequest{}, nil
 	}
 
 	return closedByMRs, nil

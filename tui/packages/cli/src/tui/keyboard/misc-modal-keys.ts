@@ -707,7 +707,7 @@ export async function handleMiscModalKeys(
       event.sequence === '\x1b' ||
       event.raw === '\x1b'
     ) {
-      // Go back to table (MR detail and other views already handled above)
+      // Go back to table (CR detail and other views already handled above)
       appStore.setViewMode('table');
     }
     return true;

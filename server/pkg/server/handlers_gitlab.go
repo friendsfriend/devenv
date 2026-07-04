@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/gitlab"
-	"github.com/friendsfriend/devenv/pkg/mr"
 )
 
 func (s *Server) resolveGitLabClient(targetApp *app.App) (gitlab.Client, *gitlab.ProjectInfo, string, error) {
@@ -31,8 +31,8 @@ func (s *Server) resolveGitLabClient(targetApp *app.App) (gitlab.Client, *gitlab
 	return client, projectInfo, username, nil
 }
 
-// handleGitLabMergeRequests fetches merge requests for a given app
-func (s *Server) handleGitLabMergeRequests(w http.ResponseWriter, r *http.Request) {
+// handleGitLabChangeRequests fetches change requests for a given app
+func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
 		return
@@ -91,7 +91,7 @@ func (s *Server) handleGitLabMergeRequests(w http.ResponseWriter, r *http.Reques
 			currentBranch != "quality"
 
 		if !isFeatureBranch {
-			respondBadRequest(w, fmt.Sprintf("Branch '%s' is not a feature branch. No merge request to show.", currentBranch))
+			respondBadRequest(w, fmt.Sprintf("Branch '%s' is not a feature branch. No change request to show.", currentBranch))
 			return
 		}
 		sourceBranchFilter = currentBranch
@@ -121,9 +121,9 @@ func (s *Server) handleGitLabMergeRequests(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Get merge requests with pagination options via the mr.Client adapter
+	// Get change requests with pagination options via the changerequest.Client adapter
 	mrClient := gitlab.NewMRClient(gitlabClient)
-	result, err := mrClient.GetMRs(projectInfo.ToMR(), &mr.MRListOptions{
+	result, err := mrClient.GetChangeRequests(projectInfo.ToChangeRequest(), &changerequest.ChangeRequestListOptions{
 		SourceBranch:  sourceBranchFilter,
 		TargetBranch:  "develop",
 		State:         state,
@@ -136,17 +136,17 @@ func (s *Server) handleGitLabMergeRequests(w http.ResponseWriter, r *http.Reques
 		SkipDetails:   skipDetails,
 	})
 	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("Failed to fetch merge requests: %v", err), http.StatusInternalServerError)
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch change requests: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	// If no MRs found, return appropriate error
-	if len(result.MergeRequests) == 0 {
+	if len(result.ChangeRequests) == 0 {
 		var errorMsg string
 		if allBranches == "true" {
-			errorMsg = "No open merge requests found for this project"
+			errorMsg = "No open change requests found for this project"
 		} else {
-			errorMsg = fmt.Sprintf("No open merge request found for branch '%s' → develop", currentBranch)
+			errorMsg = fmt.Sprintf("No open change request found for branch '%s' → develop", currentBranch)
 		}
 		respondNotFound(w, errorMsg)
 		return
@@ -298,8 +298,8 @@ func (s *Server) handleGitLabTestSummary(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(testSummary)
 }
 
-// handleGitLabMRChanges fetches changed files for a specific merge request
-func (s *Server) handleGitLabMRChanges(w http.ResponseWriter, r *http.Request) {
+// handleGitLabChangeRequestChanges fetches changed files for a specific change request
+func (s *Server) handleGitLabChangeRequestChanges(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
 		return
@@ -349,7 +349,7 @@ func (s *Server) handleGitLabMRChanges(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[DEBUG] Fetching MR changes for MR %d", mrIID)
 
 	// Get MR changes
-	changes, err := gitlabClient.GetMRChanges(projectInfo, mrIID)
+	changes, err := gitlabClient.GetChangeRequestChanges(projectInfo, mrIID)
 	if err != nil {
 		log.Printf("[ERROR] Failed to fetch MR changes: %v", err)
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch MR changes: %v", err), http.StatusInternalServerError)
@@ -362,7 +362,7 @@ func (s *Server) handleGitLabMRChanges(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(changes)
 }
 
-// handleGitLabMRVersions fetches the versions (SHAs) for a merge request
+// handleGitLabMRVersions fetches the versions (SHAs) for a change request
 func (s *Server) handleGitLabMRVersions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
@@ -432,7 +432,7 @@ type MRCommentRequest struct {
 	Position *gitlab.DiffPosition `json:"position,omitempty"`
 }
 
-// handleGitLabMRComment creates a new comment/discussion on a merge request
+// handleGitLabMRComment creates a new comment/discussion on a change request
 func (s *Server) handleGitLabMRComment(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondMethodNotAllowed(w)
@@ -500,7 +500,7 @@ func (s *Server) handleGitLabMRComment(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleGitLabMRDiscussions fetches all discussions (comments) for a merge request
+// handleGitLabMRDiscussions fetches all discussions (comments) for a change request
 func (s *Server) handleGitLabMRDiscussions(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
@@ -708,7 +708,7 @@ func (s *Server) handleGitLabMRDiscussionResolve(w http.ResponseWriter, r *http.
 	})
 }
 
-// handleGitLabMRApprove approves a merge request
+// handleGitLabMRApprove approves a change request
 func (s *Server) handleGitLabMRApprove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondMethodNotAllowed(w)
@@ -759,14 +759,14 @@ func (s *Server) handleGitLabMRApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[INFO] Approving merge request: project=%s/%s, MR=!%d",
+	log.Printf("[INFO] Approving change request: project=%s/%s, MR=!%d",
 		projectInfo.Namespace, projectInfo.Project, mrIID)
 
-	// Approve the merge request
-	err = gitlabClient.ApproveMergeRequest(projectInfo, mrIID)
+	// Approve the change request
+	err = gitlabClient.ApproveChangeRequest(projectInfo, mrIID)
 	if err != nil {
-		log.Printf("[ERROR] Failed to approve merge request: %v", err)
-		respondErrorMessage(w, fmt.Sprintf("Failed to approve merge request: %v", err), http.StatusInternalServerError)
+		log.Printf("[ERROR] Failed to approve change request: %v", err)
+		respondErrorMessage(w, fmt.Sprintf("Failed to approve change request: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -780,7 +780,7 @@ func (s *Server) handleGitLabMRApprove(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleGitLabMRUnapprove removes approval from a merge request
+// handleGitLabMRUnapprove removes approval from a change request
 func (s *Server) handleGitLabMRUnapprove(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondMethodNotAllowed(w)
@@ -831,14 +831,14 @@ func (s *Server) handleGitLabMRUnapprove(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Printf("[INFO] Unapproving merge request: project=%s/%s, MR=!%d",
+	log.Printf("[INFO] Unapproving change request: project=%s/%s, MR=!%d",
 		projectInfo.Namespace, projectInfo.Project, mrIID)
 
-	// Unapprove the merge request
-	err = gitlabClient.UnapproveMergeRequest(projectInfo, mrIID)
+	// Unapprove the change request
+	err = gitlabClient.UnapproveChangeRequest(projectInfo, mrIID)
 	if err != nil {
-		log.Printf("[ERROR] Failed to unapprove merge request: %v", err)
-		respondErrorMessage(w, fmt.Sprintf("Failed to unapprove merge request: %v", err), http.StatusInternalServerError)
+		log.Printf("[ERROR] Failed to unapprove change request: %v", err)
+		respondErrorMessage(w, fmt.Sprintf("Failed to unapprove change request: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -852,7 +852,7 @@ func (s *Server) handleGitLabMRUnapprove(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// handleGitLabMRToggleApproval toggles the approval status of a merge request
+// handleGitLabMRToggleApproval toggles the approval status of a change request
 // Uses the backend config to determine current user and automatically approve/unapprove
 func (s *Server) handleGitLabMRToggleApproval(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -909,13 +909,13 @@ func (s *Server) handleGitLabMRToggleApproval(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	log.Printf("[INFO] Toggling approval for merge request: project=%s/%s, MR=!%d, user=%s",
+	log.Printf("[INFO] Toggling approval for change request: project=%s/%s, MR=!%d, user=%s",
 		projectInfo.Namespace, projectInfo.Project, mrIID, username)
 
 	// Toggle the approval (backend determines whether to approve or unapprove)
 	err = gitlabClient.ToggleMRApproval(projectInfo, mrIID, username)
 	if err != nil {
-		log.Printf("[ERROR] Failed to toggle merge request approval: %v", err)
+		log.Printf("[ERROR] Failed to toggle change request approval: %v", err)
 		respondErrorMessage(w, fmt.Sprintf("Failed to toggle approval: %v", err), http.StatusInternalServerError)
 		return
 	}
@@ -980,14 +980,14 @@ func (s *Server) handleGitLabMRRebase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[INFO] Rebasing merge request: project=%s/%s, MR=!%d",
+	log.Printf("[INFO] Rebasing change request: project=%s/%s, MR=!%d",
 		projectInfo.Namespace, projectInfo.Project, mrIID)
 
-	// Rebase the merge request
-	err = gitlabClient.RebaseMergeRequest(projectInfo, mrIID)
+	// Rebase the change request
+	err = gitlabClient.RebaseChangeRequest(projectInfo, mrIID)
 	if err != nil {
-		log.Printf("[ERROR] Failed to rebase merge request: %v", err)
-		respondErrorMessage(w, fmt.Sprintf("Failed to rebase merge request: %v", err), http.StatusInternalServerError)
+		log.Printf("[ERROR] Failed to rebase change request: %v", err)
+		respondErrorMessage(w, fmt.Sprintf("Failed to rebase change request: %v", err), http.StatusInternalServerError)
 		return
 	}
 

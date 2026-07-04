@@ -54,7 +54,7 @@ export async function handleGlobalKeys(
   actions: KeyboardActions,
   ctx: KeyboardContext,
 ): Promise<boolean> {
-  const { uiStore, appStore, logStore, agentStore, mrStore } = stores;
+  const { uiStore, appStore, logStore, agentStore, changeRequestStore } = stores;
   const { appActions, dockerActions, utilActions, logActions, agentActions } = actions;
   const { renderer, launchPi } = ctx;
 
@@ -82,7 +82,7 @@ export async function handleGlobalKeys(
     return true;
   }
 
-  const diffTextInputActive = mrStore.showDiffModal() && (mrStore.showCommentModal() || !!mrStore.replyMode());
+  const diffTextInputActive = changeRequestStore.showDiffModal() && (changeRequestStore.showCommentModal() || !!changeRequestStore.replyMode());
 
   // GLOBAL: Shift+T opens theme picker. Do not intercept text input in diff comments/replies.
   if (!diffTextInputActive && !uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {

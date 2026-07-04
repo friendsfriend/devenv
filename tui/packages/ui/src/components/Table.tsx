@@ -318,11 +318,11 @@ export function InfrastructureTable<T = string>(props: TableProps<T>) {
 	return <WorkItemTable {...props} emptyMessage="No infrastructure services" />;
 }
 
-export function ScriptTable<T = string>(props: TableProps<T>) {
-	return <WorkItemTable {...props} emptyMessage="No scripts" runningLabel={`${props.apps.length} scripts`} />;
+export function TaskTable<T = string>(props: TableProps<T>) {
+	return <WorkItemTable {...props} emptyMessage="No tasks" runningLabel={`${props.apps.length} tasks`} />;
 }
 
-/** @deprecated Use RepositoryTable, InfrastructureTable, or ScriptTable. */
+/** @deprecated Use RepositoryTable, InfrastructureTable, or TaskTable. */
 export function Table<T = string>(props: TableProps<T>) {
 	return <RepositoryTable {...props} />;
 }

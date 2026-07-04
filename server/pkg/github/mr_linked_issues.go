@@ -16,10 +16,10 @@ func parseIssueReferences(body string) []int {
 	return parseClosingReferences(body)
 }
 
-// GetMRLinkedIssues returns issues linked to a pull request.
+// GetChangeRequestLinkedIssues returns issues linked to a pull request.
 // It parses the PR body for issue references, fetches each referenced item,
 // and filters to only issues (excludes PRs).
-func (ic *IssuesClient) GetMRLinkedIssues(ghInfo *RepoInfo, prNumber int) ([]issues.Issue, error) {
+func (ic *IssuesClient) GetChangeRequestLinkedIssues(ghInfo *RepoInfo, prNumber int) ([]issues.Issue, error) {
 	// Fetch the PR to get its body/description
 	pr, err := ic.c.GetPullRequest(ghInfo, prNumber)
 	if err != nil {
@@ -27,7 +27,7 @@ func (ic *IssuesClient) GetMRLinkedIssues(ghInfo *RepoInfo, prNumber int) ([]iss
 	}
 
 	refs := parseIssueReferences(pr.Description)
-	log.Printf("[DEBUG] GitHub GetMRLinkedIssues(!%d): found %d issue references", prNumber, len(refs))
+	log.Printf("[DEBUG] GitHub GetChangeRequestLinkedIssues(!%d): found %d issue references", prNumber, len(refs))
 
 	if len(refs) == 0 {
 		return []issues.Issue{}, nil
@@ -48,7 +48,7 @@ func (ic *IssuesClient) GetMRLinkedIssues(ghInfo *RepoInfo, prNumber int) ([]iss
 
 		resp, err := ic.c.doRequest("GET", apiURL, nil)
 		if err != nil {
-			log.Printf("[WARN] GitHub GetMRLinkedIssues: failed to fetch issue #%d: %v", issueNum, err)
+			log.Printf("[WARN] GitHub GetChangeRequestLinkedIssues: failed to fetch issue #%d: %v", issueNum, err)
 			continue
 		}
 

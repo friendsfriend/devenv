@@ -1,12 +1,12 @@
 import { createSignal } from 'solid-js';
-import type { App, ContainerStats, MergeRequest } from '@devenv/types';
+import type { App, ContainerStats, ChangeRequest } from '@devenv/types';
 import type { AppDetailKind } from '@devenv/ui';
 
 export function createAppDetailStore() {
   const [appDetailApp, setAppDetailApp] = createSignal<App | undefined>(undefined);
   const [appDetailGitInfo, setAppDetailGitInfo] = createSignal<{ branch: string; status: string } | undefined>(undefined);
-  const [appDetailMRs, setAppDetailMRs] = createSignal<MergeRequest[]>([]);
-  const [appDetailMRsLoading, setAppDetailMRsLoading] = createSignal(false);
+  const [appDetailChangeRequests, setAppDetailCRs] = createSignal<ChangeRequest[]>([]);
+  const [appDetailChangeRequestsLoading, setAppDetailCRsLoading] = createSignal(false);
   const [appDetailLogs, setAppDetailLogs] = createSignal('');
   const [appDetailStatsHistory, setAppDetailStatsHistory] = createSignal<number[]>([]);
   const [appDetailMemHistory, setAppDetailMemHistory] = createSignal<number[]>([]);
@@ -19,10 +19,10 @@ export function createAppDetailStore() {
     setAppDetailApp,
     appDetailGitInfo,
     setAppDetailGitInfo,
-    appDetailMRs,
-    setAppDetailMRs,
-    appDetailMRsLoading,
-    setAppDetailMRsLoading,
+    appDetailChangeRequests,
+    setAppDetailCRs,
+    appDetailChangeRequestsLoading,
+    setAppDetailCRsLoading,
     appDetailLogs,
     setAppDetailLogs,
     appDetailStatsHistory,

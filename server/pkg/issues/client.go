@@ -2,7 +2,7 @@
 // across different Git providers (GitHub, GitLab, etc.).
 package issues
 
-import "github.com/friendsfriend/devenv/pkg/mr"
+import "github.com/friendsfriend/devenv/pkg/changerequest"
 
 // IssueListOptions holds pagination and filter options for listing issues.
 type IssueListOptions struct {
@@ -45,6 +45,6 @@ type Client interface {
 	GetRepoLabels(info *RepoInfo) ([]string, error)
 	GetRepoCollaborators(info *RepoInfo) ([]string, error)
 
-	// GetIssueLinkedMRs returns merge requests linked to an issue.
-	GetIssueLinkedMRs(info *RepoInfo, number int) ([]mr.MergeRequest, error)
+	// GetIssueLinkedChangeRequests returns change requests linked to an issue.
+	GetIssueLinkedChangeRequests(info *RepoInfo, number int) ([]changerequest.ChangeRequest, error)
 }

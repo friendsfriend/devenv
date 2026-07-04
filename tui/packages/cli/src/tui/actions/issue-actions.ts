@@ -96,9 +96,9 @@ export function createIssueActions(
 		issueStore.setIssueCommentsLoading(true);
 		issueStore.setIssueCommentsError("");
 		issueStore.setIssueComments([]);
-		issueStore.setLinkedMRs([]);
-		issueStore.setLinkedMRsError("");
-		issueStore.setLinkedMRsLoading(true);
+		issueStore.setLinkedCRs([]);
+		issueStore.setLinkedCRsError("");
+		issueStore.setLinkedCRsLoading(true);
 		issueStore.setReferencedIssues([]);
 		issueStore.setReferencedIssuesError("");
 		issueStore.setReferencedIssuesLoading(true);
@@ -111,29 +111,29 @@ export function createIssueActions(
 			return;
 		}
 
-		// Fetch comments, linked MRs, and referenced issues independently
+		// Fetch comments, linked CRs, and referenced issues independently
 		// so one failure doesn't block the others.
-		const [commentsResult, linkedMRsResult, referencedIssuesResult] =
+		const [commentsResult, linkedChangeRequestsResult, referencedIssuesResult] =
 			await Promise.allSettled([
 				client.getIssueComments(app.ident, issue.iid, app.sourceType),
-				client.getIssueLinkedMRs(app.ident, issue.iid, app.sourceType),
+				client.getIssueLinkedCRs(app.ident, issue.iid, app.sourceType),
 				client.getIssueReferencedIssues(app.ident, issue.iid, app.sourceType),
 			]);
 
 		const comments =
 			commentsResult.status === "fulfilled" ? commentsResult.value : null;
-		const linkedMRs =
-			linkedMRsResult.status === "fulfilled" ? linkedMRsResult.value : null;
+		const linkedChangeRequests =
+			linkedChangeRequestsResult.status === "fulfilled" ? linkedChangeRequestsResult.value : null;
 		const referencedIssues =
 			referencedIssuesResult.status === "fulfilled"
 				? referencedIssuesResult.value
 				: null;
 
 		issueStore.setIssueComments(comments?.items ?? []);
-		if (linkedMRsResult.status === "rejected") {
-			issueStore.setLinkedMRsError(errMsg(linkedMRsResult.reason));
+		if (linkedChangeRequestsResult.status === "rejected") {
+			issueStore.setLinkedCRsError(errMsg(linkedChangeRequestsResult.reason));
 		}
-		issueStore.setLinkedMRs(linkedMRs ?? []);
+		issueStore.setLinkedCRs(linkedChangeRequests ?? []);
 		if (referencedIssuesResult.status === "rejected") {
 			issueStore.setReferencedIssuesError(
 				errMsg(referencedIssuesResult.reason),
@@ -143,9 +143,9 @@ export function createIssueActions(
 
 		// Merge into unified references list
 		const refs: import("../stores/issue-store").ReferenceItem[] = [
-			...(linkedMRs ?? []).map((mr) => ({
-				type: "mr" as const,
-				data: mr,
+			...(linkedChangeRequests ?? []).map((cr) => ({
+				type: "cr" as const,
+				data: cr,
 			})),
 			...(referencedIssues ?? []).map((iss) => ({
 				type: "issue" as const,
@@ -161,7 +161,7 @@ export function createIssueActions(
 
 		issueStore.setIssueDetailLoading(false);
 		issueStore.setIssueCommentsLoading(false);
-		issueStore.setLinkedMRsLoading(false);
+		issueStore.setLinkedCRsLoading(false);
 		issueStore.setReferencedIssuesLoading(false);
 	};
 
@@ -410,36 +410,36 @@ export function createIssueActions(
 		issueStore.setShowAssigneePicker(true);
 	};
 
-	// ─── Linked MRs Actions ────────────────────────────────────────────────
+	// ─── Linked CRs Actions ────────────────────────────────────────────────
 
-	const loadIssueLinkedMRs = async (issueIID: number) => {
+	const loadIssueLinkedCRs = async (issueIID: number) => {
 		const app = getSelectedApp();
 		if (!app) return;
 
-		issueStore.setLinkedMRsLoading(true);
-		issueStore.setLinkedMRsError("");
-		issueStore.setLinkedMRs([]);
+		issueStore.setLinkedCRsLoading(true);
+		issueStore.setLinkedCRsError("");
+		issueStore.setLinkedCRs([]);
 
 		try {
-			const mrs = await client.getIssueLinkedMRs(
+			const crs = await client.getIssueLinkedCRs(
 				app.ident,
 				issueIID,
 				app.sourceType,
 			);
-			issueStore.setLinkedMRs(mrs ?? []);
+			issueStore.setLinkedCRs(crs ?? []);
 		} catch (e) {
-			issueStore.setLinkedMRsError(errMsg(e));
+			issueStore.setLinkedCRsError(errMsg(e));
 		} finally {
-			issueStore.setLinkedMRsLoading(false);
+			issueStore.setLinkedCRsLoading(false);
 		}
 	};
 
-	const showLinkedMRsSubView = () => {
-		appStore.setViewMode("linkedMRs");
+	const showLinkedCRsSubView = () => {
+		appStore.setViewMode("linkedChangeRequests");
 	};
 
-	const backToIssueDetailFromLinkedMRs = () => {
-		issueStore.setSelectedLinkedMRIndex(0);
+	const backToIssueDetailFromLinkedCRs = () => {
+		issueStore.setSelectedLinkedCRIndex(0);
 		appStore.setViewMode("issueDetail");
 	};
 
@@ -476,10 +476,10 @@ export function createIssueActions(
 		openLabelPicker,
 		openAssigneePicker,
 
-		// Linked MRs
-		loadIssueLinkedMRs,
-		showLinkedMRsSubView,
-		backToIssueDetailFromLinkedMRs,
+		// Linked CRs
+		loadIssueLinkedCRs,
+		showLinkedCRsSubView,
+		backToIssueDetailFromLinkedCRs,
 
 		// Referenced Issues
 		showReferencedIssuesSubView,

@@ -303,8 +303,8 @@ func NewIssuesClient(c Client, info *RepoInfo) issues.Client {
 	}
 }
 
-// issueToMR converts github.RepoInfo to issues.RepoInfo.
-func (ic *IssuesClient) issueToMR() *issues.RepoInfo {
+// issueToChangeRequest converts github.RepoInfo to issues.RepoInfo.
+func (ic *IssuesClient) issueToChangeRequest() *issues.RepoInfo {
 	return &issues.RepoInfo{
 		Owner: ic.info.Owner,
 		Repo:  ic.info.Repo,

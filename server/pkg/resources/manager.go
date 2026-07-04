@@ -20,7 +20,6 @@ type Manager interface {
 	ResolveInfrastructureComposeFile(infraIdent string) (string, error)
 	DiscoverProfiles(appIdent, localDir string) ([]string, error)
 	DiscoverActionTargets(appIdent, localDir string, action AppAction) ([]ActionTarget, error)
-	MigrateLegacyActionResources() ([]string, error)
 	WriteShellActionScript(appIdent string, action AppAction, profile string, command string) (string, error)
 	WritePowerShellActionScript(appIdent string, action AppAction, profile string, command string) (string, error)
 	EnvFilePath() (string, bool)

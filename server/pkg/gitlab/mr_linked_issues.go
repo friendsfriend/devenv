@@ -54,8 +54,8 @@ func convertGLClosesIssue(glIssue glClosesIssue) issues.Issue {
 	return result
 }
 
-// parseIssueRefsFromMRBody parses an MR description for #123 issue references.
-func parseIssueRefsFromMRBody(body string) []int {
+// parseIssueRefsFromChangeRequestBody parses an MR description for #123 issue references.
+func parseIssueRefsFromChangeRequestBody(body string) []int {
 	re := regexp.MustCompile(`#(\d+)\b`)
 	matches := re.FindAllStringSubmatch(body, -1)
 	seen := make(map[int]bool)
@@ -127,16 +127,16 @@ func (ic *IssuesClient) fetchIssueByIID(proj *ProjectInfo, issueIID int) (*issue
 	return &result, nil
 }
 
-// GetMRLinkedIssues returns issues linked to a merge request.
+// GetChangeRequestLinkedIssues returns issues linked to a change request.
 // It combines results from the closes_issues API and #123 refs in the MR description.
-func (ic *IssuesClient) GetMRLinkedIssues(proj *ProjectInfo, mrIID int) ([]issues.Issue, error) {
+func (ic *IssuesClient) GetChangeRequestLinkedIssues(proj *ProjectInfo, mrIID int) ([]issues.Issue, error) {
 	seen := make(map[int]bool)
 	var results []issues.Issue
 
 	// Source 1: closes_issues API
 	closedIssues, err := ic.fetchClosesIssues(proj, mrIID)
 	if err != nil {
-		log.Printf("[WARN] GitLab GetMRLinkedIssues: failed to fetch closes_issues for !%d: %v", mrIID, err)
+		log.Printf("[WARN] GitLab GetChangeRequestLinkedIssues: failed to fetch closes_issues for !%d: %v", mrIID, err)
 		closedIssues = nil
 	}
 	for _, iss := range closedIssues {
@@ -158,15 +158,15 @@ func (ic *IssuesClient) GetMRLinkedIssues(proj *ProjectInfo, mrIID int) ([]issue
 			Description string `json:"description"`
 		}
 		if err := json.Unmarshal(body, &mrDetail); err == nil && mrDetail.Description != "" {
-			refs := parseIssueRefsFromMRBody(mrDetail.Description)
-			log.Printf("[DEBUG] GitLab GetMRLinkedIssues(!%d): %d closes_issues, %d inline refs", mrIID, len(closedIssues), len(refs))
+			refs := parseIssueRefsFromChangeRequestBody(mrDetail.Description)
+			log.Printf("[DEBUG] GitLab GetChangeRequestLinkedIssues(!%d): %d closes_issues, %d inline refs", mrIID, len(closedIssues), len(refs))
 			for _, refIID := range refs {
 				if seen[refIID] {
 					continue
 				}
 				iss, err := ic.fetchIssueByIID(proj, refIID)
 				if err != nil {
-					log.Printf("[WARN] GitLab GetMRLinkedIssues: failed to fetch inline issue #%d: %v", refIID, err)
+					log.Printf("[WARN] GitLab GetChangeRequestLinkedIssues: failed to fetch inline issue #%d: %v", refIID, err)
 					continue
 				}
 				seen[refIID] = true
@@ -174,7 +174,7 @@ func (ic *IssuesClient) GetMRLinkedIssues(proj *ProjectInfo, mrIID int) ([]issue
 			}
 		}
 	} else {
-		log.Printf("[WARN] GitLab GetMRLinkedIssues: failed to fetch MR !%d body: %v", mrIID, err)
+		log.Printf("[WARN] GitLab GetChangeRequestLinkedIssues: failed to fetch MR !%d body: %v", mrIID, err)
 	}
 
 	return results, nil

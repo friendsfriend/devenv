@@ -3,7 +3,7 @@ import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } 
 
 /**
  * Handles keyboard events for the issue timeline view.
- * Simpler than MR discussions — no reply/resolve/diff features.
+ * Simpler than CR discussions — no reply/resolve/diff features.
  */
 export async function handleIssueTimelineKeys(
   event: KeyboardEvent,

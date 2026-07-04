@@ -5,9 +5,12 @@ export type ProviderType = "github" | "gitlab";
 
 export interface Provider {
 	name: string;
-	type: ProviderType;
+	type: ProviderType | '';
 	username: string;
 	has_token: boolean;
+	invalid?: boolean;
+	reason?: string;
+	message?: string;
 }
 
 export interface ProviderCreateRequest {
@@ -61,12 +64,12 @@ export interface InfraTableRow extends App {
 	rowKind: "infra";
 }
 
-export interface ScriptTableRow extends App {
+export interface TaskTableRow extends App {
 	rowKind: "script";
 	nodeType: "folder" | "script";
 }
 
-export type TableRow = AppTableRow | InfraTableRow | ScriptTableRow;
+export type TableRow = AppTableRow | InfraTableRow | TaskTableRow;
 
 export type AppAction = "build" | "test" | "run";
 export type ActionRuntime = "docker" | "shell" | "powershell" | "systemshell" | "kubernetes";
@@ -283,16 +286,16 @@ export interface ServerEvent {
 
 // GitLab Merge Request types
 
-// MRListResult represents a paginated response from the merge request list endpoint.
-export interface MRListResult {
-	items: MergeRequest[];
+// ChangeRequestListResult represents a paginated response from the merge request list endpoint.
+export interface ChangeRequestListResult {
+	items: ChangeRequest[];
 	totalCount: number;
 	totalPages: number;
 	currentPage: number;
 	perPage: number;
 }
 
-export interface MergeRequest {
+export interface ChangeRequest {
 	id: number;
 	iid: number;
 	title: string;
@@ -321,10 +324,10 @@ export interface MergeRequest {
 	blocking_discussions_resolved: boolean;
 	rebase_in_progress: boolean;
 	merge_error?: string; // error message if merge/rebase failed
-	approvals?: MRApprovals;
+	approvals?: ChangeRequestApprovals;
 }
 
-export interface MRApprovals {
+export interface ChangeRequestApprovals {
 	approvals_required: number;
 	approvals_left: number;
 	approved_by: Array<{
@@ -335,7 +338,7 @@ export interface MRApprovals {
 	}>;
 }
 
-export interface MRChange {
+export interface ChangeRequestChange {
 	old_path: string;
 	new_path: string;
 	a_mode: string;
