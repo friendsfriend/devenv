@@ -5,12 +5,12 @@ import type { ChangeRequest } from '@devenv/types';
  * review. The server appends the inline-comment callback instructions
  * automatically, so this just describes what the agent should review.
  */
-export function buildMrReviewPrompt(cr: ChangeRequest): string {
+export function buildCrReviewPrompt(cr: ChangeRequest): string {
   const descLine = cr.description?.trim()
     ? `\nDescription: ${cr.description.trim()}`
     : '';
 
-  return `You are reviewing a merge request. You are already inside the feature branch worktree.
+  return `You are reviewing a change request. You are already inside the feature branch worktree.
 
 CR: ${cr.title}
 Branch: ${cr.source_branch} → ${cr.target_branch}

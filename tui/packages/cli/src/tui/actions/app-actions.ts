@@ -172,7 +172,7 @@ export function createAppActions(
       }
       if (idx >= 0) appStore.setSelectedIndex(idx);
     } catch (e) {
-      showError('Failed to Load Scripts', e instanceof Error ? e.message : 'Unknown error');
+      showError('Failed to Load Tasks', e instanceof Error ? e.message : 'Unknown error');
     }
   };
 

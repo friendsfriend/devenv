@@ -45,20 +45,18 @@ func TestAppJSONCompatibility(t *testing.T) {
 		},
 		{
 			name:    "unknown extra fields unmarshal without error",
-			rawJSON: `{"ident":"shop-mw","displayName":"Shop Middleware","appType":"APP","unknownField":"ignored","nested":{"enabled":true}}`,
+			rawJSON: `{"ident":"shop-mw","displayName":"Shop Middleware","unknownField":"ignored","nested":{"enabled":true}}`,
 			wantApp: &App{
 				Ident:       "shop-mw",
 				DisplayName: "Shop Middleware",
-				AppType:     TypeAPP,
 			},
 		},
 		{
 			name:    "missing optional fields unmarshal as zero values",
-			rawJSON: `{"ident":"shared-lib","displayName":"Shared Library","appType":"LIB"}`,
+			rawJSON: `{"ident":"shared-lib","displayName":"Shared Library"}`,
 			wantApp: &App{
 				Ident:       "shared-lib",
 				DisplayName: "Shared Library",
-				AppType:     TypeLIB,
 			},
 		},
 		{
@@ -344,7 +342,7 @@ func TestRemoveAppDeletesSplitFile(t *testing.T) {
 		t.Fatalf("failed to create libraries directory: %v", err)
 	}
 
-	appJSON := `{"ident":"to-delete","displayName":"Delete Me","localDirectoryPath":"to-delete","appType":"APP"}`
+	appJSON := `{"ident":"to-delete","displayName":"Delete Me","localDirectoryPath":"to-delete"}`
 	if err := os.WriteFile(configDir+"/apps/definitions/to-delete.json", []byte(appJSON), 0644); err != nil {
 		t.Fatalf("failed to write app file: %v", err)
 	}
@@ -485,7 +483,7 @@ func TestSaveConfigWritesInfraSplitFiles(t *testing.T) {
 		t.Fatalf("failed to create apps directory: %v", err)
 	}
 
-	appJSON := `{"ident":"test-app","displayName":"Test","localDirectoryPath":"","appType":"APP"}`
+	appJSON := `{"ident":"test-app","displayName":"Test","localDirectoryPath":""}`
 	if err := os.WriteFile(configDir+"/apps/definitions/test-app.json", []byte(appJSON), 0644); err != nil {
 		t.Fatalf("failed to write app file: %v", err)
 	}
@@ -608,7 +606,7 @@ func TestLoadConfigWorktreePathResolvesToPrimaryWhenMainBranchUnknown(t *testing
 	if err := os.MkdirAll(configDir+"/apps/definitions", 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	appJSON := `{"ident":"wt-app","displayName":"WT App","appType":"APP","gitMode":"WORKTREE"}`
+	appJSON := `{"ident":"wt-app","displayName":"WT App","gitMode":"WORKTREE"}`
 	if err := os.WriteFile(configDir+"/apps/definitions/wt-app.json", []byte(appJSON), 0644); err != nil {
 		t.Fatalf("write app file: %v", err)
 	}
@@ -652,7 +650,7 @@ func TestLoadConfigWorktreePathResolvesToPrimaryWhenMainBranchMatches(t *testing
 	if err := os.MkdirAll(configDir+"/apps/definitions", 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	appJSON := `{"ident":"wt-app2","displayName":"WT App 2","appType":"APP","gitMode":"WORKTREE"}`
+	appJSON := `{"ident":"wt-app2","displayName":"WT App 2","gitMode":"WORKTREE"}`
 	if err := os.WriteFile(configDir+"/apps/definitions/wt-app2.json", []byte(appJSON), 0644); err != nil {
 		t.Fatalf("write app file: %v", err)
 	}
@@ -700,7 +698,7 @@ func TestLoadConfigWorktreePathResolvesToLinkedDirForNonMainBranch(t *testing.T)
 	if err := os.MkdirAll(configDir+"/apps/definitions", 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
 	}
-	appJSON := `{"ident":"wt-app3","displayName":"WT App 3","appType":"APP","gitMode":"WORKTREE"}`
+	appJSON := `{"ident":"wt-app3","displayName":"WT App 3","gitMode":"WORKTREE"}`
 	if err := os.WriteFile(configDir+"/apps/definitions/wt-app3.json", []byte(appJSON), 0644); err != nil {
 		t.Fatalf("write app file: %v", err)
 	}
@@ -757,7 +755,7 @@ func TestSetMainWorktreeBranchBeforeReloadConfig(t *testing.T) {
 		t.Fatalf("mkdir: %v", err)
 	}
 	// Simulate the JSON config file that handlers_apps.go writes for a new WORKTREE app.
-	appJSON := `{"ident":"installer-fe","displayName":"Installer FE","appType":"APP","gitMode":"WORKTREE"}`
+	appJSON := `{"ident":"installer-fe","displayName":"Installer FE","gitMode":"WORKTREE"}`
 	if err := os.WriteFile(configDir+"/apps/definitions/installer-fe.json", []byte(appJSON), 0644); err != nil {
 		t.Fatalf("write app file: %v", err)
 	}

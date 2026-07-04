@@ -12,7 +12,7 @@ import type {
 	AppActions,
 	IssueActions,
 	LogActions,
-	MrActions,
+	CrActions,
 	DockerActions,
 	GitActions,
 	ProviderActions,
@@ -50,7 +50,7 @@ export interface KeyboardActions {
 	appActions: AppActions;
 	issueActions: IssueActions;
 	logActions: LogActions;
-	crActions: MrActions;
+	crActions: CrActions;
 	dockerActions: DockerActions;
 	gitActions: GitActions;
 	providerActions: ProviderActions;

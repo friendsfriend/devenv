@@ -145,7 +145,7 @@ export async function* analyzeLogsWithAIStream(
 }
 
 /**
- * Streams an AI code review for a merge request.
+ * Streams an AI code review for a change request.
  * The server creates a temporary git worktree with the CR's source branch,
  * spawns pi inside that worktree so it can run `git diff` and browse files
  * autonomously, and streams the output back.

@@ -76,7 +76,7 @@ Task-focused guides are available from the TUI Help view (`?`) and linked below:
 - [Container Runtime](tui/packages/cli/src/tui/guides/container-runtime.md) — Choose Docker or Podman via `DEVENV_CONTAINER_RUNTIME`
 - [Kubernetes Runtime](tui/packages/cli/src/tui/guides/kubernetes-runtime.md) — Run Helm app and infrastructure targets on managed kind
 - [Choosing a Runtime](tui/packages/cli/src/tui/guides/choosing-runtime.md) — When to use Docker Compose, Kubernetes, shell, or script infrastructure
-- [Adding an App](tui/packages/cli/src/tui/guides/adding-apps.md) — App definitions, Dockerfiles, Compose config, and infra linking
+- [Adding a Repository](tui/packages/cli/src/tui/guides/adding-repositories.md) — App definitions, Dockerfiles, Compose config, and infra linking
 - [Adding a Task](tui/packages/cli/src/tui/guides/adding-scripts.md) — Task discovery, --devenv-metadata convention, parameter types
 - [Adding Infrastructure](tui/packages/cli/src/tui/guides/adding-infrastructure.md) — Infra definitions, Compose placement, sharing between apps
 - [Adding Libraries](tui/packages/cli/src/tui/guides/adding-libraries.md) — Library definitions, build and test Dockerfiles
@@ -712,8 +712,6 @@ The `pkg/resources/envfile.go` file provides the underlying logic through `LoadE
 
 It's recommended to maintain a `.env.example` file as a template with empty values for variables used in your compose/provider/template files.
 
-OpenCode MCP servers use a different mechanism (`{env:VAR}` resolved from the shell environment) and require the `.env` file to be sourced in the user's shell to function correctly.
-
 ---
 
 ## Runtime Directories
@@ -814,13 +812,13 @@ If you also use worktrunk directly from the terminal in the same repo the paths 
 
 ### Manual configuration
 
-The three worktree fields in an app's JSON definition (`~/.config/devenv/apps/definitions/<ident>.json`):
+Enable worktrees with `gitMode` in the repository definition (`~/.config/devenv/apps/definitions/<ident>.json` or `~/.config/devenv/libraries/definitions/<ident>.json`):
 
 | Field | Type | Description |
 |---|---|---|
-| `worktreeMode` | bool | `true` to enable worktree mode for this app |
-| `mainWorktreeBranch` | string | Branch checked out in the primary worktree (set once at creation, do not change) |
-| `activeWorktree` | string | Branch of the currently active worktree (updated automatically on branch switch) |
+| `gitMode` | string | `"WORKTREE"` enables parallel worktrees; `"BRANCH"` uses a single checkout |
+
+Runtime worktree state (active worktree and main branch) is stored outside the definition JSON.
 
 **Example:**
 
@@ -828,14 +826,10 @@ The three worktree fields in an app's JSON definition (`~/.config/devenv/apps/de
 {
   "ident": "my-app",
   "displayName": "My App",
-  "localDirectoryPath": "my-app",
   "repositoryPath": "https://github.com/org/my-app.git",
-  "branch": "feature/login",
   "containerBaseName": "my-app",
   "provider": "my-github",
-  "worktreeMode": true,
-  "mainWorktreeBranch": "main",
-  "activeWorktree": "feature/login"
+  "gitMode": "WORKTREE"
 }
 ```
 
@@ -862,7 +856,7 @@ The three worktree fields in an app's JSON definition (`~/.config/devenv/apps/de
 ## TUI Features
 
 - Real-time container status dashboard
-- Merge request management and diff viewer
+- Change request management and diff viewer
 - CI/CD pipeline viewer
 - pi sessions (AI coding sessions with history)
 - Provider management (add, edit, delete providers)

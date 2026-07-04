@@ -18,8 +18,8 @@ const dirtyChangeType = (change: ChangeRequestChange) =>
 
 export function createChangeRequestStore() {
 	const [changeRequests, setChangeRequests] = createSignal<ChangeRequest[]>([]);
-	const [crLoading, setMrLoading] = createSignal(false);
-	const [crError, setMrError] = createSignal("");
+	const [crLoading, setCrLoading] = createSignal(false);
+	const [crError, setCrError] = createSignal("");
 
 	// Pagination state
 	const [currentPage, setCurrentPage] = createSignal(1);
@@ -28,31 +28,31 @@ export function createChangeRequestStore() {
 	const [perPage, setPerPage] = createSignal(50);
 
 	// State filter: "opened", "merged", "closed", "all"
-	const [crState, setMrState] = createSignal<string>("opened");
+	const [crState, setCrState] = createSignal<string>("opened");
 	// Active server-side search term (set when user presses Enter in search mode)
 	const [searchTerm, setSearchTerm] = createSignal("");
 	const [selectedChangeRequest, setSelectedCR] = createSignal<ChangeRequest | null>(null);
 	const [selectedChangeRequestIndex, setSelectedCRIndex] = createSignal(0);
-	const [crChanges, setMrChanges] = createSignal<ChangeRequestChange[]>([]);
-	const [crChangesLoading, setMrChangesLoading] = createSignal(false);
-	const [crChangesError, setMrChangesError] = createSignal("");
-	const [crTestSummary, setMrTestSummary] = createSignal<TestSummary | null>(
+	const [crChanges, setCrChanges] = createSignal<ChangeRequestChange[]>([]);
+	const [crChangesLoading, setCrChangesLoading] = createSignal(false);
+	const [crChangesError, setCrChangesError] = createSignal("");
+	const [crTestSummary, setCrTestSummary] = createSignal<TestSummary | null>(
 		null,
 	);
-	const [crTestLoading, setMrTestLoading] = createSignal(false);
-	const [crTestError, setMrTestError] = createSignal("");
-	const [crJobsForDetail, setMrJobsForDetail] = createSignal<Job[]>([]);
-	const [crJobsForDetailLoading, setMrJobsForDetailLoading] =
+	const [crTestLoading, setCrTestLoading] = createSignal(false);
+	const [crTestError, setCrTestError] = createSignal("");
+	const [crJobsForDetail, setCrJobsForDetail] = createSignal<Job[]>([]);
+	const [crJobsForDetailLoading, setCrJobsForDetailLoading] =
 		createSignal(false);
-	const [crJobsForDetailError, setMrJobsForDetailError] = createSignal("");
-	const [changeRequestLinkedIssues, setMrLinkedIssues] = createSignal<Issue[]>([]);
-	const [changeRequestLinkedIssuesLoading, setMrLinkedIssuesLoading] = createSignal(false);
-	const [changeRequestLinkedIssuesError, setMrLinkedIssuesError] = createSignal("");
-	const [selectedChangeRequestLinkedIssueIndex, setSelectedMrLinkedIssueIndex] =
+	const [crJobsForDetailError, setCrJobsForDetailError] = createSignal("");
+	const [changeRequestLinkedIssues, setCrLinkedIssues] = createSignal<Issue[]>([]);
+	const [changeRequestLinkedIssuesLoading, setCrLinkedIssuesLoading] = createSignal(false);
+	const [changeRequestLinkedIssuesError, setCrLinkedIssuesError] = createSignal("");
+	const [selectedChangeRequestLinkedIssueIndex, setSelectedCrLinkedIssueIndex] =
 		createSignal(0);
-	const [crDiscussions, setMrDiscussions] = createSignal<Discussion[]>([]);
-	const [crDiscussionsLoading, setMrDiscussionsLoading] = createSignal(false);
-	const [crDiscussionsError, setMrDiscussionsError] = createSignal("");
+	const [crDiscussions, setCrDiscussions] = createSignal<Discussion[]>([]);
+	const [crDiscussionsLoading, setCrDiscussionsLoading] = createSignal(false);
+	const [crDiscussionsError, setCrDiscussionsError] = createSignal("");
 	const [jobs, setJobs] = createSignal<Job[]>([]);
 	const [jobsLoading, setJobsLoading] = createSignal(false);
 	const [jobsError, setJobsError] = createSignal("");
@@ -88,8 +88,8 @@ export function createChangeRequestStore() {
 	);
 	const [discussionsShowOnlyComments, setDiscussionsShowOnlyComments] =
 		createSignal(false);
-	const [crSearchMode, setMrSearchMode] = createSignal(false);
-	const [crSearchQuery, setMrSearchQuery] = createSignal("");
+	const [crSearchMode, setCrSearchMode] = createSignal(false);
+	const [crSearchQuery, setCrSearchQuery] = createSignal("");
 	const [changedFilesSearchMode, setChangedFilesSearchMode] =
 		createSignal(false);
 	const [changedFilesSearchQuery, setChangedFilesSearchQuery] =
@@ -113,14 +113,14 @@ export function createChangeRequestStore() {
 	});
 
 	// CR AI review overlay state
-	const [crAiVisible, setMrAiVisible] = createSignal(false);
-	const [crAiLoading, setMrAiLoading] = createSignal(false);
-	const [crAiStreaming, setMrAiStreaming] = createSignal(false);
-	const [crAiSummary, setMrAiSummary] = createSignal<string | null>(null);
-	const [crAiError, setMrAiError] = createSignal<string | null>(null);
-	const [crAiFollowupText, setMrAiFollowupText] = createSignal("");
-	const [crAiPostingComments, setMrAiPostingComments] = createSignal(false);
-	const [crAiCommentsPosted, setMrAiCommentsPosted] = createSignal(false);
+	const [crAiVisible, setCrAiVisible] = createSignal(false);
+	const [crAiLoading, setCrAiLoading] = createSignal(false);
+	const [crAiStreaming, setCrAiStreaming] = createSignal(false);
+	const [crAiSummary, setCrAiSummary] = createSignal<string | null>(null);
+	const [crAiError, setCrAiError] = createSignal<string | null>(null);
+	const [crAiFollowupText, setCrAiFollowupText] = createSignal("");
+	const [crAiPostingComments, setCrAiPostingComments] = createSignal(false);
+	const [crAiCommentsPosted, setCrAiCommentsPosted] = createSignal(false);
 
 	let crAiScrollBoxRef: import("@opentui/core").ScrollBoxRenderable | undefined;
 	let diffModalScrollBoxRef: import("@opentui/core").ScrollBoxRenderable | undefined;
@@ -202,9 +202,9 @@ export function createChangeRequestStore() {
 		changeRequests,
 		setChangeRequests,
 		crLoading,
-		setMrLoading,
+		setCrLoading,
 		crError,
-		setMrError,
+		setCrError,
 		// Pagination state
 		currentPage,
 		setCurrentPage,
@@ -217,43 +217,43 @@ export function createChangeRequestStore() {
 		searchTerm,
 		setSearchTerm,
 		crState,
-		setMrState,
+		setCrState,
 		selectedChangeRequest,
 		setSelectedCR,
 		selectedChangeRequestIndex,
 		setSelectedCRIndex,
 		crChanges,
-		setMrChanges,
+		setCrChanges,
 		crChangesLoading,
-		setMrChangesLoading,
+		setCrChangesLoading,
 		crChangesError,
-		setMrChangesError,
+		setCrChangesError,
 		crTestSummary,
-		setMrTestSummary,
+		setCrTestSummary,
 		crTestLoading,
-		setMrTestLoading,
+		setCrTestLoading,
 		crTestError,
-		setMrTestError,
+		setCrTestError,
 		crJobsForDetail,
-		setMrJobsForDetail,
+		setCrJobsForDetail,
 		crJobsForDetailLoading,
-		setMrJobsForDetailLoading,
+		setCrJobsForDetailLoading,
 		crJobsForDetailError,
-		setMrJobsForDetailError,
+		setCrJobsForDetailError,
 		changeRequestLinkedIssues,
-		setMrLinkedIssues,
+		setCrLinkedIssues,
 		changeRequestLinkedIssuesLoading,
-		setMrLinkedIssuesLoading,
+		setCrLinkedIssuesLoading,
 		changeRequestLinkedIssuesError,
-		setMrLinkedIssuesError,
+		setCrLinkedIssuesError,
 		selectedChangeRequestLinkedIssueIndex,
-		setSelectedMrLinkedIssueIndex,
+		setSelectedCrLinkedIssueIndex,
 		crDiscussions,
-		setMrDiscussions,
+		setCrDiscussions,
 		crDiscussionsLoading,
-		setMrDiscussionsLoading,
+		setCrDiscussionsLoading,
 		crDiscussionsError,
-		setMrDiscussionsError,
+		setCrDiscussionsError,
 		jobs,
 		setJobs,
 		jobsLoading,
@@ -303,9 +303,9 @@ export function createChangeRequestStore() {
 		discussionsShowOnlyComments,
 		setDiscussionsShowOnlyComments,
 		crSearchMode,
-		setMrSearchMode,
+		setCrSearchMode,
 		crSearchQuery,
-		setMrSearchQuery,
+		setCrSearchQuery,
 		changedFilesSearchMode,
 		setChangedFilesSearchMode,
 		changedFilesSearchQuery,
@@ -342,21 +342,21 @@ export function createChangeRequestStore() {
 
 		// CR AI review overlay
 		crAiVisible,
-		setMrAiVisible,
+		setCrAiVisible,
 		crAiLoading,
-		setMrAiLoading,
+		setCrAiLoading,
 		crAiStreaming,
-		setMrAiStreaming,
+		setCrAiStreaming,
 		crAiSummary,
-		setMrAiSummary,
+		setCrAiSummary,
 		crAiError,
-		setMrAiError,
+		setCrAiError,
 		crAiFollowupText,
-		setMrAiFollowupText,
+		setCrAiFollowupText,
 		crAiPostingComments,
-		setMrAiPostingComments,
+		setCrAiPostingComments,
 		crAiCommentsPosted,
-		setMrAiCommentsPosted,
+		setCrAiCommentsPosted,
 		get crAiScrollBoxRef() {
 			return crAiScrollBoxRef;
 		},

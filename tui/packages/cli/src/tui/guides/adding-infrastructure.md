@@ -102,4 +102,4 @@ Infrastructure services do **not** have:
 - Change Request integration
 - CI/CD pipeline features
 
-See [Adding an App](adding-apps.md) for full application definitions.
+See [Adding a Repository](adding-repositories.md) for full application definitions.

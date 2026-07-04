@@ -12,7 +12,7 @@ import { handleHorizontalScrollKey } from "./horizontal-scroll";
  * Shift+A starts the pi-powered AI review overlay.
  * While the overlay is open all keys are forwarded to it.
  */
-export async function handleMrDetailKeys(
+export async function handleCrDetailKeys(
 	event: KeyboardEvent,
 	stores: KeyboardStores,
 	actions: KeyboardActions,
@@ -40,7 +40,7 @@ export async function handleMrDetailKeys(
 			event.sequence === "\x1b" ||
 			event.raw === "\x1b";
 		if (isEsc) {
-			changeRequestStore.setMrAiVisible(false);
+			changeRequestStore.setCrAiVisible(false);
 			return true;
 		}
 
@@ -86,7 +86,7 @@ export async function handleMrDetailKeys(
 				!changeRequestStore.crAiLoading() &&
 				!changeRequestStore.crAiStreaming()
 			) {
-				changeRequestStore.setMrAiVisible(false);
+				changeRequestStore.setCrAiVisible(false);
 			}
 			return true;
 		}
@@ -162,8 +162,8 @@ export async function handleMrDetailKeys(
 	if (event.sequence === "A") {
 		const cr = changeRequestStore.selectedChangeRequest();
 		if (cr) {
-			const { buildMrReviewPrompt } = await import("../actions/cr-ai-utils");
-			void crActions.runMrAiReview(buildMrReviewPrompt(cr));
+			const { buildCrReviewPrompt } = await import("../actions/cr-ai-utils");
+			void crActions.runCrAiReview(buildCrReviewPrompt(cr));
 		}
 		return true;
 	}
@@ -175,7 +175,7 @@ export async function handleMrDetailKeys(
 
 	// I (Shift+I) — open linked issues sub-view
 	if ((event.name === "i" && event.shift) || event.name === "I") {
-		changeRequestStore.setSelectedMrLinkedIssueIndex(0);
+		changeRequestStore.setSelectedCrLinkedIssueIndex(0);
 		appStore.setViewMode("changeRequestLinkedIssues");
 		return true;
 	}

@@ -23,14 +23,14 @@ import (
 // Session registry
 // ---------------------------------------------------------------------------
 
-// mrReviewSession holds the context for one active MR review stream.
+// crReviewSession holds the context for one active CR review stream.
 // It is registered when the stream starts and removed when it ends.
-type mrReviewSession struct {
+type crReviewSession struct {
 	appIdent string
-	mrIID    int
+	crIID    int
 	mu       sync.Mutex
 
-	// MR diff versions – lazily fetched on the first comment callback
+	// CR diff versions – lazily fetched on the first comment callback
 	versionsLoaded bool
 	baseSHA        string
 	headSHA        string
@@ -45,37 +45,37 @@ func generateToken() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
-func (s *Server) registerMRSession(token, appIdent string, mrIID int) {
-	s.mrSessionsMu.Lock()
-	defer s.mrSessionsMu.Unlock()
-	s.mrSessions[token] = &mrReviewSession{appIdent: appIdent, mrIID: mrIID}
+func (s *Server) registerCRSession(token, appIdent string, crIID int) {
+	s.crSessionsMu.Lock()
+	defer s.crSessionsMu.Unlock()
+	s.crSessions[token] = &crReviewSession{appIdent: appIdent, crIID: crIID}
 }
 
-func (s *Server) deregisterMRSession(token string) {
-	s.mrSessionsMu.Lock()
-	defer s.mrSessionsMu.Unlock()
-	delete(s.mrSessions, token)
+func (s *Server) deregisterCRSession(token string) {
+	s.crSessionsMu.Lock()
+	defer s.crSessionsMu.Unlock()
+	delete(s.crSessions, token)
 }
 
-func (s *Server) getMRSession(token string) *mrReviewSession {
-	s.mrSessionsMu.Lock()
-	defer s.mrSessionsMu.Unlock()
-	return s.mrSessions[token]
+func (s *Server) getCRSession(token string) *crReviewSession {
+	s.crSessionsMu.Lock()
+	defer s.crSessionsMu.Unlock()
+	return s.crSessions[token]
 }
 
-// ensureMRVersions lazily fetches and caches the MR diff SHAs in the session.
-func (s *Server) ensureMRVersions(sess *mrReviewSession, gitlabClient gitlab.Client, projectInfo *gitlab.ProjectInfo) error {
+// ensureCRVersions lazily fetches and caches the CR diff SHAs in the session.
+func (s *Server) ensureCRVersions(sess *crReviewSession, gitlabClient gitlab.Client, projectInfo *gitlab.ProjectInfo) error {
 	sess.mu.Lock()
 	defer sess.mu.Unlock()
 	if sess.versionsLoaded {
 		return nil
 	}
-	versions, err := gitlabClient.GetMRVersions(projectInfo, sess.mrIID)
+	versions, err := gitlabClient.GetMRVersions(projectInfo, sess.crIID)
 	if err != nil {
-		return fmt.Errorf("fetch MR versions: %w", err)
+		return fmt.Errorf("fetch CR versions: %w", err)
 	}
 	if len(versions) == 0 {
-		return fmt.Errorf("no MR versions found")
+		return fmt.Errorf("no CR versions found")
 	}
 	// First version is the latest diff
 	v := versions[0]
@@ -89,34 +89,34 @@ func (s *Server) ensureMRVersions(sess *mrReviewSession, gitlabClient gitlab.Cli
 	sess.headSHA = getString("head_commit_sha")
 	sess.startSHA = getString("start_commit_sha")
 	if sess.baseSHA == "" || sess.headSHA == "" || sess.startSHA == "" {
-		return fmt.Errorf("MR version SHAs missing (base=%q head=%q start=%q)", sess.baseSHA, sess.headSHA, sess.startSHA)
+		return fmt.Errorf("CR version SHAs missing (base=%q head=%q start=%q)", sess.baseSHA, sess.headSHA, sess.startSHA)
 	}
 	sess.versionsLoaded = true
 	return nil
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/ai/mr-comment-callback/{token}
+// POST /api/ai/cr-comment-callback/{token}
 // ---------------------------------------------------------------------------
 // Called by the AI agent (via curl) during a review to post an inline diff
-// comment or a top-level MR note.  Request body:
+// comment or a top-level CR note.  Request body:
 //
 //	{ "file": "src/foo.ts", "line": 42, "comment": "Null check missing" }
 //
 // Omit "file"/"line" for a general (top-level) comment.
-func (s *Server) handleMRCommentCallback(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCRCommentCallback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondMethodNotAllowed(w)
 		return
 	}
 
-	token := strings.TrimPrefix(r.URL.Path, "/api/ai/mr-comment-callback/")
+	token := strings.TrimPrefix(r.URL.Path, "/api/ai/cr-comment-callback/")
 	if token == "" {
 		respondBadRequest(w, "missing token in path")
 		return
 	}
 
-	sess := s.getMRSession(token)
+	sess := s.getCRSession(token)
 	if sess == nil {
 		respondErrorMessage(w, "unknown or expired review session token", http.StatusUnauthorized)
 		return
@@ -154,9 +154,9 @@ func (s *Server) handleMRCommentCallback(w http.ResponseWriter, r *http.Request)
 	var position *gitlab.DiffPosition
 
 	if req.File != "" && req.Line != nil {
-		// Inline diff comment — need MR SHAs
-		if err := s.ensureMRVersions(sess, gitlabClient, projectInfo); err != nil {
-			log.Printf("[MR AI Callback] version load failed: %v", err)
+		// Inline diff comment — need CR SHAs
+		if err := s.ensureCRVersions(sess, gitlabClient, projectInfo); err != nil {
+			log.Printf("[CR AI Callback] version load failed: %v", err)
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": err.Error()})
 			return
@@ -172,23 +172,23 @@ func (s *Server) handleMRCommentCallback(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	if err := gitlabClient.CreateMRDiffComment(projectInfo, sess.mrIID, body, position); err != nil {
-		log.Printf("[MR AI Callback] comment post failed (file=%q line=%v): %v", req.File, req.Line, err)
+	if err := gitlabClient.CreateMRDiffComment(projectInfo, sess.crIID, body, position); err != nil {
+		log.Printf("[CR AI Callback] comment post failed (file=%q line=%v): %v", req.File, req.Line, err)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{"ok": false, "error": err.Error()})
 		return
 	}
 
-	log.Printf("[MR AI Callback] posted comment (file=%q line=%v)", req.File, req.Line)
+	log.Printf("[CR AI Callback] posted comment (file=%q line=%v)", req.File, req.Line)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
 // ---------------------------------------------------------------------------
-// POST /api/ai/mr-review-stream
+// POST /api/ai/cr-review-stream
 // ---------------------------------------------------------------------------
 
-func (s *Server) handleAIMRReviewStream(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleAICRReviewStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondMethodNotAllowed(w)
 		return
@@ -196,7 +196,7 @@ func (s *Server) handleAIMRReviewStream(w http.ResponseWriter, r *http.Request) 
 
 	var req struct {
 		AppIdent     string `json:"appIdent"`
-		MRIID        int    `json:"mrIID"`
+		CRIID        int    `json:"crIID"`
 		SourceBranch string `json:"sourceBranch"`
 		TargetBranch string `json:"targetBranch"`
 		Prompt       string `json:"prompt"`
@@ -255,38 +255,38 @@ func (s *Server) handleAIMRReviewStream(w http.ResponseWriter, r *http.Request) 
 		sendError("failed to generate session token")
 		return
 	}
-	if req.MRIID > 0 {
-		s.registerMRSession(token, req.AppIdent, req.MRIID)
-		defer s.deregisterMRSession(token)
+	if req.CRIID > 0 {
+		s.registerCRSession(token, req.AppIdent, req.CRIID)
+		defer s.deregisterCRSession(token)
 	}
 
 	// --- Create temp worktree ---
-	worktreeID := fmt.Sprintf("mr-review-%d", time.Now().UnixNano())
+	worktreeID := fmt.Sprintf("cr-review-%d", time.Now().UnixNano())
 	worktreePath := filepath.Join(os.TempDir(), worktreeID)
 
-	if err := mrWorktreeAdd(targetApp.LocalDirectoryPath, req.SourceBranch, worktreePath); err != nil {
-		log.Printf("[MR AI Review] worktree add failed: %v", err)
+	if err := crWorktreeAdd(targetApp.LocalDirectoryPath, req.SourceBranch, worktreePath); err != nil {
+		log.Printf("[CR AI Review] worktree add failed: %v", err)
 		sendError(fmt.Sprintf("Could not check out branch %q: %v", req.SourceBranch, err))
 		return
 	}
 	defer func() {
-		if err := mrWorktreeRemove(targetApp.LocalDirectoryPath, worktreePath); err != nil {
-			log.Printf("[MR AI Review] worktree cleanup failed: %v", err)
+		if err := crWorktreeRemove(targetApp.LocalDirectoryPath, worktreePath); err != nil {
+			log.Printf("[CR AI Review] worktree cleanup failed: %v", err)
 		}
 	}()
 
-	log.Printf("[MR AI Review] worktree ready at %s (branch: %s, agent: pi)", worktreePath, req.SourceBranch)
+	log.Printf("[CR AI Review] worktree ready at %s (branch: %s, agent: pi)", worktreePath, req.SourceBranch)
 
 	// --- Build the full prompt with callback instructions appended ---
-	callbackURL := fmt.Sprintf("http://127.0.0.1:%d/api/ai/mr-comment-callback/%s", s.port, token)
-	fullPrompt := req.Prompt + buildCallbackInstructions(callbackURL, req.MRIID > 0)
+	callbackURL := fmt.Sprintf("http://127.0.0.1:%d/api/ai/cr-comment-callback/%s", s.port, token)
+	fullPrompt := req.Prompt + buildCallbackInstructions(callbackURL, req.CRIID > 0)
 
 	// --- Spawn pi and stream ---
 	streamMRReviewPi(ctx, w, flusher, worktreePath, fullPrompt, sendError)
 }
 
 // buildCallbackInstructions appends inline-comment curl instructions to the
-// agent prompt.  When mrIID is 0 (not a GitLab MR), the section is omitted.
+// agent prompt.  When crIID is 0 (not a GitLab change request), the section is omitted.
 func buildCallbackInstructions(callbackURL string, isGitLab bool) string {
 	if !isGitLab {
 		return ""
@@ -296,7 +296,7 @@ func buildCallbackInstructions(callbackURL string, isGitLab bool) string {
 ---
 INLINE COMMENT TOOL:
 As you identify specific code issues, post them as inline GitLab comments using curl.
-This creates real comments directly on the diff lines in the MR.
+This creates real comments directly on the diff lines in the CR.
 
 For a line-specific comment (preferred when you have a precise file + line):
   curl -s -X POST '%s' \
@@ -321,7 +321,7 @@ Rules:
 // Worktree helpers
 // ---------------------------------------------------------------------------
 
-func mrWorktreeAdd(repoDir, branch, worktreePath string) error {
+func crWorktreeAdd(repoDir, branch, worktreePath string) error {
 	fetchCtx, fetchCancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer fetchCancel()
 	exec.CommandContext(fetchCtx, "git", "-C", repoDir, "fetch", "origin", branch).Run() //nolint:errcheck
@@ -331,7 +331,7 @@ func mrWorktreeAdd(repoDir, branch, worktreePath string) error {
 	if out, err := cmd.CombinedOutput(); err == nil {
 		return nil
 	} else {
-		log.Printf("[MR AI Review] origin/%s worktree failed (%v: %s), trying local branch", branch, err, strings.TrimSpace(string(out)))
+		log.Printf("[CR AI Review] origin/%s worktree failed (%v: %s), trying local branch", branch, err, strings.TrimSpace(string(out)))
 	}
 
 	// Fallback: local branch
@@ -342,7 +342,7 @@ func mrWorktreeAdd(repoDir, branch, worktreePath string) error {
 	return nil
 }
 
-func mrWorktreeRemove(repoDir, worktreePath string) error {
+func crWorktreeRemove(repoDir, worktreePath string) error {
 	out, err := exec.Command("git", "-C", repoDir, "worktree", "remove", "--force", worktreePath).CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
@@ -495,7 +495,7 @@ func streamMRReviewPi(ctx context.Context, w http.ResponseWriter, flusher http.F
 			case "response":
 				// RPC command response — check for errors
 				if e.Success != nil && !*e.Success && e.Error != "" {
-					log.Printf("[MR AI RPC] command %q failed: %s", e.Command, e.Error)
+					log.Printf("[CR AI RPC] command %q failed: %s", e.Command, e.Error)
 				}
 			}
 		}

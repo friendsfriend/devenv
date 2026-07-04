@@ -17,7 +17,7 @@ function errMsg(e: unknown): string {
 	return e instanceof Error ? e.message : UNKNOWN_ERROR;
 }
 
-export function createMrActions(
+export function createCrActions(
 	appStore: AppStore,
 	changeRequestStore: ChangeRequestStore,
 	uiStore: UiStore,
@@ -35,8 +35,8 @@ export function createMrActions(
 			);
 		const app = getSelectedApp();
 		if (!app) return;
-		changeRequestStore.setMrLoading(true);
-		changeRequestStore.setMrError("");
+		changeRequestStore.setCrLoading(true);
+		changeRequestStore.setCrError("");
 		changeRequestStore.setSelectedCRIndex(0);
 		changeRequestStore.setChangeRequests([]);
 		changeRequestStore.setCurrentPage(1);
@@ -93,7 +93,7 @@ export function createMrActions(
 				changeRequestStore.setChangeRequests([]);
 			}
 		} finally {
-			changeRequestStore.setMrLoading(false);
+			changeRequestStore.setCrLoading(false);
 		}
 	};
 
@@ -107,9 +107,9 @@ export function createMrActions(
 		if (!app) return;
 		const p = page ?? changeRequestStore.currentPage();
 		const s = state ?? changeRequestStore.crState();
-		changeRequestStore.setMrState(s);
-		changeRequestStore.setMrLoading(true);
-		changeRequestStore.setMrError("");
+		changeRequestStore.setCrState(s);
+		changeRequestStore.setCrLoading(true);
+		changeRequestStore.setCrError("");
 		changeRequestStore.setSelectedCRIndex(0);
 		appStore.setViewMode("changeRequests");
 		try {
@@ -128,10 +128,10 @@ export function createMrActions(
 			changeRequestStore.setCurrentPage(result.currentPage);
 			changeRequestStore.setPerPage(result.perPage);
 		} catch (e) {
-			changeRequestStore.setMrError(errMsg(e));
+			changeRequestStore.setCrError(errMsg(e));
 			changeRequestStore.setChangeRequests([]);
 		} finally {
-			changeRequestStore.setMrLoading(false);
+			changeRequestStore.setCrLoading(false);
 		}
 	};
 
@@ -139,18 +139,18 @@ export function createMrActions(
 		cr: NonNullable<ReturnType<typeof changeRequestStore.selectedChangeRequest>>,
 	) => {
 		changeRequestStore.setSelectedCR(cr);
-		changeRequestStore.setMrChangesLoading(true);
-		changeRequestStore.setMrTestLoading(!!cr.head_pipeline);
-		changeRequestStore.setMrJobsForDetailLoading(!!cr.head_pipeline);
-		changeRequestStore.setMrDiscussionsLoading(true);
-		changeRequestStore.setMrChanges([]);
-		changeRequestStore.setMrChangesError("");
-		changeRequestStore.setMrTestSummary(null);
-		changeRequestStore.setMrTestError("");
-		changeRequestStore.setMrJobsForDetail([]);
-		changeRequestStore.setMrJobsForDetailError("");
-		changeRequestStore.setMrDiscussions([]);
-		changeRequestStore.setMrDiscussionsError("");
+		changeRequestStore.setCrChangesLoading(true);
+		changeRequestStore.setCrTestLoading(!!cr.head_pipeline);
+		changeRequestStore.setCrJobsForDetailLoading(!!cr.head_pipeline);
+		changeRequestStore.setCrDiscussionsLoading(true);
+		changeRequestStore.setCrChanges([]);
+		changeRequestStore.setCrChangesError("");
+		changeRequestStore.setCrTestSummary(null);
+		changeRequestStore.setCrTestError("");
+		changeRequestStore.setCrJobsForDetail([]);
+		changeRequestStore.setCrJobsForDetailError("");
+		changeRequestStore.setCrDiscussions([]);
+		changeRequestStore.setCrDiscussionsError("");
 		appStore.setViewMode("changeRequestDetail");
 		void loadCRDetailData(cr);
 	};
@@ -162,19 +162,19 @@ export function createMrActions(
 		if (!app) return;
 		const changesPromise = (async () => {
 			try {
-				changeRequestStore.setMrChanges(
+				changeRequestStore.setCrChanges(
 					await client.getChangeRequestChanges(app.ident, cr.iid, app.sourceType),
 				);
 			} catch (e) {
-				changeRequestStore.setMrChangesError(errMsg(e));
+				changeRequestStore.setCrChangesError(errMsg(e));
 			} finally {
-				changeRequestStore.setMrChangesLoading(false);
+				changeRequestStore.setCrChangesLoading(false);
 			}
 		})();
 		const jobsPromise = (async () => {
 			if (!cr.head_pipeline) return;
 			try {
-				changeRequestStore.setMrJobsForDetail(
+				changeRequestStore.setCrJobsForDetail(
 					await client.getPipelineJobs(
 						app.ident,
 						cr.head_pipeline.id,
@@ -182,15 +182,15 @@ export function createMrActions(
 					),
 				);
 			} catch (e) {
-				changeRequestStore.setMrJobsForDetailError(errMsg(e));
+				changeRequestStore.setCrJobsForDetailError(errMsg(e));
 			} finally {
-				changeRequestStore.setMrJobsForDetailLoading(false);
+				changeRequestStore.setCrJobsForDetailLoading(false);
 			}
 		})();
 		const testSummaryPromise = (async () => {
 			if (!cr.head_pipeline) return;
 			try {
-				changeRequestStore.setMrTestSummary(
+				changeRequestStore.setCrTestSummary(
 					await client.getTestSummary(
 						app.ident,
 						cr.head_pipeline.id,
@@ -198,31 +198,31 @@ export function createMrActions(
 					),
 				);
 			} catch (e) {
-				changeRequestStore.setMrTestError(errMsg(e));
+				changeRequestStore.setCrTestError(errMsg(e));
 			} finally {
-				changeRequestStore.setMrTestLoading(false);
+				changeRequestStore.setCrTestLoading(false);
 			}
 		})();
 		const linkedIssuesPromise = (async () => {
 			try {
-				changeRequestStore.setMrLinkedIssues(
+				changeRequestStore.setCrLinkedIssues(
 					await client.getCRLinkedIssues(app.ident, cr.iid, app.sourceType),
 				);
 			} catch (e) {
-				changeRequestStore.setMrLinkedIssuesError(errMsg(e));
+				changeRequestStore.setCrLinkedIssuesError(errMsg(e));
 			} finally {
-				changeRequestStore.setMrLinkedIssuesLoading(false);
+				changeRequestStore.setCrLinkedIssuesLoading(false);
 			}
 		})();
 		const discussionsPromise = (async () => {
 			try {
-				changeRequestStore.setMrDiscussions(
+				changeRequestStore.setCrDiscussions(
 					await client.getCRDiscussions(app.ident, cr.iid, app.sourceType),
 				);
 			} catch (e) {
-				changeRequestStore.setMrDiscussionsError(errMsg(e));
+				changeRequestStore.setCrDiscussionsError(errMsg(e));
 			} finally {
-				changeRequestStore.setMrDiscussionsLoading(false);
+				changeRequestStore.setCrDiscussionsLoading(false);
 			}
 		})();
 		await Promise.all([
@@ -270,7 +270,7 @@ export function createMrActions(
 			await client.createCRComment(app.ident, cr.iid, comment, position);
 			showError(
 				"Comment Posted",
-				"Your comment was successfully added to the merge request",
+				"Your comment was successfully added to the change request",
 			);
 			changeRequestStore.setShowCommentModal(false);
 			changeRequestStore.setCommentText("");
@@ -294,7 +294,7 @@ export function createMrActions(
 			return showError("Empty Reply", "Please enter a reply before submitting");
 		try {
 			await client.replyToDiscussion(app.ident, cr.iid, discussionID, body);
-			changeRequestStore.setMrDiscussions(
+			changeRequestStore.setCrDiscussions(
 				await client.getCRDiscussions(app.ident, cr.iid, app.sourceType),
 			);
 			showError("Reply Posted", "Your reply was successfully added");
@@ -321,7 +321,7 @@ export function createMrActions(
 				discussionID,
 				resolveAction,
 			);
-			changeRequestStore.setMrDiscussions(
+			changeRequestStore.setCrDiscussions(
 				await client.getCRDiscussions(app.ident, cr.iid, app.sourceType),
 			);
 		} catch (e) {
@@ -348,8 +348,8 @@ export function createMrActions(
 
 	const backToCRList = () => {
 		changeRequestStore.setSelectedCR(null);
-		changeRequestStore.setMrSearchMode(false);
-		changeRequestStore.setMrSearchQuery("");
+		changeRequestStore.setCrSearchMode(false);
+		changeRequestStore.setCrSearchQuery("");
 		appStore.setViewMode("changeRequests");
 	};
 
@@ -389,7 +389,7 @@ export function createMrActions(
 		const cr = changeRequestStore.selectedChangeRequest();
 		if (!app || !cr) return;
 		try {
-			uiStore.setLoadingModalMessage("Rebasing merge request");
+			uiStore.setLoadingModalMessage("Rebasing change request");
 			uiStore.setShowLoadingModal(true);
 			await client.rebaseCR(app.ident, cr.iid);
 			await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -417,7 +417,7 @@ export function createMrActions(
 				else
 					showError(
 						"Rebase Successful",
-						"Merge request has been rebased successfully.",
+						"Change request has been rebased successfully.",
 					);
 			}
 			await loadCRDetailData(updated || cr);
@@ -535,19 +535,19 @@ export function createMrActions(
 		return linesWithComments;
 	};
 
-	const runMrAiReview = async (prompt?: string) => {
+	const runCrAiReview = async (prompt?: string) => {
 		const cr = changeRequestStore.selectedChangeRequest();
 		const app = getSelectedApp();
 		if (!cr || !app) return;
 
-		const { buildMrReviewPrompt } = await import("./cr-ai-utils");
-		const reviewPrompt = prompt ?? buildMrReviewPrompt(cr);
+		const { buildCrReviewPrompt } = await import("./cr-ai-utils");
+		const reviewPrompt = prompt ?? buildCrReviewPrompt(cr);
 
-		changeRequestStore.setMrAiVisible(true);
-		changeRequestStore.setMrAiLoading(true);
-		changeRequestStore.setMrAiStreaming(false);
-		changeRequestStore.setMrAiSummary(null);
-		changeRequestStore.setMrAiError(null);
+		changeRequestStore.setCrAiVisible(true);
+		changeRequestStore.setCrAiLoading(true);
+		changeRequestStore.setCrAiStreaming(false);
+		changeRequestStore.setCrAiSummary(null);
+		changeRequestStore.setCrAiError(null);
 		changeRequestStore.crAiAtBottom = true;
 		changeRequestStore.crAiLastScrollTop = 0;
 
@@ -561,12 +561,12 @@ export function createMrActions(
 				reviewPrompt,
 			)) {
 				if (firstDelta) {
-					changeRequestStore.setMrAiLoading(false);
-					changeRequestStore.setMrAiStreaming(true);
-					changeRequestStore.setMrAiSummary("");
+					changeRequestStore.setCrAiLoading(false);
+					changeRequestStore.setCrAiStreaming(true);
+					changeRequestStore.setCrAiSummary("");
 					firstDelta = false;
 				}
-				changeRequestStore.setMrAiSummary((prev) => (prev ?? "") + delta);
+				changeRequestStore.setCrAiSummary((prev) => (prev ?? "") + delta);
 				if (changeRequestStore.crAiAtBottom && changeRequestStore.crAiScrollBoxRef) {
 					if (
 						changeRequestStore.crAiScrollBoxRef.scrollTop !== changeRequestStore.crAiLastScrollTop
@@ -582,18 +582,18 @@ export function createMrActions(
 			}
 			if (firstDelta) {
 				// No output at all — set empty summary so overlay shows done state
-				changeRequestStore.setMrAiLoading(false);
-				changeRequestStore.setMrAiSummary("");
+				changeRequestStore.setCrAiLoading(false);
+				changeRequestStore.setCrAiSummary("");
 			}
 		} catch (e) {
-			changeRequestStore.setMrAiError(e instanceof Error ? e.message : "AI review failed");
+			changeRequestStore.setCrAiError(e instanceof Error ? e.message : "AI review failed");
 		} finally {
-			changeRequestStore.setMrAiLoading(false);
-			changeRequestStore.setMrAiStreaming(false);
+			changeRequestStore.setCrAiLoading(false);
+			changeRequestStore.setCrAiStreaming(false);
 		}
 	};
 
-	const postMrAiComments = async () => {
+	const postCrAiComments = async () => {
 		const summary = changeRequestStore.crAiSummary();
 		const app = getSelectedApp();
 		const cr = changeRequestStore.selectedChangeRequest();
@@ -605,15 +605,15 @@ export function createMrActions(
 			);
 			return;
 		}
-		changeRequestStore.setMrAiPostingComments(true);
+		changeRequestStore.setCrAiPostingComments(true);
 		try {
 			const body = AI_ATTRIBUTION_HEADER + summary;
 			await client.createCRComment(app.ident, cr.iid, body);
-			changeRequestStore.setMrAiCommentsPosted(true);
+			changeRequestStore.setCrAiCommentsPosted(true);
 		} catch (e) {
-			changeRequestStore.setMrAiError(`Failed to post comments: ${errMsg(e)}`);
+			changeRequestStore.setCrAiError(`Failed to post comments: ${errMsg(e)}`);
 		} finally {
-			changeRequestStore.setMrAiPostingComments(false);
+			changeRequestStore.setCrAiPostingComments(false);
 		}
 	};
 
@@ -632,9 +632,9 @@ export function createMrActions(
 		rebaseCR,
 		getDiscussionAtCurrentLine,
 		getLinesWithComments,
-		runMrAiReview,
-		postMrAiComments,
+		runCrAiReview,
+		postCrAiComments,
 	};
 }
 
-export type MrActions = ReturnType<typeof createMrActions>;
+export type CrActions = ReturnType<typeof createCrActions>;

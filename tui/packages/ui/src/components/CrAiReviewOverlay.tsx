@@ -7,7 +7,7 @@ import { createFrames, createColors } from '../spinner';
 import { getMarkdownSyntaxStyle } from '../markdownSyntax';
 import { ScrollableContent } from './ScrollableContent';
 
-export interface MrAiReviewOverlayProps {
+export interface CrAiReviewOverlayProps {
   loading: boolean;
   streaming: boolean;
   summary: string | null;
@@ -19,7 +19,7 @@ export interface MrAiReviewOverlayProps {
 const knightRiderFrames = createFrames({ color: uiColors.primary, style: 'blocks', width: 6, inactiveFactor: 0.6, minAlpha: 0.3 });
 const knightRiderColor = createColors({ color: uiColors.primary, style: 'blocks', width: 6, inactiveFactor: 0.6, minAlpha: 0.3 });
 
-export function MrAiReviewOverlay(props: MrAiReviewOverlayProps) {
+export function CrAiReviewOverlay(props: CrAiReviewOverlayProps) {
   const renderer = useRenderer();
   const overlayWidth = () => Math.floor(renderer.width * 0.88);
 

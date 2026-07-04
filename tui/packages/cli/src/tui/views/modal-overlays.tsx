@@ -20,7 +20,7 @@ import {
 	WorktreeManagerModal,
 	ScriptArgsModal,
 	ScriptAddModal,
-	MrAiReviewOverlay,
+	CrAiReviewOverlay,
 	IssueScopeModal,
 	CloseReasonModal,
 	CommentModal,
@@ -562,12 +562,12 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 			</Show>
 
 			<Show when={changeRequestStore.crAiVisible()}>
-				<MrAiReviewOverlay
+				<CrAiReviewOverlay
 					loading={changeRequestStore.crAiLoading()}
 					streaming={changeRequestStore.crAiStreaming()}
 					summary={changeRequestStore.crAiSummary()}
 					error={changeRequestStore.crAiError()}
-					onDismiss={() => changeRequestStore.setMrAiVisible(false)}
+					onDismiss={() => changeRequestStore.setCrAiVisible(false)}
 					onScrollBoxReady={(sb) => {
 						changeRequestStore.crAiScrollBoxRef = sb;
 					}}

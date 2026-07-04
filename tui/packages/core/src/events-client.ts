@@ -3,8 +3,7 @@ import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 
 /**
- * Subscribe to server events (SSE)
- * Following OpenCode's event subscription pattern
+ * Subscribe to server events (SSE).
  */
 export async function* subscribeToEvents(deps: ClientDeps): AsyncGenerator<ServerEvent> {
   const response = await deps.sseFetchFn(`${deps.baseUrl}/api/events`);

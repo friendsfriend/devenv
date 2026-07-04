@@ -3,7 +3,7 @@ import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 
 /**
- * Get merge requests for a specific app, with pagination support.
+ * Get change requests for a specific app, with pagination support.
  * Returns a paginated result with items and metadata.
  */
 export async function getChangeRequests(
@@ -49,7 +49,7 @@ export async function getChangeRequests(
 }
 
 /**
- * Get changed files for a specific merge request
+ * Get changed files for a specific change request
  */
 export async function getChangeRequestChanges(
   deps: ClientDeps,
@@ -70,7 +70,7 @@ export async function getChangeRequestChanges(
 }
 
 /**
- * Get CR versions (SHAs) for a specific merge request
+ * Get CR versions (SHAs) for a specific change request
  */
 export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: number): Promise<any[]> {
   const url = `${deps.baseUrl}/api/gitlab/cr-versions?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`;
@@ -84,7 +84,7 @@ export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: n
 }
 
 /**
- * Create a comment on a merge request diff
+ * Create a comment on a change request diff
  */
 export async function createCRComment(
   deps: ClientDeps,
@@ -170,7 +170,7 @@ export async function createCRComment(
 }
 
 /**
- * Get discussions (comments) for a merge request
+ * Get discussions (comments) for a change request
  */
 export async function getCRDiscussions(
   deps: ClientDeps,
@@ -191,7 +191,7 @@ export async function getCRDiscussions(
 }
 
 /**
- * Toggle merge request approval (approve if not approved, unapprove if already approved)
+ * Toggle change request approval (approve if not approved, unapprove if already approved)
  * Backend determines the current approval state using the configured GitLab username
  */
 export async function toggleCRApproval(
@@ -212,7 +212,7 @@ export async function toggleCRApproval(
 }
 
 /**
- * Approve a merge request
+ * Approve a change request
  */
 export async function approveChangeRequest(
   deps: ClientDeps,
@@ -232,7 +232,7 @@ export async function approveChangeRequest(
 }
 
 /**
- * Unapprove a merge request (remove approval)
+ * Unapprove a change request (remove approval)
  */
 export async function unapproveChangeRequest(
   deps: ClientDeps,
@@ -252,7 +252,7 @@ export async function unapproveChangeRequest(
 }
 
 /**
- * Rebase a merge request
+ * Rebase a change request
  */
 export async function rebaseCR(deps: ClientDeps, appIdent: string, crIID: number): Promise<void> {
   const response = await deps.fetchFn(

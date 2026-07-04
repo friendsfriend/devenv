@@ -256,7 +256,7 @@ export async function addIssueComment(
 }
 
 /**
- * Get linked merge requests for an issue.
+ * Get linked change requests for an issue.
  */
 export async function getIssueLinkedCRs(
 	deps: ClientDeps,
@@ -304,7 +304,7 @@ export async function getIssueReferencedIssues(
 }
 
 /**
- * Get linked issues for a merge request.
+ * Get linked issues for a change request.
  */
 export async function getCRLinkedIssues(
 	deps: ClientDeps,

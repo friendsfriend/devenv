@@ -1,4 +1,4 @@
-# Adding an App
+# Adding a Repository
 
 This guide walks through defining a new application in DevEnv.
 

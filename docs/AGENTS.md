@@ -2,23 +2,20 @@
 
 > **IMPORTANT**: After completing any significant operation (new features, refactors, architectural changes, package additions/removals), update both this file (`docs/AGENTS.md`) and `README.md` to reflect the changes. Documentation must stay in sync with the codebase.
 
-## 🌟 Primary Inspiration & Reference
+## 🌟 Primary Architecture Reference
 
-**OpenCode** - The open source AI coding agent built for the terminal  
-- **Repository**: https://github.com/sst/opencode
-- **Why**: OpenCode is the premier reference implementation for terminal-based AI coding tools using OpenTUI + SolidJS
-- **Usage**: All TUI development should align with OpenCode's proven patterns and architecture
+DevEnv uses a Go HTTP API server plus a TypeScript/Bun OpenTUI frontend with SolidJS.
 
-### Key Learnings from OpenCode:
-- **JSX Configuration**: Uses `@opentui/solid/preload` in `bunfig.toml` for proper JSX runtime initialization
-- **Type Safety**: TypeScript with `jsxImportSource: "@opentui/solid"` and DOM types
-- **Component Patterns**: Reusable SolidJS components with OpenTUI primitives
-- **State Management**: SolidJS signals and stores for reactive UI
-- **Client/Server Architecture**: HTTP API + Server-Sent Events for real-time updates
-- **Separate Process Pattern**: Server runs in separate process from TUI (avoids Bun compilation networking issues)
-- **Plugin System**: Extensible architecture for custom functionality
+Key rules:
+- **JSX Configuration**: Use `@opentui/solid/preload` in `bunfig.toml` for OpenTUI JSX runtime initialization.
+- **Type Safety**: Use TypeScript with `jsxImportSource: "@opentui/solid"` and DOM types.
+- **Component Patterns**: Prefer reusable SolidJS components with OpenTUI primitives.
+- **State Management**: Use SolidJS signals and stores for reactive UI.
+- **Client/Server Architecture**: Use HTTP API + Server-Sent Events for real-time updates.
+- **Separate Process Pattern**: Server runs in a separate process from the TUI to avoid Bun compiled-binary networking issues.
+- **Pi-only AI**: AI workflows use `pi`; OpenCode is not an AI backend.
 
-**IMPORTANT**: When implementing new TUI features, consult OpenCode's implementation first to ensure alignment with best practices.
+OpenCode compatibility is limited to theme JSON shape support.
 
 ---
 
@@ -78,7 +75,7 @@ devenv-cli/
 │   │   │   │   ├── apps-client.ts     # App/infra/status API methods
 │   │   │   │   ├── docker-client.ts   # Docker container operations
 │   │   │   │   ├── git-client.ts      # Git operations
-│   │   │   │   ├── mr-client.ts       # MR/PR management
+│   │   │   │   ├── cr-client.ts       # CR management
 │   │   │   │   ├── ci-client.ts       # CI/CD pipeline/job operations
 │   │   │   │   ├── provider-client.ts # Provider CRUD
 │   │   │   │   ├── agent-client.ts    # Agent spaces/sessions
@@ -109,7 +106,7 @@ devenv-cli/
 
 ## 🏗️ Architecture: Separate Process Pattern
 
-**CRITICAL**: Following OpenCode's architecture, we use **separate processes** for server and TUI:
+**CRITICAL**: DevEnv uses **separate processes** for server and TUI:
 
 ```
 ┌─────────────────────────────────┐
@@ -134,7 +131,7 @@ devenv-cli/
 - Subsequent requests fail with ECONNREFUSED
 - This is a Bun limitation in compiled binaries
 
-**Solution** (from OpenCode):
+**Solution**:
 1. **`spawn` command** (default): Starts server process, then spawns TUI process with `attach` command
 2. **`attach <url>` command**: Connects TUI to running server via HTTP
 3. **Result**: Each process has its own event loop, Bun's fetch works correctly
@@ -229,25 +226,23 @@ build:binaries:
 ### TUI Frontend
 - **Store pattern**: Factory functions `createXxxStore()` return signal bundles typed as `XxxStore`. SolidJS signals are closures that must be created inside a reactive context, hence the factory pattern.
 - **Action pattern**: Factory functions `createXxxActions(store1, store2, client, ...)` receive the stores they need. Actions contain business logic and API calls.
-- **Keyboard handling**: OpenTUI only supports ONE `useKeyboard` hook per app. The single handler dispatches to sub-handler functions organized by domain (e.g., `handleGlobalKeys`, `handleTableKeys`, `handleMrDetailKeys`).
+- **Keyboard handling**: OpenTUI only supports ONE `useKeyboard` hook per app. The single handler dispatches to sub-handler functions organized by domain (e.g., `handleGlobalKeys`, `handleTableKeys`, `handleCrDetailKeys`).
 - **Views**: Content router selects the active view based on UI store state. Modal overlays are rendered conditionally.
 - **Core client**: `DevEnvClient` is a facade class (~122 lines). Domain-specific API methods live in 10 separate client modules (e.g., `apps-client.ts`, `docker-client.ts`). Each module exports functions that take `ClientDeps` as their first argument.
 
 ### UI Colors
-- **CRITICAL**: Always use colors from `@icon-tui/ui` (Catppuccin Mocha theme)
-  - Import via: `import { uiColors } from '@icon-tui/ui'`
+- **CRITICAL**: Always use colors from `@devenv/ui` (active theme)
+  - Import via: `import { uiColors } from '@devenv/ui'`
   - Never hardcode hex colors in components
   - Use semantic color names: `uiColors.primary`, `uiColors.error`, `uiColors.textPrimary`, etc.
 - When you change keybinds for actions also change the help text for the view
-- **ALIGN WITH OPENCODE**: All new TUI code should follow OpenCode's patterns (see repository link above)
+## Color System
 
-## Color System (Catppuccin Mocha)
-
-**CRITICAL**: All UI components MUST use the centralized Catppuccin Mocha color scheme. Never hardcode colors.
+**CRITICAL**: All UI components MUST use centralized theme colors. Never hardcode colors.
 
 ### Usage in TypeScript/OpenTUI Components
 ```typescript
-import { uiColors } from '@icon-tui/ui';
+import { uiColors } from '@devenv/ui';
 
 // ✅ CORRECT - Use semantic color names
 <text style={{ color: uiColors.primary }}>Loading...</text>
@@ -257,16 +252,6 @@ import { uiColors } from '@icon-tui/ui';
 // ❌ WRONG - Never hardcode colors
 <text style={{ color: '#4A90E2' }}>Loading...</text>
 <box backgroundColor="#2C2C2C">...</box>
-```
-
-**For advanced usage**, you can access the full Catppuccin Mocha palette:
-```typescript
-import { colors } from '@icon-tui/ui';
-
-// Access any of the 26 Catppuccin Mocha colors
-const customBlue = colors.blue;      // #89b4fa
-const customGreen = colors.green;    // #a6e3a1
-const customRed = colors.red;        // #f38ba8
 ```
 
 ### Available Semantic Colors
@@ -309,12 +294,12 @@ uiColors = {
 
 ### Usage in TypeScript/OpenTUI Components
 
-**Three Ways to Style Text** (from OpenCode):
+**Three Ways to Style Text**:
 
 #### 1. Direct Attributes on `<text>` Element (Preferred for Bold)
 ```typescript
 import { TextAttributes } from '@opentui/core';
-import { uiColors } from '@icon-tui/ui';
+import { uiColors } from '@devenv/ui';
 
 // ✅ CORRECT - Use attributes property directly on <text>
 <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>Bold Text</text>
@@ -395,31 +380,26 @@ const isBold = () => isSelected || isCurrent;
 </text>
 ```
 
-### Pattern Reference (from OpenCode)
-This pattern is used throughout the OpenCode repository. When in doubt, check their implementation:
-- `packages/opencode/src/cli/cmd/tui/ui/` - Dialog components with text styling
-- `packages/opencode/src/cli/cmd/tui/component/` - Reusable components
+### Pattern Reference
 - Never use `style={{ bold: true }}` - it won't work
 - Always import `TextAttributes` from `@opentui/core`
 
-### Real-World Examples from OpenCode
+### Examples
 
 #### Example 1: Dialog Titles (Direct Attributes)
 ```typescript
-// From dialog-select.tsx
-<text fg={theme.text} attributes={TextAttributes.BOLD}>
+<text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
   {props.title}
 </text>
 ```
 
 #### Example 2: Keybind Help Text (HTML Tags + Inline Styles)
 ```typescript
-// From dialog-select.tsx - showing keybinds with descriptions
 <text>
-  <span style={{ fg: theme.text }}>
+  <span style={{ fg: uiColors.textPrimary }}>
     <b>{item.title}</b>{" "}
   </span>
-  <span style={{ fg: theme.textMuted }}>{Keybind.toString(item.keybind)}</span>
+  <span style={{ fg: uiColors.textMuted }}>{keybind}</span>
 </text>
 ```
 
@@ -428,12 +408,12 @@ This pattern is used throughout the OpenCode repository. When in doubt, check th
 // From dialog-mcp.tsx - enabled/disabled status
 function Status(props: { enabled: boolean; loading: boolean }) {
   if (props.loading) {
-    return <span style={{ fg: theme.textMuted }}>⋯ Loading</span>
+    return <span style={{ fg: uiColors.textMuted }}>⋯ Loading</span>
   }
   if (props.enabled) {
-    return <span style={{ fg: theme.success, attributes: TextAttributes.BOLD }}>✓ Enabled</span>
+    return <span style={{ fg: uiColors.success, attributes: TextAttributes.BOLD }}>✓ Enabled</span>
   }
-  return <span style={{ fg: theme.textMuted }}>○ Disabled</span>
+  return <span style={{ fg: uiColors.textMuted }}>○ Disabled</span>
 }
 ```
 
@@ -441,7 +421,7 @@ function Status(props: { enabled: boolean; loading: boolean }) {
 ```typescript
 // From dialog-select.tsx - bold when active
 <text 
-  fg={props.active ? fg : theme.text}
+  fg={props.active ? fg : uiColors.textPrimary}
   attributes={props.active ? TextAttributes.BOLD : undefined}>
   {props.title}
 </text>
@@ -451,20 +431,20 @@ function Status(props: { enabled: boolean; loading: boolean }) {
 ```typescript
 // From dialog-prompt.tsx - mixed bold and normal text
 <text>
-  enter <span style={{ fg: theme.textMuted }}>submit</span>
+  enter <span style={{ fg: uiColors.textMuted }}>submit</span>
 </text>
 
 // With inline bold
 <text>
-  <b>enter</b> <span style={{ fg: theme.textMuted }}>to continue</span>
+  <b>enter</b> <span style={{ fg: uiColors.textMuted }}>to continue</span>
 </text>
 ```
 
 ---
 
-## JSX Configuration (OpenCode-Aligned)
+## JSX Configuration
 
-**CRITICAL**: OpenTUI requires specific JSX configuration to work correctly. This is based on OpenCode's proven setup.
+**CRITICAL**: OpenTUI requires specific JSX configuration to work correctly.
 
 ### bunfig.toml (Bun Configuration)
 ```toml
@@ -573,7 +553,7 @@ DevEnvClient (facade)
     ├── apps-client.ts      → getApps(), getInfra(), getStatuses()
     ├── docker-client.ts    → startContainer(), stopContainer(), ...
     ├── git-client.ts       → pull(), push(), checkout(), ...
-    ├── mr-client.ts        → getMergeRequests(), approveMR(), ...
+    ├── cr-client.ts        → getChangeRequests(), approveCR(), ...
     ├── ci-client.ts        → getPipelines(), getJobs(), retryJob(), ...
     ├── provider-client.ts  → getProviders(), createProvider(), ...
     ├── agent-client.ts     → getSpaces(), getSessions(), ...
@@ -590,7 +570,6 @@ Each domain module exports functions taking `ClientDeps` (base URL + fetch funct
 - ✅ **DO**: Split new handlers into the appropriate `handlers_*.go` file
 - ✅ **DO**: Add new API methods to the relevant domain client module
 - ✅ **DO**: Keep Go backend logic intact (Docker, Git, GitLab/GitHub operations)
-- ✅ **DO**: Consult OpenCode's implementation when in doubt (https://github.com/sst/opencode)
 - ❌ **DON'T**: Create global variables or singletons
 - ❌ **DON'T**: Add API methods directly to `DevEnvClient` — use domain modules
 - ❌ **DON'T**: Create additional `useKeyboard` hooks — add sub-dispatchers instead
@@ -600,45 +579,31 @@ Each domain module exports functions taking `ClientDeps` (base URL + fetch funct
 
 ## 🤖 AI Features
 
-The TUI provides two AI-powered features. Both support **opencode** and **pi** as selectable backends.
-
-### Choosing a Backend
-
-When you trigger an AI action, a **"Choose AI Backend"** picker appears (like the editor or profile pickers). Use `j`/`k` to navigate, `Enter` to confirm, `Esc` to cancel.
-
-- **opencode** — Uses the `opencode serve` sidecar for streaming AI analysis. Supports multi-turn conversations and opening the session in opencode after analysis.
-- **pi** — Uses `pi --print` for one-shot non-interactive analysis. Requires `pi` to be in `PATH`.
+The TUI provides pi-only AI features.
 
 ### Feature 1 — Log Analysis (`Shift+A` in the log modal)
 
 1. Open any log view (container logs, operation logs, job logs).
 2. Optionally enter visual mode (`v`) and select a range of lines.
-3. Press `Shift+A` — the backend picker opens.
-4. Select a backend and press `Enter`.
-5. Type a prompt (or press `Enter` for the default) and the analysis streams in.
-6. Ask follow-up questions directly in the overlay.
-7. `Ctrl+O` opens the session in opencode (opencode backend only).
-
-The header of the AI overlay displays the active backend: `✦ AI Analysis  [opencode]` or `✦ AI Analysis  [pi]`.
+3. Press `Shift+A`.
+4. Type a prompt (or press `Enter` for the default).
+5. DevEnv runs `pi --print --no-session --no-tools` and shows the analysis in the overlay.
 
 ### Feature 2 — Agent Session Launcher (`a` key → Agent view)
 
 1. Press `a` from the main table to open the Agent view.
-2. Existing opencode sessions are listed at the top; pi sessions appear below a `— pi sessions —` separator.
-3. Press `Enter` on an **existing session** to resume it with the correct tool automatically.
-4. Press `Enter` on **+ New Session** — the backend picker opens:
-   - **opencode**: proceeds to the opencode agent sub-picker.
-   - **pi**: launches `pi` directly in the project root.
+2. Existing pi sessions are listed by working directory.
+3. Press `Enter` on an **existing session** to resume it with `pi`.
+4. Press `Enter` on **+ New Session** to launch `pi` in the project root.
 
 ### Server Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/ai/analyze-logs-stream` | Stream AI log analysis. Optional `backend` field: `"opencode"` (default) or `"pi"`. |
+| `POST` | `/api/ai/analyze-logs-stream` | Stream pi log analysis. |
 | `GET`  | `/api/pi-sessions` | List pi sessions grouped by CWD. Session `id` is the full `.jsonl` file path. |
 
 ### Requirements
 
-- **opencode**: must be in `PATH` for opencode features.
-- **pi**: must be in `PATH` for pi features. If absent, the server returns HTTP 503 with `{"error":"pi not found in PATH"}` and the overlay shows an error.
-- Pi sessions are read from `~/.pi/agent/sessions/`. If the directory does not exist, the pi sessions section is simply empty.
+- `pi` must be in `PATH`. If absent, the server returns HTTP 503 with `{"error":"pi not found in PATH"}` and the overlay shows an error.
+- Pi sessions are read from `~/.pi/agent/sessions/`. If the directory does not exist, the pi sessions section is empty.

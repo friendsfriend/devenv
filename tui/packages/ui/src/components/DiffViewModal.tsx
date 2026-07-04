@@ -49,10 +49,9 @@ interface SplitDiffLine {
 }
 
 /**
- * DiffViewModal Component - OpenCode-Aligned Pattern with Line Selection
+ * DiffViewModal component with line selection.
  * 
  * Enhanced with vim-style navigation (j/k/up/down) and line selection.
- * Base implementation follows OpenCode patterns from dialog-select.tsx.
  * 
  * IMPORTANT: Due to OpenTUI limitation (only ONE useKeyboard hook works per app),
  * keyboard events are handled in the PARENT component (app-opentui.tsx) and
@@ -63,7 +62,7 @@ interface SplitDiffLine {
  * - Controlled line selection from parent
  * - Auto-scroll to keep selected line visible
  * - Mouse support for line selection
- * - OpenCode's exact color scheme (Catppuccin Mocha)
+ * - Theme-driven colors
  * 
  * Navigation (handled in parent):
  * - j/k or up/down: Navigate lines
@@ -395,7 +394,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
   // Note: startReply and cancelReply are no longer needed here
   // Reply mode is controlled by parent via keyboard handler
 
-  // Auto-scroll when selected line changes (OpenCode pattern from dialog-select.tsx:127-143)
+  // Auto-scroll when selected line changes.
   createEffect(() => {
     const next = props.selectedLine;
     const lines = selectableLines();
@@ -520,7 +519,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
       customFooter={customFooter()}
       onBackdropClick={props.onClose}
     >
-      {/* Scrollable wrapper for diff content - OpenCode pattern with line selection */}
+      {/* Scrollable wrapper for diff content with line selection. */}
       <ScrollableContent
         axes={['x', 'y']}
         keyboardAxes={['x']}
@@ -555,7 +554,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
                 // REACTIVE: Check if line is in visual selection range
                 const isInSelection = () => isInVisualSelection(selectableIndex);
 
-                // Background color based on line type and selection (OpenCode-aligned)
+                // Background color based on line type and selection.
                 const bgColor = () => {
                   // Current cursor line - brightest highlight
                   if (isSelected()) return uiColors.primary;
@@ -563,7 +562,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
                   // Lines in visual selection - dimmer highlight
                   if (isInSelection()) return uiColors.bgSurface2;
 
-                  // Diff line backgrounds (OpenCode colors)
+                  // Diff line backgrounds.
                   switch (line.type) {
                     case 'added': return uiColors.diffAddedBg;      // #24312b (subtle green tint)
                     case 'removed': return uiColors.diffRemovedBg;  // #3c2a32 (subtle red tint)
@@ -572,7 +571,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
                   }
                 };
 
-                // Foreground color based on line type and selection (OpenCode-aligned)
+                // Foreground color based on line type and selection.
                 const fgColor = () => {
                   // Cursor line: dark text for high contrast on bright blue
                   if (isSelected()) return uiColors.bgBase;
@@ -580,7 +579,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
                   // Visual selection: bright text for contrast on dim gray background
                   if (isInSelection()) return uiColors.textPrimary;  // #cdd6f4 (bright)
 
-                  // Diff text colors (OpenCode colors)
+                  // Diff text colors.
                   switch (line.type) {
                     case 'added': return uiColors.diffAdded;      // #a6e3a1 (green)
                     case 'removed': return uiColors.diffRemoved;  // #f38ba8 (red)

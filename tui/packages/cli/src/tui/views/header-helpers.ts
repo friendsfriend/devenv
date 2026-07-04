@@ -18,7 +18,7 @@ export const getTabName = (tab: TabType): string => {
 		case "libraries":
 			return "Libraries";
 		case "scripts":
-			return "Scripts";
+			return "Tasks";
 	}
 };
 
@@ -121,11 +121,11 @@ export function getHeaderInfo(deps: HeaderSubtitleDeps): HeaderInfo {
 		return issue ? { title: issue.reference ?? `#${issue.iid}`, context: headerText(issue.title), detail: `comments: ${issueStore.issueComments().length} · linked CRs: ${issueStore.linkedChangeRequests().length} · refs: ${issueStore.references().length}`, right: issue.state ?? "" } : { title: "Issue detail" };
 	}
 	if (view === "changeRequests") {
-		return { title: "Merge requests", context: `${selectedApp?.displayName ?? "All apps"}${branch}`, detail: changeRequestStore.crSearchQuery() ? `Search: "${changeRequestStore.crSearchQuery()}"` : `page ${changeRequestStore.currentPage()}/${changeRequestStore.totalPages() || 1}`, right: `${changeRequestStore.totalCount()} total` };
+		return { title: "Change requests", context: `${selectedApp?.displayName ?? "All apps"}${branch}`, detail: changeRequestStore.crSearchQuery() ? `Search: "${changeRequestStore.crSearchQuery()}"` : `page ${changeRequestStore.currentPage()}/${changeRequestStore.totalPages() || 1}`, right: `${changeRequestStore.totalCount()} total` };
 	}
 	if (view === "changeRequestDetail") {
 		const cr: any = changeRequestStore.selectedChangeRequest();
-		return cr ? { title: `CR !${cr.iid}`, context: headerText(cr.title), detail: `changes: ${changeRequestStore.crChanges().length} · discussions: ${changeRequestStore.crDiscussions().length} · jobs: ${changeRequestStore.crJobsForDetail().length}`, right: cr.state ?? "" } : { title: "Merge request" };
+		return cr ? { title: `CR !${cr.iid}`, context: headerText(cr.title), detail: `changes: ${changeRequestStore.crChanges().length} · discussions: ${changeRequestStore.crDiscussions().length} · jobs: ${changeRequestStore.crJobsForDetail().length}`, right: cr.state ?? "" } : { title: "Change request" };
 	}
 	if (view === "changedFiles") {
 		const files = changeRequestStore.changedFilesFiltered();

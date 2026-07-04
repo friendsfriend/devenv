@@ -13,7 +13,7 @@ export function createPipelineActions(
     const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
     const cr = changeRequestStore.selectedChangeRequest();
     if (!app || !cr || !cr.head_pipeline) {
-      const msg = !app ? 'No app selected' : !cr ? 'No merge request selected' : 'No pipeline available for this merge request';
+      const msg = !app ? 'No app selected' : !cr ? 'No change request selected' : 'No pipeline available for this change request';
       changeRequestStore.setJobsError(msg);
       changeRequestStore.setJobsLoading(false);
       if (!cr || !cr.head_pipeline) return;

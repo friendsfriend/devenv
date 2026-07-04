@@ -237,7 +237,7 @@ program
 
     await serverLogFile.close();
 
-    // Now spawn TUI in a separate process (like OpenCode does)
+    // Now spawn TUI in a separate process.
 
     // Determine the command to spawn TUI
     const bin = process.execPath;

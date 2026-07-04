@@ -79,7 +79,7 @@ export function ContentRouter(props: ContentRouterProps) {
 					totalCount={changeRequestStore.changeRequestLinkedIssues().length}
 					scope={"all"}
 					onClose={() => {
-						changeRequestStore.setSelectedMrLinkedIssueIndex(0);
+						changeRequestStore.setSelectedCrLinkedIssueIndex(0);
 						appStore.setViewMode("changeRequestDetail");
 					}}
 				/>
@@ -338,7 +338,7 @@ export function ContentRouter(props: ContentRouterProps) {
 														onClose={() => {
 															appStore.setViewMode("table");
 															changeRequestStore.setChangeRequests([]);
-															changeRequestStore.setMrError("");
+															changeRequestStore.setCrError("");
 															changeRequestStore.setSelectedCR(null);
 															changeRequestStore.setSelectedCRIndex(0);
 														}}

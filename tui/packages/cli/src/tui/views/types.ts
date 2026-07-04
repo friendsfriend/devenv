@@ -12,7 +12,7 @@ import type {
 	AppActions,
 	IssueActions,
 	LogActions,
-	MrActions,
+	CrActions,
 	DockerActions,
 	GitActions,
 	ProviderActions,
@@ -38,7 +38,7 @@ export interface ViewActions {
 	appActions: AppActions;
 	issueActions: IssueActions;
 	logActions: LogActions;
-	crActions: MrActions;
+	crActions: CrActions;
 	dockerActions: DockerActions;
 	gitActions: GitActions;
 	providerActions: ProviderActions;

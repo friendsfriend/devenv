@@ -284,9 +284,9 @@ export interface ServerEvent {
 	timestamp: string;
 }
 
-// GitLab Merge Request types
+// GitLab Change Request types
 
-// ChangeRequestListResult represents a paginated response from the merge request list endpoint.
+// ChangeRequestListResult represents a paginated response from the change request list endpoint.
 export interface ChangeRequestListResult {
 	items: ChangeRequest[];
 	totalCount: number;

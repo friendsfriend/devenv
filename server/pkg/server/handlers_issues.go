@@ -1057,7 +1057,7 @@ func (s *Server) handleGitHubAddComment(w http.ResponseWriter, r *http.Request) 
 
 // ─── Linked MRs Handlers ───────────────────────────────────────────────────
 
-// handleGitHubIssueLinkedMRs — GET /api/github/issues/{n}/linked-mrs
+// handleGitHubIssueLinkedMRs — GET /api/github/issues/{n}/linked-crs
 func (s *Server) handleGitHubIssueLinkedMRs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
@@ -1100,7 +1100,7 @@ func (s *Server) handleGitHubIssueLinkedMRs(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(mrs)
 }
 
-// handleGitLabIssueLinkedMRs — GET /api/gitlab/issues/{n}/linked-mrs
+// handleGitLabIssueLinkedMRs — GET /api/gitlab/issues/{n}/linked-crs
 func (s *Server) handleGitLabIssueLinkedMRs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)

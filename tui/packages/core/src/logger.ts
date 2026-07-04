@@ -54,8 +54,7 @@ function resolveDevenvHome(): string {
 }
 
 /**
- * Logger utility that captures console errors and writes to file
- * Follows OpenCode patterns for robust error logging
+ * Logger utility that captures console errors and writes to file.
  */
 export class Logger {
   private logFilePath: string;

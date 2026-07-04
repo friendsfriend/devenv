@@ -66,24 +66,24 @@ export async function handleIssueListKeys(
 		const selectedIdx = changeRequestStore.selectedChangeRequestLinkedIssueIndex();
 
 		if (isDownKey(event)) {
-			changeRequestStore.setSelectedMrLinkedIssueIndex(
+			changeRequestStore.setSelectedCrLinkedIssueIndex(
 				Math.min(selectedIdx + 1, linkedIssues.length - 1),
 			);
 			return true;
 		}
 		if (isUpKey(event)) {
-			changeRequestStore.setSelectedMrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
+			changeRequestStore.setSelectedCrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
 			return true;
 		}
 		if (event.name === "g" && !event.ctrl) {
-			changeRequestStore.setSelectedMrLinkedIssueIndex(0);
+			changeRequestStore.setSelectedCrLinkedIssueIndex(0);
 			return true;
 		}
 		if (
 			(event.name === "G" || (event.name === "g" && event.shift)) &&
 			!event.ctrl
 		) {
-			changeRequestStore.setSelectedMrLinkedIssueIndex(
+			changeRequestStore.setSelectedCrLinkedIssueIndex(
 				Math.max(0, linkedIssues.length - 1),
 			);
 			return true;
@@ -96,7 +96,7 @@ export async function handleIssueListKeys(
 			return true;
 		}
 		if (event.name === "escape" || event.name === "q") {
-			changeRequestStore.setSelectedMrLinkedIssueIndex(0);
+			changeRequestStore.setSelectedCrLinkedIssueIndex(0);
 			appStore.setViewMode("changeRequestDetail");
 			return true;
 		}

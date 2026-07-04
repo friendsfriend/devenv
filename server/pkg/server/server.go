@@ -30,9 +30,9 @@ type Server struct {
 	opStatus      map[string]*OperationStatus
 	opStatusMu    sync.RWMutex
 
-	// MR review sessions: token → session (created per review, cleaned up on stream close)
-	mrSessions   map[string]*mrReviewSession
-	mrSessionsMu sync.Mutex
+	// CR review sessions: token → session (created per review, cleaned up on stream close)
+	crSessions   map[string]*crReviewSession
+	crSessionsMu sync.Mutex
 }
 
 type OperationStatus struct {
@@ -91,7 +91,7 @@ func NewServer(port int) *Server {
 		port:       port,
 		listeners:  make(map[chan Event]bool),
 		opStatus:   make(map[string]*OperationStatus),
-		mrSessions: make(map[string]*mrReviewSession),
+		crSessions: make(map[string]*crReviewSession),
 	}
 	return s
 }
@@ -179,16 +179,16 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/gitlab/pipeline-jobs", s.handleGitLabPipelineJobs)
 	mux.HandleFunc("/api/gitlab/jobs", s.handleGitLabJobs)
 	mux.HandleFunc("/api/gitlab/test-summary", s.handleGitLabTestSummary)
-	mux.HandleFunc("/api/gitlab/mr-changes", s.handleGitLabChangeRequestChanges)
-	mux.HandleFunc("/api/gitlab/mr-versions", s.handleGitLabMRVersions)
-	mux.HandleFunc("/api/gitlab/mr-comment", s.handleGitLabMRComment)
-	mux.HandleFunc("/api/gitlab/mr-discussions", s.handleGitLabMRDiscussions)
-	mux.HandleFunc("/api/gitlab/mr-discussion-reply", s.handleGitLabMRDiscussionReply)
-	mux.HandleFunc("/api/gitlab/mr-discussion-resolve", s.handleGitLabMRDiscussionResolve)
-	mux.HandleFunc("/api/gitlab/mr-approve", s.handleGitLabMRApprove)
-	mux.HandleFunc("/api/gitlab/mr-unapprove", s.handleGitLabMRUnapprove)
-	mux.HandleFunc("/api/gitlab/mr-toggle-approval", s.handleGitLabMRToggleApproval)
-	mux.HandleFunc("/api/gitlab/mr-rebase", s.handleGitLabMRRebase)
+	mux.HandleFunc("/api/gitlab/cr-changes", s.handleGitLabChangeRequestChanges)
+	mux.HandleFunc("/api/gitlab/cr-versions", s.handleGitLabMRVersions)
+	mux.HandleFunc("/api/gitlab/cr-comment", s.handleGitLabMRComment)
+	mux.HandleFunc("/api/gitlab/cr-discussions", s.handleGitLabMRDiscussions)
+	mux.HandleFunc("/api/gitlab/cr-discussion-reply", s.handleGitLabMRDiscussionReply)
+	mux.HandleFunc("/api/gitlab/cr-discussion-resolve", s.handleGitLabMRDiscussionResolve)
+	mux.HandleFunc("/api/gitlab/cr-approve", s.handleGitLabMRApprove)
+	mux.HandleFunc("/api/gitlab/cr-unapprove", s.handleGitLabMRUnapprove)
+	mux.HandleFunc("/api/gitlab/cr-toggle-approval", s.handleGitLabMRToggleApproval)
+	mux.HandleFunc("/api/gitlab/cr-rebase", s.handleGitLabMRRebase)
 	mux.HandleFunc("/api/gitlab/job-logs", s.handleGitLabJobLogs)
 	mux.HandleFunc("/api/gitlab/job-retry", s.handleGitLabJobRetry)
 	mux.HandleFunc("/api/gitlab/job-cancel", s.handleGitLabJobCancel)
@@ -210,9 +210,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/github/issues/assignee", s.handleGitHubSetAssignee)
 	mux.HandleFunc("/api/github/issues/unassign", s.handleGitHubRemoveAssignee)
 	mux.HandleFunc("/api/github/issues/comment", s.handleGitHubAddComment)
-	mux.HandleFunc("/api/github/issues/linked-mrs", s.handleGitHubIssueLinkedMRs)
+	mux.HandleFunc("/api/github/issues/linked-crs", s.handleGitHubIssueLinkedMRs)
 	mux.HandleFunc("/api/github/issues/references", s.handleGitHubIssueReferencedIssues)
-	mux.HandleFunc("/api/github/mr/linked-issues", s.handleGitHubMRLinkedIssues)
+	mux.HandleFunc("/api/github/cr/linked-issues", s.handleGitHubMRLinkedIssues)
 	mux.HandleFunc("/api/github/labels", s.handleGitHubRepoLabels)
 	mux.HandleFunc("/api/github/collaborators", s.handleGitHubRepoCollaborators)
 	mux.HandleFunc("/api/gitlab/issues", s.handleGitLabIssues)
@@ -224,15 +224,15 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/gitlab/issues/assignee", s.handleGitLabSetAssignee)
 	mux.HandleFunc("/api/gitlab/issues/unassign", s.handleGitLabRemoveAssignee)
 	mux.HandleFunc("/api/gitlab/issues/comment", s.handleGitLabAddComment)
-	mux.HandleFunc("/api/gitlab/issues/linked-mrs", s.handleGitLabIssueLinkedMRs)
+	mux.HandleFunc("/api/gitlab/issues/linked-crs", s.handleGitLabIssueLinkedMRs)
 	mux.HandleFunc("/api/gitlab/issues/references", s.handleGitLabIssueReferencedIssues)
-	mux.HandleFunc("/api/gitlab/mr/linked-issues", s.handleGitLabMRLinkedIssues)
+	mux.HandleFunc("/api/gitlab/cr/linked-issues", s.handleGitLabMRLinkedIssues)
 	mux.HandleFunc("/api/gitlab/labels", s.handleGitLabRepoLabels)
 	mux.HandleFunc("/api/gitlab/collaborators", s.handleGitLabRepoCollaborators)
 	mux.HandleFunc("/api/ai/analyze-logs", s.handleAIAnalyzeLogs)
 	mux.HandleFunc("/api/ai/analyze-logs-stream", s.handleAIAnalyzeLogsStream)
-	mux.HandleFunc("/api/ai/mr-review-stream", s.handleAIMRReviewStream)
-	mux.HandleFunc("/api/ai/mr-comment-callback/", s.handleMRCommentCallback)
+	mux.HandleFunc("/api/ai/cr-review-stream", s.handleAICRReviewStream)
+	mux.HandleFunc("/api/ai/cr-comment-callback/", s.handleCRCommentCallback)
 	mux.HandleFunc("/api/providers", s.handleProviders)
 	mux.HandleFunc("/api/providers/", s.handleProviderByName)
 	mux.HandleFunc("/api/repos/search", s.handleRepoSearch)

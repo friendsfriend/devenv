@@ -307,19 +307,19 @@ func (s *Server) handleGitLabChangeRequestChanges(w http.ResponseWriter, r *http
 
 	// Get parameters from query
 	appIdent := r.URL.Query().Get("appIdent")
-	mrIIDStr := r.URL.Query().Get("mrIID")
+	mrIIDStr := r.URL.Query().Get("crIID")
 
 	log.Printf("[DEBUG] MR changes request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
 
 	if appIdent == "" || mrIIDStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	// Parse MR IID
 	var mrIID int
 	if _, err := fmt.Sscanf(mrIIDStr, "%d", &mrIID); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -371,18 +371,18 @@ func (s *Server) handleGitLabMRVersions(w http.ResponseWriter, r *http.Request) 
 
 	// Get parameters from query
 	appIdent := r.URL.Query().Get("appIdent")
-	mrIIDStr := r.URL.Query().Get("mrIID")
+	mrIIDStr := r.URL.Query().Get("crIID")
 
 	log.Printf("[DEBUG] MR versions request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
 
 	if appIdent == "" || mrIIDStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	var mrIID int
 	if _, err := fmt.Sscanf(mrIIDStr, "%d", &mrIID); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -427,7 +427,7 @@ func (s *Server) handleGitLabMRVersions(w http.ResponseWriter, r *http.Request) 
 // MRCommentRequest represents a request to create an MR comment
 type MRCommentRequest struct {
 	AppIdent string               `json:"appIdent"`
-	MRIID    int                  `json:"mrIID"`
+	MRIID    int                  `json:"crIID"`
 	Body     string               `json:"body"`
 	Position *gitlab.DiffPosition `json:"position,omitempty"`
 }
@@ -448,7 +448,7 @@ func (s *Server) handleGitLabMRComment(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if req.AppIdent == "" || req.MRIID == 0 || req.Body == "" {
-		respondBadRequest(w, "appIdent, mrIID, and body are required")
+		respondBadRequest(w, "appIdent, crIID, and body are required")
 		return
 	}
 
@@ -509,19 +509,19 @@ func (s *Server) handleGitLabMRDiscussions(w http.ResponseWriter, r *http.Reques
 
 	// Get parameters from query
 	appIdent := r.URL.Query().Get("appIdent")
-	mrIIDStr := r.URL.Query().Get("mrIID")
+	mrIIDStr := r.URL.Query().Get("crIID")
 
 	log.Printf("[DEBUG] MR discussions request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
 
 	if appIdent == "" || mrIIDStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	// Parse MR IID
 	var mrIID int
 	if _, err := fmt.Sscanf(mrIIDStr, "%d", &mrIID); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -574,7 +574,7 @@ func (s *Server) handleGitLabMRDiscussionReply(w http.ResponseWriter, r *http.Re
 	// Parse request body
 	var req struct {
 		AppIdent     string `json:"appIdent"`
-		MRIID        int    `json:"mrIID"`
+		MRIID        int    `json:"crIID"`
 		DiscussionID string `json:"discussionID"`
 		Body         string `json:"body"`
 	}
@@ -587,7 +587,7 @@ func (s *Server) handleGitLabMRDiscussionReply(w http.ResponseWriter, r *http.Re
 
 	// Validate required fields
 	if req.AppIdent == "" || req.MRIID == 0 || req.DiscussionID == "" || req.Body == "" {
-		respondBadRequest(w, "appIdent, mrIID, discussionID, and body are required")
+		respondBadRequest(w, "appIdent, crIID, discussionID, and body are required")
 		return
 	}
 
@@ -644,7 +644,7 @@ func (s *Server) handleGitLabMRDiscussionResolve(w http.ResponseWriter, r *http.
 	// Parse request body
 	var req struct {
 		AppIdent     string `json:"appIdent"`
-		MRIID        int    `json:"mrIID"`
+		MRIID        int    `json:"crIID"`
 		DiscussionID string `json:"discussionID"`
 		Resolved     bool   `json:"resolved"`
 	}
@@ -657,7 +657,7 @@ func (s *Server) handleGitLabMRDiscussionResolve(w http.ResponseWriter, r *http.
 
 	// Validate required fields
 	if req.AppIdent == "" || req.MRIID == 0 || req.DiscussionID == "" {
-		respondBadRequest(w, "appIdent, mrIID, and discussionID are required")
+		respondBadRequest(w, "appIdent, crIID, and discussionID are required")
 		return
 	}
 
@@ -717,7 +717,7 @@ func (s *Server) handleGitLabMRApprove(w http.ResponseWriter, r *http.Request) {
 
 	// Get parameters from query
 	appIdent := r.URL.Query().Get("appIdent")
-	mrIIDStr := r.URL.Query().Get("mrIID")
+	mrIIDStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -725,14 +725,14 @@ func (s *Server) handleGitLabMRApprove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if mrIIDStr == "" {
-		respondBadRequest(w, "mrIID parameter required")
+		respondBadRequest(w, "crIID parameter required")
 		return
 	}
 
 	// Parse MR IID
 	var mrIID int
 	if _, err := fmt.Sscanf(mrIIDStr, "%d", &mrIID); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -789,7 +789,7 @@ func (s *Server) handleGitLabMRUnapprove(w http.ResponseWriter, r *http.Request)
 
 	// Get parameters from query
 	appIdent := r.URL.Query().Get("appIdent")
-	mrIIDStr := r.URL.Query().Get("mrIID")
+	mrIIDStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -797,14 +797,14 @@ func (s *Server) handleGitLabMRUnapprove(w http.ResponseWriter, r *http.Request)
 	}
 
 	if mrIIDStr == "" {
-		respondBadRequest(w, "mrIID parameter required")
+		respondBadRequest(w, "crIID parameter required")
 		return
 	}
 
 	// Parse MR IID
 	var mrIID int
 	if _, err := fmt.Sscanf(mrIIDStr, "%d", &mrIID); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -862,7 +862,7 @@ func (s *Server) handleGitLabMRToggleApproval(w http.ResponseWriter, r *http.Req
 
 	// Get parameters from query
 	appIdent := r.URL.Query().Get("appIdent")
-	mrIIDStr := r.URL.Query().Get("mrIID")
+	mrIIDStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -870,14 +870,14 @@ func (s *Server) handleGitLabMRToggleApproval(w http.ResponseWriter, r *http.Req
 	}
 
 	if mrIIDStr == "" {
-		respondBadRequest(w, "mrIID parameter required")
+		respondBadRequest(w, "crIID parameter required")
 		return
 	}
 
 	// Parse MR IID
 	var mrIID int
 	if _, err := fmt.Sscanf(mrIIDStr, "%d", &mrIID); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -938,7 +938,7 @@ func (s *Server) handleGitLabMRRebase(w http.ResponseWriter, r *http.Request) {
 
 	// Get parameters from query
 	appIdent := r.URL.Query().Get("appIdent")
-	mrIIDStr := r.URL.Query().Get("mrIID")
+	mrIIDStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -946,14 +946,14 @@ func (s *Server) handleGitLabMRRebase(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if mrIIDStr == "" {
-		respondBadRequest(w, "mrIID parameter required")
+		respondBadRequest(w, "crIID parameter required")
 		return
 	}
 
 	// Parse MR IID
 	var mrIID int
 	if _, err := fmt.Sscanf(mrIIDStr, "%d", &mrIID); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 

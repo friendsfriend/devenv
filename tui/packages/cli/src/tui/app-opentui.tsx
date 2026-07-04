@@ -35,7 +35,7 @@ import {
 	createAppActions,
 	createIssueActions,
 	createLogActions,
-	createMrActions,
+	createCrActions,
 	createDockerActions,
 	createGitActions,
 	createProviderActions,
@@ -54,8 +54,8 @@ import {
 	handleDiffModalKeys,
 	handleLogModalKeys,
 	handleJobsKeys,
-	handleMrListKeys,
-	handleMrDetailKeys,
+	handleCrListKeys,
+	handleCrDetailKeys,
 	handleChangedFilesKeys,
 	handleTestResultsKeys,
 	handleDiscussionsKeys,
@@ -122,7 +122,7 @@ function TUIApp(props: TUIAppProps) {
 		showError,
 	);
 	const logActions = createLogActions(logStore, appStore, client, showError);
-	const crActions = createMrActions(
+	const crActions = createCrActions(
 		appStore,
 		changeRequestStore,
 		uiStore,
@@ -253,8 +253,8 @@ function TUIApp(props: TUIAppProps) {
 		if (await handleDiffModalKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleLogModalKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleJobsKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleMrListKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleMrDetailKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleCrListKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleCrDetailKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueTimelineKeys(event, kbStores, kbActions, kbCtx)) return;

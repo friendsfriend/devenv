@@ -172,16 +172,16 @@ func (s *Server) handleGitHubPRChanges(w http.ResponseWriter, r *http.Request) {
 	}
 
 	appIdent := r.URL.Query().Get("appIdent")
-	prNumberStr := r.URL.Query().Get("mrIID")
+	prNumberStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" || prNumberStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	var prNumber int
 	if _, err := fmt.Sscanf(prNumberStr, "%d", &prNumber); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -216,16 +216,16 @@ func (s *Server) handleGitHubPRDiscussions(w http.ResponseWriter, r *http.Reques
 	}
 
 	appIdent := r.URL.Query().Get("appIdent")
-	prNumberStr := r.URL.Query().Get("mrIID")
+	prNumberStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" || prNumberStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	var prNumber int
 	if _, err := fmt.Sscanf(prNumberStr, "%d", &prNumber); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -260,16 +260,16 @@ func (s *Server) handleGitHubPRApprove(w http.ResponseWriter, r *http.Request) {
 	}
 
 	appIdent := r.URL.Query().Get("appIdent")
-	prNumberStr := r.URL.Query().Get("mrIID")
+	prNumberStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" || prNumberStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	var prNumber int
 	if _, err := fmt.Sscanf(prNumberStr, "%d", &prNumber); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -303,16 +303,16 @@ func (s *Server) handleGitHubPRUnapprove(w http.ResponseWriter, r *http.Request)
 	}
 
 	appIdent := r.URL.Query().Get("appIdent")
-	prNumberStr := r.URL.Query().Get("mrIID")
+	prNumberStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" || prNumberStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	var prNumber int
 	if _, err := fmt.Sscanf(prNumberStr, "%d", &prNumber); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 
@@ -346,16 +346,16 @@ func (s *Server) handleGitHubPRToggleApproval(w http.ResponseWriter, r *http.Req
 	}
 
 	appIdent := r.URL.Query().Get("appIdent")
-	prNumberStr := r.URL.Query().Get("mrIID")
+	prNumberStr := r.URL.Query().Get("crIID")
 
 	if appIdent == "" || prNumberStr == "" {
-		respondBadRequest(w, "appIdent and mrIID parameters required")
+		respondBadRequest(w, "appIdent and crIID parameters required")
 		return
 	}
 
 	var prNumber int
 	if _, err := fmt.Sscanf(prNumberStr, "%d", &prNumber); err != nil {
-		respondBadRequest(w, "Invalid mrIID")
+		respondBadRequest(w, "Invalid crIID")
 		return
 	}
 

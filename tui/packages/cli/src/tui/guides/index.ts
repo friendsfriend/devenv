@@ -45,11 +45,11 @@ export const guides: Guide[] = [
     import: () => import("./effective-docker-builds.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
-    key: "adding-apps",
-    title: "Adding an App",
+    key: "adding-repositories",
+    title: "Adding a Repository",
     description: "App definitions, Dockerfiles, Compose config, and infra linking",
     category: "Authoring",
-    import: () => import("./adding-apps.md", { with: { type: "text" } }).then((m) => m.default),
+    import: () => import("./adding-repositories.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
     key: "adding-scripts",

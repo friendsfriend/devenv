@@ -9,7 +9,7 @@ import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
  * - Enter to select CR
  * - j/k/g/G for navigation
  */
-export async function handleMrListKeys(
+export async function handleCrListKeys(
   event: KeyboardEvent,
   stores: KeyboardStores,
   actions: KeyboardActions,
@@ -26,15 +26,15 @@ export async function handleMrListKeys(
       event.name === 'escape' || event.name === 'Escape' ||
       event.name === 'esc' || event.sequence === '\x1b'
     ) {
-      changeRequestStore.setMrSearchMode(false);
-      changeRequestStore.setMrSearchQuery('');
+      changeRequestStore.setCrSearchMode(false);
+      changeRequestStore.setCrSearchQuery('');
       changeRequestStore.setSelectedCRIndex(0);
       return true;
     }
     if (event.name === 'return' || event.name === 'enter') {
       const query = changeRequestStore.crSearchQuery();
-      changeRequestStore.setMrSearchMode(false);
-      changeRequestStore.setMrSearchQuery(''); // clear client-side filter so server results aren't double-filtered
+      changeRequestStore.setCrSearchMode(false);
+      changeRequestStore.setCrSearchQuery(''); // clear client-side filter so server results aren't double-filtered
       changeRequestStore.setSelectedCRIndex(0);
       if (query) {
         // Submit search to server
@@ -44,13 +44,13 @@ export async function handleMrListKeys(
       return true;
     }
     if (event.name === 'backspace' || event.name === 'delete') {
-      changeRequestStore.setMrSearchQuery(q => q.slice(0, -1));
+      changeRequestStore.setCrSearchQuery(q => q.slice(0, -1));
       changeRequestStore.setSelectedCRIndex(0);
       return true;
     }
     const ch = event.sequence ?? event.name ?? '';
     if (ch.length === 1 && ch >= ' ') {
-      changeRequestStore.setMrSearchQuery(q => q + ch);
+      changeRequestStore.setCrSearchQuery(q => q + ch);
       changeRequestStore.setSelectedCRIndex(0);
       return true;
     }
@@ -67,8 +67,8 @@ export async function handleMrListKeys(
 
   // '/' to enter search mode
   if (event.name === '/' || event.sequence === '/') {
-    changeRequestStore.setMrSearchMode(true);
-    changeRequestStore.setMrSearchQuery('');
+    changeRequestStore.setCrSearchMode(true);
+    changeRequestStore.setCrSearchQuery('');
     changeRequestStore.setSelectedCRIndex(0);
     return true;
   }
@@ -76,9 +76,9 @@ export async function handleMrListKeys(
   // ESC: clear search first, then go back
   if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
     if (changeRequestStore.crSearchQuery() || changeRequestStore.searchTerm()) {
-      changeRequestStore.setMrSearchQuery('');
+      changeRequestStore.setCrSearchQuery('');
       changeRequestStore.setSearchTerm('');
-      changeRequestStore.setMrSearchMode(false);
+      changeRequestStore.setCrSearchMode(false);
       changeRequestStore.setSelectedCRIndex(0);
       // Reload without search filter if we had a server-side search active
       if (changeRequestStore.changeRequests().length > 0) {
@@ -88,7 +88,7 @@ export async function handleMrListKeys(
     }
     appStore.setViewMode('table');
     changeRequestStore.setChangeRequests([]);
-    changeRequestStore.setMrError('');
+    changeRequestStore.setCrError('');
     changeRequestStore.setSelectedCR(null);
     changeRequestStore.setSelectedCRIndex(0);
     changeRequestStore.setSearchTerm('');
@@ -113,7 +113,7 @@ export async function handleMrListKeys(
       current === 'opened' ? 'closed' :
       current === 'closed' ? 'all' :
       'opened';
-    changeRequestStore.setMrState(next);
+    changeRequestStore.setCrState(next);
     void crActions.loadAllChangeRequests(1, undefined, next);
     return true;
   }
