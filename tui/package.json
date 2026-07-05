@@ -1,6 +1,6 @@
 {
   "name": "devenv",
-  "version": "0.9.0",
+  "version": "0.11.0",
   "description": "DevEnv - Development Environment TUI",
   "private": true,
   "packageManager": "bun@1.3.14",
