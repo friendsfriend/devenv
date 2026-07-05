@@ -1,10 +1,10 @@
-import { createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal } from 'solid-js';
 import type {
 	Issue,
 	IssueComment,
 	IssueScope,
 	ChangeRequest,
-} from "@devenv/types";
+} from '@devenv/types';
 
 export type ReferenceItem =
 	| { type: "cr"; data: ChangeRequest }

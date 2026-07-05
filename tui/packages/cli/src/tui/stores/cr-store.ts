@@ -1,4 +1,4 @@
-import { createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal } from 'solid-js';
 import type {
 	Discussion,
 	Issue,
@@ -7,7 +7,7 @@ import type {
 	ChangeRequestChange,
 	TestCase,
 	TestSummary,
-} from "@devenv/types";
+} from '@devenv/types';
 
 type ListControlTarget = "changedFiles" | "jobs" | "tests";
 type SortDirection = "asc" | "desc" | "none";

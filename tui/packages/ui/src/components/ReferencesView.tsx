@@ -1,5 +1,5 @@
-import { Show } from "solid-js";
-import type { Issue, ChangeRequest } from "@devenv/types";
+import { Show } from 'solid-js';
+import type { Issue, ChangeRequest } from '@devenv/types';
 import { uiColors } from "../colors";
 import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";

@@ -1,7 +1,7 @@
-import type { DevEnvClient } from "@devenv/core";
+import type { DevEnvClient } from '@devenv/core';
 import type { AppStore } from "../stores/app-store";
 import type { IssueStore } from "../stores/issue-store";
-import type { IssueScope } from "@devenv/types";
+import type { IssueScope } from '@devenv/types';
 
 const UNKNOWN_ERROR = "Unknown error";
 

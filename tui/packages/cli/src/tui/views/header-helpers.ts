@@ -1,5 +1,5 @@
-import { uiColors } from "@devenv/ui";
-import type { App, InfraService } from "@devenv/types";
+import { uiColors } from '@devenv/ui';
+import type { App, InfraService } from '@devenv/types';
 import type { AppStore, AppDetailStore, IssueStore, ChangeRequestStore } from "../stores";
 import type { HelpActions } from "../actions";
 

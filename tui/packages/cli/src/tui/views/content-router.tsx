@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import { Show } from 'solid-js';
 import {
 	RepositoryTable,
 	InfrastructureTable,
@@ -21,7 +21,7 @@ import {
 	uiColors,
 	LAYOUT_CHROME_LINES,
 	ContentStack,
-} from "@devenv/ui";
+} from '@devenv/ui';
 import { getGuide, guides as allGuides } from "../guides";
 import type { ContentRouterProps } from "./types";
 import { StartupSplash } from "./startup-splash";

@@ -98,6 +98,8 @@ export type {
 } from "./components/EditorPickerView";
 export { WorktreeManagerModal } from "./components/WorktreeManagerModal";
 export type { WorktreeManagerModalProps } from "./components/WorktreeManagerModal";
+export { WorkItemCard } from "./components/WorkItemCard";
+export type { WorkItemCardProps } from "./components/WorkItemCard";
 export { TaskArgsModal } from "./components/TaskArgsModal";
 export type { TaskArgsModalProps } from "./components/TaskArgsModal";
 export { TaskAddModal } from "./components/TaskAddModal";

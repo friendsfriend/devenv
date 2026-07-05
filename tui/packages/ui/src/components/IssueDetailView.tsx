@@ -1,8 +1,8 @@
-import { TextAttributes } from "@opentui/core";
-import type { ScrollBoxRenderable } from "@opentui/core";
+import { TextAttributes } from '@opentui/core';
+import type { ScrollBoxRenderable } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
-import { For, Show } from "solid-js";
-import type { Issue, IssueComment, ChangeRequest } from "@devenv/types";
+import { For, Show } from 'solid-js';
+import type { Issue, IssueComment, ChangeRequest } from '@devenv/types';
 import { uiColors } from "../colors";
 import { ContentFrame } from "./ContentStack";
 import { getMarkdownSyntaxStyle } from "../markdownSyntax";

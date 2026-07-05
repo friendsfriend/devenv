@@ -21,7 +21,7 @@ import type {
 	PipelineActions,
 	HelpActions,
 } from "../actions";
-import type { App } from "@devenv/types";
+import type { App } from '@devenv/types';
 
 export interface KeyboardEvent {
 	name?: string;

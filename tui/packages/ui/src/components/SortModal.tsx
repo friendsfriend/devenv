@@ -1,5 +1,5 @@
-import { For } from "solid-js";
-import { TextAttributes } from "@opentui/core";
+import { For } from 'solid-js';
+import { TextAttributes } from '@opentui/core';
 import { GenericModal } from "./GenericModal";
 import { uiColors } from "../colors";
 

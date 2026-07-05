@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -749,5 +748,3 @@ func (ic *IssuesClient) AddComment(info *issues.RepoInfo, number int, body strin
 	result := convertGLIssueNote(glNote)
 	return &result, nil
 }
-
-var _ = log.Printf

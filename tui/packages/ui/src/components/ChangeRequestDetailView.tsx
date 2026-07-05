@@ -1,6 +1,6 @@
-import { TextAttributes } from "@opentui/core";
+import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
-import { Show, For, createMemo } from "solid-js";
+import { Show, For, createMemo } from 'solid-js';
 import { uiColors } from "../colors";
 import { ContentFrame } from "./ContentStack";
 import { getMarkdownSyntaxStyle } from "../markdownSyntax";
@@ -14,7 +14,7 @@ import type {
 	TestSummary,
 	ChangeRequestChange,
 	Discussion,
-} from "@devenv/types";
+} from '@devenv/types';
 
 interface ChangeRequestDetailViewProps {
 	changeRequest: ChangeRequest;

@@ -1,4 +1,4 @@
-import { getLogger } from "@devenv/core";
+import { getLogger } from '@devenv/core';
 import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,

@@ -1,8 +1,8 @@
-import { TextAttributes } from "@opentui/core";
+import { TextAttributes } from '@opentui/core';
 import { uiColors } from "../colors";
 import { ListViewModal } from "./ListViewModal";
 import { formatHelpText } from "./HelpText";
-import type { IssueScope } from "@devenv/types";
+import type { IssueScope } from '@devenv/types';
 
 export interface IssueScopeOption {
 	label: string;

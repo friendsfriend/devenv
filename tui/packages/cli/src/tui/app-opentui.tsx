@@ -4,14 +4,14 @@ import {
 	usePaste,
 	useRenderer,
 	useTerminalDimensions,
-} from "@opentui/solid";
-import { createCliRenderer } from "@opentui/core";
+} from '@opentui/solid';
+import { createCliRenderer } from '@opentui/core';
 import { setExitRenderer } from "./exit";
-import { onMount, createEffect, on, onCleanup } from "solid-js";
+import { onMount, createEffect, on, onCleanup } from 'solid-js';
 import "opentui-spinner/solid";
 import { APP_VERSION } from "../version";
-import { createClient, registerFatalCleanup } from "@devenv/core";
-import type { App } from "@devenv/types";
+import { createClient, registerFatalCleanup } from '@devenv/core';
+import type { App } from '@devenv/types';
 import {
 	Header,
 	StatusBar,
@@ -19,7 +19,7 @@ import {
 	getSelectableRows,
 	setGlobalSelectionMouseUpHandler,
 	uiColors,
-} from "@devenv/ui";
+} from '@devenv/ui';
 import { createFrames } from "./spinner";
 import {
 	createAppStore,

@@ -1,5 +1,5 @@
-import { Show } from "solid-js";
-import { TextAttributes, RGBA } from "@opentui/core";
+import { Show } from 'solid-js';
+import { TextAttributes, RGBA } from '@opentui/core';
 import {
 	LogModal,
 	DiffViewModal,
@@ -32,7 +32,7 @@ import {
 	ThemePickerView,
 	themeNames,
 	uiColors,
-} from "@devenv/ui";
+} from '@devenv/ui';
 import type { ModalOverlaysProps } from "./types";
 import { FirstStepsView } from "./first-steps-view";
 import { getGuide, guides as allGuides } from "../guides";

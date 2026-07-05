@@ -21,7 +21,7 @@ import type {
 	PipelineActions,
 	HelpActions,
 } from "../actions";
-import type { TableColumn } from "@devenv/ui";
+import type { TableColumn } from '@devenv/ui';
 
 export interface ViewStores {
 	appStore: AppStore;

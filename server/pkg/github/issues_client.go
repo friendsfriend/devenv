@@ -3,7 +3,6 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -866,6 +865,3 @@ func (ic *IssuesClient) AddComment(info *issues.RepoInfo, number int, body strin
 	result := convertGHIssueComment(ghComment)
 	return &result, nil
 }
-
-// ensure logger import is used
-var _ = log.Printf

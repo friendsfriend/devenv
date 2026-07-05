@@ -1,6 +1,6 @@
-import { TextAttributes, RGBA } from "@opentui/core";
-import { useTerminalDimensions } from "@opentui/solid";
-import { uiColors } from "@devenv/ui";
+import { TextAttributes, RGBA } from '@opentui/core';
+import { useTerminalDimensions } from '@opentui/solid';
+import { uiColors } from '@devenv/ui';
 import type { AppStore, ProviderStore } from "../stores";
 
 export function FirstStepsView(props: {

@@ -1,6 +1,6 @@
-import { For, Show, type JSX } from "solid-js";
-import { TextAttributes } from "@opentui/core";
-import type { TableRow } from "@devenv/types";
+import { For, Show, type JSX } from 'solid-js';
+import { TextAttributes } from '@opentui/core';
+import type { TableRow } from '@devenv/types';
 import { uiColors } from "../colors";
 import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
@@ -322,7 +322,7 @@ export function TaskTable<T = string>(props: TableProps<T>) {
 	return <WorkItemTable {...props} emptyMessage="No tasks" runningLabel={`${props.apps.length} tasks`} />;
 }
 
-/** @deprecated Use RepositoryTable, InfrastructureTable, or TaskTable. */
+/** Generic table component. Prefer RepositoryTable, InfrastructureTable, or TaskTable for domain-specific variants. */
 export function Table<T = string>(props: TableProps<T>) {
 	return <RepositoryTable {...props} />;
 }

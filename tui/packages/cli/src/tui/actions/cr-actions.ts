@@ -1,5 +1,5 @@
-import { getLogger } from "@devenv/core";
-import type { DevEnvClient } from "@devenv/core";
+import { getLogger } from '@devenv/core';
+import type { DevEnvClient } from '@devenv/core';
 import type { AppStore } from "../stores/app-store";
 import type { ChangeRequestStore } from "../stores/cr-store";
 import type { UiStore } from "../stores/ui-store";

@@ -1395,5 +1395,3 @@ func (s *Server) handleGitLabIssueReferencedIssues(w http.ResponseWriter, r *htt
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(referenced)
 }
-
-var _ = log.Printf

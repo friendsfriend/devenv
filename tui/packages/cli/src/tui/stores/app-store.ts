@@ -1,4 +1,4 @@
-import { createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal } from 'solid-js';
 import type {
 	App,
 	InfraService,
@@ -6,8 +6,8 @@ import type {
 	ScriptVisibleRow,
 	StatusLogEntry,
 	TableRow,
-} from "@devenv/types";
-import type { TableTab } from "@devenv/ui";
+} from '@devenv/types';
+import type { TableTab } from '@devenv/ui';
 
 export type ViewMode =
 	| "table"

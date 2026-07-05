@@ -1,7 +1,7 @@
 import { TextAttributes } from '@opentui/core';
-import { Show } from "solid-js";
+import { Show } from 'solid-js';
 import { uiColors } from "../colors";
-import type { Issue, IssueScope } from "@devenv/types";
+import type { Issue, IssueScope } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { CenteredState } from "./CenteredState";
 import { SearchHeader } from "./SearchHeader";

@@ -1,4 +1,4 @@
-import { getLogger } from "@devenv/core";
+import { getLogger } from '@devenv/core';
 import type {
 	KeyboardEvent,
 	KeyboardStores,

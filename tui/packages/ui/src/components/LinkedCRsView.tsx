@@ -1,7 +1,7 @@
-import { TextAttributes } from "@opentui/core";
-import { Show } from "solid-js";
+import { TextAttributes } from '@opentui/core';
+import { Show } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
-import type { ChangeRequest } from "@devenv/types";
+import type { ChangeRequest } from '@devenv/types';
 import { uiColors } from "../colors";
 import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";

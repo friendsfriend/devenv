@@ -1,4 +1,4 @@
-import type { HelpSection } from "@devenv/ui";
+import type { HelpSection } from '@devenv/ui';
 import { KEYBINDS } from "../keyboard/registry";
 import type { AppStore } from "../stores/app-store";
 import type { IssueStore } from "../stores/issue-store";
