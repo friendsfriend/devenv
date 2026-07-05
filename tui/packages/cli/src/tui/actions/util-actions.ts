@@ -1,6 +1,6 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { ScriptParameter, SshHost } from '@devenv/types';
+import type { ScriptParameter, SshHost, TableRow } from '@devenv/types';
 import { EDITOR_OPTIONS, type EditorChoice } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
 import type { AgentStore } from '../stores/agent-store';
@@ -17,13 +17,23 @@ const isTmuxSession = (): boolean => {
   }
 };
 
-const spawnInTmuxWindow = (windowName: string, cmd: string, args: string[], cwd: string): void => {
-  // tmux new-window focuses the new window automatically by default
-  Bun.spawn(['tmux', 'new-window', '-n', windowName, '-c', cwd, cmd, ...args], {
-    stdout: 'ignore',
-    stderr: 'ignore',
-    stdin: 'ignore',
-  }).unref();
+const spawnInTmuxWindow = (windowName: string, cmd: string, args: string[], cwd: string): { success: boolean; windowId?: string; error?: string } => {
+  // tmux new-window focuses the new window automatically by default.
+  // Run synchronously so launch failures are visible instead of silently closing modals.
+  const safeWindowName = windowName.replace(/[^a-zA-Z0-9 _-]/g, '-').replace(/\s+/g, ' ').trim().slice(0, 80) || 'devenv';
+  try {
+    const { spawnSync } = require('child_process') as typeof import('child_process');
+    const result = spawnSync('tmux', ['new-window', '-P', '-F', '#{window_id}', '-n', safeWindowName, '-c', cwd, cmd, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: false,
+    });
+    if (result.error) return { success: false, error: result.error.message };
+    if (result.status !== 0) return { success: false, error: (result.stderr || result.stdout || `tmux exited with ${result.status}`).trim() };
+    return { success: true, windowId: (result.stdout || '').trim() || undefined };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
 };
 
 // Holds the current script parameters fetched from the server metadata endpoint.
@@ -71,7 +81,13 @@ export function createUtilActions(
   renderer: ReturnType<typeof import('@opentui/solid').useRenderer>,
   client: DevEnvClient,
 ) {
-  const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
+  const getSelectedApp = (): TableRow | undefined =>
+    appStore.tableFilteredApps()[appStore.selectedIndex()] ?? appStore.filteredApps()[appStore.selectedIndex()];
+
+  const getTaskRowByRelativePath = (relativePath: string): TableRow | undefined => {
+    const rows = [...appStore.tableFilteredApps(), ...appStore.filteredApps()];
+    return rows.find((row) => row.resourceType === 'script-file' && row.scriptRelativePath === relativePath);
+  };
 
   const openLogFileInEditor = () => {
     const logPath = getLogger().getLogPath();
@@ -194,9 +210,12 @@ export function createUtilActions(
     }
   };
 
-  const runSelectedScriptInForeground = (taskArgs: string[] = []) => {
-    const app = getSelectedApp();
-    if (!app || app.resourceType !== 'script-file' || !app.scriptPath) return;
+  const runScriptInForeground = (app: TableRow | undefined, taskArgs: string[] = []): boolean => {
+    if (!app || app.resourceType !== 'script-file' || !app.scriptPath) {
+      getLogger().write('WARN', `Task execution skipped: no script row selected (selectedIndex=${appStore.selectedIndex()})`);
+      uiStore.showError('Task Execution Failed', 'No task selected to run');
+      return false;
+    }
 
     const path = require('path') as typeof import('path');
     const fs = require('fs') as typeof import('fs');
@@ -300,8 +319,10 @@ export function createUtilActions(
     if (process.platform === 'win32') {
       const plan = resolveInterpreterForWindows(app.scriptPath);
       if (!plan) {
-        uiStore.showError('Interpreter Not Found', `Could not find a compatible interpreter for ${app.displayName}.`);
-        return;
+        const message = `Could not find a compatible interpreter for ${app.displayName}.`;
+        getLogger().write('ERROR', `Task execution failed: ${message}`);
+        uiStore.showError('Interpreter Not Found', message);
+        return false;
       }
       cmd = plan.cmd;
       cmdArgs = plan.args;
@@ -311,24 +332,37 @@ export function createUtilActions(
       cmdArgs = taskArgs;
     }
 
+    getLogger().write('INFO', `Starting task ${app.scriptRelativePath || app.displayName}: ${[cmd, ...cmdArgs].join(' ')}`);
+
     if (isTmuxSession()) {
-      const windowName = `${cmd} - ${app.displayName}`;
-      if (runWhich('bash')) {
-        spawnInTmuxWindow(windowName, 'bash', ['-lc', buildHeldCommand(cmd, cmdArgs)], cwd);
-      } else {
-        spawnInTmuxWindow(windowName, cmd, cmdArgs, cwd);
+      const windowName = app.displayName || path.basename(app.scriptPath);
+      const result = runWhich('bash')
+        ? spawnInTmuxWindow(windowName, 'bash', ['-lc', buildHeldCommand(cmd, cmdArgs)], cwd)
+        : spawnInTmuxWindow(windowName, cmd, cmdArgs, cwd);
+      if (!result.success) {
+        const message = result.error || 'tmux window could not be opened';
+        getLogger().write('ERROR', `Task tmux launch failed for ${app.scriptRelativePath || app.displayName}: ${message}`);
+        uiStore.showError('Task Launch Failed', `Failed to open tmux window: ${message}`);
+        return false;
       }
-      return;
+      getLogger().write('INFO', `Task ${app.scriptRelativePath || app.displayName} opened in tmux window ${result.windowId || '(unknown)'}`);
+      return true;
     }
 
+    getLogger().write('WARN', `Task ${app.scriptRelativePath || app.displayName} running in foreground because TUI is not inside tmux`);
     renderer.suspend();
     try {
-      spawnSync(cmd, cmdArgs, { stdio: 'inherit', shell: false, cwd });
+      const result = spawnSync(cmd, cmdArgs, { stdio: 'inherit', shell: false, cwd });
+      if (result.error) getLogger().write('ERROR', `Task execution failed for ${app.scriptRelativePath || app.displayName}: ${result.error.message}`);
+      else getLogger().write('INFO', `Task ${app.scriptRelativePath || app.displayName} exited with ${result.status ?? 0}`);
       pauseUntilKeypress();
+      return !result.error;
     } finally {
       renderer.resume();
     }
   };
+
+  const runSelectedScriptInForeground = (taskArgs: string[] = []) => runScriptInForeground(getSelectedApp(), taskArgs);
 
   const buildArgsFromParameterValues = (values: Record<string, string>, parameters: ScriptParameter[]): string[] => {
     const args: string[] = [];
@@ -424,13 +458,15 @@ export function createUtilActions(
   };
 
   const submitTaskArgsAndRun = async () => {
-    const app = getSelectedApp();
+    const targetPath = uiStore.taskArgsTargetScript();
+    const app = targetPath ? getTaskRowByRelativePath(targetPath) : getSelectedApp();
     if (!app || app.resourceType !== 'script-file') return;
 
     try {
       const current = { ...(uiStore.scriptArgValues() || {}) };
       const args = buildArgsFromParameterValues(current, currentScriptParameters);
-      runSelectedScriptInForeground(args);
+      const launched = runScriptInForeground(app, args);
+      if (!launched) return;
 
       if (app.scriptRelativePath) {
         uiStore.setTaskArgsHistory((prev) => {

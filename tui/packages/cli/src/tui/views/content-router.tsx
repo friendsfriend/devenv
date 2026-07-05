@@ -70,6 +70,7 @@ export function ContentRouter(props: ContentRouterProps) {
 				<IssueView
 					issues={changeRequestStore.changeRequestLinkedIssues()}
 					selectedIndex={changeRequestStore.selectedChangeRequestLinkedIssueIndex()}
+					onSelectedIndexChange={changeRequestStore.setSelectedCrLinkedIssueIndex}
 					runningTextEnabled={props.runningTextEnabled}
 					runningTextOffset={props.runningTextOffset}
 					loading={changeRequestStore.changeRequestLinkedIssuesLoading()}
@@ -88,6 +89,7 @@ export function ContentRouter(props: ContentRouterProps) {
 				<IssueView
 					issues={issueStore.referencedIssues()}
 					selectedIndex={issueStore.selectedReferencedIssueIndex()}
+					onSelectedIndexChange={issueStore.setSelectedReferencedIssueIndex}
 					runningTextEnabled={props.runningTextEnabled}
 					runningTextOffset={props.runningTextOffset}
 					loading={issueStore.referencedIssuesLoading()}
@@ -337,6 +339,7 @@ export function ContentRouter(props: ContentRouterProps) {
 													<ChangeRequestView
 														changeRequests={changeRequestStore.changeRequests()}
 														selectedIndex={changeRequestStore.selectedChangeRequestIndex()}
+														onSelectedIndexChange={changeRequestStore.setSelectedCRIndex}
 														onClose={() => {
 															appStore.setViewMode("table");
 															changeRequestStore.setChangeRequests([]);
@@ -398,6 +401,7 @@ export function ContentRouter(props: ContentRouterProps) {
 									<IssueView
 										issues={issueStore.issues()}
 										selectedIndex={issueStore.selectedIssueIndex()}
+										onSelectedIndexChange={issueStore.setSelectedIssueIndex}
 										loading={issueStore.issueLoading()}
 										error={issueStore.issueError()}
 										currentPage={issueStore.currentPage()}
