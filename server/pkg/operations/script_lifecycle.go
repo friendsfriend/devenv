@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"syscall"
 	"time"
@@ -104,24 +103,18 @@ func processAlive(pid int) bool {
 	if pid <= 0 {
 		return false
 	}
-	if runtime.GOOS == "windows" {
-		proc, err := os.FindProcess(pid)
-		if err != nil {
-			return false
-		}
-		return proc.Signal(syscall.Signal(0)) == nil
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
 	}
-	return syscall.Kill(pid, 0) == nil
+	return proc.Signal(syscall.Signal(0)) == nil
 }
 
 func killProcessGroup(cmd *exec.Cmd) error {
 	if cmd == nil || cmd.Process == nil {
 		return nil
 	}
-	if runtime.GOOS == "windows" {
-		return cmd.Process.Kill()
-	}
-	return syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+	return cmd.Process.Kill()
 }
 
 func startLoggedProcess(svc app.InfraService, command string, args []string, logPath string) (*exec.Cmd, chan error, error) {
@@ -138,9 +131,7 @@ func startLoggedProcess(svc app.InfraService, command string, args []string, log
 	cmd.Env = scriptEnv(svc.Env)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
-	if runtime.GOOS != "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	}
+	setProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		_ = logFile.Close()
 		return nil, nil, err

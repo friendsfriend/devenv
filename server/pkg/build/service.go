@@ -6,7 +6,6 @@ import (
 	"os"
 	osExec "os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -426,14 +425,11 @@ func processAlive(pid int) bool {
 	if pid <= 0 {
 		return false
 	}
-	if runtime.GOOS == "windows" {
-		proc, err := os.FindProcess(pid)
-		if err != nil {
-			return false
-		}
-		return proc.Signal(syscall.Signal(0)) == nil
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
 	}
-	return syscall.Kill(pid, 0) == nil
+	return proc.Signal(syscall.Signal(0)) == nil
 }
 
 func (s *service) runShellTmux(a *app.App, target resources.ActionTarget, statusCb func(string)) {
