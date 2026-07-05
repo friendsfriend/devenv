@@ -31,7 +31,7 @@ export interface App {
 	localDirectoryPath: string;
 	repositoryPath: string;
 	branch: string;
-	appType: "APP" | "LIB" | "INFRA" | "SCRIPT";
+	appType: "APP" | "LIB";
 	containerBaseName: string;
 	sourceType?: ProviderType;
 	provider?: string;
@@ -41,12 +41,14 @@ export interface App {
 	gitStatus?: string;
 	operationStatus?: OperationStatus;
 	status?: "running" | "stopped" | "failed" | string;
+	// Transitional table fields. App rows do not populate these, but keeping them
+	// optional allows generic table/action helpers to inspect TableRow safely.
 	type?: InfraServiceType;
 	logPath?: string;
 	shellPath?: string;
 	powerShellPath?: string;
 	defaultRunner?: ScriptRunner;
-	resourceType?: "app" | "script-folder" | "script-file";
+	resourceType?: "script-folder" | "script-file";
 	scriptPath?: string;
 	scriptRelativePath?: string;
 	scriptDepth?: number;
@@ -60,13 +62,48 @@ export interface AppTableRow extends App {
 	rowKind: "app";
 }
 
-export interface InfraTableRow extends App {
+export interface InfraTableRow extends InfraService {
 	rowKind: "infra";
+	// Non-infra row fields stay optional so generic table helpers can inspect rows safely.
+	localDirectoryPath?: string;
+	repositoryPath?: string;
+	branch?: string;
+	appType?: never;
+	sourceType?: never;
+	provider?: never;
+	resourceType?: never;
+	scriptPath?: never;
+	scriptRelativePath?: never;
+	scriptDepth?: never;
+	scriptExpanded?: never;
+	scriptExecutable?: never;
+	interpreter?: never;
+	scriptParameters?: never;
 }
 
-export interface TaskTableRow extends App {
+export interface TaskTableRow {
 	rowKind: "script";
+	ident: string;
+	displayName: string;
+	localDirectoryPath?: string;
+	repositoryPath?: string;
+	branch?: string;
+	appType?: never;
+	sourceType?: never;
+	provider?: never;
+	containerBaseName?: never;
 	nodeType: "folder" | "script";
+	resourceType: "script-folder" | "script-file";
+	scriptPath: string;
+	scriptRelativePath: string;
+	scriptDepth: number;
+	scriptExpanded?: boolean;
+	scriptExecutable: boolean;
+	interpreter?: string | null;
+	scriptParameters?: ScriptParameter[];
+	status?: string;
+	dockerInfo?: DockerInfo;
+	operationStatus?: OperationStatus;
 }
 
 export type TableRow = AppTableRow | InfraTableRow | TaskTableRow;

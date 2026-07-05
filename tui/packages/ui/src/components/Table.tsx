@@ -85,9 +85,9 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 	const runningSummary = () => props.runningLabel ?? `${props.apps.filter(isRunning).length}/${props.apps.length} running`;
 
 	const appKind = (app: TableRow) => {
-		if (app.rowKind === "script") return app.nodeType === "folder" ? "Folder" : "Script";
+		if (app.rowKind === "script") return app.nodeType === "folder" ? "Folder" : "Task";
 		if (app.rowKind === "infra") return "Infra";
-		return app.appType === "APP" ? "App" : "Lib";
+		return app.appType === "APP" ? "Application" : "Library";
 	};
 
 	const appMarker = (app: TableRow) => {
@@ -104,7 +104,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 			return app.operationStatus.message;
 		}
 		if (app.rowKind === "script" && app.nodeType === "folder") return "folder";
-		if (app.rowKind === "script") return app.scriptExecutable ? "executable" : "script";
+		if (app.rowKind === "script") return app.scriptExecutable ? "executable task" : "task file";
 		return formatStatus(app.status || app.dockerInfo?.Status || "not found");
 	};
 

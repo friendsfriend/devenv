@@ -43,12 +43,12 @@ export type {
 	ConnectProviderModalProps,
 	ConnectProviderStep,
 } from "./components/ConnectProviderModal";
-export { AddAppModal } from "./components/AddAppModal";
+export { AddRepositoryModal } from "./components/AddRepositoryModal";
 export type {
-	AddAppModalProps,
-	AddAppStep,
+	AddRepositoryModalProps,
+	AddRepositoryStep,
 	FindRepoMode,
-} from "./components/AddAppModal";
+} from "./components/AddRepositoryModal";
 export { HelpView } from "./components/HelpView";
 export { ThemePickerView } from "./components/ThemePickerView";
 export type { ThemePickerViewProps } from "./components/ThemePickerView";
@@ -98,10 +98,10 @@ export type {
 } from "./components/EditorPickerView";
 export { WorktreeManagerModal } from "./components/WorktreeManagerModal";
 export type { WorktreeManagerModalProps } from "./components/WorktreeManagerModal";
-export { ScriptArgsModal } from "./components/ScriptArgsModal";
-export type { ScriptArgsModalProps } from "./components/ScriptArgsModal";
-export { ScriptAddModal } from "./components/ScriptAddModal";
-export type { ScriptAddModalProps } from "./components/ScriptAddModal";
+export { TaskArgsModal } from "./components/TaskArgsModal";
+export type { TaskArgsModalProps } from "./components/TaskArgsModal";
+export { TaskAddModal } from "./components/TaskAddModal";
+export type { TaskAddModalProps } from "./components/TaskAddModal";
 export type { HeaderProps } from "./components/Header";
 export type { StatusBarProps } from "./components/StatusBar";
 export type { LayoutProps } from "./components/Layout";

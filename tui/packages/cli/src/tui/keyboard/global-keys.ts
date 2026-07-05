@@ -310,10 +310,10 @@ export async function handleGlobalKeys(
     return true;
   }
 
-  if (appStore.showFirstSteps() && appStore.viewMode() === 'table' && !stores.providerStore.showConnectProviderModal() && !stores.providerStore.showAddAppModal()) {
+  if (appStore.showFirstSteps() && appStore.viewMode() === 'table' && !stores.providerStore.showConnectProviderModal() && !stores.providerStore.showAddRepositoryModal()) {
     const runFirstStep = async (idx: number) => {
       if (idx === 0) actions.providerActions.openAddProviderModal();
-      if (idx === 1) await actions.providerActions.openAddAppModal();
+      if (idx === 1) await actions.providerActions.openAddRepositoryModal();
       if (idx === 2) void actions.appActions.createExampleConfig();
       if (idx === 3) {
         const guide = getGuide('config-repository');

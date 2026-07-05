@@ -168,8 +168,8 @@ If you want the least surprise, keep Kubernetes apps with Kubernetes infrastruct
 
 ## Operational shortcuts
 
-- `s`: start/run selected app or infra.
-- `S`: stop selected app or infra.
+- `s`: start/run selected item.
+- `S`: stop selected item.
 - `9`: open `k9s --context kind-devenv`.
 - Press `s` during an active operation to open live action logs.
 - Operation logs show full commands and output for build/run/start/stop actions.

@@ -10,7 +10,7 @@ export function createDockerActions(
   showError: (title: string, message: string) => void,
   showActionLog?: (appIdent: string, appName: string) => Promise<void>,
 ) {
-  const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
+  const getSelectedApp = (): App | InfraService | undefined => appStore.filteredApps()[appStore.selectedIndex()] as App | InfraService | undefined;
 
   const performDockerOperation = async (action: 'start' | 'stop' | 'restart', app: App | InfraService, profile?: string, targetId?: string, runner?: 'shell' | 'powershell') => {
     const appIdent = app.ident;
@@ -63,7 +63,7 @@ export function createDockerActions(
       }
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
-      const appName = appStore.apps().find((a) => a.ident === appIdent)?.displayName || 'Unknown App';
+      const appName = appStore.apps().find((a) => a.ident === appIdent)?.displayName || 'Unknown Item';
       showError(`Docker ${action.charAt(0).toUpperCase() + action.slice(1)} Failed`, `Failed to ${action} ${appName}.\n\nError: ${errorMsg}`);
       appStore.setApps(appStore.apps().map((a) =>
         a.ident === appIdent
@@ -87,7 +87,7 @@ export function createDockerActions(
   const requestDockerOperation = async (action: 'start' | 'stop' | 'restart') => {
     const app = getSelectedApp();
     if (!app) {
-      showError('No Application Selected', 'Please select an application before performing this operation.');
+      showError('No Item Selected', 'Please select an item before performing this operation.');
       return;
     }
     if (appStore.operationInProgressForApp()) {
@@ -125,7 +125,7 @@ export function createDockerActions(
       ? `apps/run/${app.ident}-dev${ext}`
       : `apps/build/${app.ident}-${action}${ext}`;
     uiStore.setConfirmDialogTitle('No Target Configured');
-    uiStore.setConfirmDialogMessage(`No ${action} target is configured for ${app.displayName}.\n\nCreate script ${path}?`);
+    uiStore.setConfirmDialogMessage(`No ${action} target is configured for ${app.displayName}.\n\nCreate target script ${path}?`);
     uiStore.setConfirmDialogAction(() => () => { void createShellTarget(app, action); });
     uiStore.setShowConfirmDialog(true);
   };
@@ -162,8 +162,9 @@ export function createDockerActions(
   };
 
   const performAppAction = async (action: AppAction) => {
-    const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
-    if (!app) return;
+    const row = appStore.tableFilteredApps()[appStore.selectedIndex()];
+    if (!row || row.rowKind !== 'app') return;
+    const app = row;
 
     const currentApp = appStore.apps().find((a) => a.ident === app.ident) ?? app;
     if (currentApp.operationStatus?.status === 'active') {

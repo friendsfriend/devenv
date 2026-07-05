@@ -59,7 +59,7 @@ export function createScriptColumns(): TableColumn[] {
   return [
     {
       key: 'displayName',
-      header: 'Script Collection',
+      header: 'Task Collection',
       width: '55%',
       render: (app) => {
         if (app.rowKind !== 'script') return app.displayName;
@@ -80,7 +80,7 @@ export function createScriptColumns(): TableColumn[] {
       render: (app) => {
         if (app.rowKind !== 'script') return '';
         if (app.nodeType === 'folder') return 'folder';
-        return app.interpreter || 'script';
+        return app.interpreter || 'task';
       },
     },
     {

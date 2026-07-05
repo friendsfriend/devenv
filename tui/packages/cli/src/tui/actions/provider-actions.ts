@@ -41,111 +41,111 @@ export function createProviderActions(
     providerStore.setConnectProviderEditMode(false);
   };
 
-  const resetAddAppModal = () => {
-    providerStore.setShowAddAppModal(false);
-    providerStore.setAddAppStep('selectProvider');
-    providerStore.setAddAppProviders([]);
-    providerStore.setAddAppSelectedProviderIndex(0);
-    providerStore.setAddAppSearchQuery('');
-    providerStore.setAddAppSearchResults([]);
-    providerStore.setAddAppSelectedResultIndex(0);
-    providerStore.setAddAppManualUrl('');
-    providerStore.setAddAppFindRepoMode('selectMode');
-    providerStore.setAddAppFindRepoModeIndex(0);
-    providerStore.setAddAppName('');
-    providerStore.setAddAppBranches([]);
-    providerStore.setAddAppSelectedBranchIndex(0);
-    providerStore.setAddAppBranchFilter('');
-    providerStore.setAddAppLoading(false);
-    providerStore.setAddAppError(null);
-    providerStore.setAddAppAppType('APP');
-    providerStore.setAddAppAppTypeIndex(0);
+  const resetAddRepositoryModal = () => {
+    providerStore.setShowAddRepositoryModal(false);
+    providerStore.setAddRepositoryStep('selectProvider');
+    providerStore.setAddRepositoryProviders([]);
+    providerStore.setAddRepositorySelectedProviderIndex(0);
+    providerStore.setAddRepositorySearchQuery('');
+    providerStore.setAddRepositorySearchResults([]);
+    providerStore.setAddRepositorySelectedResultIndex(0);
+    providerStore.setAddRepositoryManualUrl('');
+    providerStore.setAddRepositoryFindRepoMode('selectMode');
+    providerStore.setAddRepositoryFindRepoModeIndex(0);
+    providerStore.setAddRepositoryName('');
+    providerStore.setAddRepositoryBranches([]);
+    providerStore.setAddRepositorySelectedBranchIndex(0);
+    providerStore.setAddRepositoryBranchFilter('');
+    providerStore.setAddRepositoryLoading(false);
+    providerStore.setAddRepositoryError(null);
+    providerStore.setAddRepositoryDestinationType('APP');
+    providerStore.setAddRepositoryDestinationTypeIndex(0);
   };
 
-  const openAddAppModal = async () => {
-    resetAddAppModal();
+  const openAddRepositoryModal = async () => {
+    resetAddRepositoryModal();
     const tab = appStore.activeTab();
-    providerStore.setAddAppAppTypeIndex(tab === 'libraries' ? 1 : 0);
-    providerStore.setAddAppAppType(tab === 'libraries' ? 'LIB' : 'APP');
-    providerStore.setAddAppLoading(true);
-    providerStore.setShowAddAppModal(true);
+    providerStore.setAddRepositoryDestinationTypeIndex(tab === 'libraries' ? 1 : 0);
+    providerStore.setAddRepositoryDestinationType(tab === 'libraries' ? 'LIB' : 'APP');
+    providerStore.setAddRepositoryLoading(true);
+    providerStore.setShowAddRepositoryModal(true);
     try {
       const providers = await client.getProviders();
       const usableProviders = providers.filter((p) => !p.invalid);
-      providerStore.setAddAppProviders(usableProviders.map((p) => ({ name: p.name, type: p.type })));
+      providerStore.setAddRepositoryProviders(usableProviders.map((p) => ({ name: p.name, type: p.type })));
       if (usableProviders.length === 0) {
-        providerStore.setAddAppError(providers.length === 0
+        providerStore.setAddRepositoryError(providers.length === 0
           ? 'No providers configured. Add a provider first.'
           : 'All providers are invalid. Open providers view and move clear-text credentials to .env placeholders.');
       }
     } catch (e) {
-      providerStore.setAddAppError(e instanceof Error ? e.message : 'Failed to load providers');
+      providerStore.setAddRepositoryError(e instanceof Error ? e.message : 'Failed to load providers');
     } finally {
-      providerStore.setAddAppLoading(false);
+      providerStore.setAddRepositoryLoading(false);
     }
   };
 
-  const addAppPerformSearch = async () => {
-    const query = providerStore.addAppSearchQuery().trim();
+  const addRepositoryPerformSearch = async () => {
+    const query = providerStore.addRepositorySearchQuery().trim();
     if (!query) return;
-    const providers = providerStore.addAppProviders();
-    const idx = providerStore.addAppSelectedProviderIndex();
+    const providers = providerStore.addRepositoryProviders();
+    const idx = providerStore.addRepositorySelectedProviderIndex();
     if (idx < 0 || idx >= providers.length) return;
     const provider = providers[idx];
-    providerStore.setAddAppLoading(true);
-    providerStore.setAddAppError(null);
+    providerStore.setAddRepositoryLoading(true);
+    providerStore.setAddRepositoryError(null);
     try {
       const results = await client.searchRepos(provider.name, query);
-      providerStore.setAddAppSearchResults(results);
-      providerStore.setAddAppSelectedResultIndex(0);
-      if (!results.length) providerStore.setAddAppError('No repositories found');
+      providerStore.setAddRepositorySearchResults(results);
+      providerStore.setAddRepositorySelectedResultIndex(0);
+      if (!results.length) providerStore.setAddRepositoryError('No repositories found');
     } catch (e) {
-      providerStore.setAddAppError(e instanceof Error ? e.message : 'Search failed');
+      providerStore.setAddRepositoryError(e instanceof Error ? e.message : 'Search failed');
     } finally {
-      providerStore.setAddAppLoading(false);
+      providerStore.setAddRepositoryLoading(false);
     }
   };
 
-  const addAppFetchBranches = async (repoUrl: string) => {
-    providerStore.setAddAppLoading(true);
-    providerStore.setAddAppError(null);
+  const addRepositoryFetchBranches = async (repoUrl: string) => {
+    providerStore.setAddRepositoryLoading(true);
+    providerStore.setAddRepositoryError(null);
     try {
       const branches = await client.getRepoBranches(repoUrl);
-      providerStore.setAddAppBranches(branches);
-      providerStore.setAddAppSelectedBranchIndex(0);
-      if (!branches.length) providerStore.setAddAppError('No branches found');
+      providerStore.setAddRepositoryBranches(branches);
+      providerStore.setAddRepositorySelectedBranchIndex(0);
+      if (!branches.length) providerStore.setAddRepositoryError('No branches found');
     } catch (e) {
-      providerStore.setAddAppError(e instanceof Error ? e.message : 'Failed to load branches');
+      providerStore.setAddRepositoryError(e instanceof Error ? e.message : 'Failed to load branches');
     } finally {
-      providerStore.setAddAppLoading(false);
+      providerStore.setAddRepositoryLoading(false);
     }
   };
 
-  const addAppSubmitCreate = async () => {
-    const providers = providerStore.addAppProviders();
-    const providerIdx = providerStore.addAppSelectedProviderIndex();
+  const addRepositorySubmitCreate = async () => {
+    const providers = providerStore.addRepositoryProviders();
+    const providerIdx = providerStore.addRepositorySelectedProviderIndex();
     if (providerIdx < 0 || providerIdx >= providers.length) return;
-    const repoUrl = providerStore.addAppFindRepoMode() === 'url'
-      ? providerStore.addAppManualUrl().trim()
-      : providerStore.addAppSearchResults()[providerStore.addAppSelectedResultIndex()]?.url ?? '';
-    const filteredBranchList = providerStore.addAppBranches().filter((b) => b.toLowerCase().includes(providerStore.addAppBranchFilter().toLowerCase()));
-    const branch = filteredBranchList[providerStore.addAppSelectedBranchIndex()] ?? '';
-    if (!providerStore.addAppName().trim() || !repoUrl || !branch) {
-      providerStore.setAddAppError('Missing required fields');
+    const repoUrl = providerStore.addRepositoryFindRepoMode() === 'url'
+      ? providerStore.addRepositoryManualUrl().trim()
+      : providerStore.addRepositorySearchResults()[providerStore.addRepositorySelectedResultIndex()]?.url ?? '';
+    const filteredBranchList = providerStore.addRepositoryBranches().filter((b) => b.toLowerCase().includes(providerStore.addRepositoryBranchFilter().toLowerCase()));
+    const branch = filteredBranchList[providerStore.addRepositorySelectedBranchIndex()] ?? '';
+    if (!providerStore.addRepositoryName().trim() || !repoUrl || !branch) {
+      providerStore.setAddRepositoryError('Missing required fields');
       return;
     }
-    providerStore.setAddAppLoading(true);
-    providerStore.setAddAppError(null);
+    providerStore.setAddRepositoryLoading(true);
+    providerStore.setAddRepositoryError(null);
     try {
       const request: CreateAppRequest = {
-        displayName: providerStore.addAppName().trim(),
+        displayName: providerStore.addRepositoryName().trim(),
         repositoryURL: repoUrl,
         branch,
         provider: providers[providerIdx].name,
-        definitionLocation: providerStore.addAppAppType() === 'LIB' ? 'libraries' : 'apps',
+        definitionLocation: providerStore.addRepositoryDestinationType() === 'LIB' ? 'libraries' : 'apps',
       };
       const newApp = await client.createApp(request);
-      resetAddAppModal();
+      resetAddRepositoryModal();
       appStore.setApps((prev) => [...prev, { ...newApp, operationStatus: { operation: 'checkout', status: 'active', message: 'Checking out...' } }]);
       const fetchedApps = await client.getApps();
       appStore.setApps((prev) => {
@@ -153,8 +153,8 @@ export function createProviderActions(
         return fetchedApps.map((a) => (statusMap.has(a.ident) ? { ...a, operationStatus: statusMap.get(a.ident) } : a));
       });
     } catch (e) {
-      providerStore.setAddAppError(e instanceof Error ? e.message : 'Failed to create repository entry');
-      providerStore.setAddAppLoading(false);
+      providerStore.setAddRepositoryError(e instanceof Error ? e.message : 'Failed to create repository entry');
+      providerStore.setAddRepositoryLoading(false);
     }
   };
 
@@ -227,11 +227,11 @@ export function createProviderActions(
     loadProviders,
     refreshProviders,
     resetConnectProviderModal,
-    resetAddAppModal,
-    openAddAppModal,
-    addAppPerformSearch,
-    addAppFetchBranches,
-    addAppSubmitCreate,
+    resetAddRepositoryModal,
+    openAddRepositoryModal,
+    addRepositoryPerformSearch,
+    addRepositoryFetchBranches,
+    addRepositorySubmitCreate,
     openAddProviderModal,
     openEditProviderModal,
     deleteSelectedProvider,

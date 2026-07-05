@@ -1,10 +1,15 @@
 # Adding a Repository
 
-This guide walks through defining a new application in DevEnv.
+This guide walks through defining a new repository in DevEnv. Repositories can appear in either the Applications tab or the Libraries tab.
 
-## 1. Create the app definition
+## 1. Create the repository definition
 
-Create a JSON file at `~/.config/devenv/apps/definitions/IDENT.json`:
+Create a JSON file in one of these locations:
+
+- Application: `~/.config/devenv/apps/definitions/IDENT.json`
+- Library: `~/.config/devenv/libraries/definitions/IDENT.json`
+
+The definition shape is the same; location determines destination/type:
 
 ```json
 {
@@ -28,10 +33,12 @@ Key fields:
 
 ## 2. Create Dockerfiles
 
-Place build and test Dockerfiles at:
+Place build and test Dockerfiles next to the selected destination:
 
-- `~/.config/devenv/apps/build/IDENT-build.Dockerfile`
-- `~/.config/devenv/apps/build/IDENT-test.Dockerfile`
+- Application: `~/.config/devenv/apps/build/IDENT-build.Dockerfile`
+- Application: `~/.config/devenv/apps/build/IDENT-test.Dockerfile`
+- Library: `~/.config/devenv/libraries/build/IDENT-build.Dockerfile`
+- Library: `~/.config/devenv/libraries/build/IDENT-test.Dockerfile`
 
 **Build Dockerfile** produces a runnable image and can extract artifacts. Use `LABEL devenv.artifacts="PATH"` to declare build output:
 
@@ -62,11 +69,13 @@ RUN go test ./...
 
 ## 3. Configure Compose
 
-Create a Docker Compose file for running the app:
+For applications, create a Docker Compose file for running the app:
 
 ```
 ~/.config/devenv/apps/compose/IDENT-compose.yml
 ```
+
+Libraries normally use build/test workflows and do not need compose run targets.
 
 ```yaml
 x-devenv:
@@ -86,9 +95,9 @@ For profile variants, use `IDENT-PROFILE-compose.yml` (e.g., `my-service-staging
 
 Shell actions live next to Docker resources and can coexist with them:
 
-- `~/.config/devenv/apps/build/IDENT-build.sh` — shell build target
-- `~/.config/devenv/apps/build/IDENT-test.sh` — shell test target
-- `~/.config/devenv/apps/run/IDENT-PROFILE.sh` — shell run profile
+- Application build/test: `~/.config/devenv/apps/build/IDENT-build.sh`, `~/.config/devenv/apps/build/IDENT-test.sh`
+- Application run profile: `~/.config/devenv/apps/run/IDENT-PROFILE.sh`
+- Library build/test: `~/.config/devenv/libraries/build/IDENT-build.sh`, `~/.config/devenv/libraries/build/IDENT-test.sh`
 
 Example run profile:
 
@@ -129,6 +138,6 @@ This is a breaking change for configs that relied on Compose `depends_on` as Dev
 
 ## 6. Add from the TUI
 
-Alternatively, press `+` in the TUI table view to add an app interactively — select provider, search for a repository, name it, and choose a branch.
+Alternatively, press `+` in the TUI table view to add a repository interactively — select provider, choose Applications or Libraries as destination, search for a repository, name it, and choose a branch.
 
 See [Effective Docker Builds](effective-docker-builds.md) for fast Dockerfiles that work with Docker and Podman. See [Adding Infrastructure](adding-infrastructure.md) for shared services and [Adding Libraries](adding-libraries.md) for library definitions.

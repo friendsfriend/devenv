@@ -9,7 +9,10 @@ export function createGitActions(
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
 ) {
-  const getSelectedApp = () => appStore.tableFilteredApps()[appStore.selectedIndex()];
+  const getSelectedApp = () => {
+    const row = appStore.tableFilteredApps()[appStore.selectedIndex()];
+    return row?.rowKind === 'app' ? row : undefined;
+  };
 
   const appendStatusLog = (app: { ident: string; displayName: string }, operation: string, status: string, message: string) => {
     void client.addStatusLog({
@@ -80,7 +83,7 @@ export function createGitActions(
 
   const openBranchSelector = async () => {
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
-    const app = appStore.filteredApps()[appStore.selectedIndex()];
+    const app = getSelectedApp();
     if (!app) return;
     uiStore.setTargetAppForBranch(app);
     uiStore.setBranchesLoading(true);
@@ -103,7 +106,7 @@ export function createGitActions(
     } catch (e) {
       const app = uiStore.targetAppForBranch();
       closeBranchSelector();
-      showError('Failed to Load Branches', `Could not load branches for ${app?.displayName || 'Unknown App'}.\n\nError: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      showError('Failed to Load Branches', `Could not load branches for ${app?.displayName || 'Unknown Repository'}.\n\nError: ${e instanceof Error ? e.message : 'Unknown error'}`);
     } finally {
       uiStore.setBranchesLoading(false);
     }

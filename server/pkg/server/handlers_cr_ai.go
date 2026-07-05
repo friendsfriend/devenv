@@ -98,7 +98,7 @@ func (s *Server) ensureCRVersions(sess *crReviewSession, gitlabClient gitlab.Cli
 // ---------------------------------------------------------------------------
 // POST /api/ai/cr-comment-callback/{token}
 // ---------------------------------------------------------------------------
-// Called by the AI agent (via curl) during a review to post an inline diff
+// Called by a pi session (via curl) during a review to post an inline diff
 // comment or a top-level CR note.  Request body:
 //
 //	{ "file": "src/foo.ts", "line": 42, "comment": "Null check missing" }

@@ -50,26 +50,26 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	// ========== table — Navigation ==========
 	{ keys: ["↑", "k"], description: "Move selection up", context: "table", category: "Navigation" },
 	{ keys: ["↓", "j"], description: "Move selection down", context: "table", category: "Navigation" },
-	{ keys: ["Tab", "1", "2", "3", "4"], description: "Switch tab (Apps/Infra/Libs/Tasks)", context: "table", category: "Navigation" },
+	{ keys: ["Tab", "1", "2", "3", "4"], description: "Switch tab (Applications/Infrastructure/Libraries/Tasks)", context: "table", category: "Navigation" },
 
 	// ========== table — Actions ==========
-	{ keys: ["l"], description: "View container logs for selected app", footerDescription: "App logs", context: "table", category: "Actions" },
-	{ keys: ["o"], description: "View operation logs for selected app", footerDescription: "Op logs", context: "table", category: "Actions" },
+	{ keys: ["l"], description: "View container logs for selected item", footerDescription: "Logs", context: "table", category: "Actions" },
+	{ keys: ["o"], description: "View operation logs for selected item", footerDescription: "Op logs", context: "table", category: "Actions" },
 	{ keys: ["L"], description: "Toggle status log maximize", footerDescription: "Max logs", context: "table", category: "Actions" },
 	{ keys: ["m"], description: "View CR for current branch", footerDescription: "CR", context: "table", category: "Actions" },
 	{ keys: ["M"], description: "View all open CRs", footerDescription: "All CRs", context: "table", category: "Actions" },
 	{ keys: ["i"], description: "Open issue scope picker", footerDescription: "Issues", context: "table", category: "Actions" },
 	{ keys: ["I"], description: "Load all issues", footerDescription: "All issues", context: "table", category: "Actions" },
 	{ keys: ["c"], description: "View providers config", footerDescription: "Providers", context: "table", category: "Actions" },
-	{ keys: ["e"], description: "Open app directory in $EDITOR", footerDescription: "Edit app", context: "table", category: "Actions" },
+	{ keys: ["e"], description: "Open selected item directory in $EDITOR", footerDescription: "Edit", context: "table", category: "Actions" },
 	{ keys: ["E"], description: "Open editor picker", footerDescription: "Editors", context: "table", category: "Actions" },
-	{ keys: ["G"], description: "Open lazygit for selected app", footerDescription: "Lazygit", context: "table", category: "Actions" },
+	{ keys: ["G"], description: "Open lazygit for selected repository", footerDescription: "Lazygit", context: "table", category: "Actions" },
 	{ keys: ["9"], description: "Open k9s for managed Kubernetes cluster", footerDescription: "k9s", context: "table", category: "Actions" },
-	{ keys: ["d"], description: "Open lazydocker for selected app", footerDescription: "Lazydocker", context: "table", category: "Actions" },
+	{ keys: ["d"], description: "Open lazydocker for selected item", footerDescription: "Lazydocker", context: "table", category: "Actions" },
 	{ keys: ["w"], description: "Open worktree manager", footerDescription: "Worktrees", context: "table", category: "Actions" },
-	{ keys: ["+"], description: "Add app or task", footerDescription: "Add", context: "table", category: "Actions" },
-	{ keys: ["-"], description: "Remove selected app or task", footerDescription: "Remove", context: "table", category: "Actions" },
-	{ keys: ["Enter"], description: "View app detail or run task", footerDescription: "Open", context: "table", category: "Actions" },
+	{ keys: ["+"], description: "Add repository or task", footerDescription: "Add", context: "table", category: "Actions" },
+	{ keys: ["-"], description: "Remove selected item", footerDescription: "Remove", context: "table", category: "Actions" },
+	{ keys: ["Enter"], description: "View repository detail or run task", footerDescription: "Open", context: "table", category: "Actions" },
 	{ keys: ["/"], description: "Search table", context: "table", category: "Actions" },
 	{ keys: ["F"], description: "Filter table", context: "table", category: "Actions" },
 	{ keys: ["O"], description: "Order/sort table", context: "table", category: "Actions" },
@@ -96,11 +96,11 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["r"], description: "Refresh tasks", context: "table", category: "Tasks" },
 
 	// ========== table — General ==========
-	{ keys: ["A"], description: "Open AI agent view", context: "table", category: "General" },
+	{ keys: ["A"], description: "Open pi session view", context: "table", category: "General" },
 	{ keys: ["H"], description: "Open SSH host picker", context: "table", category: "General" },
 	{ keys: ["Ctrl+Shift+C"], description: "Copy selection to clipboard", context: "table", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "table", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "table", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "table", category: "General" },
 
 	// ========== changeRequests ==========
 	{ keys: ["j", "k"], description: "Navigate change requests", context: "changeRequests", category: "Navigation" },
@@ -113,7 +113,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["]", "Shift+J"], description: "Next page", context: "changeRequests", category: "Actions" },
 	{ keys: ["Esc"], description: "Back to table", context: "changeRequests", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "changeRequests", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "changeRequests", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "changeRequests", category: "General" },
 
 	// ========== changeRequestDetail ==========
 	{ keys: ["a"], description: "Toggle approval (approve/unapprove)", context: "changeRequestDetail", category: "Actions" },
@@ -126,7 +126,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["I"], description: "View linked issues", context: "changeRequestDetail", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to CR list", context: "changeRequestDetail", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "changeRequestDetail", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "changeRequestDetail", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "changeRequestDetail", category: "General" },
 
 	// ========== jobs ==========
 	{ keys: ["↑/↓", "j/k"], description: "Navigate jobs in current stage", context: "jobs", category: "Navigation" },
@@ -137,7 +137,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["/"], description: "Search jobs", context: "jobs", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to CR detail", context: "jobs", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "jobs", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "jobs", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "jobs", category: "General" },
 
 	// ========== testResults ==========
 	{ keys: ["j/k"], description: "Navigate up/down through tests", context: "testResults", category: "Navigation" },
@@ -148,7 +148,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["c"], description: "Copy test output/stack trace", context: "testResults", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to CR detail", context: "testResults", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "testResults", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "testResults", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "testResults", category: "General" },
 
 	// ========== changedFiles ==========
 	{ keys: ["↑/↓", "j/k"], description: "Navigate changed files", context: "changedFiles", category: "Navigation" },
@@ -161,7 +161,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["D"], description: "Switch to discussions view", context: "changedFiles", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to CR detail", context: "changedFiles", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "changedFiles", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "changedFiles", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "changedFiles", category: "General" },
 
 	// ========== discussionsView (Discussions/Comments) ==========
 	{ keys: ["j/k", "↑/↓"], description: "Navigate discussions", context: "discussionsView", category: "Navigation" },
@@ -174,11 +174,11 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Shift+C"], description: "Switch to changed files view", context: "discussionsView", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to CR detail", context: "discussionsView", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "discussionsView", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "discussionsView", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "discussionsView", category: "General" },
 
 	// ========== appDetail ==========
-	{ keys: ["Esc"], description: "Return to application table", context: "appDetail", category: "Navigation" },
-	{ keys: ["q"], description: "Quit application", context: "appDetail", category: "General" },
+	{ keys: ["Esc"], description: "Return to table", context: "appDetail", category: "Navigation" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "appDetail", category: "General" },
 
 	// ========== providers ==========
 	{ keys: ["j/k"], description: "Navigate provider list", context: "providers", category: "Navigation" },
@@ -187,7 +187,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["d"], description: "Delete selected provider", context: "providers", category: "Actions" },
 	{ keys: ["Esc"], description: "Return to table", context: "providers", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "providers", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "providers", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "providers", category: "General" },
 
 	// ========== issues ==========
 	{ keys: ["j/k"], description: "Navigate issues", context: "issues", category: "Navigation" },
@@ -200,7 +200,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["]", "Shift+J"], description: "Next page", context: "issues", category: "Actions" },
 	{ keys: ["Esc"], description: "Back to table", context: "issues", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "issues", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "issues", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "issues", category: "General" },
 
 	// ========== issueDetail ==========
 	{ keys: ["r"], description: "Add comment (reply)", context: "issueDetail", category: "Actions" },
@@ -239,7 +239,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Shift+E"], description: "Choose editor for logs", context: "logModal", category: "Actions" },
 	{ keys: ["Shift+A"], description: "AI analysis", context: "logModal", category: "Actions" },
 	{ keys: ["Esc"], description: "Close logs", context: "logModal", category: "General" },
-	{ keys: ["q"], description: "Quit application", context: "logModal", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "logModal", category: "General" },
 
 	// ========== Passphrase Modal (uiStore.showPassphraseModal) ==========
 	{ keys: ["Enter"], description: "Unlock key", context: "passphraseModal", category: "Actions" },
@@ -294,24 +294,24 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Esc"], description: "Go back / cancel", context: "connectProvider", category: "General" },
 
 	// ========== Add Repository Modal ==========
-	{ keys: ["j/k", "↑/↓"], description: "Navigate options/results/branches", context: "addAppModal", category: "Navigation" },
-	{ keys: ["Enter"], description: "Confirm step / search / create repository entry", context: "addAppModal", category: "Actions" },
-	{ keys: ["Backspace", "Delete"], description: "Delete text while editing", context: "addAppModal", category: "Actions" },
-	{ keys: ["Esc"], description: "Go back / cancel", context: "addAppModal", category: "General" },
+	{ keys: ["j/k", "↑/↓"], description: "Navigate options/results/branches", context: "addRepositoryModal", category: "Navigation" },
+	{ keys: ["Enter"], description: "Confirm step / search / create repository entry", context: "addRepositoryModal", category: "Actions" },
+	{ keys: ["Backspace", "Delete"], description: "Delete text while editing", context: "addRepositoryModal", category: "Actions" },
+	{ keys: ["Esc"], description: "Go back / cancel", context: "addRepositoryModal", category: "General" },
 
-	// ========== Script Args Modal ==========
-	{ keys: ["j/k", "↑/↓"], description: "Navigate parameters / history", context: "scriptArgsModal", category: "Navigation" },
-	{ keys: ["h/l", "←/→", "Tab", "Space"], description: "Change boolean or enum value", context: "scriptArgsModal", category: "Actions" },
-	{ keys: ["Enter"], description: "Run task", context: "scriptArgsModal", category: "Actions" },
-	{ keys: ["Backspace", "Delete"], description: "Delete typed value", context: "scriptArgsModal", category: "Actions" },
-	{ keys: ["Esc"], description: "Cancel", context: "scriptArgsModal", category: "General" },
+	// ========== Task Args Modal ==========
+	{ keys: ["j/k", "↑/↓"], description: "Navigate parameters / history", context: "taskArgsModal", category: "Navigation" },
+	{ keys: ["h/l", "←/→", "Tab", "Space"], description: "Change boolean or enum value", context: "taskArgsModal", category: "Actions" },
+	{ keys: ["Enter"], description: "Run task", context: "taskArgsModal", category: "Actions" },
+	{ keys: ["Backspace", "Delete"], description: "Delete typed value", context: "taskArgsModal", category: "Actions" },
+	{ keys: ["Esc"], description: "Cancel", context: "taskArgsModal", category: "General" },
 
-	// ========== Script Add Modal ==========
-	{ keys: ["Tab", "j/k", "↑/↓"], description: "Switch field", context: "scriptAddModal", category: "Navigation" },
-	{ keys: ["h/l", "←/→", "Space"], description: "Toggle create/link mode", context: "scriptAddModal", category: "Actions" },
-	{ keys: ["Enter"], description: "Submit", context: "scriptAddModal", category: "Actions" },
-	{ keys: ["Backspace", "Delete"], description: "Delete typed path", context: "scriptAddModal", category: "Actions" },
-	{ keys: ["Esc"], description: "Cancel", context: "scriptAddModal", category: "General" },
+	// ========== Task Add Modal ==========
+	{ keys: ["Tab", "j/k", "↑/↓"], description: "Switch field", context: "taskAddModal", category: "Navigation" },
+	{ keys: ["h/l", "←/→", "Space"], description: "Toggle create/link mode", context: "taskAddModal", category: "Actions" },
+	{ keys: ["Enter"], description: "Submit", context: "taskAddModal", category: "Actions" },
+	{ keys: ["Backspace", "Delete"], description: "Delete typed path", context: "taskAddModal", category: "Actions" },
+	{ keys: ["Esc"], description: "Cancel", context: "taskAddModal", category: "General" },
 
 	// ========== Editor Picker ==========
 	{ keys: ["j/k", "↑/↓"], description: "Navigate editors", context: "editorPicker", category: "Navigation" },
@@ -392,7 +392,7 @@ const FOOTER_LABELS = new Map<string, string>([
 	["Close theme picker", "Close"],
 	["Move selection up", "Up"],
 	["Move selection down", "Down"],
-	["Switch tab (Apps/Infra/Libs/Tasks)", "Tabs"],
+	["Switch tab (Applications/Infrastructure/Libraries/Tasks)", "Tabs"],
 	["Search table", "Search"],
 	["Filter table", "Filter"],
 	["Order/sort table", "Sort"],
@@ -406,10 +406,10 @@ const FOOTER_LABELS = new Map<string, string>([
 	["Run task with args (tasks tab)", "Run args"],
 	["Delete task/folder", "Delete"],
 	["Refresh tasks", "Refresh"],
-	["Open AI agent view", "AI"],
+	["Open pi session view", "Pi"],
 	["Open SSH host picker", "SSH"],
 	["Copy selection to clipboard", "Copy"],
-	["Quit application", "Quit"],
+	["Quit DevEnv", "Quit"],
 	["Navigate change requests", "CRs"],
 	["Go to first CR", "First CR"],
 	["Go to last CR", "Last CR"],
@@ -457,7 +457,7 @@ const FOOTER_LABELS = new Map<string, string>([
 	["Toggle comments-only filter", "Comments only"],
 	["Open diff for commented file", "Diff"],
 	["Switch to changed files view", "Files"],
-	["Return to application table", "Back"],
+	["Return to table", "Back"],
 	["Navigate provider list", "Providers"],
 	["Add a new provider", "Add provider"],
 	["Edit selected provider", "Edit"],

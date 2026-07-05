@@ -4,22 +4,22 @@ import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 
-export type AddAppStep = 'selectProvider' | 'selectAppType' | 'findRepo' | 'appName' | 'selectBranch' | 'confirm';
+export type AddRepositoryStep = 'selectProvider' | 'selectDestination' | 'findRepo' | 'repositoryName' | 'selectBranch' | 'confirm';
 export type FindRepoMode = 'selectMode' | 'search' | 'url';
 
-export interface AddAppModalProps {
-  step: AddAppStep;
+export interface AddRepositoryModalProps {
+  step: AddRepositoryStep;
   providers: Array<{ name: string; type: string }>;
   selectedProviderIndex: number;
-  appType: 'APP' | 'LIB';
-  appTypeIndex: number;
+  destinationType: 'APP' | 'LIB';
+  destinationTypeIndex: number;
   searchQuery: string;
   searchResults: Array<{ name: string; fullPath: string; url: string; defaultBranch: string }>;
   selectedResultIndex: number;
   manualUrl: string;
   findRepoMode: FindRepoMode;
   findRepoModeIndex: number;
-  appName: string;
+  repositoryName: string;
   branches: string[];
   selectedBranchIndex: number;
   branchFilterQuery: string;
@@ -27,23 +27,23 @@ export interface AddAppModalProps {
   error: string | null;
 }
 
-export function AddAppModal(props: AddAppModalProps) {
+export function AddRepositoryModal(props: AddRepositoryModalProps) {
   const selectedProvider = () => props.providers[props.selectedProviderIndex];
   const selectedRepo = () => props.searchResults[props.selectedResultIndex];
   const repoUrl = () => (props.findRepoMode === 'url' ? props.manualUrl : selectedRepo()?.url ?? '');
   const filteredBranches = () => props.branches.filter(b => b.toLowerCase().includes(props.branchFilterQuery.toLowerCase()));
   const hasSearchQuery = () => props.searchQuery.length > 0;
   const hasManualUrl = () => props.manualUrl.length > 0;
-  const hasAppName = () => props.appName.length > 0;
+  const hasRepositoryName = () => props.repositoryName.length > 0;
   const hasBranchFilter = () => props.branchFilterQuery.length > 0;
-  const destinationLabel = () => props.appType === 'APP' ? 'Applications' : 'Libraries';
-  const itemLabel = () => props.appType === 'APP' ? 'Application' : 'Library';
+  const destinationLabel = () => props.destinationType === 'APP' ? 'Applications' : 'Libraries';
+  const itemLabel = () => props.destinationType === 'APP' ? 'Application' : 'Library';
 
   const title = () => {
     if (props.step === 'selectProvider') return 'Add Repository';
-    if (props.step === 'selectAppType') return 'Add Repository — Destination';
+    if (props.step === 'selectDestination') return 'Add Repository — Destination';
     if (props.step === 'findRepo') return 'Add Repository — Source';
-    if (props.step === 'appName') return 'Add Repository — Name';
+    if (props.step === 'repositoryName') return 'Add Repository — Name';
     if (props.step === 'selectBranch') return 'Add Repository — Branch';
     return 'Add Repository — Confirm';
   };
@@ -56,7 +56,7 @@ export function AddAppModal(props: AddAppModalProps) {
         { key: 'Esc', action: 'Cancel' },
       ]);
     }
-    if (props.step === 'selectAppType') {
+    if (props.step === 'selectDestination') {
       return formatHelpText([
         { key: 'j/k', action: 'Navigate' },
         { key: 'Enter', action: 'Select' },
@@ -83,7 +83,7 @@ export function AddAppModal(props: AddAppModalProps) {
         { key: 'Esc', action: 'Back' },
       ]);
     }
-    if (props.step === 'appName') {
+    if (props.step === 'repositoryName') {
       return formatHelpText([
         { key: 'Type', action: 'Edit Name' },
         { key: 'Enter', action: 'Next' },
@@ -141,7 +141,7 @@ export function AddAppModal(props: AddAppModalProps) {
         })}
       </Show>
 
-      <Show when={props.step === 'selectAppType'}>
+      <Show when={props.step === 'selectDestination'}>
         <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
           <text fg={uiColors.textMuted}>{'Provider: '}</text>
           <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
@@ -154,7 +154,7 @@ export function AddAppModal(props: AddAppModalProps) {
         </box>
 
         {(['Application', 'Library'] as const).map((label, idx) => {
-          const isSelected = () => props.appTypeIndex === idx;
+          const isSelected = () => props.destinationTypeIndex === idx;
           return (
             <box style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0 }}>
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
@@ -262,7 +262,7 @@ export function AddAppModal(props: AddAppModalProps) {
         </Show>
       </Show>
 
-      <Show when={props.step === 'appName'}>
+      <Show when={props.step === 'repositoryName'}>
         <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row' }}>
           <text fg={uiColors.textMuted}>{'Provider: '}</text>
           <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
@@ -285,12 +285,12 @@ export function AddAppModal(props: AddAppModalProps) {
         >
           <text fg={uiColors.textMuted}>{'Name: '}</text>
           <text
-            fg={hasAppName() ? uiColors.textPrimary : uiColors.textMuted}
-            attributes={hasAppName() ? TextAttributes.BOLD : undefined}
+            fg={hasRepositoryName() ? uiColors.textPrimary : uiColors.textMuted}
+            attributes={hasRepositoryName() ? TextAttributes.BOLD : undefined}
           >
-            {hasAppName() ? props.appName : 'enter app name...'}
+            {hasRepositoryName() ? props.repositoryName : 'enter repository name...'}
           </text>
-          {hasAppName() && <text fg={uiColors.primary}>{'█'}</text>}
+          {hasRepositoryName() && <text fg={uiColors.primary}>{'█'}</text>}
         </box>
       </Show>
 
@@ -309,7 +309,7 @@ export function AddAppModal(props: AddAppModalProps) {
 
         <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
           <text fg={uiColors.textMuted}>{'Name:     '}</text>
-          <text fg={uiColors.textSecondary}>{props.appName}</text>
+          <text fg={uiColors.textSecondary}>{props.repositoryName}</text>
         </box>
 
         <box
@@ -374,7 +374,7 @@ export function AddAppModal(props: AddAppModalProps) {
 
         <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
           <text fg={uiColors.textMuted}>{`${itemLabel()} Name: `}</text>
-          <text fg={uiColors.textPrimary}>{props.appName}</text>
+          <text fg={uiColors.textPrimary}>{props.repositoryName}</text>
         </box>
 
         <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>

@@ -53,8 +53,8 @@ tail -f ~/devenv/logs/status.log
 
 ## 5. Viewing logs in the TUI
 
-- Press `l` to view container logs for the selected app
-- Press `o` to view operation logs for the selected app
+- Press `l` to view container logs for the selected item
+- Press `o` to view operation logs for the selected item
 - Press `L` to toggle the status log maximized view
 
 See [Using the Log Viewer](using-log-viewer.md) for full keyboard shortcuts and features.

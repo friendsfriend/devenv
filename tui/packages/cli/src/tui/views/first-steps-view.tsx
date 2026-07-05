@@ -45,7 +45,7 @@ export function FirstStepsView(props: {
 					Welcome to DevEnv
 				</text>
 				<text fg={uiColors.textPrimary}>Thank you for using DevEnv.</text>
-				<text fg={uiColors.textSecondary}>Connect a provider, then add an app, load examples, or set up config sync.</text>
+				<text fg={uiColors.textSecondary}>Connect a provider, then add a repository, load examples, or set up config sync.</text>
 
 				<box style={{ width: "100%", height: 1, flexDirection: "row" }}>
 					<box style={{ width: 5, height: 1, justifyContent: "flex-end" }}>
@@ -63,7 +63,7 @@ export function FirstStepsView(props: {
 					</box>
 					<box backgroundColor={selected(1) ? uiColors.bgSurface2 : undefined} style={{ width: "24%", height: 1, paddingLeft: 1, paddingRight: 1 }}>
 						<text fg={rowColor(1, hasWorkspaceResource(), hasProvider() ? uiColors.textPrimary : uiColors.textSecondary)} attributes={selected(1) || hasWorkspaceResource() ? TextAttributes.BOLD : undefined}>
-							{cursor(1)}Add app
+							{cursor(1)}Add repository
 						</text>
 					</box>
 					<box style={{ width: "8%", height: 1, justifyContent: "center" }}>

@@ -126,7 +126,7 @@ export function AppDetailView(props: AppDetailViewProps) {
             <Show when={props.kind !== 'infra'}>
               <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
                 <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Type: </text>
-                <text fg={uiColors.textSecondary}>{props.app.appType}</text>
+                <text fg={uiColors.textSecondary}>{props.app.appType === 'LIB' ? 'Library' : 'Application'}</text>
               </box>
 
               <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>

@@ -5,8 +5,8 @@ import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 import type { ScriptParameter } from '@devenv/types';
 
-export interface ScriptArgsModalProps {
-  scriptName: string;
+export interface TaskArgsModalProps {
+  taskName: string;
   parameters: ScriptParameter[];
   values: Record<string, string>;
   selectedIndex: number;
@@ -18,7 +18,7 @@ export interface ScriptArgsModalProps {
   error: string | null;
 }
 
-export function ScriptArgsModal(props: ScriptArgsModalProps) {
+export function TaskArgsModal(props: TaskArgsModalProps) {
   const selectedParameterIndex = () => Math.max(0, Math.min(props.selectedIndex, Math.max(0, props.parameters.length - 1)));
   const selectedParameter = () => props.parameters[selectedParameterIndex()];
   const selectionBg = (pane: 'parameter' | 'value') => props.focusedPane === pane ? uiColors.bgSurface2 : uiColors.bgMantle;
@@ -45,7 +45,7 @@ export function ScriptArgsModal(props: ScriptArgsModalProps) {
 
   return (
     <GenericModal
-      title="Run Script"
+      title="Run Task"
       helpText={formatHelpText([
         { key: 'h/l', action: 'Focus' },
         { key: 'j/k', action: 'Move' },
@@ -57,14 +57,14 @@ export function ScriptArgsModal(props: ScriptArgsModalProps) {
       heightPercent={0.85}
     >
       <box style={{ width: '100%', height: 1, flexDirection: 'row', marginBottom: 1, flexShrink: 0 }}>
-        <text fg={uiColors.textMuted}>script </text>
-        <text fg={uiColors.textPrimary}>{props.scriptName}</text>
+        <text fg={uiColors.textMuted}>task </text>
+        <text fg={uiColors.textPrimary}>{props.taskName}</text>
         <text fg={uiColors.textMuted}>  •  history </text>
         <text fg={uiColors.textSecondary}>{props.historyTotal === 0 ? 'none' : `${props.historyIndex + 1}/${props.historyTotal}`}</text>
       </box>
 
       {props.parameters.length === 0 ? (
-        <text fg={uiColors.textMuted}>No parameter metadata found for this script.</text>
+        <text fg={uiColors.textMuted}>No parameter metadata found for this task.</text>
       ) : (
         <box style={{ width: '100%', flexGrow: 1, minHeight: 0, flexDirection: 'row', gap: 2 }}>
           <box style={{ width: '35%', flexDirection: 'column' }}>

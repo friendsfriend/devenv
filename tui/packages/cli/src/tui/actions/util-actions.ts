@@ -27,7 +27,7 @@ const spawnInTmuxWindow = (windowName: string, cmd: string, args: string[], cwd:
 };
 
 // Holds the current script parameters fetched from the server metadata endpoint.
-// Used by openScriptArgsModal -> submitScriptArgsAndRun flow.
+// Used by openTaskArgsModal -> submitTaskArgsAndRun flow.
 let currentScriptParameters: ScriptParameter[] = [];
 
 const shellEscape = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`;
@@ -131,7 +131,7 @@ export function createUtilActions(
 
   const launchLazygit = () => {
     const app = getSelectedApp();
-    if (!app) return;
+    if (!app?.localDirectoryPath) return;
     if (isTmuxSession()) {
       spawnInTmuxWindow(`lazygit - ${app.displayName}`, 'lazygit', [], app.localDirectoryPath);
       return;
@@ -147,7 +147,7 @@ export function createUtilActions(
 
   const launchLazygitBranchLog = (branchName: string) => {
     const app = getSelectedApp();
-    if (!app) return;
+    if (!app?.localDirectoryPath) return;
     if (isTmuxSession()) {
       spawnInTmuxWindow(`lazygit log - ${app.displayName}`, 'lazygit', ['log'], app.localDirectoryPath);
       return;
@@ -180,7 +180,7 @@ export function createUtilActions(
 
   const launchLazygitStatus = () => {
     const app = getSelectedApp();
-    if (!app) return;
+    if (!app?.localDirectoryPath) return;
     if (isTmuxSession()) {
       spawnInTmuxWindow(`lazygit - ${app.displayName}`, 'lazygit', ['status'], app.localDirectoryPath);
       return;
@@ -194,7 +194,7 @@ export function createUtilActions(
     }
   };
 
-  const runSelectedScriptInForeground = (scriptArgs: string[] = []) => {
+  const runSelectedScriptInForeground = (taskArgs: string[] = []) => {
     const app = getSelectedApp();
     if (!app || app.resourceType !== 'script-file' || !app.scriptPath) return;
 
@@ -248,7 +248,7 @@ export function createUtilActions(
             }
             const windowsCmd = mapShebangToWindows(interp);
             if (runWhich(windowsCmd)) {
-              return { cmd: windowsCmd, args: [...shebangArgs, scriptPath, ...scriptArgs] };
+              return { cmd: windowsCmd, args: [...shebangArgs, scriptPath, ...taskArgs] };
             }
             return null;
           }
@@ -268,7 +268,7 @@ export function createUtilActions(
       };
       const cmd = extMap[ext];
       if (cmd && runWhich(cmd)) {
-        return { cmd, args: [scriptPath, ...scriptArgs] };
+        return { cmd, args: [scriptPath, ...taskArgs] };
       }
 
       return null;
@@ -308,7 +308,7 @@ export function createUtilActions(
     } else {
       // Unix: execute directly via shebang
       cmd = app.scriptPath;
-      cmdArgs = scriptArgs;
+      cmdArgs = taskArgs;
     }
 
     if (isTmuxSession()) {
@@ -369,7 +369,7 @@ export function createUtilActions(
     return args;
   };
 
-  const openScriptArgsModal = async () => {
+  const openTaskArgsModal = async () => {
     const app = getSelectedApp();
     if (!app || app.resourceType !== 'script-file' || !app.scriptRelativePath) return;
 
@@ -394,7 +394,7 @@ export function createUtilActions(
     }
 
     // Store fetched parameters for the keyboard handler
-    uiStore.setScriptArgsParameters(metadataParams);
+    uiStore.setTaskArgsParameters(metadataParams);
     currentScriptParameters = metadataParams;
 
     // If no parameters, run directly without showing modal
@@ -403,27 +403,27 @@ export function createUtilActions(
       return;
     }
 
-    uiStore.setScriptArgsTargetScript(app.scriptRelativePath);
+    uiStore.setTaskArgsTargetScript(app.scriptRelativePath);
     uiStore.setScriptArgValues(initialValues);
-    uiStore.setScriptArgsSelectedIndex(0);
-    uiStore.setScriptArgsSelectedValueIndex(0);
-    uiStore.setScriptArgsFocusedPane('parameter');
-    uiStore.setScriptArgsEditing(false);
-    uiStore.setScriptArgsEditOriginalValue('');
-    uiStore.setScriptArgsHistoryCursor(-1);
-    uiStore.setScriptArgsError(null);
+    uiStore.setTaskArgsSelectedIndex(0);
+    uiStore.setTaskArgsSelectedValueIndex(0);
+    uiStore.setTaskArgsFocusedPane('parameter');
+    uiStore.setTaskArgsEditing(false);
+    uiStore.setTaskArgsEditOriginalValue('');
+    uiStore.setTaskArgsHistoryCursor(-1);
+    uiStore.setTaskArgsError(null);
 
     try {
       const response = await client.getScriptArgsHistory(app.scriptRelativePath, 50);
-      uiStore.setScriptArgsHistory((prev) => ({ ...prev, [app.scriptRelativePath!]: response.entries || [] }));
+      uiStore.setTaskArgsHistory((prev) => ({ ...prev, [app.scriptRelativePath!]: response.entries || [] }));
     } catch {
       // keep modal usable even when history loading fails
     }
 
-    uiStore.setShowScriptArgsModal(true);
+    uiStore.setShowTaskArgsModal(true);
   };
 
-  const submitScriptArgsAndRun = async () => {
+  const submitTaskArgsAndRun = async () => {
     const app = getSelectedApp();
     if (!app || app.resourceType !== 'script-file') return;
 
@@ -433,7 +433,7 @@ export function createUtilActions(
       runSelectedScriptInForeground(args);
 
       if (app.scriptRelativePath) {
-        uiStore.setScriptArgsHistory((prev) => {
+        uiStore.setTaskArgsHistory((prev) => {
           const key = app.scriptRelativePath!;
           const existing = prev[key] || [];
           const deduped = existing.filter((entry) => JSON.stringify(entry) !== JSON.stringify(current));
@@ -443,17 +443,17 @@ export function createUtilActions(
         void client.addScriptArgsHistory(app.scriptRelativePath, current);
       }
 
-      uiStore.setShowScriptArgsModal(false);
-      uiStore.setScriptArgsError(null);
+      uiStore.setShowTaskArgsModal(false);
+      uiStore.setTaskArgsError(null);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Invalid script arguments';
-      uiStore.setScriptArgsError(message);
+      const message = error instanceof Error ? error.message : 'Invalid task arguments';
+      uiStore.setTaskArgsError(message);
     }
   };
 
   const launchLazydocker = () => {
     const app = getSelectedApp();
-    if (!app) return;
+    if (!app?.localDirectoryPath) return;
     if (isTmuxSession()) {
       spawnInTmuxWindow(`lazydocker - ${app.displayName}`, 'lazydocker', [], app.localDirectoryPath);
       return;
@@ -678,8 +678,8 @@ export function createUtilActions(
     launchLazygitStatus,
     launchLazydocker,
     runSelectedScriptInForeground,
-    openScriptArgsModal,
-    submitScriptArgsAndRun,
+    openTaskArgsModal,
+    submitTaskArgsAndRun,
     parseSshConfig,
     openSshPicker,
     isKeyLoadedInAgent,

@@ -70,7 +70,7 @@ type ChangeRequestListResult struct {
 	PerPage int `json:"perPage"`
 }
 
-// Client is the unified interface for merge/pull request operations across providers.
+// Client is the unified interface for change request operations across providers.
 //
 // This interface abstracts the differences between Git providers (GitHub, GitLab, etc.)
 // allowing the application to work with any provider through a consistent API.
@@ -86,49 +86,49 @@ type Client interface {
 	// Returns repositories the authenticated user has access to.
 	Search(info *RepoInfo, query string, limit int) ([]SearchResult, error)
 
-	// GetChangeRequests returns merge/pull requests matching the given options.
+	// GetChangeRequests returns change requests matching the given options.
 	//
 	// If options is nil, default options are used (page 1, per_page 50, opened state, no details skipped).
 	//
 	// Returns an ChangeRequestListResult with items and pagination metadata.
-	// Items is an empty slice if no MRs match, never nil.
+	// Items is an empty slice if no change requests match, never nil.
 	GetChangeRequests(info *RepoInfo, options *ChangeRequestListOptions) (*ChangeRequestListResult, error)
 
-	// GetChangeRequestChanges returns the list of changed files in a merge/pull request.
+	// GetChangeRequestChanges returns the list of changed files in a change request.
 	//
-	// The mrNumber is the provider-specific change request ID (IID on GitLab, Number on GitHub).
+	// The crNumber is the provider-specific change request ID (IID on GitLab, Number on GitHub).
 	//
 	// Each ChangeRequestChange includes the diff and parsed diff lines for rendering.
 	// Returns an empty slice if the change request has no changes.
-	GetChangeRequestChanges(info *RepoInfo, mrNumber int) ([]ChangeRequestChange, error)
+	GetChangeRequestChanges(info *RepoInfo, crNumber int) ([]ChangeRequestChange, error)
 
-	// GetDiscussions returns all discussion threads in a merge/pull request.
+	// GetDiscussions returns all discussion threads in a change request.
 	//
 	// A discussion is a thread of comments, either on a specific code location
 	// (inline review comment) or at the change request level (general comment).
 	//
 	// Returns an empty slice if no discussions exist.
-	GetDiscussions(info *RepoInfo, mrNumber int) ([]Discussion, error)
+	GetDiscussions(info *RepoInfo, crNumber int) ([]Discussion, error)
 
-	// Approve submits an approval for the merge/pull request.
+	// Approve submits an approval for the change request.
 	//
 	// Returns nil on success. Returns an error if:
 	//   - the repository cannot be reached
 	//   - the user lacks permission to approve
 	//   - the change request is already merged or closed
-	Approve(info *RepoInfo, mrNumber int) error
+	Approve(info *RepoInfo, crNumber int) error
 
-	// Unapprove removes the user's approval from the merge/pull request.
+	// Unapprove removes the user's approval from the change request.
 	//
 	// Returns nil on success, even if the user hadn't approved.
 	// Returns an error if the repository cannot be reached.
-	Unapprove(info *RepoInfo, mrNumber int) error
+	Unapprove(info *RepoInfo, crNumber int) error
 
 	// ToggleApproval approves if not yet approved, or removes approval if already approved.
 	//
 	// This is a convenience method that queries the current approval state
 	// and calls either Approve or Unapprove accordingly.
-	ToggleApproval(info *RepoInfo, mrNumber int) error
+	ToggleApproval(info *RepoInfo, crNumber int) error
 
 	// GetJobLogs retrieves the log output for a CI/CD job.
 	//
@@ -177,13 +177,13 @@ type Client interface {
 	//   - the user lacks permission
 	CancelJob(info *RepoInfo, jobID int) error
 
-	// Close closes a merge/pull request.
+	// Close closes a change request.
 	//
 	// Returns nil on success. Returns an error if:
 	//   - the repository cannot be reached
 	//   - the change request is already merged or closed
 	//   - the user lacks permission
-	Close(info *RepoInfo, mrNumber int) error
+	Close(info *RepoInfo, crNumber int) error
 
 	// Rebase rebases the source branch onto the target branch.
 	//
@@ -192,7 +192,7 @@ type Client interface {
 	//   - the change request is already merged or closed
 	//   - the user lacks permission
 	//   - rebasing is not supported by the provider (e.g., GitHub)
-	Rebase(info *RepoInfo, mrNumber int) error
+	Rebase(info *RepoInfo, crNumber int) error
 
 	// CreateDiffComment creates a new inline comment on a specific line in the diff.
 	//
@@ -203,7 +203,7 @@ type Client interface {
 	//   - the repository cannot be reached
 	//   - the change request cannot be found
 	//   - the user lacks permission
-	CreateDiffComment(info *RepoInfo, mrNumber int, body string, position *DiffPosition) error
+	CreateDiffComment(info *RepoInfo, crNumber int, body string, position *DiffPosition) error
 
 	// ReplyToDiscussion adds a reply to an existing discussion thread.
 	//
@@ -211,7 +211,7 @@ type Client interface {
 	//   - the repository cannot be reached
 	//   - the discussion cannot be found
 	//   - the user lacks permission
-	ReplyToDiscussion(info *RepoInfo, mrNumber int, discussionID string, body string) error
+	ReplyToDiscussion(info *RepoInfo, crNumber int, discussionID string, body string) error
 
 	// ResolveDiscussion marks a discussion as resolved or unresolves it.
 	//
@@ -219,7 +219,7 @@ type Client interface {
 	//   - the repository cannot be reached
 	//   - the discussion cannot be found
 	//   - the user lacks permission
-	ResolveDiscussion(info *RepoInfo, mrNumber int, discussionID string, resolved bool) error
+	ResolveDiscussion(info *RepoInfo, crNumber int, discussionID string, resolved bool) error
 
 	// GetTestSummary returns test results for a pipeline.
 	//
@@ -248,7 +248,7 @@ type SearchResult struct {
 	DefaultBranch string `json:"defaultBranch"`
 }
 
-// ChangeRequest represents a merge/pull request from any Git provider.
+// ChangeRequest represents a change request from any Git provider.
 // Field names and JSON tags are normalized across providers.
 type ChangeRequest struct {
 	// ID is the provider-assigned unique identifier.
@@ -278,17 +278,17 @@ type ChangeRequest struct {
 	} `json:"author"`
 	// HeadPipeline is the CI/CD pipeline running on the source branch, if any.
 	HeadPipeline *PipelineRef `json:"head_pipeline,omitempty"`
-	// MergeStatus summarizes whether the MR can be merged.
+	// MergeStatus summarizes whether the change request can be merged.
 	// Common values: "can_be_merged", "cannot_be_merged", "checking".
 	MergeStatus string `json:"merge_status"`
 	// DetailedMergeStatus provides more specific mergeability info.
 	// Examples: "mergeable", "not_open", "dirty", "checking".
 	DetailedMergeStatus string `json:"detailed_merge_status"`
-	// Draft is true if the MR is marked as a draft/work-in-progress.
+	// Draft is true if the change request is marked as a draft/work-in-progress.
 	Draft bool `json:"draft"`
 	// WorkInProgress is an alias for Draft for compatibility.
 	WorkInProgress bool `json:"work_in_progress"`
-	// HasConflicts is true if the MR has merge conflicts with the target branch.
+	// HasConflicts is true if the change request has merge conflicts with the target branch.
 	HasConflicts bool `json:"has_conflicts"`
 	// BlockingDiscussionsResolved is true if all required discussions are resolved.
 	BlockingDiscussionsResolved bool `json:"blocking_discussions_resolved"`
@@ -322,7 +322,7 @@ type ApproveStatus struct {
 	} `json:"approved_by"`
 }
 
-// ChangeRequestChange represents a changed file in a merge/pull request.
+// ChangeRequestChange represents a changed file in a change request.
 type ChangeRequestChange struct {
 	// OldPath is the file path before the change (for renames/deletes).
 	OldPath string `json:"old_path"`
@@ -365,7 +365,7 @@ type DiffLine struct {
 	RichText string `json:"rich_text"`
 }
 
-// Discussion represents a comment thread in a merge/pull request.
+// Discussion represents a comment thread in a change request.
 // A discussion can be either an inline review comment (attached to a code location)
 // or a general comment at the change request level.
 type Discussion struct {

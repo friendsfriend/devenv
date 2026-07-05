@@ -61,8 +61,8 @@ Commit this file to the repo — worktrunk runs the hook when creating new workt
 - Press `d` to delete the selected worktree
 - Press `Enter` to switch to a worktree
 
-## 7. Removing an app
+## 7. Removing a repository
 
-Press `d` in the TUI to remove an app. This deletes the entire app directory including all worktrees.
+Press `-` in the TUI to remove a repository. This deletes the entire repository directory including all worktrees.
 
 See the [worktrunk documentation](https://worktrunk.dev) for advanced configuration.

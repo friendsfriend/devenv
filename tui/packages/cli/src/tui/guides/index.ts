@@ -47,7 +47,7 @@ export const guides: Guide[] = [
   {
     key: "adding-repositories",
     title: "Adding a Repository",
-    description: "App definitions, Dockerfiles, Compose config, and infra linking",
+    description: "Repository definitions, Dockerfiles, Compose config, and infra linking",
     category: "Authoring",
     import: () => import("./adding-repositories.md", { with: { type: "text" } }).then((m) => m.default),
   },
@@ -89,7 +89,7 @@ export const guides: Guide[] = [
   {
     key: "using-ai-features",
     title: "Using AI Features",
-    description: "AI agent view, sessions, pi agent integration",
+    description: "pi session view, sessions, pi integration",
     category: "AI",
     import: () => import("./using-ai-features.md", { with: { type: "text" } }).then((m) => m.default),
   },

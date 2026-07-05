@@ -8,18 +8,18 @@ export function routePastedText(text: string, providerStore: ProviderStore): boo
  * Handles paste events for the TUI — routes pasted text to the appropriate
  * input field based on current modal state.
  */
-  if (providerStore.showAddAppModal()) {
-    const step = providerStore.addAppStep();
-    const mode = providerStore.addAppFindRepoMode();
+  if (providerStore.showAddRepositoryModal()) {
+    const step = providerStore.addRepositoryStep();
+    const mode = providerStore.addRepositoryFindRepoMode();
     if (step === 'findRepo' && mode === 'url') {
-      providerStore.setAddAppManualUrl(v => v + text);
+      providerStore.setAddRepositoryManualUrl(v => v + text);
     } else if (step === 'findRepo' && mode === 'search') {
-      providerStore.setAddAppSearchQuery(v => v + text);
-    } else if (step === 'appName') {
-      providerStore.setAddAppName(v => v + text);
+      providerStore.setAddRepositorySearchQuery(v => v + text);
+    } else if (step === 'repositoryName') {
+      providerStore.setAddRepositoryName(v => v + text);
     } else if (step === 'selectBranch') {
-      providerStore.setAddAppBranchFilter(v => v + text);
-      providerStore.setAddAppSelectedBranchIndex(0);
+      providerStore.setAddRepositoryBranchFilter(v => v + text);
+      providerStore.setAddRepositorySelectedBranchIndex(0);
     }
     return true;
   }

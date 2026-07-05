@@ -38,7 +38,7 @@ devenv-cli/
 │   │   ├── resources/                  # Home dir, config dir, env file, template management
 │   │   ├── server/                     # HTTP API server (DI-based)
 │   │   │   ├── server.go              # Server struct, Start(), SSE, pollers
-│   │   │   ├── handlers_agent.go      # Agent spaces/sessions endpoints
+│   │   │   ├── handlers_agent.go      # Pi session endpoints
 │   │   │   ├── handlers_apps.go       # App/infra/status endpoints
 │   │   │   ├── handlers_build.go      # Build/test/run/start actions
 │   │   │   ├── handlers_docker.go     # Docker start/stop/restart/logs
@@ -78,7 +78,7 @@ devenv-cli/
 │   │   │   │   ├── cr-client.ts       # CR management
 │   │   │   │   ├── ci-client.ts       # CI/CD pipeline/job operations
 │   │   │   │   ├── provider-client.ts # Provider CRUD
-│   │   │   │   ├── agent-client.ts    # Agent spaces/sessions
+│   │   │   │   ├── agent-client.ts    # Pi sessions
 │   │   │   │   ├── logs-client.ts     # Operation logs + AI analysis
 │   │   │   │   ├── repos-client.ts    # Repo search/branches
 │   │   │   │   ├── events-client.ts   # SSE subscription + health
@@ -556,7 +556,7 @@ DevEnvClient (facade)
     ├── cr-client.ts        → getChangeRequests(), approveCR(), ...
     ├── ci-client.ts        → getPipelines(), getJobs(), retryJob(), ...
     ├── provider-client.ts  → getProviders(), createProvider(), ...
-    ├── agent-client.ts     → getSpaces(), getSessions(), ...
+    ├── agent-client.ts     → getPiSessions(), ...
     ├── logs-client.ts      → getLogs(), analyzeWithAI(), ...
     ├── repos-client.ts     → searchRepos(), getBranches(), ...
     └── events-client.ts    → subscribeSSE(), healthCheck(), ...
@@ -589,9 +589,9 @@ The TUI provides pi-only AI features.
 4. Type a prompt (or press `Enter` for the default).
 5. DevEnv runs `pi --print --no-session --no-tools` and shows the analysis in the overlay.
 
-### Feature 2 — Agent Session Launcher (`a` key → Agent view)
+### Feature 2 — Pi Session Launcher (`A` key → pi session view)
 
-1. Press `a` from the main table to open the Agent view.
+1. Press `A` from the main table to open the pi session view.
 2. Existing pi sessions are listed by working directory.
 3. Press `Enter` on an **existing session** to resume it with `pi`.
 4. Press `Enter` on **+ New Session** to launch `pi` in the project root.

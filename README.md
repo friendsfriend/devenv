@@ -76,12 +76,12 @@ Task-focused guides are available from the TUI Help view (`?`) and linked below:
 - [Container Runtime](tui/packages/cli/src/tui/guides/container-runtime.md) — Choose Docker or Podman via `DEVENV_CONTAINER_RUNTIME`
 - [Kubernetes Runtime](tui/packages/cli/src/tui/guides/kubernetes-runtime.md) — Run Helm app and infrastructure targets on managed kind
 - [Choosing a Runtime](tui/packages/cli/src/tui/guides/choosing-runtime.md) — When to use Docker Compose, Kubernetes, shell, or script infrastructure
-- [Adding a Repository](tui/packages/cli/src/tui/guides/adding-repositories.md) — App definitions, Dockerfiles, Compose config, and infra linking
+- [Adding a Repository](tui/packages/cli/src/tui/guides/adding-repositories.md) — Repository definitions, Dockerfiles, Compose config, and infra linking
 - [Adding a Task](tui/packages/cli/src/tui/guides/adding-scripts.md) — Task discovery, --devenv-metadata convention, parameter types
 - [Adding Infrastructure](tui/packages/cli/src/tui/guides/adding-infrastructure.md) — Infra definitions, Compose placement, sharing between apps
 - [Adding Libraries](tui/packages/cli/src/tui/guides/adding-libraries.md) — Library definitions, build and test Dockerfiles
 - [Using Worktrees](tui/packages/cli/src/tui/guides/using-worktrees.md) — Single checkout vs worktrees, worktrunk, IDE setup
-- [Using AI Features](tui/packages/cli/src/tui/guides/using-ai-features.md) — AI agent view, sessions, pi agent integration
+- [Using AI Features](tui/packages/cli/src/tui/guides/using-ai-features.md) — pi session view, sessions, pi integration
 - [Using Git Integrations](tui/packages/cli/src/tui/guides/using-git-integrations.md) — Providers, Change Request browsing, diff, discussions, approvals, AI review, pipelines, test results
 - [Using the Log Viewer](tui/packages/cli/src/tui/guides/using-log-viewer.md) — Container logs, operation logs, search, visual mode, keyboard shortcuts
 - [Finding Logs](tui/packages/cli/src/tui/guides/finding-logs.md) — Log directory structure, status log format, per-app logs, server log
@@ -176,7 +176,7 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 Task collections live under `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`), not in the config directory. If you share `~/.config/devenv` as a config repository, sync tasks separately:
 
 ```
-~/devenv/scripts/                       # Any executable file is a script
+~/devenv/scripts/                       # Any executable file is a task file
 ├── deploy.sh
 ├── greet.py                            # Python with shebang — works natively
 ├── weather.ts                          # TypeScript/Bun — works out of the box
@@ -214,7 +214,7 @@ Custom TUI themes live in `DEVENV_CONFIG_DIR/themes/` (default `~/.config/devenv
 ~/.config/devenv/themes/<theme-name>.json
 ```
 
-Restart the TUI, then open the theme picker with `T`. Custom themes appear alongside built-in OpenCode themes and can override built-in names.
+Restart the TUI, then open the theme picker with `T`. Custom themes appear alongside built-in compatible themes and can override built-in names.
 
 DevEnv also provides a `system` theme. It queries your terminal foreground, background, and ANSI palette at startup, then builds a theme from those colors.
 
@@ -250,7 +250,7 @@ See Help → Guides → Custom Themes for full field guidance.
 
 ### `providers/`
 
-Git provider definitions are stored as individual JSON files in `~/.config/devenv/providers/`. Actual credentials live in `.env`; provider JSON must use `${...}` placeholders for `username` and `token`, making provider metadata safe to share in a config repository. Clear-text credentials in provider JSON are rejected.
+Git provider definitions are stored as individual JSON files in `~/.config/devenv/providers/`. Actual credentials live in `.env`; provider JSON must use `${...}` placeholders for `username` and `token`, making provider metadata safe to share in a config repository. Clear-text credentials in provider JSON are blocked: startup continues, the provider is shown as invalid in the TUI, and credentials are unusable until migrated to `.env` placeholders.
 
 **Schema:**
 
@@ -568,13 +568,13 @@ Template files that are copied into app directories during initialization. All f
 
 ### `scripts/`
 
-Task collections for the Tasks tab in the TUI. Tasks are executable script files discovered recursively from `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`) and support both flat and nested layouts.
+Task collections for the Tasks tab in the TUI. Tasks are executable task files discovered recursively from `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`) and support both flat and nested layouts.
 
 **Discovery rules:**
-- **Unix:** Any executable file (`+x`) is treated as a script, regardless of extension. The OS handles interpreter selection via the shebang (`#!`) line.
+- **Unix:** Any executable file (`+x`) is treated as a task file, regardless of extension. The OS handles interpreter selection via the shebang (`#!`) line.
 - **Windows:** Files with known executable extensions (`.sh`, `.ps1`, `.py`, `.ts`, `.js`, `.bat`, `.cmd`, `.exe`) are discovered, plus any file with a shebang referencing a recognized interpreter.
 
-This means scripts in any language work out of the box — Python, TypeScript/Bun, Rust, Ruby, or any executable with a shebang:
+This means task files in any language work out of the box — Python, TypeScript/Bun, Rust, Ruby, or any executable with a shebang:
 
 ```text
 scripts/
@@ -676,13 +676,13 @@ if (process.argv.includes("--devenv-metadata")) {
 #### Server-side metadata API
 
 The server provides a `GET /api/scripts/metadata?path=<relativePath>` endpoint that the TUI calls before showing the args modal. This endpoint:
-- Runs `--devenv-metadata` on the script with a 3-second timeout
+- Runs `--devenv-metadata` on the task file with a 3-second timeout
 - Caches the result per-file, invalidating on mtime change
 - Returns `{ "parameters": [...] }` or `{ "parameters": [] }` on error
 
 #### Execution
 
-- **Unix:** The script file is executed directly via its shebang line (`exec.Command(scriptPath, args...)`). No interpreter resolution needed — the OS handles it.
+- **Unix:** The task file is executed directly via its shebang line (`exec.Command(scriptPath, args...)`). No interpreter resolution needed — the OS handles it.
 - **Windows:** The shebang line is read, the interpreter is mapped to a Windows command (e.g., `python3` → `python`, `bun` → `bun.exe`), and execution proceeds with the resolved interpreter.
 
 Both foreground (interactive TUI via `spawnSync`) and server-side (background via `exec.Command`) paths use the same architecture.
@@ -695,7 +695,7 @@ In the parameter modal:
 - `Type` / `Backspace` edits text values
 - `←/→` cycles through enum choices
 - `Space` toggles boolean parameters
-- `↑/↓` navigates per-script argument history
+- `↑/↓` navigates per-task argument history
 - `Esc` cancels
 
 ### Secrets Management
@@ -732,7 +732,7 @@ The home directory (default `~/devenv`) is where repositories are cloned and ope
 
 ## Worktrees
 
-By default, devenv manages one checkout per app. Switching branches modifies the working tree in-place. **Worktree mode** gives each branch its own permanent directory instead — so `main`, `feature/login`, and `hotfix/auth` all exist on disk simultaneously and you can switch between them instantly without any git checkout.
+By default, devenv manages one checkout per repository. Switching branches modifies the working tree in-place. **Worktree mode** gives each branch its own permanent directory instead — so `main`, `feature/login`, and `hotfix/auth` all exist on disk simultaneously and you can switch between them instantly without any git checkout.
 
 This solves two common problems:
 
@@ -750,16 +750,9 @@ wt config shell install   # enables directory switching in your shell
 
 ### Enabling worktree mode
 
-When adding a new app through the TUI (`a`), the wizard includes a **Worktrees** step after branch selection:
+Set `"gitMode": "WORKTREE"` in the repository definition JSON (`~/.config/devenv/apps/definitions/<ident>.json` or `~/.config/devenv/libraries/definitions/<ident>.json`).
 
-```
-Use Git worktrees for this app?
-
-  ▸ No  — single checkout, switch branches in place
-    Yes — parallel checkouts, requires worktrunk
-```
-
-Use `j`/`k` to choose and `Enter` to continue. The choice is stored in the app's config file and cannot be changed after the app is created without editing the JSON manually.
+Repositories added through the TUI use single-checkout branch mode by default. To enable worktrees for those repositories, edit the definition JSON and restart DevEnv.
 
 ### Directory layout
 
@@ -776,7 +769,7 @@ $DEVENV_HOME/
 
 The branch name becomes the directory suffix. Slashes in branch names are replaced with dashes (`feature/login` → `my-app.feature-login`).
 
-> **Removing an app** (`d` in the TUI) deletes the entire `my-app/` folder, including all worktrees, in one step.
+> **Removing a repository** (`-` in the TUI) deletes the entire `my-app/` folder, including all worktrees, in one step.
 
 ### Switching branches
 

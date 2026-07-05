@@ -10,7 +10,7 @@ import {
 	ConfirmDialog,
 	AgentSpaceView,
 	ConnectProviderModal,
-	AddAppModal,
+	AddRepositoryModal,
 	MarkdownModal,
 	SshHostPickerView,
 	PassphraseModal,
@@ -18,8 +18,8 @@ import {
 	ActionTargetPickerView,
 	EditorPickerView,
 	WorktreeManagerModal,
-	ScriptArgsModal,
-	ScriptAddModal,
+	TaskArgsModal,
+	TaskAddModal,
 	CrAiReviewOverlay,
 	IssueScopeModal,
 	CloseReasonModal,
@@ -51,7 +51,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 
 	return (
 		<>
-			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddAppModal() && !uiStore.showMarkdownModal()}>
+			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddRepositoryModal() && !uiStore.showMarkdownModal()}>
 				<FirstStepsView appStore={appStore} providerStore={providerStore} />
 			</Show>
 			<Show when={uiStore.showThemePicker()}>
@@ -284,25 +284,25 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={providerStore.showAddAppModal()}>
-				<AddAppModal
-					step={providerStore.addAppStep()}
-					providers={providerStore.addAppProviders()}
-					selectedProviderIndex={providerStore.addAppSelectedProviderIndex()}
-					searchQuery={providerStore.addAppSearchQuery()}
-					searchResults={providerStore.addAppSearchResults()}
-					selectedResultIndex={providerStore.addAppSelectedResultIndex()}
-					manualUrl={providerStore.addAppManualUrl()}
-					findRepoMode={providerStore.addAppFindRepoMode()}
-					findRepoModeIndex={providerStore.addAppFindRepoModeIndex()}
-					appName={providerStore.addAppName()}
-					branches={providerStore.addAppBranches()}
-					selectedBranchIndex={providerStore.addAppSelectedBranchIndex()}
-					branchFilterQuery={providerStore.addAppBranchFilter()}
-					loading={providerStore.addAppLoading()}
-					error={providerStore.addAppError()}
-					appType={providerStore.addAppAppType()}
-					appTypeIndex={providerStore.addAppAppTypeIndex()}
+			<Show when={providerStore.showAddRepositoryModal()}>
+				<AddRepositoryModal
+					step={providerStore.addRepositoryStep()}
+					providers={providerStore.addRepositoryProviders()}
+					selectedProviderIndex={providerStore.addRepositorySelectedProviderIndex()}
+					searchQuery={providerStore.addRepositorySearchQuery()}
+					searchResults={providerStore.addRepositorySearchResults()}
+					selectedResultIndex={providerStore.addRepositorySelectedResultIndex()}
+					manualUrl={providerStore.addRepositoryManualUrl()}
+					findRepoMode={providerStore.addRepositoryFindRepoMode()}
+					findRepoModeIndex={providerStore.addRepositoryFindRepoModeIndex()}
+					repositoryName={providerStore.addRepositoryName()}
+					branches={providerStore.addRepositoryBranches()}
+					selectedBranchIndex={providerStore.addRepositorySelectedBranchIndex()}
+					branchFilterQuery={providerStore.addRepositoryBranchFilter()}
+					loading={providerStore.addRepositoryLoading()}
+					error={providerStore.addRepositoryError()}
+					destinationType={providerStore.addRepositoryDestinationType()}
+					destinationTypeIndex={providerStore.addRepositoryDestinationTypeIndex()}
 				/>
 			</Show>
 
@@ -406,31 +406,31 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={uiStore.showScriptArgsModal()}>
-				<ScriptArgsModal
-					scriptName={
+			<Show when={uiStore.showTaskArgsModal()}>
+				<TaskArgsModal
+					taskName={
 						appStore.tableFilteredApps()[appStore.selectedIndex()]
 							?.displayName || ""
 					}
-					parameters={uiStore.scriptArgsParameters()}
+					parameters={uiStore.taskArgsParameters()}
 					values={uiStore.scriptArgValues()}
-					selectedIndex={uiStore.scriptArgsSelectedIndex()}
-					selectedValueIndex={uiStore.scriptArgsSelectedValueIndex()}
-					focusedPane={uiStore.scriptArgsFocusedPane()}
-					editing={uiStore.scriptArgsEditing()}
-					historyIndex={uiStore.scriptArgsHistoryCursor()}
-					historyTotal={uiStore.scriptArgsHistoryForCurrent().length}
-					error={uiStore.scriptArgsError()}
+					selectedIndex={uiStore.taskArgsSelectedIndex()}
+					selectedValueIndex={uiStore.taskArgsSelectedValueIndex()}
+					focusedPane={uiStore.taskArgsFocusedPane()}
+					editing={uiStore.taskArgsEditing()}
+					historyIndex={uiStore.taskArgsHistoryCursor()}
+					historyTotal={uiStore.taskArgsHistoryForCurrent().length}
+					error={uiStore.taskArgsError()}
 				/>
 			</Show>
 
-			<Show when={uiStore.showScriptAddModal()}>
-				<ScriptAddModal
-					mode={uiStore.scriptAddMode()}
-					targetPath={uiStore.scriptAddTargetPath()}
-					sourcePath={uiStore.scriptAddSourcePath()}
-					selectedField={uiStore.scriptAddSelectedField()}
-					error={uiStore.scriptAddError()}
+			<Show when={uiStore.showTaskAddModal()}>
+				<TaskAddModal
+					mode={uiStore.taskAddMode()}
+					targetPath={uiStore.taskAddTargetPath()}
+					sourcePath={uiStore.taskAddSourcePath()}
+					selectedField={uiStore.taskAddSelectedField()}
+					error={uiStore.taskAddError()}
 				/>
 			</Show>
 

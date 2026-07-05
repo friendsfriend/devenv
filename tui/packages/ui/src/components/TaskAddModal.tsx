@@ -2,7 +2,7 @@ import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 
-export interface ScriptAddModalProps {
+export interface TaskAddModalProps {
   mode: 'create' | 'link';
   targetPath: string;
   sourcePath: string;
@@ -10,7 +10,7 @@ export interface ScriptAddModalProps {
   error: string | null;
 }
 
-export function ScriptAddModal(props: ScriptAddModalProps) {
+export function TaskAddModal(props: TaskAddModalProps) {
   const modeLabel = () => (props.mode === 'create' ? 'Create new task' : 'Use existing task file');
 
   const row = (label: string, value: string, selected: boolean) => (
@@ -39,8 +39,8 @@ export function ScriptAddModal(props: ScriptAddModalProps) {
       heightPercent={0.5}
     >
       <box style={{ width: '100%', height: 2, flexDirection: 'column', marginBottom: 1, flexShrink: 0 }}>
-        <text fg={uiColors.textMuted}>Use target name/path as relative path under tasks directory (`$DEVENV_HOME/scripts/`) (e.g. folder/subfolder/script or script)</text>
-        <text fg={uiColors.textMuted}>If extension is omitted, .sh is used (or source extension for links).</text>
+        <text fg={uiColors.textMuted}>Use target name/path as relative path under tasks directory (`$DEVENV_HOME/scripts/`) (e.g. folder/subfolder/task or task)</text>
+        <text fg={uiColors.textMuted}>If extension is omitted, .sh is used (or source extension for linked task files).</text>
       </box>
 
       {row('Mode', modeLabel(), props.selectedField === 0)}

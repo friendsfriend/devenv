@@ -4,7 +4,7 @@ export type {
 	KeyboardContext,
 } from "./types";
 export { handleGlobalKeys } from "./global-keys";
-export { handleAddAppModalKeys } from "./add-app-modal-keys";
+export { handleAddRepositoryModalKeys } from "./add-repository-modal-keys";
 export { handleConnectProviderModalKeys } from "./connect-provider-modal-keys";
 export { handleDiffModalKeys } from "./diff-modal-keys";
 export { handleLogModalKeys } from "./log-modal-keys";

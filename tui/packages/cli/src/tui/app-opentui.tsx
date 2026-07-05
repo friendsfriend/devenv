@@ -49,7 +49,7 @@ import { setupLogEffects } from "./effects/log-effects";
 import { createColumns, createScriptColumns } from "./columns";
 import {
 	handleGlobalKeys,
-	handleAddAppModalKeys,
+	handleAddRepositoryModalKeys,
 	handleConnectProviderModalKeys,
 	handleDiffModalKeys,
 	handleLogModalKeys,
@@ -167,10 +167,12 @@ function TUIApp(props: TUIAppProps) {
 	const launchPi = (sessionPath: string | null) =>
 		agentActions.launchPi(sessionPath, renderer);
 
-	const getSelectedApp = (): App | undefined =>
-		(appStore.viewMode() === "table"
+	const getSelectedApp = (): App | undefined => {
+		const row = (appStore.viewMode() === "table"
 			? appStore.tableFilteredApps()
 			: appStore.filteredApps())[appStore.selectedIndex()];
+		return row?.rowKind === "app" ? row : undefined;
+	};
 
 	// --- Effects ---
 	setupLogEffects(logStore, client);
@@ -247,7 +249,7 @@ function TUIApp(props: TUIAppProps) {
 
 	useKeyboard(async (event) => {
 		if (await handleGlobalKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleAddAppModalKeys(event, kbStores, kbActions)) return;
+		if (await handleAddRepositoryModalKeys(event, kbStores, kbActions)) return;
 		if (await handleConnectProviderModalKeys(event, kbStores, kbActions))
 			return;
 		if (await handleDiffModalKeys(event, kbStores, kbActions, kbCtx)) return;

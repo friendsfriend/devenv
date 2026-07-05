@@ -12,7 +12,7 @@ Commit the contents of:
 
 Do **not** commit the `.env` file. It can contain machine-specific paths and secrets.
 
-Provider definitions in `providers/*.json` can be committed when they contain `${...}` placeholders for `username` and `token`. DevEnv-managed providers store actual credentials in `.env` and write placeholders into provider JSON. Clear-text credentials in provider JSON are rejected.
+Provider definitions in `providers/*.json` can be committed when they contain `${...}` placeholders for `username` and `token`. DevEnv-managed providers store actual credentials in `.env` and write placeholders into provider JSON. Clear-text credentials in provider JSON are blocked: startup continues, the provider is shown as invalid in the TUI, and credentials are unusable until migrated to `.env` placeholders.
 
 Task collections are not part of the config directory. They live under `$DEVENV_HOME/scripts` (default `~/devenv/scripts`). Sync them separately if your team wants shared tasks.
 
