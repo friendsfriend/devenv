@@ -32,7 +32,7 @@ devenv-cli/
 │   │   ├── git/                        # Git repository operations (go-git)
 │   │   ├── github/                     # GitHub API client
 │   │   ├── gitlab/                     # GitLab API client
-│   │   ├── logging/                    # Status log + per-app log writer
+│   │   ├── logging/                    # Status log + per-item log writer
 │   │   ├── operations/                 # Clone/checkout/run operations + executor
 │   │   ├── provider/                   # Git provider credential management
 │   │   ├── resources/                  # Home dir, config dir, env file, template management

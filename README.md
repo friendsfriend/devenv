@@ -18,7 +18,7 @@ devenv-cli/
 │       ├── git/           # Git repository operations
 │       ├── github/        # GitHub API client
 │       ├── gitlab/        # GitLab API client
-│       ├── logging/       # Status log + per-app log writer
+│       ├── logging/       # Status log + per-item log writer
 │       ├── operations/    # Clone/checkout/run operations + executor
 │       ├── provider/      # Git provider credential management
 │       ├── resources/     # Home dir, config dir, env file, templates
@@ -84,7 +84,7 @@ Task-focused guides are available from the TUI Help view (`?`) and linked below:
 - [Using AI Features](tui/packages/cli/src/tui/guides/using-ai-features.md) — pi session view, sessions, pi integration
 - [Using Git Integrations](tui/packages/cli/src/tui/guides/using-git-integrations.md) — Providers, Change Request browsing, diff, discussions, approvals, AI review, pipelines, test results
 - [Using the Log Viewer](tui/packages/cli/src/tui/guides/using-log-viewer.md) — Container logs, operation logs, search, visual mode, keyboard shortcuts
-- [Finding Logs](tui/packages/cli/src/tui/guides/finding-logs.md) — Log directory structure, status log format, per-app logs, server log
+- [Finding Logs](tui/packages/cli/src/tui/guides/finding-logs.md) — Log directory structure, status log format, per-item logs, server log
 
 ### Run
 
@@ -170,7 +170,7 @@ All configuration lives outside the repository in `~/.config/devenv/`. The serve
 ├── libraries/
 │   ├── definitions/                     # Per-library JSON definitions
 │   └── build/                           # Library build helpers (optional)
-├── templates/                           # Template files (copied into app directories)
+├── templates/                           # Template files (copied into repository directories)
 ```
 
 Task collections live under `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`), not in the config directory. If you share `~/.config/devenv` as a config repository, sync tasks separately:
@@ -564,7 +564,7 @@ Optional directory for build helpers and shared Dockerfile snippets used across 
 
 ### `templates/`
 
-Template files that are copied into app directories during initialization. All files in this directory (non-recursive) are copied to the target app directory when setting up a new app.
+Template files that are copied into repository directories during initialization. All files in this directory (non-recursive) are copied to the target repository directory when setting up a new repository.
 
 ### `scripts/`
 
@@ -722,7 +722,7 @@ The home directory (default `~/devenv`) is where repositories are cloned and ope
 
 ```
 ~/devenv/
-├── <app-localDirectoryPath>/   # Cloned app repositories
+├── <repository-localDirectoryPath>/   # Cloned repositories
 ├── logs/
 │   ├── status.log              # Operation status log (structured)
 │   └── <app-ident>.log         # Per-app command output logs
@@ -830,7 +830,7 @@ Runtime worktree state (active worktree and main branch) is stored outside the d
 
 | Endpoint | Method | Description |
 |---|---|---|
-| `/api/git/worktrees?appIdent=...` | GET | List all worktrees for an app (branch, path, isMain, active) |
+| `/api/git/worktrees?appIdent=...` | GET | List all worktrees for a repository (branch, path, isMain, active) |
 | `/api/git/worktrees?appIdent=...&branch=...` | DELETE | Remove a linked worktree (active and primary worktrees are protected) |
 | `/api/git/checkout?appIdent=...&branch=...` | POST | Create or activate a worktree for the branch |
 
@@ -875,4 +875,4 @@ bun run build:single   # Current platform only
 ### Debugging
 
 - **Server logs:** `<devenv_home>/logs/status.log`
-- **App logs:** `<devenv_home>/logs/<app-ident>.log`
+- **Item logs:** `<devenv_home>/logs/<item-ident>.log`

@@ -4,7 +4,7 @@ Worktree mode gives each branch its own directory, so you can switch instantly a
 
 ## 1. Single checkout vs worktrees
 
-By default, DevEnv manages one checkout per app — switching branches modifies the working tree in-place. **Worktree mode** gives each branch its own permanent directory:
+By default, DevEnv manages one checkout per repository — switching branches modifies the working tree in-place. **Worktree mode** gives each branch its own permanent directory:
 
 ```
 $DEVENV_HOME/

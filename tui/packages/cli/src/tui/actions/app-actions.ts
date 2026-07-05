@@ -222,11 +222,11 @@ export function createAppActions(
 
       closeAddTaskModal();
       await loadScripts(result.relativePath);
-      getLogger().write('INFO', `Script ${result.operation} succeeded: ${result.relativePath}`);
+      getLogger().write('INFO', `Task ${result.operation} succeeded: ${result.relativePath}`);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown error';
       uiStore.setTaskAddError(message);
-      getLogger().write('WARN', `Script add failed: ${message}`);
+      getLogger().write('WARN', `Task add failed: ${message}`);
     }
   };
 
@@ -322,9 +322,9 @@ export function createAppActions(
     try {
       const result = await client.deleteScript(relativePath);
       await loadScripts(parentScriptPath(result.relativePath));
-      getLogger().write('INFO', `Script target deleted: ${result.relativePath}`);
+      getLogger().write('INFO', `Task target deleted: ${result.relativePath}`);
     } catch (e) {
-      showError('Delete Script Failed', e instanceof Error ? e.message : 'Unknown error');
+      showError('Delete Task Failed', e instanceof Error ? e.message : 'Unknown error');
     }
   };
 
@@ -334,12 +334,12 @@ export function createAppActions(
     if (!selected || !selected.scriptRelativePath) return;
 
     if (selected.resourceType === 'script-file') {
-      uiStore.setConfirmDialogTitle('Delete Script');
+      uiStore.setConfirmDialogTitle('Delete Task');
       uiStore.setConfirmDialogMessage(
         `Delete task "${selected.displayName}" (${selected.scriptRelativePath})? This cannot be undone.`,
       );
     } else if (selected.resourceType === 'script-folder') {
-      uiStore.setConfirmDialogTitle('Delete Script Folder');
+      uiStore.setConfirmDialogTitle('Delete Task Folder');
       uiStore.setConfirmDialogMessage(
         `Delete folder "${selected.displayName}" (${selected.scriptRelativePath}) and all nested task files? This cannot be undone.`,
       );

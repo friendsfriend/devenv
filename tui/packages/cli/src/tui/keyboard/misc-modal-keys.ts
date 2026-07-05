@@ -60,7 +60,7 @@ export async function handleMiscModalKeys(
     return true; // Consume all other keys while picker is open
   }
 
-  // Script add modal keyboard handler
+  // Task add modal keyboard handler
   if (uiStore.showTaskAddModal()) {
     const mode = uiStore.taskAddMode();
     const fieldCount = mode === 'link' ? 3 : 2; // mode + target (+ source)
@@ -135,7 +135,7 @@ export async function handleMiscModalKeys(
     return true;
   }
 
-  // Script args modal keyboard handler
+  // Task args modal keyboard handler
   if (uiStore.showTaskArgsModal()) {
     const params = uiStore.taskArgsParameters();
     const selectedParam = params[Math.max(0, Math.min(uiStore.taskArgsSelectedIndex(), Math.max(0, params.length - 1)))];

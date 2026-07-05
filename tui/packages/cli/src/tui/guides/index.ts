@@ -110,7 +110,7 @@ export const guides: Guide[] = [
   {
     key: "finding-logs",
     title: "Finding Logs",
-    description: "Log directory structure, status log format, per-app logs, server log",
+    description: "Log directory structure, status log format, per-item logs, server log",
     category: "Logs",
     import: () => import("./finding-logs.md", { with: { type: "text" } }).then((m) => m.default),
   },

@@ -223,7 +223,7 @@ Use:
 - `# syntax=docker/dockerfile:1.7` only when using BuildKit-style mounts
 - cache mounts only if your Podman version supports them
 - cache-friendly `COPY lockfiles -> install -> COPY source` order
-- `.dockerignore` in each app repo
+- `.dockerignore` in each repository
 - multi-stage builds for small final images
 
 Avoid:

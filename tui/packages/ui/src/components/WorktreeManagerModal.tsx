@@ -53,7 +53,7 @@ function WorktreeRow(props: {
 }
 
 /**
- * WorktreeManagerModal — lists all worktrees for a scoped application.
+ * WorktreeManagerModal — lists all worktrees for a scoped repository.
  * Navigation and deletion are handled by worktree-manager-keys.ts.
  */
 export function WorktreeManagerModal(props: WorktreeManagerModalProps) {
@@ -75,7 +75,7 @@ export function WorktreeManagerModal(props: WorktreeManagerModalProps) {
       reservedHeight={4}
       scrollIndicatorLabel="worktrees"
       emptyContent={
-        <text fg={uiColors.textSecondary}>No worktrees found for this application.</text>
+        <text fg={uiColors.textSecondary}>No worktrees found for this repository.</text>
       }
       renderItem={(worktree, isSelected) => (
         <WorktreeRow worktree={worktree} isSelected={isSelected()} />
