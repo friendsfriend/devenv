@@ -42,7 +42,13 @@ import {
 	createShellActionScript,
 	getActionTargets,
 	getContainerLogs,
+	createKubernetesCluster,
+	deleteKubernetesCluster,
+	exportKubernetesKubeconfig,
+	getKubernetesClusterStatus,
 	getKubernetesLogs,
+	recreateKubernetesCluster,
+	refreshKubernetesCluster,
 	restartContainer,
 	runApp,
 	startApp,
@@ -617,6 +623,24 @@ export class DevEnvClient {
 	}
 	getKubernetesLogs(appIdent: string): Promise<string> {
 		return getKubernetesLogs(this.deps, appIdent);
+	}
+	getKubernetesClusterStatus(): Promise<import("@devenv/types").KubernetesClusterStatus> {
+		return getKubernetesClusterStatus(this.deps);
+	}
+	createKubernetesCluster(): Promise<import("@devenv/types").KubernetesClusterStatus | void> {
+		return createKubernetesCluster(this.deps);
+	}
+	deleteKubernetesCluster(): Promise<import("@devenv/types").KubernetesClusterStatus | void> {
+		return deleteKubernetesCluster(this.deps);
+	}
+	recreateKubernetesCluster(): Promise<import("@devenv/types").KubernetesClusterStatus | void> {
+		return recreateKubernetesCluster(this.deps);
+	}
+	exportKubernetesKubeconfig(): Promise<void> {
+		return exportKubernetesKubeconfig(this.deps);
+	}
+	refreshKubernetesCluster(): Promise<import("@devenv/types").KubernetesClusterStatus> {
+		return refreshKubernetesCluster(this.deps);
 	}
 	getProfiles(
 		appIdent: string,

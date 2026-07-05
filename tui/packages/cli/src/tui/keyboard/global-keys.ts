@@ -42,8 +42,7 @@ const copyText = async (text: string, uiStore: KeyboardStores['uiStore']): Promi
   const { copyToClipboard } = await import('@devenv/core');
   const success = copyToClipboard(text);
   if (success) {
-    uiStore.setCopyStatus('✓ Copied');
-    setTimeout(() => uiStore.setCopyStatus(null), 2000);
+    uiStore.setNotification('Copied', 'success');
   }
   return success;
 };
@@ -77,8 +76,7 @@ export async function handleGlobalKeys(
     const next = !uiStore.runningTextEnabled();
     uiStore.setRunningTextEnabled(next);
     uiStore.setRunningTextOffset(0);
-    uiStore.setCopyStatus(next ? '✓ Running text on' : '✗ Running text off');
-    setTimeout(() => uiStore.setCopyStatus(null), 2000);
+    uiStore.setNotification(next ? 'Running text on' : 'Running text off', 'info');
     return true;
   }
 
@@ -109,8 +107,7 @@ export async function handleGlobalKeys(
       const text = `${uiStore.errorDialogTitle()}\n\n${uiStore.errorDialogMessage()}`;
       const success = copyToClipboard(text);
       if (success) {
-        uiStore.setCopyStatus('✓ Copied');
-        setTimeout(() => uiStore.setCopyStatus(null), 2000);
+        uiStore.setNotification('Copied', 'success');
       }
       return true;
     }
@@ -215,8 +212,7 @@ export async function handleGlobalKeys(
       if (selected && applyTheme(selected)) {
         uiStore.setActiveThemeName(selected);
         saveThemeName(selected);
-        uiStore.setCopyStatus(`✓ Theme: ${selected}`);
-        setTimeout(() => uiStore.setCopyStatus(null), 2000);
+        uiStore.setNotification(`Theme: ${selected}`, 'success');
       }
       uiStore.setThemePickerFilterActive(false);
       uiStore.setThemePickerFilterQuery('');

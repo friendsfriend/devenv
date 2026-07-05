@@ -58,7 +58,7 @@ export interface ContentRouterProps {
 	runningTextEnabled?: boolean;
 	runningTextOffset?: number;
 	getTabBorderColor: (
-		tab: "applications" | "infrastructure" | "libraries" | "scripts",
+		tab: "applications" | "infrastructure" | "libraries" | "scripts" | "kubernetes",
 	) => string;
 }
 

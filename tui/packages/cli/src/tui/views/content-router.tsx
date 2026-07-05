@@ -1,4 +1,5 @@
-import { Show } from 'solid-js';
+import { createEffect, For, Show } from 'solid-js';
+import { TextAttributes } from '@opentui/core';
 import {
 	RepositoryTable,
 	InfrastructureTable,
@@ -21,6 +22,7 @@ import {
 	uiColors,
 	LAYOUT_CHROME_LINES,
 	ContentStack,
+	KubernetesClusterView,
 } from '@devenv/ui';
 import { getGuide, guides as allGuides } from "../guides";
 import type { ContentRouterProps } from "./types";
@@ -29,16 +31,23 @@ import { StartupSplash } from "./startup-splash";
 export function ContentRouter(props: ContentRouterProps) {
 	const { appStore, issueStore, changeRequestStore, providerStore, appDetailStore } =
 		props.stores;
-	const { helpActions, issueActions, pipelineActions, logActions, crActions } =
+	const { helpActions, issueActions, pipelineActions, logActions, crActions, dockerActions } =
 		props.actions;
+
+	// Fetch once on tab activation — subsequent updates arrive via SSE kubernetes.cluster.refreshed
+	createEffect(() => {
+		if (appStore.activeTab() !== "kubernetes" || appStore.viewMode() !== "table") return;
+		void dockerActions.refreshKubernetesCluster();
+	});
 
 	// Table shares content area with StatusLogView (6 lines below it).
 	// Include three 1-line gutters: header-tabs, table-log, log-footer.
 	const STATUS_LOG_HEIGHT = 6;
 	const TABLE_VIEW_GUTTERS = 3;
+	const TAB_BAR_LINES = 3;
 	const availableTableLines = Math.max(
 		1,
-		props.dimensions.height - LAYOUT_CHROME_LINES - STATUS_LOG_HEIGHT - TABLE_VIEW_GUTTERS,
+		props.dimensions.height - LAYOUT_CHROME_LINES - STATUS_LOG_HEIGHT - TABLE_VIEW_GUTTERS - TAB_BAR_LINES,
 	);
 	const tableColumns = () =>
 		appStore.activeTab() === "scripts"
@@ -70,6 +79,7 @@ export function ContentRouter(props: ContentRouterProps) {
 				<IssueView
 					issues={changeRequestStore.changeRequestLinkedIssues()}
 					selectedIndex={changeRequestStore.selectedChangeRequestLinkedIssueIndex()}
+					onSelectedIndexChange={changeRequestStore.setSelectedCrLinkedIssueIndex}
 					runningTextEnabled={props.runningTextEnabled}
 					runningTextOffset={props.runningTextOffset}
 					loading={changeRequestStore.changeRequestLinkedIssuesLoading()}
@@ -88,6 +98,7 @@ export function ContentRouter(props: ContentRouterProps) {
 				<IssueView
 					issues={issueStore.referencedIssues()}
 					selectedIndex={issueStore.selectedReferencedIssueIndex()}
+					onSelectedIndexChange={issueStore.setSelectedReferencedIssueIndex}
 					runningTextEnabled={props.runningTextEnabled}
 					runningTextOffset={props.runningTextOffset}
 					loading={issueStore.referencedIssuesLoading()}
@@ -337,6 +348,7 @@ export function ContentRouter(props: ContentRouterProps) {
 													<ChangeRequestView
 														changeRequests={changeRequestStore.changeRequests()}
 														selectedIndex={changeRequestStore.selectedChangeRequestIndex()}
+														onSelectedIndexChange={changeRequestStore.setSelectedCRIndex}
 														onClose={() => {
 															appStore.setViewMode("table");
 															changeRequestStore.setChangeRequests([]);
@@ -398,6 +410,7 @@ export function ContentRouter(props: ContentRouterProps) {
 									<IssueView
 										issues={issueStore.issues()}
 										selectedIndex={issueStore.selectedIssueIndex()}
+										onSelectedIndexChange={issueStore.setSelectedIssueIndex}
 										loading={issueStore.issueLoading()}
 										error={issueStore.issueError()}
 										currentPage={issueStore.currentPage()}
@@ -496,31 +509,76 @@ export function ContentRouter(props: ContentRouterProps) {
 										overflow: "hidden",
 									}}
 								>
-									{(() => {
-										const TableComponent = appStore.activeTab() === "scripts"
-											? TaskTable
-											: appStore.activeTab() === "infrastructure"
-												? InfrastructureTable
-												: RepositoryTable;
-										return <TableComponent
-											apps={appStore.tableFilteredApps()}
-											columns={tableColumns()}
-											selectedIndex={appStore.selectedIndex()}
-											onSelect={appStore.setSelectedIndex}
-											showBorder={true}
-											availableLines={availableTableLines}
-											tabs={appStore.tableTabs()}
-											activeTab={appStore.activeTab()}
-											onTabChange={appStore.setActiveTab}
-											getTabBorderColor={props.getTabBorderColor}
-											searchMode={appStore.tableSearchMode()}
-											searchQuery={appStore.tableSearchQuery()}
-											spinnerFrames={props.spinnerFrames}
-											spinnerFrame={appStore.spinnerFrame}
-											runningTextEnabled={props.runningTextEnabled}
-											runningTextOffset={props.runningTextOffset}
-										/>;
-									})()}
+									<Show when={appStore.tableTabs().length > 0}>
+									<box
+										backgroundColor={uiColors.bgBase}
+										style={{
+											width: "100%",
+											flexDirection: "row",
+											gap: 1,
+										}}
+									>
+										<For each={appStore.tableTabs()}>
+											{(tab) => {
+												const isActive = () => appStore.activeTab() === tab.id;
+												return (
+													<box
+														backgroundColor={isActive() ? uiColors.bgSurface0 : uiColors.bgMantle}
+														onMouseUp={() => appStore.setActiveTab(tab.id)}
+														style={{
+															paddingLeft: 2,
+															paddingRight: 2,
+															height: 3,
+															alignItems: "center",
+															justifyContent: "center",
+														}}
+													>
+														<text
+															fg={isActive() ? uiColors.primary : uiColors.textMuted}
+															attributes={isActive() ? TextAttributes.BOLD : undefined}
+														>
+															{tab.label}
+															{tab.count !== undefined ? ` (${tab.count})` : ""}
+														</text>
+													</box>
+												);
+											}}
+										</For>
+									</box>
+									</Show>
+									<Show
+										when={appStore.activeTab() === "kubernetes"}
+										fallback={(() => {
+											const TableComponent = appStore.activeTab() === "scripts"
+												? TaskTable
+												: appStore.activeTab() === "infrastructure"
+													? InfrastructureTable
+													: RepositoryTable;
+											return <TableComponent
+												apps={appStore.tableFilteredApps()}
+												columns={tableColumns()}
+												selectedIndex={appStore.selectedIndex()}
+												onSelect={appStore.setSelectedIndex}
+												showBorder={true}
+												availableLines={availableTableLines}
+												searchMode={appStore.tableSearchMode()}
+												searchQuery={appStore.tableSearchQuery()}
+												spinnerFrames={props.spinnerFrames}
+												spinnerFrame={appStore.spinnerFrame}
+												runningTextEnabled={props.runningTextEnabled}
+												runningTextOffset={props.runningTextOffset}
+											/>;
+										})()}
+									>
+										<KubernetesClusterView
+											status={appStore.kubernetesClusterStatus()}
+											loading={appStore.kubernetesClusterLoading()}
+											error={appStore.kubernetesClusterError()}
+											cpuHistory={appStore.kubernetesCPUHistory()}
+											memoryHistory={appStore.kubernetesMemoryHistory()}
+											height={availableTableLines}
+										/>
+									</Show>
 								</box>,
 								<box style={{ flexShrink: 0 }}>
 									<StatusLogView

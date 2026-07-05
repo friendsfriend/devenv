@@ -14,6 +14,7 @@ interface ChangeRequestViewProps {
   selectedIndex: number;
   onClose: () => void;
   onSelectCR?: (cr: ChangeRequest) => void;
+  onSelectedIndexChange?: (index: number) => void;
   loading?: boolean;
   error?: string;
   searchMode?: boolean;
@@ -62,6 +63,15 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
       : `[Pg ${cp}] [${loaded} loaded]`;
   });
 
+  const scrollSelection = (direction: 'up' | 'down' | 'left' | 'right', delta: number) => {
+    if (!props.onSelectedIndexChange || props.changeRequests.length === 0) return;
+    const amount = Math.max(1, delta);
+    const next = direction === 'down' || direction === 'right'
+      ? props.selectedIndex + amount
+      : props.selectedIndex - amount;
+    props.onSelectedIndexChange(Math.max(0, Math.min(next, props.changeRequests.length - 1)));
+  };
+
   return (
     <ContentPanel>
       <Show when={props.loading}>
@@ -93,6 +103,7 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
               reservedLines={RESERVED_LINES}
               estimatedItemHeight={2}
               showScrollIndicator={false}
+              onScroll={scrollSelection}
               renderItem={(cr, isSelected, index) => {
                 const mergeStatus = getMergeStatusText(cr);
                 const pipeline = cr.head_pipeline?.status || '-';

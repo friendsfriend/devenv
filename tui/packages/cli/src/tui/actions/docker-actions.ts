@@ -205,11 +205,105 @@ export function createDockerActions(
     await performAppAction('build');
   };
 
+  const refreshKubernetesCluster = async () => {
+    appStore.setKubernetesClusterLoading(true);
+    appStore.setKubernetesClusterError(null);
+    try {
+      const status = await client.getKubernetesClusterStatus();
+      appStore.setKubernetesClusterStatus(status);
+      if (!status.exists) {
+        appStore.setKubernetesCPUHistory([]);
+        appStore.setKubernetesMemoryHistory([]);
+      } else if (status.stats) {
+        appStore.setKubernetesCPUHistory((history) => [...history.slice(-29), status.stats!.cpuPercent]);
+        appStore.setKubernetesMemoryHistory((history) => [...history.slice(-29), status.stats!.memoryPercent]);
+      }
+    } catch (e) {
+      appStore.setKubernetesClusterError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      appStore.setKubernetesClusterLoading(false);
+    }
+  };
+
+  const createCluster = async () => {
+    uiStore.setLoadingModalMessage('Creating Kubernetes cluster...');
+    uiStore.setShowLoadingModal(true);
+    try {
+      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in_progress', Message: 'Creating managed kind cluster...' });
+      await client.createKubernetesCluster();
+      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'completed', Message: 'Kubernetes cluster ready' });
+      await refreshKubernetesCluster();
+    } catch (e) {
+      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'failed', Message: e instanceof Error ? e.message : 'Unknown error' });
+      showError('Kubernetes Create Failed', e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      uiStore.setShowLoadingModal(false);
+    }
+  };
+
+  const exportKubeconfig = async () => {
+    try {
+      await client.exportKubernetesKubeconfig();
+      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'completed', Message: 'Kubeconfig exported for kind-devenv' });
+      uiStore.setNotification('Kubeconfig exported for kind-devenv', 'info');
+    } catch (e) {
+      showError('Kubeconfig Export Failed', e instanceof Error ? e.message : 'Unknown error');
+    }
+  };
+
+  const requestDeleteCluster = () => {
+    uiStore.setConfirmDialogTitle('Delete Kubernetes Cluster');
+    uiStore.setConfirmDialogMessage('Delete managed kind cluster kind-devenv?\n\nThis removes all in-cluster resources, namespaces, workloads, and DevEnv releases.');
+    uiStore.setConfirmDialogAction(() => async () => {
+      uiStore.setLoadingModalMessage('Deleting Kubernetes cluster...');
+      uiStore.setShowLoadingModal(true);
+      try {
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in_progress', Message: 'Deleting managed kind cluster...' });
+        await client.deleteKubernetesCluster();
+        appStore.setKubernetesCPUHistory([]);
+        appStore.setKubernetesMemoryHistory([]);
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'completed', Message: 'Kubernetes cluster deleted' });
+        await refreshKubernetesCluster();
+      } catch (e) {
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'failed', Message: e instanceof Error ? e.message : 'Unknown error' });
+        showError('Kubernetes Delete Failed', e instanceof Error ? e.message : 'Unknown error');
+      } finally {
+        uiStore.setShowLoadingModal(false);
+      }
+    });
+    uiStore.setShowConfirmDialog(true);
+  };
+
+  const requestRecreateCluster = () => {
+    uiStore.setConfirmDialogTitle('Recreate Kubernetes Cluster');
+    uiStore.setConfirmDialogMessage('Recreate managed kind cluster kind-devenv?\n\nThis deletes the existing cluster and removes all in-cluster resources before creating a fresh cluster.');
+    uiStore.setConfirmDialogAction(() => async () => {
+      uiStore.setLoadingModalMessage('Recreating Kubernetes cluster...');
+      uiStore.setShowLoadingModal(true);
+      try {
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in_progress', Message: 'Deleting managed kind cluster...' });
+        await client.deleteKubernetesCluster();
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in_progress', Message: 'Creating fresh kind cluster...' });
+        await client.createKubernetesCluster();
+        appStore.setKubernetesCPUHistory([]);
+        appStore.setKubernetesMemoryHistory([]);
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'completed', Message: 'Kubernetes cluster recreated' });
+        await refreshKubernetesCluster();
+      } catch (e) {
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'failed', Message: e instanceof Error ? e.message : 'Unknown error' });
+        showError('Kubernetes Recreate Failed', e instanceof Error ? e.message : 'Unknown error');
+      } finally {
+        uiStore.setShowLoadingModal(false);
+      }
+    });
+    uiStore.setShowConfirmDialog(true);
+  };
+
   const performTest = async () => {
     await performAppAction('test');
   };
 
-  return { requestDockerOperation, performDockerOperation, performBuild, performTest, performAppAction, runSelectedTarget };
+  return { requestDockerOperation, performDockerOperation, performBuild, performTest, performAppAction, runSelectedTarget, refreshKubernetesCluster, createCluster, exportKubeconfig, requestDeleteCluster, requestRecreateCluster };
 }
 
 export type DockerActions = ReturnType<typeof createDockerActions>;

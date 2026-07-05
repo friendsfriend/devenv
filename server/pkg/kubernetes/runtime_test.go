@@ -32,6 +32,19 @@ func TestRunnerPreflightMissingTool(t *testing.T) {
 	}
 }
 
+func TestRunnerKindLifecycleCommands(t *testing.T) {
+	r := NewRunner(docker.Runtime{Name: "docker", Command: "docker"})
+	if got := r.KindCreateClusterCommand().Args; !reflect.DeepEqual(got, []string{"create", "cluster", "--name", "devenv"}) {
+		t.Fatalf("create args = %#v", got)
+	}
+	if got := r.KindDeleteClusterCommand().Args; !reflect.DeepEqual(got, []string{"delete", "cluster", "--name", "devenv"}) {
+		t.Fatalf("delete args = %#v", got)
+	}
+	if got := r.KindExportKubeconfigCommand().Args; !reflect.DeepEqual(got, []string{"export", "kubeconfig", "--name", "devenv"}) {
+		t.Fatalf("export args = %#v", got)
+	}
+}
+
 func TestRunnerProviderEnv(t *testing.T) {
 	dockerRunner := NewRunner(docker.Runtime{Name: "docker", Command: "docker"})
 	if env := dockerRunner.KindCreateClusterCommand().Env; len(env) != 0 {
@@ -43,5 +56,8 @@ func TestRunnerProviderEnv(t *testing.T) {
 	}
 	if env := podmanRunner.KindLoadImageCommand("app:dev").Env; !reflect.DeepEqual(env, []string{"KIND_EXPERIMENTAL_PROVIDER=podman"}) {
 		t.Fatalf("podman load env = %#v", env)
+	}
+	if env := podmanRunner.KindDeleteClusterCommand().Env; !reflect.DeepEqual(env, []string{"KIND_EXPERIMENTAL_PROVIDER=podman"}) {
+		t.Fatalf("podman delete env = %#v", env)
 	}
 }

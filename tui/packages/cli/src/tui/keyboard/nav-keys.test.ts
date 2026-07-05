@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
+import { isDownKey, isEnterKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
 import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 import type { KeyboardEvent } from './types';
 
@@ -21,5 +21,13 @@ describe('keyboard navigation helpers', () => {
     expect(isUpKey(shiftK)).toBe(false);
     expect(isNextRelatedKey(shiftJ)).toBe(true);
     expect(isPreviousRelatedKey(shiftK)).toBe(true);
+  });
+
+  test('enter helper accepts named and raw return events', () => {
+    expect(isEnterKey(key('return', '\r'))).toBe(true);
+    expect(isEnterKey(key('enter', '\n'))).toBe(true);
+    expect(isEnterKey({ sequence: '\r' } as KeyboardEvent)).toBe(true);
+    expect(isEnterKey({ raw: '\n' } as KeyboardEvent)).toBe(true);
+    expect(isEnterKey(key('j'))).toBe(false);
   });
 });

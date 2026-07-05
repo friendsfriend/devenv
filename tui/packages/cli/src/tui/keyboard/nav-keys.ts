@@ -11,3 +11,13 @@ export const isLeftKey = (event: KeyboardEvent) =>
 
 export const isRightKey = (event: KeyboardEvent) =>
   !event.shift && (event.name === 'l' || event.sequence === 'l' || event.name === 'right' || event.name === 'Right');
+
+export const isEnterKey = (event: KeyboardEvent) =>
+  event.name === 'return' ||
+  event.name === 'Return' ||
+  event.name === 'enter' ||
+  event.name === 'Enter' ||
+  event.sequence === '\r' ||
+  event.sequence === '\n' ||
+  event.raw === '\r' ||
+  event.raw === '\n';

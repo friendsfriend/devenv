@@ -1,7 +1,7 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 import { guides as allGuides } from '../guides';
 
-import { isDownKey, isUpKey } from './nav-keys';
+import { isDownKey, isEnterKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for miscellaneous modals and views:
  * - Passphrase modal (ESC to cancel, Enter to submit, text input)
@@ -140,7 +140,7 @@ export async function handleMiscModalKeys(
     const params = uiStore.taskArgsParameters();
     const selectedParam = params[Math.max(0, Math.min(uiStore.taskArgsSelectedIndex(), Math.max(0, params.length - 1)))];
     const isEsc = event.name === 'escape' || event.name === 'Escape' || event.name === 'esc' || event.sequence === '\x1b' || event.raw === '\x1b';
-    const isEnter = event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter';
+    const isEnter = isEnterKey(event);
     const isLeft = event.name === 'left' || event.name === 'Left' || event.name === 'h';
     const isRight = event.name === 'right' || event.name === 'Right' || event.name === 'l' || event.name === 'tab';
     const isEditTrigger = event.name === 'i' || event.sequence === ' ';

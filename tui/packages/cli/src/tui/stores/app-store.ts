@@ -2,6 +2,7 @@ import { createMemo, createSignal } from 'solid-js';
 import type {
 	App,
 	InfraService,
+	KubernetesClusterStatus,
 	ScriptNode,
 	ScriptVisibleRow,
 	StatusLogEntry,
@@ -35,7 +36,8 @@ export type TabType =
 	| "applications"
 	| "infrastructure"
 	| "libraries"
-	| "scripts";
+	| "scripts"
+	| "kubernetes";
 
 type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
 type TableSortDirection = "asc" | "desc" | "none";
@@ -140,6 +142,11 @@ function sortApps(items: TableRow[], rules: TableSortRule[]): TableRow[] {
 export function createAppStore() {
 	const [apps, setApps] = createSignal<App[]>([]);
 	const [infraServices, setInfraServices] = createSignal<InfraService[]>([]);
+	const [kubernetesClusterStatus, setKubernetesClusterStatus] = createSignal<KubernetesClusterStatus | null>(null);
+	const [kubernetesClusterLoading, setKubernetesClusterLoading] = createSignal(false);
+	const [kubernetesClusterError, setKubernetesClusterError] = createSignal<string | null>(null);
+	const [kubernetesCPUHistory, setKubernetesCPUHistory] = createSignal<number[]>([]);
+	const [kubernetesMemoryHistory, setKubernetesMemoryHistory] = createSignal<number[]>([]);
 	const [loading, setLoading] = createSignal(true);
 	const [error, setError] = createSignal<string | null>(null);
 	const [viewMode, setViewMode] = createSignal<ViewMode>("table");
@@ -162,7 +169,7 @@ export function createAppStore() {
 	const [tableFilterValueIndex, setTableFilterValueIndex] = createSignal(0);
 	const [tableFilterFocusedPane, setTableFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
 	const [tableFiltersByTab, setTableFiltersByTab] = createSignal<Record<TabType, Record<string, string[]>>>(
-		{ applications: {}, infrastructure: {}, libraries: {}, scripts: {} },
+		{ applications: {}, infrastructure: {}, libraries: {}, scripts: {}, kubernetes: {} },
 	);
 	const [showTableSortModal, setShowTableSortModal] = createSignal(false);
 	const [tableSortSelectedIndex, setTableSortSelectedIndex] = createSignal(0);
@@ -182,6 +189,7 @@ export function createAppStore() {
 		infrastructure: appSortRules(),
 		libraries: appSortRules(),
 		scripts: scriptSortRules(),
+		kubernetes: appSortRules(),
 	});
 	const [statusLogEntries, setStatusLogEntries] = createSignal<
 		StatusLogEntry[]
@@ -279,6 +287,7 @@ export function createAppStore() {
 		if (tab === "applications") return allApps.filter((app) => app.appType === "APP").map((app) => ({ ...app, rowKind: "app" as const }));
 		if (tab === "libraries") return allApps.filter((app) => app.appType === "LIB").map((app) => ({ ...app, rowKind: "app" as const }));
 		if (tab === "scripts") return scriptRows();
+		if (tab === "kubernetes") return [];
 		if (tab === "infrastructure") {
 			return infraServices().map((svc): TableRow => ({
 				rowKind: "infra",
@@ -367,6 +376,7 @@ export function createAppStore() {
 				count: allApps.filter((app) => app.appType === "LIB").length,
 			},
 			{ id: "scripts", label: "Tasks", count: scriptVisibleRows().length },
+			{ id: "kubernetes", label: "Kubernetes", count: kubernetesClusterStatus()?.exists ? 1 : 0 },
 		];
 	});
 
@@ -379,6 +389,16 @@ export function createAppStore() {
 		setApps,
 		infraServices,
 		setInfraServices,
+		kubernetesClusterStatus,
+		setKubernetesClusterStatus,
+		kubernetesClusterLoading,
+		setKubernetesClusterLoading,
+		kubernetesClusterError,
+		setKubernetesClusterError,
+		kubernetesCPUHistory,
+		setKubernetesCPUHistory,
+		kubernetesMemoryHistory,
+		setKubernetesMemoryHistory,
 		loading,
 		startupState,
 		setStartupState,

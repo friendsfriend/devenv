@@ -116,6 +116,26 @@ export function createAppActions(
           );
         }
 
+        if (event.type === 'kubernetes.cluster.refreshed') {
+          const cStatus = event.properties as unknown as import('@devenv/types').KubernetesClusterStatus;
+          if (cStatus && cStatus.clusterName) {
+            appStore.setKubernetesClusterStatus(cStatus);
+            appStore.setKubernetesClusterError(null);
+            if (cStatus.stats) {
+              appStore.setKubernetesCPUHistory((h) => [...h.slice(-29), cStatus.stats!.cpuPercent]);
+              appStore.setKubernetesMemoryHistory((h) => [...h.slice(-29), cStatus.stats!.memoryPercent]);
+            }
+
+          }
+          continue;
+        }
+
+        if (event.type === 'kubernetes.cluster.deleted') {
+          appStore.setKubernetesCPUHistory([]);
+          appStore.setKubernetesMemoryHistory([]);
+          continue;
+        }
+
         if (event.type === 'statuslog.entry') {
           const { timestamp, appIdent, appName, operation, status, message } = event.properties;
           const entry: StatusLogEntry = {

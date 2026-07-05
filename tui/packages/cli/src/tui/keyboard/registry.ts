@@ -50,7 +50,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	// ========== table — Navigation ==========
 	{ keys: ["↑", "k"], description: "Move selection up", context: "table", category: "Navigation" },
 	{ keys: ["↓", "j"], description: "Move selection down", context: "table", category: "Navigation" },
-	{ keys: ["Tab", "1", "2", "3", "4"], description: "Switch tab (Applications/Infrastructure/Libraries/Tasks)", context: "table", category: "Navigation" },
+	{ keys: ["Tab", "1", "2", "3", "4", "5"], description: "Switch tab (Applications/Infrastructure/Libraries/Tasks/Kubernetes)", context: "table", category: "Navigation" },
 
 	// ========== table — Actions ==========
 	{ keys: ["l"], description: "View container logs for selected item", footerDescription: "Logs", context: "table", category: "Actions" },
@@ -81,6 +81,16 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["r"], description: "Refresh status (non-tasks tab)", context: "table", category: "Docker" },
 	{ keys: ["b"], description: "Build application / toggle build logs while running", context: "table", category: "Docker" },
 	{ keys: ["t"], description: "Test application / toggle test logs while running", context: "table", category: "Docker" },
+
+	// ========== kubernetes ==========
+	{ keys: ["s"], description: "Create/start managed kind cluster", footerDescription: "Start", context: "kubernetes", category: "Kubernetes" },
+	{ keys: ["S"], description: "Delete/stop managed kind cluster", footerDescription: "Delete", context: "kubernetes", category: "Kubernetes" },
+	{ keys: ["R"], description: "Recreate managed kind cluster", footerDescription: "Recreate", context: "kubernetes", category: "Kubernetes" },
+	{ keys: ["r"], description: "Refresh Kubernetes cluster status", footerDescription: "Refresh", context: "kubernetes", category: "Kubernetes" },
+	{ keys: ["e"], description: "Export kubeconfig for managed kind cluster", footerDescription: "Export", context: "kubernetes", category: "Kubernetes" },
+	{ keys: ["9"], description: "Open k9s for managed Kubernetes cluster", footerDescription: "k9s", context: "kubernetes", category: "Kubernetes" },
+	{ keys: ["?"], description: "Show help", context: "kubernetes", category: "General" },
+	{ keys: ["q"], description: "Quit DevEnv", context: "kubernetes", category: "General" },
 
 	// ========== table — Git ==========
 	{ keys: ["p"], description: "Git pull", context: "table", category: "Git" },

@@ -15,6 +15,7 @@ interface IssueViewProps {
 	selectedIndex: number;
 	onClose?: () => void;
 	onSelectIssue?: (issue: Issue) => void;
+	onSelectedIndexChange?: (index: number) => void;
 	loading?: boolean;
 	error?: string;
 	searchMode?: boolean;
@@ -52,11 +53,18 @@ export function IssueView(props: IssueViewProps) {
 	const summary = () => {
 		const cp = props.currentPage ?? 1;
 		const tp = props.totalPages;
-		const scopeLabel = props.scope && props.scope !== "all" ? props.scope : "";
-		const stateLabel = props.state || "open";
 		const pageLabel = tp && tp > 0 ? `Pg ${cp}/${tp}` : `Pg ${cp}/?`;
 		const loadedLabel = `${props.issues.length} loaded`;
 		return `${pageLabel}  ${loadedLabel}`;
+	};
+
+	const scrollSelection = (direction: 'up' | 'down' | 'left' | 'right', delta: number) => {
+		if (!props.onSelectedIndexChange || props.issues.length === 0) return;
+		const amount = Math.max(1, delta);
+		const next = direction === 'down' || direction === 'right'
+			? props.selectedIndex + amount
+			: props.selectedIndex - amount;
+		props.onSelectedIndexChange(Math.max(0, Math.min(next, props.issues.length - 1)));
 	};
 
 	return (
@@ -93,6 +101,7 @@ export function IssueView(props: IssueViewProps) {
 							reservedLines={RESERVED_LINES}
 							estimatedItemHeight={2}
 							showScrollIndicator={false}
+							onScroll={scrollSelection}
 							renderItem={(issue, isSelected, index) => {
 								const labels = issue.labels ?? [];
 								const labelText = labels.length > 0

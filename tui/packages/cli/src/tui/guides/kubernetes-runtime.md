@@ -32,6 +32,25 @@ KIND_EXPERIMENTAL_PROVIDER=podman kind delete cluster --name devenv
 
 DevEnv always targets managed context `kind-devenv`. It never uses your current kube context for app/infra lifecycle commands.
 
+## Cluster management tab
+
+The Kubernetes tab shows the managed kind cluster state, provider, context, Kubernetes version, nodes, pod counts, namespaces, DevEnv Helm releases, and Docker/Podman node resource stats when available.
+
+Cluster controls live in the footer/help keybinds:
+
+- `s`: create/start the managed cluster and export kubeconfig
+- `S`: delete/stop the managed cluster after confirmation
+- `R`: recreate the cluster after confirmation
+- `r`: refresh cluster status
+- `e`: export kubeconfig for `kind-devenv`
+- `9`: open `k9s --context kind-devenv`
+
+Delete/stop runs `kind delete cluster --name devenv`. This is destructive: all in-cluster namespaces, workloads, volumes, and DevEnv Helm releases are removed. After successful deletion DevEnv stops tracked Kubernetes port-forwards, clears cached Kubernetes app run state, refreshes Kubernetes infrastructure/app status, and broadcasts updates so stopped state appears in the TUI.
+
+Lazy creation still works: starting a Kubernetes app or infrastructure target creates the managed cluster if missing and reuses it if already running. Explicitly creating the cluster first is optional.
+
+Custom kind config, node sizing, registry mirrors, and cluster resource setup are not part of this release and remain future work.
+
 ## Using the runtime
 
 Typical flow:

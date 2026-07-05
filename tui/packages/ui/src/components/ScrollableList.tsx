@@ -158,6 +158,9 @@ export interface ScrollableListProps<T> {
 
   /** Called each time the user types in the active filter input. */
   onFilterChange?: (query: string) => void;
+
+  /** Called when mouse wheel/trackpad scrolls over the list rows. */
+  onScroll?: (direction: 'up' | 'down' | 'left' | 'right', delta: number) => void;
 }
 
 /**
@@ -283,6 +286,14 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
     props.items.length > 0 &&
     visibleItems().length < props.items.length;
 
+  const handleMouseScroll = (event: any) => {
+    const direction = event.scroll?.direction;
+    if (!direction) return;
+    props.onScroll?.(direction, Math.max(1, Math.round(Math.abs(event.scroll?.delta ?? 1))));
+    event.preventDefault?.();
+    event.stopPropagation?.();
+  };
+
   /**
    * Top offset of the scrollbar thumb in terminal lines.
    * Proportional to how far into the list the visible window starts.
@@ -397,6 +408,7 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
            * The scrollbar is 1 char wide and only rendered when items overflow.
            */}
           <box
+            onMouseScroll={handleMouseScroll}
             style={{
               width: '100%',
               height: listAreaLines(),
