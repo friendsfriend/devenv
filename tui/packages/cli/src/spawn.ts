@@ -231,12 +231,13 @@ program
       console.error('Server failed to start: Health check timed out after retries');
       serverProcess.kill();
       await serverLogFile.close();
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
 
     await serverLogFile.close();
 
-    // Now spawn TUI in a separate process (like OpenCode does)
+    // Now spawn TUI in a separate process.
 
     // Determine the command to spawn TUI
     const bin = process.execPath;
@@ -260,8 +261,8 @@ program
       try { tuiProcess.kill(); } catch (e) { /* already gone */ }
     };
 
-    process.on('SIGINT', () => { killServer(); process.exit(0); });
-    process.on('SIGTERM', () => { killServer(); process.exit(0); });
+    process.on('SIGINT', () => { process.exitCode = 0; killServer(); });
+    process.on('SIGTERM', () => { process.exitCode = 0; killServer(); });
     process.on('exit', () => { killServer(); });
 
     // Wait for TUI to exit
@@ -283,7 +284,8 @@ program
     
     // Give it 1 second to shutdown gracefully
     await new Promise(resolve => setTimeout(resolve, 1000));
-    process.exit(tuiProcess.exitCode || 0);
+    process.exitCode = tuiProcess.exitCode || 0;
+    return;
   });
 
 program
@@ -362,7 +364,8 @@ program
       }
     }
     
-    process.exit(serverProcess.exitCode || 0);
+    process.exitCode = serverProcess.exitCode || 0;
+    return;
   });
 
 program.parse();

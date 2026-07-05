@@ -242,10 +242,10 @@ export async function handleIssueDetailKeys(
 		return true;
 	}
 
-	// M (Shift+M) - Open linked MRs sub-view
+	// M (Shift+M) - Open linked CRs sub-view
 	if ((event.name === "m" && event.shift) || event.name === "M") {
-		issueStore.setSelectedLinkedMRIndex(0);
-		issueActions.showLinkedMRsSubView();
+		issueStore.setSelectedLinkedCRIndex(0);
+		issueActions.showLinkedCRsSubView();
 		return true;
 	}
 

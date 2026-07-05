@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { isThemeJson, setActiveThemeName, setCustomThemes, setSystemTheme, themeNames, type ThemeJson } from "@devenv/ui";
+import { isThemeJson, setActiveThemeName, setCustomThemes, setSystemTheme, themeNames, type ThemeJson } from '@devenv/ui';
 
 const configDir = () => process.env.DEVENV_CONFIG_DIR || path.join(os.homedir(), ".config", "devenv");
 const settingsPath = () => path.join(configDir(), "tui.json");

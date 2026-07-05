@@ -1,17 +1,18 @@
-import { createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal } from 'solid-js';
 import type {
 	App,
 	InfraService,
 	ScriptNode,
 	ScriptVisibleRow,
 	StatusLogEntry,
-} from "@devenv/types";
-import type { TableTab } from "@devenv/ui";
+	TableRow,
+} from '@devenv/types';
+import type { TableTab } from '@devenv/ui';
 
 export type ViewMode =
 	| "table"
-	| "mergeRequests"
-	| "mergeRequestDetail"
+	| "changeRequests"
+	| "changeRequestDetail"
 	| "changedFiles"
 	| "discussionsView"
 	| "testResults"
@@ -25,9 +26,9 @@ export type ViewMode =
 	| "issueDetail"
 	| "issueTimeline"
 	| "issueScopePicker"
-	| "linkedMRs"
+	| "linkedChangeRequests"
 	| "referencedIssues"
-	| "mrLinkedIssues"
+	| "changeRequestLinkedIssues"
 	| "references";
 
 export type TabType =
@@ -36,8 +37,8 @@ export type TabType =
 	| "libraries"
 	| "scripts";
 
-export type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
-export type TableSortDirection = "asc" | "desc" | "none";
+type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
+type TableSortDirection = "asc" | "desc" | "none";
 export interface TableSortRule {
 	key: TableSortKey;
 	label: string;
@@ -99,30 +100,30 @@ function folderPaths(nodes: ScriptNode[]): string[] {
 	return paths;
 }
 
-function appStatusRank(app: App): number {
+function appStatusRank(app: TableRow): number {
 	if (app.operationStatus?.status === "active") return 0;
 	const status = (app.status || app.dockerInfo?.Status || "").toLowerCase();
 	if (status.includes("up") || status.includes("running") || status.includes("healthy")) return 0;
 	return 1;
 }
 
-function appGitRank(app: App): number {
-	const status = app.gitStatus?.trim() || "";
+function appGitRank(app: TableRow): number {
+	const status = app.rowKind === "app" ? app.gitStatus?.trim() || "" : "";
 	return status.includes("+") || status.includes("~") || status.includes("-") || status.includes("*") ? 0 : 1;
 }
 
-function compareByRule(a: App, b: App, rule: TableSortRule): number {
+function compareByRule(a: TableRow, b: TableRow, rule: TableSortRule): number {
 	let result = 0;
 	if (rule.key === "status") result = appStatusRank(a) - appStatusRank(b);
 	if (rule.key === "git") result = appGitRank(a) - appGitRank(b);
 	if (rule.key === "name") result = a.displayName.localeCompare(b.displayName);
-	if (rule.key === "interpreter") result = (a.interpreter || "").localeCompare(b.interpreter || "");
-	if (rule.key === "path") result = (a.scriptRelativePath || a.localDirectoryPath || "").localeCompare(b.scriptRelativePath || b.localDirectoryPath || "");
+	if (rule.key === "interpreter") result = (a.rowKind === "script" ? a.interpreter || "" : "").localeCompare(b.rowKind === "script" ? b.interpreter || "" : "");
+	if (rule.key === "path") result = (a.rowKind === "script" ? a.scriptRelativePath || "" : a.rowKind === "app" ? a.localDirectoryPath : "").localeCompare(b.rowKind === "script" ? b.scriptRelativePath || "" : b.rowKind === "app" ? b.localDirectoryPath : "");
 	if (rule.key === "params") result = (a.scriptParameters?.length ?? 0) - (b.scriptParameters?.length ?? 0);
 	return rule.direction === "desc" ? -result : result;
 }
 
-function sortApps(items: App[], rules: TableSortRule[]): App[] {
+function sortApps(items: TableRow[], rules: TableSortRule[]): TableRow[] {
 	const activeRules = rules.filter((rule) => rule.direction !== "none");
 	return items
 		.map((app, index) => ({ app, index }))
@@ -207,44 +208,36 @@ export function createAppStore() {
 		flattenScriptTree(scriptsTree(), expandedScriptFolders()),
 	);
 
-	const scriptRowsAsApps = createMemo<App[]>(() =>
-		scriptVisibleRows().map(
-			(row): App => ({
-				ident: `script:${row.relativePath}`,
-				displayName: row.name,
-				localDirectoryPath: row.absolutePath,
-				repositoryPath: "",
-				branch: row.nodeType === "script" ? row.interpreter || "" : "folder",
-				appType: "LIB" as const,
-				containerBaseName: "",
-				resourceType:
-					row.nodeType === "folder"
-						? ("script-folder" as const)
-						: ("script-file" as const),
-				scriptPath: row.absolutePath,
-				scriptRelativePath: row.relativePath,
-				scriptDepth: row.depth,
-				scriptExpanded:
-					row.nodeType === "folder"
-						? expandedScriptFolders().has(row.relativePath)
-						: undefined,
-				scriptExecutable: row.nodeType === "script",
-				interpreter: row.interpreter,
-				scriptParameters: row.parameters,
-			}),
-		),
+	const scriptRows = createMemo<TableRow[]>(() =>
+		scriptVisibleRows().map((row): TableRow => ({
+			rowKind: "script",
+			ident: `script:${row.relativePath}`,
+			displayName: row.name,
+			localDirectoryPath: row.absolutePath,
+			repositoryPath: "",
+			branch: row.nodeType === "script" ? row.interpreter || "" : "folder",
+			nodeType: row.nodeType,
+			resourceType: row.nodeType === "folder" ? "script-folder" : "script-file",
+			scriptPath: row.absolutePath,
+			scriptRelativePath: row.relativePath,
+			scriptDepth: row.depth,
+			scriptExpanded: row.nodeType === "folder" ? expandedScriptFolders().has(row.relativePath) : undefined,
+			scriptExecutable: row.nodeType === "script",
+			interpreter: row.interpreter,
+			scriptParameters: row.parameters,
+		})),
 	);
 
-	const appFilterValue = (app: App, key: string) => {
+	const appFilterValue = (app: TableRow, key: string) => {
 		if (key === "status") {
 			const status = (app.status || app.dockerInfo?.Status || "not found").toLowerCase();
 			if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "running";
 			if (status.includes("exit") || status.includes("stop")) return "exited";
 			return status;
 		}
-		if (key === "git") return appGitRank(app) === 0 ? "dirty" : app.gitStatus === "✓" ? "clean" : "unknown";
-		if (key === "provider") return app.provider || app.sourceType || "unknown";
-		if (key === "interpreter") return app.interpreter || (app.resourceType === "script-folder" ? "folder" : "unknown");
+		if (key === "git" && app.rowKind === "app") return appGitRank(app) === 0 ? "dirty" : app.gitStatus === "✓" ? "clean" : "unknown";
+		if (key === "provider" && app.rowKind === "app") return app.provider || app.sourceType || "unknown";
+		if (key === "interpreter" && app.rowKind === "script") return app.interpreter || (app.nodeType === "folder" ? "folder" : "unknown");
 		if (key === "params") {
 			const count = app.scriptParameters?.length ?? 0;
 			if (count === 0) return "none";
@@ -271,7 +264,7 @@ export function createAppStore() {
 		}));
 	};
 
-	const applyTableFilters = (items: App[]) => {
+	const applyTableFilters = (items: TableRow[]) => {
 		const filters = tableFilters();
 		return items.filter((app) =>
 			Object.entries(filters).every(([key, values]) =>
@@ -283,17 +276,17 @@ export function createAppStore() {
 	const filteredAppsUnsorted = createMemo(() => {
 		const allApps = apps();
 		const tab = activeTab();
-		if (tab === "applications") return allApps.filter((app) => app.appType === "APP");
-		if (tab === "libraries") return allApps.filter((app) => app.appType === "LIB");
-		if (tab === "scripts") return scriptRowsAsApps();
+		if (tab === "applications") return allApps.filter((app) => app.appType === "APP").map((app) => ({ ...app, rowKind: "app" as const }));
+		if (tab === "libraries") return allApps.filter((app) => app.appType === "LIB").map((app) => ({ ...app, rowKind: "app" as const }));
+		if (tab === "scripts") return scriptRows();
 		if (tab === "infrastructure") {
-			return infraServices().map((svc) => ({
+			return infraServices().map((svc): TableRow => ({
+				rowKind: "infra",
 				ident: svc.ident,
 				displayName: svc.displayName,
 				localDirectoryPath: "",
 				repositoryPath: "",
 				branch: "",
-				appType: "LIB" as const,
 				containerBaseName: svc.containerBaseName || svc.ident,
 				dockerInfo: svc.dockerInfo,
 				operationStatus: svc.operationStatus,
@@ -303,9 +296,9 @@ export function createAppStore() {
 				powerShellPath: svc.powerShellPath,
 				defaultRunner: svc.defaultRunner,
 				logPath: svc.logPath,
-			})) as App[];
+			}));
 		}
-		return allApps;
+		return allApps.map((app) => ({ ...app, rowKind: "app" as const }));
 	});
 
 	const tableFilterParameters = createMemo(() => {
@@ -373,7 +366,7 @@ export function createAppStore() {
 				label: "Libraries",
 				count: allApps.filter((app) => app.appType === "LIB").length,
 			},
-			{ id: "scripts", label: "Scripts", count: scriptVisibleRows().length },
+			{ id: "scripts", label: "Tasks", count: scriptVisibleRows().length },
 		];
 	});
 

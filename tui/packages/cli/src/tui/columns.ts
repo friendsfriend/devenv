@@ -1,7 +1,8 @@
 import { type TableColumn, getGitStatusStyle } from '@devenv/ui';
-import type { App } from '@devenv/types';
+import type { TableRow } from '@devenv/types';
 
-function getProviderIcon(app: App): string {
+function getProviderIcon(app: TableRow): string {
+  if (app.rowKind !== 'app') return '';
   if (app.sourceType === 'github') return '';
   if (app.sourceType === 'gitlab') return '';
   return '?';
@@ -23,6 +24,7 @@ export function createColumns(): TableColumn[] {
       header: 'Branch',
       width: '32%',
       render: (app) => {
+        if (app.rowKind !== 'app') return '';
         const branch = app.branch || '...';
         const isLinkedWorktree = app.activeWorktree && app.activeWorktree !== app.mainWorktreeBranch;
         if (isLinkedWorktree) {
@@ -57,12 +59,13 @@ export function createScriptColumns(): TableColumn[] {
   return [
     {
       key: 'displayName',
-      header: 'Script Collection',
+      header: 'Task Collection',
       width: '55%',
       render: (app) => {
+        if (app.rowKind !== 'script') return app.displayName;
         const depth = app.scriptDepth || 0;
         const indent = '  '.repeat(depth);
-        if (app.resourceType === 'script-folder') {
+        if (app.nodeType === 'folder') {
           const icon = app.scriptExpanded ? '▾' : '▸';
           return `${indent}${icon}  ${app.displayName}`;
         }
@@ -75,15 +78,16 @@ export function createScriptColumns(): TableColumn[] {
       header: 'Type',
       width: '12%',
       render: (app) => {
-        if (app.resourceType === 'script-folder') return 'folder';
-        return app.interpreter || 'script';
+        if (app.rowKind !== 'script') return '';
+        if (app.nodeType === 'folder') return 'folder';
+        return app.interpreter || 'task';
       },
     },
     {
       key: 'repositoryPath',
       header: 'Path',
       width: '33%',
-      render: (app) => app.scriptRelativePath || '',
+      render: (app) => app.rowKind === 'script' ? app.scriptRelativePath || '' : '',
     },
   ];
 }

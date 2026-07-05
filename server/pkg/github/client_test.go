@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/friendsfriend/devenv/pkg/mr"
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 )
 
 func TestExtractRepoInfo(t *testing.T) {
@@ -81,7 +81,7 @@ func TestExtractRepoInfo(t *testing.T) {
 	}
 }
 
-func TestGetMRs(t *testing.T) {
+func TestGetChangeRequests(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -119,15 +119,15 @@ func TestGetMRs(t *testing.T) {
 		httpClient: &http.Client{Transport: rewriteTransport{base: srv.URL, inner: http.DefaultTransport}},
 	}
 
-	info := &mr.RepoInfo{Owner: "owner", Repo: "repo"}
-	result, err := c.GetMRs(info, nil)
+	info := &changerequest.RepoInfo{Owner: "owner", Repo: "repo"}
+	result, err := c.GetChangeRequests(info, nil)
 	if err != nil {
-		t.Fatalf("GetMRs: %v", err)
+		t.Fatalf("GetChangeRequests: %v", err)
 	}
-	if len(result.MergeRequests) != 1 {
-		t.Fatalf("expected 1 PR, got %d", len(result.MergeRequests))
+	if len(result.ChangeRequests) != 1 {
+		t.Fatalf("expected 1 PR, got %d", len(result.ChangeRequests))
 	}
-	prs := result.MergeRequests
+	prs := result.ChangeRequests
 	if prs[0].IID != 42 {
 		t.Errorf("IID: got %d, want 42", prs[0].IID)
 	}
@@ -142,9 +142,9 @@ func TestGetMRs(t *testing.T) {
 	}
 }
 
-func TestGetMRsNilInfo(t *testing.T) {
+func TestGetChangeRequestsNilInfo(t *testing.T) {
 	c := newClient("token", "user", nil)
-	_, err := c.GetMRs(nil, nil)
+	_, err := c.GetChangeRequests(nil, nil)
 	if err == nil {
 		t.Fatal("expected error for nil info")
 	}
@@ -181,7 +181,7 @@ func TestGetPRApprovals(t *testing.T) {
 	}
 }
 
-func TestGetMRChanges(t *testing.T) {
+func TestGetChangeRequestChanges(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		files := []ghPRFile{
 			{
@@ -208,10 +208,10 @@ func TestGetMRChanges(t *testing.T) {
 		httpClient: &http.Client{Transport: rewriteTransport{base: srv.URL, inner: http.DefaultTransport}},
 	}
 
-	info := &mr.RepoInfo{Owner: "owner", Repo: "repo"}
-	changes, err := c.GetMRChanges(info, 1)
+	info := &changerequest.RepoInfo{Owner: "owner", Repo: "repo"}
+	changes, err := c.GetChangeRequestChanges(info, 1)
 	if err != nil {
-		t.Fatalf("GetMRChanges: %v", err)
+		t.Fatalf("GetChangeRequestChanges: %v", err)
 	}
 	if len(changes) != 2 {
 		t.Fatalf("expected 2 changes, got %d", len(changes))
@@ -266,7 +266,7 @@ func TestGetDiscussions(t *testing.T) {
 		httpClient: &http.Client{Transport: rewriteTransport{base: srv.URL, inner: http.DefaultTransport}},
 	}
 
-	info := &mr.RepoInfo{Owner: "owner", Repo: "repo"}
+	info := &changerequest.RepoInfo{Owner: "owner", Repo: "repo"}
 	discussions, err := c.GetDiscussions(info, 1)
 	if err != nil {
 		t.Fatalf("GetDiscussions: %v", err)
@@ -285,7 +285,7 @@ func TestGetDiscussions(t *testing.T) {
 
 func TestParseDiffLines(t *testing.T) {
 	patch := "@@ -1,3 +1,4 @@\n context\n-old line\n+new line\n+added line\n context2"
-	lines := parseDiffLinesToMR(patch, "foo.go")
+	lines := parseDiffLinesToChangeRequest(patch, "foo.go")
 
 	if len(lines) == 0 {
 		t.Fatal("expected parsed diff lines, got none")
@@ -316,17 +316,17 @@ func TestParseDiffLines(t *testing.T) {
 
 func TestStateConversions(t *testing.T) {
 	openPR := ghPR{State: "open"}
-	if prStateToMRState(openPR) != "opened" {
+	if prStateToChangeRequestState(openPR) != "opened" {
 		t.Errorf("open PR should map to 'opened'")
 	}
 
 	closedPR := ghPR{State: "closed"}
-	if prStateToMRState(closedPR) != "closed" {
+	if prStateToChangeRequestState(closedPR) != "closed" {
 		t.Errorf("closed PR should map to 'closed'")
 	}
 
 	mergedPR := ghPR{State: "closed", Merged: true}
-	if prStateToMRState(mergedPR) != "merged" {
+	if prStateToChangeRequestState(mergedPR) != "merged" {
 		t.Errorf("merged PR should map to 'merged'")
 	}
 }
@@ -548,7 +548,7 @@ func TestGetRunJobs(t *testing.T) {
 	}
 }
 
-func TestGetMRsPopulatesHeadPipeline(t *testing.T) {
+func TestGetChangeRequestsPopulatesHeadPipeline(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 	const headSHA = "sha123abc"
 
@@ -606,18 +606,18 @@ func TestGetMRsPopulatesHeadPipeline(t *testing.T) {
 		httpClient: &http.Client{Transport: rewriteTransport{base: srv.URL, inner: http.DefaultTransport}},
 	}
 
-	info := &mr.RepoInfo{Owner: "owner", Repo: "repo"}
-	result, err := c.GetMRs(info, nil)
+	info := &changerequest.RepoInfo{Owner: "owner", Repo: "repo"}
+	result, err := c.GetChangeRequests(info, nil)
 	if err != nil {
-		t.Fatalf("GetMRs: %v", err)
+		t.Fatalf("GetChangeRequests: %v", err)
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if len(result.MergeRequests) != 1 {
-		t.Fatalf("expected 1 PR, got %d", len(result.MergeRequests))
+	if len(result.ChangeRequests) != 1 {
+		t.Fatalf("expected 1 PR, got %d", len(result.ChangeRequests))
 	}
-	pr := result.MergeRequests[0]
+	pr := result.ChangeRequests[0]
 	if pr.HeadPipeline == nil {
 		t.Fatal("expected HeadPipeline to be populated, got nil")
 	}
@@ -657,7 +657,7 @@ func TestGetJobLogs(t *testing.T) {
 		httpClient: &http.Client{Transport: rewriteTransport{base: apiSrv.URL, inner: http.DefaultTransport}},
 	}
 
-	info := &mr.RepoInfo{Owner: "owner", Repo: "repo"}
+	info := &changerequest.RepoInfo{Owner: "owner", Repo: "repo"}
 	logs, err := c.GetJobLogs(info, 101)
 	if err != nil {
 		t.Fatalf("GetJobLogs: unexpected error: %v", err)
@@ -689,11 +689,11 @@ func (rt rewriteTransport) RoundTrip(req *http.Request) (*http.Response, error) 
 
 func TestParseLinkHeaderForPagination(t *testing.T) {
 	tests := []struct {
-		name            string
-		linkHeader      string
-		currentPage     int
-		wantPage        int
-		wantTotalPages  int
+		name           string
+		linkHeader     string
+		currentPage    int
+		wantPage       int
+		wantTotalPages int
 	}{
 		{
 			name:           "no link header - single page",

@@ -35,11 +35,33 @@ jobs:
         run: go test -race $(go list ./... | grep -v /vendor/)
         working-directory: server
 
+  test-tui:
+    name: Test (TUI)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+
+      - name: Install TUI dependencies
+        run: bun install
+        working-directory: tui
+
+      - name: Type check
+        run: bun run type-check
+        working-directory: tui
+
+      - name: Test
+        run: bun run test
+        working-directory: tui
+
   build-binaries:
     name: Build (all platforms)
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: test-go
+    needs: [test-go, test-tui]
     permissions:
       contents: write
     steps:

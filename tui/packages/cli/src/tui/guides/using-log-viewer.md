@@ -4,8 +4,8 @@ DevEnv provides a built-in log viewer for container logs and operation logs.
 
 ## 1. Opening logs
 
-- Press `l` to view container logs for the selected app
-- Press `o` to view operation logs for the selected app
+- Press `l` to view container logs for the selected item
+- Press `o` to view operation logs for the selected item
 - Press `L` to toggle the status log maximized view
 
 ## 2. Log navigation
@@ -47,7 +47,7 @@ and press `Enter` to refine.
 | `e` | Open logs in `$EDITOR` |
 | `Shift+E` | Choose an editor for logs |
 | `Esc` | Close log viewer |
-| `q` | Quit application |
+| `q` | Quit DevEnv |
 
 ## 6. Keyboard shortcuts summary
 

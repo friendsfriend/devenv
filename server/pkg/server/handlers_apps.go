@@ -374,19 +374,32 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		providers := s.services.ProviderStore().List()
+		invalidProviders := s.services.ProviderStore().InvalidProviders()
 		type providerResponse struct {
 			Name     string `json:"name"`
 			Type     string `json:"type"`
 			Username string `json:"username"`
 			HasToken bool   `json:"has_token"`
+			Invalid  bool   `json:"invalid,omitempty"`
+			Reason   string `json:"reason,omitempty"`
+			Message  string `json:"message,omitempty"`
 		}
-		result := make([]providerResponse, 0, len(providers))
+		result := make([]providerResponse, 0, len(providers)+len(invalidProviders))
 		for _, p := range providers {
 			result = append(result, providerResponse{
 				Name:     p.Name,
 				Type:     p.Type,
 				Username: p.Username,
 				HasToken: p.Token != "",
+			})
+		}
+		for _, p := range invalidProviders {
+			result = append(result, providerResponse{
+				Name:    p.Name,
+				Type:    p.Type,
+				Invalid: true,
+				Reason:  p.Reason,
+				Message: p.Message,
 			})
 		}
 		respondJSON(w, result, http.StatusOK)
@@ -619,11 +632,11 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		DisplayName   string `json:"displayName"`
-		RepositoryURL string `json:"repositoryURL"`
-		Branch        string `json:"branch"`
-		Provider      string `json:"provider"`
-		AppType       string `json:"appType"`
+		DisplayName        string `json:"displayName"`
+		RepositoryURL      string `json:"repositoryURL"`
+		Branch             string `json:"branch"`
+		Provider           string `json:"provider"`
+		DefinitionLocation string `json:"definitionLocation"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -647,9 +660,9 @@ func (s *Server) handleCreateApp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appType := req.AppType
-	if appType != app.TypeAPP && appType != app.TypeLIB {
-		appType = app.TypeAPP
+	appType := app.TypeAPP
+	if req.DefinitionLocation == "libraries" {
+		appType = app.TypeLIB
 	}
 
 	ident := slugify(req.DisplayName)

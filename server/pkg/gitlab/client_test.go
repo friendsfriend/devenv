@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/friendsfriend/devenv/pkg/mr"
+	"github.com/friendsfriend/devenv/pkg/changerequest"
 )
 
 func TestExtractProjectInfo(t *testing.T) {
@@ -243,7 +243,7 @@ func TestFailedTestGrouping(t *testing.T) {
 	t.Logf("Successfully grouped %d failing tests into %d classes", 4, len(failedTestGroups))
 }
 
-func TestGetMergeRequestsWithOptions_SkipDetails(t *testing.T) {
+func TestGetChangeRequestsWithOptions_SkipDetails(t *testing.T) {
 	// Track API calls
 	var listCalls, detailCalls, approvalsCalls int
 
@@ -252,14 +252,14 @@ func TestGetMergeRequestsWithOptions_SkipDetails(t *testing.T) {
 		if strings.Contains(r.URL.Path, "/approvals") {
 			approvalsCalls++
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(MRApprovals{})
+			json.NewEncoder(w).Encode(MergeRequestApprovals{})
 			return
 		}
 		// Single MR detail call
 		if strings.Contains(r.URL.Path, "/merge_requests/") {
 			detailCalls++
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(MergeRequest{
+			json.NewEncoder(w).Encode(ChangeRequest{
 				ID:    1,
 				IID:   42,
 				Title: "Test MR",
@@ -270,7 +270,7 @@ func TestGetMergeRequestsWithOptions_SkipDetails(t *testing.T) {
 		// List MRs endpoint
 		listCalls++
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]MergeRequest{
+		json.NewEncoder(w).Encode([]ChangeRequest{
 			{
 				ID:    1,
 				IID:   42,
@@ -305,18 +305,18 @@ func TestGetMergeRequestsWithOptions_SkipDetails(t *testing.T) {
 	detailCalls = 0
 	approvalsCalls = 0
 
-	result, err := c.GetMergeRequestsWithOptions(projectInfo, &mr.MRListOptions{
+	result, err := c.GetChangeRequestsWithOptions(projectInfo, &changerequest.ChangeRequestListOptions{
 		SkipDetails: true,
 		PerPage:     50,
 	})
 	if err != nil {
-		t.Fatalf("GetMergeRequestsWithOptions (SkipDetails=true): %v", err)
+		t.Fatalf("GetChangeRequestsWithOptions (SkipDetails=true): %v", err)
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if len(result.MergeRequests) != 2 {
-		t.Errorf("expected 2 MRs, got %d", len(result.MergeRequests))
+	if len(result.ChangeRequests) != 2 {
+		t.Errorf("expected 2 MRs, got %d", len(result.ChangeRequests))
 	}
 	if detailCalls > 0 {
 		t.Errorf("expected 0 detail calls with SkipDetails=true, got %d", detailCalls)
@@ -328,30 +328,30 @@ func TestGetMergeRequestsWithOptions_SkipDetails(t *testing.T) {
 		t.Errorf("expected 1 list call, got %d", listCalls)
 	}
 
-	// Test with SkipDetails=false — should make detail calls per MR (approvals fetched inside GetMergeRequest)
+	// Test with SkipDetails=false — should make detail calls per MR (approvals fetched inside GetChangeRequest)
 	listCalls = 0
 	detailCalls = 0
 	approvalsCalls = 0
 
-	result, err = c.GetMergeRequestsWithOptions(projectInfo, &mr.MRListOptions{
+	result, err = c.GetChangeRequestsWithOptions(projectInfo, &changerequest.ChangeRequestListOptions{
 		SkipDetails: false,
 		PerPage:     50,
 	})
 	if err != nil {
-		t.Fatalf("GetMergeRequestsWithOptions (SkipDetails=false): %v", err)
+		t.Fatalf("GetChangeRequestsWithOptions (SkipDetails=false): %v", err)
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")
 	}
-	if len(result.MergeRequests) != 2 {
-		t.Errorf("expected 2 MRs, got %d", len(result.MergeRequests))
+	if len(result.ChangeRequests) != 2 {
+		t.Errorf("expected 2 MRs, got %d", len(result.ChangeRequests))
 	}
 	if detailCalls != 2 {
 		t.Errorf("expected 2 detail calls with SkipDetails=false, got %d", detailCalls)
 	}
 }
 
-func TestGetMergeRequestsWithOptions_Pagination(t *testing.T) {
+func TestGetChangeRequestsWithOptions_Pagination(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verify the query params
 		if r.URL.Query().Get("page") != "2" {
@@ -371,7 +371,7 @@ func TestGetMergeRequestsWithOptions_Pagination(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		// Return empty list for this test
-		json.NewEncoder(w).Encode([]MergeRequest{})
+		json.NewEncoder(w).Encode([]ChangeRequest{})
 	}))
 	defer srv.Close()
 
@@ -388,13 +388,13 @@ func TestGetMergeRequestsWithOptions_Pagination(t *testing.T) {
 		Project:   "project",
 	}
 
-	result, err := c.GetMergeRequestsWithOptions(projectInfo, &mr.MRListOptions{
+	result, err := c.GetChangeRequestsWithOptions(projectInfo, &changerequest.ChangeRequestListOptions{
 		Page:    2,
 		PerPage: 25,
 		State:   "opened",
 	})
 	if err != nil {
-		t.Fatalf("GetMergeRequestsWithOptions: %v", err)
+		t.Fatalf("GetChangeRequestsWithOptions: %v", err)
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")
@@ -413,11 +413,11 @@ func TestGetMergeRequestsWithOptions_Pagination(t *testing.T) {
 	}
 }
 
-func TestGetMergeRequestsWithOptions_MissingHeaders(t *testing.T) {
+func TestGetChangeRequestsWithOptions_MissingHeaders(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Return no pagination headers (GitLab behavior when total > 10,000)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]MergeRequest{})
+		json.NewEncoder(w).Encode([]ChangeRequest{})
 	}))
 	defer srv.Close()
 
@@ -434,13 +434,13 @@ func TestGetMergeRequestsWithOptions_MissingHeaders(t *testing.T) {
 		Project:   "project",
 	}
 
-	result, err := c.GetMergeRequestsWithOptions(projectInfo, &mr.MRListOptions{
+	result, err := c.GetChangeRequestsWithOptions(projectInfo, &changerequest.ChangeRequestListOptions{
 		Page:    1,
 		PerPage: 50,
 		State:   "opened",
 	})
 	if err != nil {
-		t.Fatalf("GetMergeRequestsWithOptions: %v", err)
+		t.Fatalf("GetChangeRequestsWithOptions: %v", err)
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")

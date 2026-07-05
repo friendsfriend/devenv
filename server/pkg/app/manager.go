@@ -112,7 +112,6 @@ type appConfigFile struct {
 	Ident             string `json:"ident"`
 	DisplayName       string `json:"displayName"`
 	RepositoryPath    string `json:"repositoryPath"`
-	AppType           string `json:"appType,omitempty"`
 	ContainerBaseName string `json:"containerBaseName,omitempty"`
 	SourceType        string `json:"sourceType,omitempty"`
 	Provider          string `json:"provider,omitempty"`
@@ -727,16 +726,9 @@ func (am *appManager) loadAppsFromDirectory(dirPath string, defaultType string) 
 			Provider:          cfg.Provider,
 			GitMode:           cfg.GitMode,
 		}
-		if cfg.AppType != "" {
-			app.AppType = cfg.AppType
-		}
 		if app.Ident == "" {
 			app.Ident = strings.TrimSuffix(entry.Name(), ".json")
 		}
-		if app.AppType == "" {
-			app.AppType = defaultType
-		}
-
 		apps = append(apps, app)
 	}
 

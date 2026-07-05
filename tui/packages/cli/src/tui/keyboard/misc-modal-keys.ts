@@ -6,7 +6,7 @@ import { isDownKey, isUpKey } from './nav-keys';
  * Handles keyboard events for miscellaneous modals and views:
  * - Passphrase modal (ESC to cancel, Enter to submit, text input)
  * - SSH host picker (ESC/q to close, j/k navigation, Enter to launch, search)
- * - Agent view (sessions step + newSessionSpacePicker step)
+ * - Pi session view
  * - Providers view (a to add, e to edit, d to delete, j/k navigation)
  * - Generic ESC handler for non-table views not handled elsewhere
  */
@@ -60,9 +60,9 @@ export async function handleMiscModalKeys(
     return true; // Consume all other keys while picker is open
   }
 
-  // Script add modal keyboard handler
-  if (uiStore.showScriptAddModal()) {
-    const mode = uiStore.scriptAddMode();
+  // Task add modal keyboard handler
+  if (uiStore.showTaskAddModal()) {
+    const mode = uiStore.taskAddMode();
     const fieldCount = mode === 'link' ? 3 : 2; // mode + target (+ source)
 
     const isEsc =
@@ -73,32 +73,32 @@ export async function handleMiscModalKeys(
       event.raw === '\x1b';
 
     if (isEsc) {
-      appActions.closeAddScriptModal();
+      appActions.closeAddTaskModal();
       return true;
     }
 
     if (event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter') {
-      void appActions.submitAddScript();
+      void appActions.submitAddTask();
       return true;
     }
 
     if (event.name === 'tab' || isDownKey(event)) {
-      uiStore.setScriptAddSelectedField((prev) => (prev + 1) % fieldCount);
+      uiStore.setTaskAddSelectedField((prev) => (prev + 1) % fieldCount);
       return true;
     }
 
     if (isUpKey(event)) {
-      uiStore.setScriptAddSelectedField((prev) => (prev - 1 + fieldCount) % fieldCount);
+      uiStore.setTaskAddSelectedField((prev) => (prev - 1 + fieldCount) % fieldCount);
       return true;
     }
 
-    const selectedField = Math.max(0, Math.min(uiStore.scriptAddSelectedField(), fieldCount - 1));
+    const selectedField = Math.max(0, Math.min(uiStore.taskAddSelectedField(), fieldCount - 1));
 
     if (selectedField === 0) {
       const toggleMode = () => {
-        uiStore.setScriptAddMode((prev) => (prev === 'create' ? 'link' : 'create'));
-        uiStore.setScriptAddSelectedField(0);
-        uiStore.setScriptAddError(null);
+        uiStore.setTaskAddMode((prev) => (prev === 'create' ? 'link' : 'create'));
+        uiStore.setTaskAddSelectedField(0);
+        uiStore.setTaskAddError(null);
       };
       if (
         event.name === 'left' || event.name === 'Left' || event.name === 'h' ||
@@ -112,13 +112,13 @@ export async function handleMiscModalKeys(
 
     const updateTextField = (updater: (value: string) => string) => {
       if (selectedField === 1) {
-        uiStore.setScriptAddTargetPath((prev) => updater(prev));
-        uiStore.setScriptAddError(null);
+        uiStore.setTaskAddTargetPath((prev) => updater(prev));
+        uiStore.setTaskAddError(null);
         return true;
       }
       if (selectedField === 2 && mode === 'link') {
-        uiStore.setScriptAddSourcePath((prev) => updater(prev));
-        uiStore.setScriptAddError(null);
+        uiStore.setTaskAddSourcePath((prev) => updater(prev));
+        uiStore.setTaskAddError(null);
         return true;
       }
       return false;
@@ -135,10 +135,10 @@ export async function handleMiscModalKeys(
     return true;
   }
 
-  // Script args modal keyboard handler
-  if (uiStore.showScriptArgsModal()) {
-    const params = uiStore.scriptArgsParameters();
-    const selectedParam = params[Math.max(0, Math.min(uiStore.scriptArgsSelectedIndex(), Math.max(0, params.length - 1)))];
+  // Task args modal keyboard handler
+  if (uiStore.showTaskArgsModal()) {
+    const params = uiStore.taskArgsParameters();
+    const selectedParam = params[Math.max(0, Math.min(uiStore.taskArgsSelectedIndex(), Math.max(0, params.length - 1)))];
     const isEsc = event.name === 'escape' || event.name === 'Escape' || event.name === 'esc' || event.sequence === '\x1b' || event.raw === '\x1b';
     const isEnter = event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter';
     const isLeft = event.name === 'left' || event.name === 'Left' || event.name === 'h';
@@ -165,34 +165,34 @@ export async function handleMiscModalKeys(
       return true;
     };
 
-    if (uiStore.scriptArgsEditing()) {
+    if (uiStore.taskArgsEditing()) {
       if (isEnter) {
         if (!isCompleteFreeTextValue(selectedParam, selectedParam ? uiStore.scriptArgValues()[selectedParam.name] || '' : '')) {
-          uiStore.setScriptArgsError(selectedParam?.type === 'int' ? `Parameter ${selectedParam.name} must be an integer` : selectedParam ? `Parameter ${selectedParam.name} must be a decimal number` : 'Invalid script argument');
+          uiStore.setTaskArgsError(selectedParam?.type === 'int' ? `Parameter ${selectedParam.name} must be an integer` : selectedParam ? `Parameter ${selectedParam.name} must be a decimal number` : 'Invalid task argument');
           return true;
         }
-        uiStore.setScriptArgsEditing(false);
-        uiStore.setScriptArgsEditOriginalValue('');
-        uiStore.setScriptArgsError(null);
+        uiStore.setTaskArgsEditing(false);
+        uiStore.setTaskArgsEditOriginalValue('');
+        uiStore.setTaskArgsError(null);
         return true;
       }
       if (isEsc) {
-        if (selectedParam) uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: uiStore.scriptArgsEditOriginalValue() }));
-        uiStore.setScriptArgsEditing(false);
-        uiStore.setScriptArgsEditOriginalValue('');
+        if (selectedParam) uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: uiStore.taskArgsEditOriginalValue() }));
+        uiStore.setTaskArgsEditing(false);
+        uiStore.setTaskArgsEditOriginalValue('');
         return true;
       }
       if (selectedParam && selectedParam.type !== 'bool' && selectedParam.type !== 'enum') {
         if (event.name === 'backspace' || event.name === 'Backspace' || event.name === 'delete') {
           uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: (prev[selectedParam.name] || '').slice(0, -1) }));
-          uiStore.setScriptArgsError(null);
+          uiStore.setTaskArgsError(null);
           return true;
         }
         if (event.sequence && event.sequence.length === 1 && event.sequence >= ' ' && !event.ctrl && !event.meta) {
           const next = (uiStore.scriptArgValues()[selectedParam.name] || '') + event.sequence;
           if (isValidFreeTextValue(selectedParam, next)) {
             uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: next }));
-            uiStore.setScriptArgsError(null);
+            uiStore.setTaskArgsError(null);
           }
           return true;
         }
@@ -201,54 +201,54 @@ export async function handleMiscModalKeys(
     }
 
     if (isEsc) {
-      uiStore.setShowScriptArgsModal(false);
-      uiStore.setScriptArgsError(null);
+      uiStore.setShowTaskArgsModal(false);
+      uiStore.setTaskArgsError(null);
       return true;
     }
 
     if (isLeft) {
-      uiStore.setScriptArgsFocusedPane('parameter');
+      uiStore.setTaskArgsFocusedPane('parameter');
       return true;
     }
     if (isRight) {
-      uiStore.setScriptArgsFocusedPane('value');
+      uiStore.setTaskArgsFocusedPane('value');
       return true;
     }
 
     if (isDownKey(event)) {
-      if (uiStore.scriptArgsFocusedPane() === 'parameter') {
-        if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.min(prev + 1, params.length - 1));
-        uiStore.setScriptArgsSelectedValueIndex(0);
+      if (uiStore.taskArgsFocusedPane() === 'parameter') {
+        if (params.length > 0) uiStore.setTaskArgsSelectedIndex((prev) => Math.min(prev + 1, params.length - 1));
+        uiStore.setTaskArgsSelectedValueIndex(0);
       } else {
-        uiStore.setScriptArgsSelectedValueIndex((prev) => Math.min(prev + 1, Math.max(0, valuesFor().length - 1)));
+        uiStore.setTaskArgsSelectedValueIndex((prev) => Math.min(prev + 1, Math.max(0, valuesFor().length - 1)));
       }
       return true;
     }
 
     if (isUpKey(event)) {
-      if (uiStore.scriptArgsFocusedPane() === 'parameter') {
-        if (params.length > 0) uiStore.setScriptArgsSelectedIndex((prev) => Math.max(prev - 1, 0));
-        uiStore.setScriptArgsSelectedValueIndex(0);
+      if (uiStore.taskArgsFocusedPane() === 'parameter') {
+        if (params.length > 0) uiStore.setTaskArgsSelectedIndex((prev) => Math.max(prev - 1, 0));
+        uiStore.setTaskArgsSelectedValueIndex(0);
       } else {
-        uiStore.setScriptArgsSelectedValueIndex((prev) => Math.max(prev - 1, 0));
+        uiStore.setTaskArgsSelectedValueIndex((prev) => Math.max(prev - 1, 0));
       }
       return true;
     }
 
     if (isEnter) {
-      void utilActions.submitScriptArgsAndRun();
+      void utilActions.submitTaskArgsAndRun();
       return true;
     }
 
-    if (selectedParam && uiStore.scriptArgsFocusedPane() === 'value' && isEditTrigger) {
+    if (selectedParam && uiStore.taskArgsFocusedPane() === 'value' && isEditTrigger) {
       const values = valuesFor();
       if (selectedParam.type === 'bool' || selectedParam.type === 'enum') {
-        const next = values[Math.max(0, Math.min(uiStore.scriptArgsSelectedValueIndex(), values.length - 1))];
+        const next = values[Math.max(0, Math.min(uiStore.taskArgsSelectedValueIndex(), values.length - 1))];
         if (next !== undefined) uiStore.setScriptArgValues((prev) => ({ ...prev, [selectedParam.name]: next }));
-        uiStore.setScriptArgsError(null);
+        uiStore.setTaskArgsError(null);
       } else {
-        uiStore.setScriptArgsEditOriginalValue(uiStore.scriptArgValues()[selectedParam.name] || '');
-        uiStore.setScriptArgsEditing(true);
+        uiStore.setTaskArgsEditOriginalValue(uiStore.scriptArgValues()[selectedParam.name] || '');
+        uiStore.setTaskArgsEditing(true);
       }
       return true;
     }
@@ -400,7 +400,7 @@ export async function handleMiscModalKeys(
     return true;
   }
 
-  // Agent view keyboard handler
+  // Pi session view keyboard handler
   if (appStore.viewMode() === 'agentView') {
     const isEsc =
       event.name === 'escape' ||
@@ -438,7 +438,7 @@ export async function handleMiscModalKeys(
           agentStore.setSelectedAgentItemIndex(0);
           return true;
         }
-        // Close the agent view
+        // Close the pi session view
         agentStore.setSelectedAgentItemIndex(0);
         appStore.setViewMode('table');
         return true;
@@ -707,7 +707,7 @@ export async function handleMiscModalKeys(
       event.sequence === '\x1b' ||
       event.raw === '\x1b'
     ) {
-      // Go back to table (MR detail and other views already handled above)
+      // Go back to table (CR detail and other views already handled above)
       appStore.setViewMode('table');
     }
     return true;

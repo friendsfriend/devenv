@@ -9,6 +9,7 @@ interface InitDeps {
   showError: (title: string, message: string) => void;
   serverUrl: string;
   refreshProviders?: () => Promise<void>;
+  abortSignal?: AbortSignal;
 }
 
 /**
@@ -111,7 +112,7 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
     appStore.setLoading(false);
 
     void appActions.fetchStatus();
-    void appActions.subscribeToUpdates();
+    void appActions.subscribeToUpdates(deps.abortSignal);
     void appActions.fetchStatusLog();
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Unknown error occurred during initialization';

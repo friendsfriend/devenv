@@ -1,4 +1,4 @@
-import { getLogger } from "@devenv/core";
+import { getLogger } from '@devenv/core';
 import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
@@ -10,7 +10,7 @@ import type {
 /**
  * Handles keyboard events for table-level views:
  * - Branch selector overlay (ESC/q to close, Enter to checkout, j/k navigation)
- * - App detail escape/quit
+ * - Repository detail escape/quit
  * - Table search mode (type query, clear)
  * - Main table navigation (switch with j/k/tab, app operations, view launchers)
  */
@@ -25,7 +25,7 @@ export async function handleTableKeys(
 		appActions,
 		issueActions,
 		logActions,
-		mrActions,
+		crActions,
 		dockerActions,
 		gitActions,
 		providerActions,
@@ -386,8 +386,8 @@ export async function handleTableKeys(
 				if (selected?.resourceType === "script-folder") {
 					appActions.toggleScriptFolder();
 				} else if (selected?.resourceType === "script-file") {
-					// openScriptArgsModal fetches metadata from server and shows modal if params exist
-					void utilActions.openScriptArgsModal();
+					// openTaskArgsModal fetches metadata from server and shows modal if params exist
+					void utilActions.openTaskArgsModal();
 				}
 			} else if (appList.length > 0) {
 				void appActions.openAppDetail();
@@ -470,14 +470,14 @@ export async function handleTableKeys(
 				logActions.loadOperationLogs();
 			break;
 		case "m":
-			// Show MR detail for current branch (lowercase m)
+			// Show CR detail for current branch (lowercase m)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				mrActions.loadMergeRequestForCurrentBranch();
+				crActions.loadChangeRequestForCurrentBranch();
 			break;
 		case "M":
-			// Show all open MRs list (uppercase M / Shift+M)
+			// Show all open CRs list (uppercase M / Shift+M)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				mrActions.loadAllMergeRequests();
+				crActions.loadAllChangeRequests();
 			break;
 		case "i":
 			// Open issue scope picker (lowercase i)
@@ -498,12 +498,12 @@ export async function handleTableKeys(
 		case "s":
 			if (appStore.activeTab() === "scripts") {
 				if (appList.length > 0) {
-					// openScriptArgsModal fetches metadata from server and shows modal if params exist
-					void utilActions.openScriptArgsModal();
+					// openTaskArgsModal fetches metadata from server and shows modal if params exist
+					void utilActions.openTaskArgsModal();
 				}
 				break;
 			}
-			// Start selected app or infrastructure service.
+			// Start selected item.
 			if (appList.length > 0) {
 				const app = getSelectedApp();
 				if (!app) break;
@@ -529,7 +529,7 @@ export async function handleTableKeys(
 			break;
 		case "S":
 			if (appStore.activeTab() === "scripts") {
-				if (appList.length > 0) void utilActions.openScriptArgsModal();
+				if (appList.length > 0) void utilActions.openTaskArgsModal();
 				break;
 			}
 			// Stop container (uppercase S)
@@ -587,7 +587,7 @@ export async function handleTableKeys(
 			break;
 		}
 		case "e":
-			// Open selected app directory in default editor ($EDITOR)
+			// Open selected item directory in default editor ($EDITOR)
 			if (appList.length > 0) utilActions.openInEditor();
 			break;
 		case "E":
@@ -595,12 +595,12 @@ export async function handleTableKeys(
 			if (appList.length > 0) utilActions.openEditorPicker();
 			break;
 		case "G":
-			// Open selected app repository in lazygit (Shift+G)
+			// Open selected repository in lazygit (Shift+G)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
 				utilActions.launchLazygit();
 			break;
 		case "d":
-			// Open lazydocker for selected app
+			// Open lazydocker for selected item
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
 				utilActions.launchLazydocker();
 			break;
@@ -634,7 +634,7 @@ export async function handleTableKeys(
 			break;
 		}
 		case "A":
-			// Open Agent view (uppercase A)
+			// Open pi session view (uppercase A)
 			agentActions.openAgentView();
 			break;
 		case "H":
@@ -643,11 +643,11 @@ export async function handleTableKeys(
 			break;
 		case "+":
 			if (appStore.activeTab() === "scripts")
-				void appActions.openAddScriptModal();
-			else void providerActions.openAddAppModal();
+				void appActions.openAddTaskModal();
+			else void providerActions.openAddRepositoryModal();
 			break;
 		case "-":
-			if (appStore.activeTab() === "scripts") appActions.requestRemoveScript();
+			if (appStore.activeTab() === "scripts") appActions.requestRemoveTask();
 			else appActions.requestRemoveApp();
 			break;
 	}

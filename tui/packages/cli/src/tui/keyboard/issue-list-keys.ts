@@ -1,3 +1,4 @@
+import { ISSUE_SCOPE_OPTIONS } from '@devenv/ui';
 import { isDownKey, isUpKey } from './nav-keys';
 import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 import type {
@@ -13,33 +14,20 @@ export async function handleIssueListKeys(
 	actions: KeyboardActions,
 	_ctx: KeyboardContext,
 ): Promise<boolean> {
-	const { appStore, issueStore, mrStore } = stores;
+	const { appStore, issueStore, changeRequestStore } = stores;
 	const { issueActions } = actions;
 
 	if (
 		appStore.viewMode() !== "issues" &&
 		appStore.viewMode() !== "issueScopePicker" &&
 		appStore.viewMode() !== "referencedIssues" &&
-		appStore.viewMode() !== "mrLinkedIssues"
+		appStore.viewMode() !== "changeRequestLinkedIssues"
 	) {
 		return false;
 	}
 
 	// Scope picker mode — j/k navigation + Enter/Esc
 	if (appStore.viewMode() === "issueScopePicker") {
-		const SCOPE_ITEMS = [
-			"All issues",
-			"Assigned to me",
-			"Created by me",
-			"No assignee",
-		];
-		const SCOPE_VALUES = [
-			"all",
-			"assigned-to-me",
-			"created-by-me",
-			"no-assignee",
-		];
-
 		if (event.name === "escape" || event.name === "q") {
 			appStore.setViewMode("table");
 			issueStore.setIssueScopePickerIndex(0);
@@ -47,7 +35,7 @@ export async function handleIssueListKeys(
 		}
 
 		if (isDownKey(event)) {
-			const max = Math.max(0, SCOPE_ITEMS.length - 1);
+			const max = Math.max(0, ISSUE_SCOPE_OPTIONS.length - 1);
 			issueStore.setIssueScopePickerIndex((prev: number) =>
 				Math.min(prev + 1, max),
 			);
@@ -63,8 +51,8 @@ export async function handleIssueListKeys(
 
 		if (event.name === "return" || event.name === "enter") {
 			const idx = issueStore.issueScopePickerIndex();
-			if (idx >= 0 && idx < SCOPE_VALUES.length) {
-				issueActions.selectScope(SCOPE_VALUES[idx] as any);
+			if (idx >= 0 && idx < ISSUE_SCOPE_OPTIONS.length) {
+				issueActions.selectScope(ISSUE_SCOPE_OPTIONS[idx].value);
 			}
 			return true;
 		}
@@ -72,30 +60,30 @@ export async function handleIssueListKeys(
 		return true; // Eat all other keys in scope picker
 	}
 
-	// MR linked issues sub-view
-	if (appStore.viewMode() === "mrLinkedIssues") {
-		const linkedIssues = mrStore.mrLinkedIssues();
-		const selectedIdx = mrStore.selectedMrLinkedIssueIndex();
+	// CR linked issues sub-view
+	if (appStore.viewMode() === "changeRequestLinkedIssues") {
+		const linkedIssues = changeRequestStore.changeRequestLinkedIssues();
+		const selectedIdx = changeRequestStore.selectedChangeRequestLinkedIssueIndex();
 
 		if (isDownKey(event)) {
-			mrStore.setSelectedMrLinkedIssueIndex(
+			changeRequestStore.setSelectedCrLinkedIssueIndex(
 				Math.min(selectedIdx + 1, linkedIssues.length - 1),
 			);
 			return true;
 		}
 		if (isUpKey(event)) {
-			mrStore.setSelectedMrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
+			changeRequestStore.setSelectedCrLinkedIssueIndex(Math.max(selectedIdx - 1, 0));
 			return true;
 		}
 		if (event.name === "g" && !event.ctrl) {
-			mrStore.setSelectedMrLinkedIssueIndex(0);
+			changeRequestStore.setSelectedCrLinkedIssueIndex(0);
 			return true;
 		}
 		if (
 			(event.name === "G" || (event.name === "g" && event.shift)) &&
 			!event.ctrl
 		) {
-			mrStore.setSelectedMrLinkedIssueIndex(
+			changeRequestStore.setSelectedCrLinkedIssueIndex(
 				Math.max(0, linkedIssues.length - 1),
 			);
 			return true;
@@ -108,8 +96,8 @@ export async function handleIssueListKeys(
 			return true;
 		}
 		if (event.name === "escape" || event.name === "q") {
-			mrStore.setSelectedMrLinkedIssueIndex(0);
-			appStore.setViewMode("mergeRequestDetail");
+			changeRequestStore.setSelectedCrLinkedIssueIndex(0);
+			appStore.setViewMode("changeRequestDetail");
 			return true;
 		}
 		return true;

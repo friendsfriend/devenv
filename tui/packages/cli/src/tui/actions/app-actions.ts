@@ -41,11 +41,11 @@ export function createAppActions(
     }
   };
 
-  const subscribeToUpdates = async () => {
+  const subscribeToUpdates = async (signal?: AbortSignal) => {
     try {
       appStore.setLiveUpdatesActive(true);
       getLogger().write('INFO', 'Starting SSE subscription...');
-      for await (const event of client.subscribeToEvents()) {
+      for await (const event of client.subscribeToEvents(signal)) {
         if (event.type === 'connection.established') {
           appStore.setLiveUpdatesActive(true);
           continue;
@@ -172,11 +172,11 @@ export function createAppActions(
       }
       if (idx >= 0) appStore.setSelectedIndex(idx);
     } catch (e) {
-      showError('Failed to Load Scripts', e instanceof Error ? e.message : 'Unknown error');
+      showError('Failed to Load Tasks', e instanceof Error ? e.message : 'Unknown error');
     }
   };
 
-  const openAddScriptModal = () => {
+  const openAddTaskModal = () => {
     if (appStore.activeTab() !== 'scripts') return;
 
     const selected = appStore.tableFilteredApps()[appStore.selectedIndex()];
@@ -187,46 +187,46 @@ export function createAppActions(
       prefill = parentScriptPath(selected.scriptRelativePath || '');
     }
 
-    uiStore.setScriptAddMode('create');
-    uiStore.setScriptAddTargetPath(prefill);
-    uiStore.setScriptAddSourcePath('');
-    uiStore.setScriptAddSelectedField(1);
-    uiStore.setScriptAddError(null);
-    uiStore.setShowScriptAddModal(true);
+    uiStore.setTaskAddMode('create');
+    uiStore.setTaskAddTargetPath(prefill);
+    uiStore.setTaskAddSourcePath('');
+    uiStore.setTaskAddSelectedField(1);
+    uiStore.setTaskAddError(null);
+    uiStore.setShowTaskAddModal(true);
   };
 
-  const closeAddScriptModal = () => {
-    uiStore.setShowScriptAddModal(false);
-    uiStore.setScriptAddError(null);
-    uiStore.setScriptAddSelectedField(0);
+  const closeAddTaskModal = () => {
+    uiStore.setShowTaskAddModal(false);
+    uiStore.setTaskAddError(null);
+    uiStore.setTaskAddSelectedField(0);
   };
 
-  const submitAddScript = async () => {
-    const targetPath = uiStore.scriptAddTargetPath().trim();
-    const mode = uiStore.scriptAddMode();
+  const submitAddTask = async () => {
+    const targetPath = uiStore.taskAddTargetPath().trim();
+    const mode = uiStore.taskAddMode();
 
     if (!targetPath) {
-      uiStore.setScriptAddError('Target name/path is required.');
+      uiStore.setTaskAddError('Target name/path is required.');
       return;
     }
 
-    if (mode === 'link' && !uiStore.scriptAddSourcePath().trim()) {
-      uiStore.setScriptAddError('Source script path is required for "Use existing script".');
+    if (mode === 'link' && !uiStore.taskAddSourcePath().trim()) {
+      uiStore.setTaskAddError('Source task file path is required for "Use existing task file".');
       return;
     }
 
     try {
       const result = mode === 'create'
         ? await client.createScript(targetPath)
-        : await client.linkScript(targetPath, uiStore.scriptAddSourcePath().trim());
+        : await client.linkScript(targetPath, uiStore.taskAddSourcePath().trim());
 
-      closeAddScriptModal();
+      closeAddTaskModal();
       await loadScripts(result.relativePath);
-      getLogger().write('INFO', `Script ${result.operation} succeeded: ${result.relativePath}`);
+      getLogger().write('INFO', `Task ${result.operation} succeeded: ${result.relativePath}`);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Unknown error';
-      uiStore.setScriptAddError(message);
-      getLogger().write('WARN', `Script add failed: ${message}`);
+      uiStore.setTaskAddError(message);
+      getLogger().write('WARN', `Task add failed: ${message}`);
     }
   };
 
@@ -250,11 +250,11 @@ export function createAppActions(
     if (!app) return;
     const kind = appStore.activeTab() === 'infrastructure' ? 'infra' : app.appType === 'LIB' ? 'library' : 'app';
     appDetailStore.setAppDetailKind(kind);
-    appDetailStore.setAppDetailApp(app);
+    appDetailStore.setAppDetailApp(app as any);
     appDetailStore.setAppDetailLoading(true);
     appDetailStore.setAppDetailGitInfo(undefined);
-    appDetailStore.setAppDetailMRs([]);
-    appDetailStore.setAppDetailMRsLoading(kind !== 'infra');
+    appDetailStore.setAppDetailCRs([]);
+    appDetailStore.setAppDetailCRsLoading(kind !== 'infra');
     appDetailStore.setAppDetailLogs('');
     appDetailStore.setAppDetailStatsHistory([]);
     appDetailStore.setAppDetailMemHistory([]);
@@ -269,17 +269,17 @@ export function createAppActions(
       }
 
       try {
-        const result = await client.getMergeRequests(app.ident, 'opened', 'current', app.sourceType);
-        if (result.items.length > 0) appDetailStore.setAppDetailMRs(result.items.slice(0, 5));
-        else appDetailStore.setAppDetailMRs((await client.getMergeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
+        const result = await client.getChangeRequests(app.ident, 'opened', 'current', app.sourceType);
+        if (result.items.length > 0) appDetailStore.setAppDetailCRs(result.items.slice(0, 5));
+        else appDetailStore.setAppDetailCRs((await client.getChangeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
       } catch {
         try {
-          appDetailStore.setAppDetailMRs((await client.getMergeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
+          appDetailStore.setAppDetailCRs((await client.getChangeRequests(app.ident, 'opened', 'all', app.sourceType)).items.slice(0, 5));
         } catch {
-          appDetailStore.setAppDetailMRs([]);
+          appDetailStore.setAppDetailCRs([]);
         }
       }
-      appDetailStore.setAppDetailMRsLoading(false);
+      appDetailStore.setAppDetailCRsLoading(false);
     }
 
     appDetailStore.setAppDetailLoading(false);
@@ -318,36 +318,36 @@ export function createAppActions(
 
 
 
-  const performRemoveScriptTarget = async (relativePath: string) => {
+  const performRemoveTaskTarget = async (relativePath: string) => {
     try {
       const result = await client.deleteScript(relativePath);
       await loadScripts(parentScriptPath(result.relativePath));
-      getLogger().write('INFO', `Script target deleted: ${result.relativePath}`);
+      getLogger().write('INFO', `Task target deleted: ${result.relativePath}`);
     } catch (e) {
-      showError('Delete Script Failed', e instanceof Error ? e.message : 'Unknown error');
+      showError('Delete Task Failed', e instanceof Error ? e.message : 'Unknown error');
     }
   };
 
-  const requestRemoveScript = () => {
+  const requestRemoveTask = () => {
     if (appStore.activeTab() !== 'scripts') return;
     const selected = appStore.tableFilteredApps()[appStore.selectedIndex()];
     if (!selected || !selected.scriptRelativePath) return;
 
     if (selected.resourceType === 'script-file') {
-      uiStore.setConfirmDialogTitle('Delete Script');
+      uiStore.setConfirmDialogTitle('Delete Task');
       uiStore.setConfirmDialogMessage(
-        `Delete script "${selected.displayName}" (${selected.scriptRelativePath})? This cannot be undone.`,
+        `Delete task "${selected.displayName}" (${selected.scriptRelativePath})? This cannot be undone.`,
       );
     } else if (selected.resourceType === 'script-folder') {
-      uiStore.setConfirmDialogTitle('Delete Script Folder');
+      uiStore.setConfirmDialogTitle('Delete Task Folder');
       uiStore.setConfirmDialogMessage(
-        `Delete folder "${selected.displayName}" (${selected.scriptRelativePath}) and all nested scripts/files? This cannot be undone.`,
+        `Delete folder "${selected.displayName}" (${selected.scriptRelativePath}) and all nested task files? This cannot be undone.`,
       );
     } else {
       return;
     }
 
-    uiStore.setConfirmDialogAction(() => () => void performRemoveScriptTarget(selected.scriptRelativePath!));
+    uiStore.setConfirmDialogAction(() => () => void performRemoveTaskTarget(selected.scriptRelativePath!));
     uiStore.setShowConfirmDialog(true);
   };
 
@@ -356,14 +356,14 @@ export function createAppActions(
       await client.deleteApp(ident);
       appStore.setApps(await client.getApps());
     } catch (e) {
-      showError('Remove App Failed', e instanceof Error ? e.message : 'Unknown error');
+      showError('Remove Repository Failed', e instanceof Error ? e.message : 'Unknown error');
     }
   };
 
   const requestRemoveApp = () => {
     const app = getSelectedApp();
     if (!app || appStore.activeTab() === 'scripts') return;
-    uiStore.setConfirmDialogTitle('Remove Application');
+    uiStore.setConfirmDialogTitle('Remove Selected Item');
     uiStore.setConfirmDialogMessage(
       `Remove "${app.displayName}" (${app.ident})? This will delete the local directory and remove it from the configuration.`,
     );
@@ -392,15 +392,15 @@ export function createAppActions(
     subscribeToUpdates,
     fetchStatusLog,
     loadScripts,
-    openAddScriptModal,
-    closeAddScriptModal,
-    submitAddScript,
+    openAddTaskModal,
+    closeAddTaskModal,
+    submitAddTask,
     toggleScriptFolder,
     openAppDetail,
     closeAppDetail,
     exitApp,
-    requestRemoveScript,
-    performRemoveScriptTarget,
+    requestRemoveTask,
+    performRemoveTaskTarget,
     requestRemoveApp,
     performRemoveApp,
     createExampleConfig,

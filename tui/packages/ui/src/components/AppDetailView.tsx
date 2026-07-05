@@ -4,7 +4,7 @@ import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { ContentFrame } from './ContentStack';
 import { DetailSection } from './DetailSection';
-import type { App, MergeRequest, ContainerStats } from '@devenv/types';
+import type { App, ChangeRequest, ContainerStats } from '@devenv/types';
 import { ScrollableContent } from './ScrollableContent';
 import { getStatusStyle } from '../statusUtils';
 
@@ -14,13 +14,13 @@ interface AppDetailViewProps {
   app: App;
   kind: AppDetailKind;
   gitInfo?: { branch: string; status: string };
-  mergeRequests: MergeRequest[];
+  changeRequests: ChangeRequest[];
   logs: string;
   statsHistory: number[];
   memHistory: number[];
   latestStats?: ContainerStats;
   loading: boolean;
-  mrsLoading: boolean;
+  changeRequestsLoading: boolean;
 }
 
 export function AppDetailView(props: AppDetailViewProps) {
@@ -71,7 +71,7 @@ export function AppDetailView(props: AppDetailViewProps) {
 
   const hasDocker = () => props.kind === 'app' || props.kind === 'infra';
   const hasGit = () => props.kind === 'app' || props.kind === 'library';
-  const hasMRs = () => props.kind === 'app' || props.kind === 'library';
+  const hasCRs = () => props.kind === 'app' || props.kind === 'library';
 
   const leftWidth = () => {
     if (props.kind === 'library') return '100%';
@@ -126,7 +126,7 @@ export function AppDetailView(props: AppDetailViewProps) {
             <Show when={props.kind !== 'infra'}>
               <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
                 <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Type: </text>
-                <text fg={uiColors.textSecondary}>{props.app.appType}</text>
+                <text fg={uiColors.textSecondary}>{props.app.appType === 'LIB' ? 'Library' : 'Application'}</text>
               </box>
 
               <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
@@ -197,10 +197,10 @@ export function AppDetailView(props: AppDetailViewProps) {
 
         <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-        {/* MRs Panel — app and library only */}
-        <Show when={hasMRs()}>
+        {/* CRs Panel — app and library only */}
+        <Show when={hasCRs()}>
           <DetailSection
-            title="Open Merge Requests"
+            title="Open Change Requests"
             titleColor={uiColors.borderHighlight}
             style={{
               width: '100%',
@@ -214,24 +214,24 @@ export function AppDetailView(props: AppDetailViewProps) {
             axes={["x", "y"]}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
-              <Show when={props.mrsLoading}>
+              <Show when={props.changeRequestsLoading}>
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
                   <text fg={uiColors.warning}>Loading...</text>
                 </box>
               </Show>
-              <Show when={!props.mrsLoading && props.mergeRequests.length === 0}>
+              <Show when={!props.changeRequestsLoading && props.changeRequests.length === 0}>
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No open merge requests</text>
+                  <text fg={uiColors.textMuted}>No open change requests</text>
                 </box>
               </Show>
-              <For each={props.mergeRequests.slice(0, 5)}>
-                {(mr) => (
+              <For each={props.changeRequests.slice(0, 5)}>
+                {(cr) => (
                   <>
                     <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                      <text fg={uiColors.textPrimary}>!{mr.iid} {mr.title}</text>
+                      <text fg={uiColors.textPrimary}>!{cr.iid} {cr.title}</text>
                     </box>
                     <box style={{ paddingLeft: 3, paddingRight: 1 }}>
-                      <text fg={uiColors.textSecondary}>{mr.source_branch} → {mr.target_branch}</text>
+                      <text fg={uiColors.textSecondary}>{cr.source_branch} → {cr.target_branch}</text>
                     </box>
                   </>
                 )}

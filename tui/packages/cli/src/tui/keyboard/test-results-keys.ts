@@ -16,7 +16,7 @@ export async function handleTestResultsKeys(
   actions: KeyboardActions,
   _ctx: KeyboardContext,
 ): Promise<boolean> {
-  const { appStore, mrStore } = stores;
+  const { appStore, changeRequestStore } = stores;
   const { appActions, helpActions } = actions;
 
   if (appStore.viewMode() !== 'testResults') return false;
@@ -32,36 +32,36 @@ export async function handleTestResultsKeys(
   }
 
   // Test search mode — capture all keys while user is typing
-  if (mrStore.testSearchMode()) {
+  if (changeRequestStore.testSearchMode()) {
     if (
       event.name === 'escape' || event.name === 'Escape' ||
       event.name === 'esc' || event.sequence === '\x1b'
     ) {
-      mrStore.setTestSearchMode(false);
-      mrStore.setTestSearchQuery('');
-      mrStore.setSelectedTestIndex(0);
+      changeRequestStore.setTestSearchMode(false);
+      changeRequestStore.setTestSearchQuery('');
+      changeRequestStore.setSelectedTestIndex(0);
       return true;
     }
     if (event.name === 'return' || event.name === 'enter') {
-      mrStore.setTestSearchMode(false);
-      mrStore.setSelectedTestIndex(0);
+      changeRequestStore.setTestSearchMode(false);
+      changeRequestStore.setSelectedTestIndex(0);
       return true;
     }
     if (event.name === 'backspace' || event.name === 'delete') {
-      mrStore.setTestSearchQuery(q => q.slice(0, -1));
-      mrStore.setSelectedTestIndex(0);
+      changeRequestStore.setTestSearchQuery(q => q.slice(0, -1));
+      changeRequestStore.setSelectedTestIndex(0);
       return true;
     }
     const ch = event.sequence ?? event.name ?? '';
     if (ch.length === 1 && ch >= ' ') {
-      mrStore.setTestSearchQuery(q => q + ch);
-      mrStore.setSelectedTestIndex(0);
+      changeRequestStore.setTestSearchQuery(q => q + ch);
+      changeRequestStore.setSelectedTestIndex(0);
       return true;
     }
     return true; // swallow all other keys
   }
 
-  const testSuites = mrStore.mrTestSummary()?.test_suites || [];
+  const testSuites = changeRequestStore.crTestSummary()?.test_suites || [];
   // Build flattened+sorted+filtered list to get correct totalTests count
   const allTests: Array<{ name: string; classname: string; status: string; suiteName: string }> = [];
   for (const suite of testSuites) {
@@ -78,7 +78,7 @@ export async function handleTestResultsKeys(
     if (cc !== 0) return cc;
     return a.name.localeCompare(b.name);
   });
-  const q = mrStore.testSearchQuery().toLowerCase();
+  const q = changeRequestStore.testSearchQuery().toLowerCase();
   const filteredTests = q
     ? allTests.filter(t =>
         [t.name, t.classname, t.suiteName, t.status].some(v => v && v.toLowerCase().includes(q))
@@ -88,10 +88,10 @@ export async function handleTestResultsKeys(
 
   // '/' to enter search mode
   if (event.name === '/' || event.sequence === '/') {
-    if (!mrStore.showTestDetailModal()) {
-      mrStore.setTestSearchMode(true);
-      mrStore.setTestSearchQuery('');
-      mrStore.setSelectedTestIndex(0);
+    if (!changeRequestStore.showTestDetailModal()) {
+      changeRequestStore.setTestSearchMode(true);
+      changeRequestStore.setTestSearchQuery('');
+      changeRequestStore.setSelectedTestIndex(0);
       return true;
     }
   }
@@ -104,34 +104,34 @@ export async function handleTestResultsKeys(
     event.raw === '\x1b'
   ) {
     // If test detail modal is open, close it first
-    if (mrStore.showTestDetailModal()) {
-      mrStore.setShowTestDetailModal(false);
+    if (changeRequestStore.showTestDetailModal()) {
+      changeRequestStore.setShowTestDetailModal(false);
       return true;
     }
     // Clear search query first on Esc
-    if (mrStore.testSearchQuery()) {
-      mrStore.setTestSearchQuery('');
-      mrStore.setTestSearchMode(false);
-      mrStore.setSelectedTestIndex(0);
+    if (changeRequestStore.testSearchQuery()) {
+      changeRequestStore.setTestSearchQuery('');
+      changeRequestStore.setTestSearchMode(false);
+      changeRequestStore.setSelectedTestIndex(0);
       return true;
     }
-    appStore.setViewMode('mergeRequestDetail');
-    mrStore.setSelectedTestIndex(0);
+    appStore.setViewMode('changeRequestDetail');
+    changeRequestStore.setSelectedTestIndex(0);
     return true;
   }
 
   // Enter to open test detail modal
   if (event.name === 'return' || event.name === 'enter' || event.name === 'Return' || event.name === 'Enter') {
-    if (!mrStore.showTestDetailModal() && totalTests > 0) {
-      mrStore.setShowTestDetailModal(true);
+    if (!changeRequestStore.showTestDetailModal() && totalTests > 0) {
+      changeRequestStore.setShowTestDetailModal(true);
     }
     return true;
   }
 
   // 'c' to copy output/stack trace when detail modal is open
   if (event.name === 'c' || event.sequence === 'c') {
-    if (mrStore.showTestDetailModal()) {
-      const test = mrStore.selectedTestForDetail();
+    if (changeRequestStore.showTestDetailModal()) {
+      const test = changeRequestStore.selectedTestForDetail();
       if (test) {
         const isFailed = test.status === 'failed' || test.status === 'error';
         const text = isFailed
@@ -141,8 +141,8 @@ export async function handleTestResultsKeys(
           const { copyToClipboard } = await import('@devenv/core');
           const success = copyToClipboard(text);
           if (success) {
-            mrStore.setTestDetailCopyStatus('✓ Copied!');
-            setTimeout(() => mrStore.setTestDetailCopyStatus(null), 1500);
+            changeRequestStore.setTestDetailCopyStatus('✓ Copied!');
+            setTimeout(() => changeRequestStore.setTestDetailCopyStatus(null), 1500);
           }
         }
       }
@@ -151,29 +151,29 @@ export async function handleTestResultsKeys(
   }
 
   // Block navigation while detail modal is open
-  if (mrStore.showTestDetailModal()) return true;
+  if (changeRequestStore.showTestDetailModal()) return true;
 
   if (isDownKey(event)) {
-    if (mrStore.selectedTestIndex() < totalTests - 1) {
-      mrStore.setSelectedTestIndex(prev => prev + 1);
+    if (changeRequestStore.selectedTestIndex() < totalTests - 1) {
+      changeRequestStore.setSelectedTestIndex(prev => prev + 1);
     }
     return true;
   }
 
   if (isUpKey(event)) {
-    if (mrStore.selectedTestIndex() > 0) {
-      mrStore.setSelectedTestIndex(prev => prev - 1);
+    if (changeRequestStore.selectedTestIndex() > 0) {
+      changeRequestStore.setSelectedTestIndex(prev => prev - 1);
     }
     return true;
   }
 
   if (event.name === 'g' || event.sequence === 'g') {
-    mrStore.setSelectedTestIndex(0);
+    changeRequestStore.setSelectedTestIndex(0);
     return true;
   }
 
   if (event.name === 'G' || event.sequence === 'G') {
-    mrStore.setSelectedTestIndex(Math.max(0, totalTests - 1));
+    changeRequestStore.setSelectedTestIndex(Math.max(0, totalTests - 1));
     return true;
   }
 

@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal } from 'solid-js';
 import aura from "./themes/aura.json" with { type: "json" };
 import ayu from "./themes/ayu.json" with { type: "json" };
 import carbonfox from "./themes/carbonfox.json" with { type: "json" };
@@ -38,7 +38,7 @@ export type ThemeJson = {
   theme: Record<string, string | number | { dark: string; light: string } | undefined>;
 };
 
-export const DEFAULT_THEME_JSON: Record<string, ThemeJson> = {
+const DEFAULT_THEME_JSON: Record<string, ThemeJson> = {
   aura: aura as ThemeJson,
   ayu: ayu as ThemeJson,
   carbonfox: carbonfox as ThemeJson,

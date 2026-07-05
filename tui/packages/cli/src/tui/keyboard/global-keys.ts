@@ -11,7 +11,7 @@ import { applyTheme, saveThemeName } from '../theme-settings';
  * - Error dialog (copy + dismiss)
  * - Confirm dialog (y/n)
  * - Profile picker navigation
- * - AI backend picker navigation
+ * - Theme picker navigation
  * - Ctrl+C to exit
  * - Ctrl+Shift+C to copy selection
  */
@@ -54,7 +54,7 @@ export async function handleGlobalKeys(
   actions: KeyboardActions,
   ctx: KeyboardContext,
 ): Promise<boolean> {
-  const { uiStore, appStore, logStore, agentStore, mrStore } = stores;
+  const { uiStore, appStore, logStore, agentStore, changeRequestStore } = stores;
   const { appActions, dockerActions, utilActions, logActions, agentActions } = actions;
   const { renderer, launchPi } = ctx;
 
@@ -82,7 +82,7 @@ export async function handleGlobalKeys(
     return true;
   }
 
-  const diffTextInputActive = mrStore.showDiffModal() && (mrStore.showCommentModal() || !!mrStore.replyMode());
+  const diffTextInputActive = changeRequestStore.showDiffModal() && (changeRequestStore.showCommentModal() || !!changeRequestStore.replyMode());
 
   // GLOBAL: Shift+T opens theme picker. Do not intercept text input in diff comments/replies.
   if (!diffTextInputActive && !uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
@@ -310,10 +310,10 @@ export async function handleGlobalKeys(
     return true;
   }
 
-  if (appStore.showFirstSteps() && appStore.viewMode() === 'table' && !stores.providerStore.showConnectProviderModal() && !stores.providerStore.showAddAppModal()) {
+  if (appStore.showFirstSteps() && appStore.viewMode() === 'table' && !stores.providerStore.showConnectProviderModal() && !stores.providerStore.showAddRepositoryModal()) {
     const runFirstStep = async (idx: number) => {
       if (idx === 0) actions.providerActions.openAddProviderModal();
-      if (idx === 1) await actions.providerActions.openAddAppModal();
+      if (idx === 1) await actions.providerActions.openAddRepositoryModal();
       if (idx === 2) void actions.appActions.createExampleConfig();
       if (idx === 3) {
         const guide = getGuide('config-repository');

@@ -1,5 +1,5 @@
-import { Show } from "solid-js";
-import { TextAttributes, RGBA } from "@opentui/core";
+import { Show } from 'solid-js';
+import { TextAttributes, RGBA } from '@opentui/core';
 import {
 	LogModal,
 	DiffViewModal,
@@ -10,7 +10,7 @@ import {
 	ConfirmDialog,
 	AgentSpaceView,
 	ConnectProviderModal,
-	AddAppModal,
+	AddRepositoryModal,
 	MarkdownModal,
 	SshHostPickerView,
 	PassphraseModal,
@@ -18,9 +18,9 @@ import {
 	ActionTargetPickerView,
 	EditorPickerView,
 	WorktreeManagerModal,
-	ScriptArgsModal,
-	ScriptAddModal,
-	MrAiReviewOverlay,
+	TaskArgsModal,
+	TaskAddModal,
+	CrAiReviewOverlay,
 	IssueScopeModal,
 	CloseReasonModal,
 	CommentModal,
@@ -32,7 +32,7 @@ import {
 	ThemePickerView,
 	themeNames,
 	uiColors,
-} from "@devenv/ui";
+} from '@devenv/ui';
 import type { ModalOverlaysProps } from "./types";
 import { FirstStepsView } from "./first-steps-view";
 import { getGuide, guides as allGuides } from "../guides";
@@ -42,16 +42,16 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 		appStore,
 		issueStore,
 		logStore,
-		mrStore,
+		changeRequestStore,
 		providerStore,
 		uiStore,
 		agentStore,
 	} = props.stores;
-	const { dockerActions, mrActions, logActions, issueActions, helpActions } = props.actions;
+	const { dockerActions, crActions, logActions, issueActions, helpActions } = props.actions;
 
 	return (
 		<>
-			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddAppModal() && !uiStore.showMarkdownModal()}>
+			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddRepositoryModal() && !uiStore.showMarkdownModal()}>
 				<FirstStepsView appStore={appStore} providerStore={providerStore} />
 			</Show>
 			<Show when={uiStore.showThemePicker()}>
@@ -148,36 +148,25 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				})()}
 			</Show>
 
-			<Show when={mrStore.showListFilterModal()}>
+			<Show when={changeRequestStore.showListFilterModal()}>
 				<FilterModal
-					parameters={mrStore.listFilterParameters()}
-					selectedParameterIndex={mrStore.listFilterParameterIndex()}
-					selectedValueIndex={mrStore.listFilterValueIndex()}
-					focusedPane={mrStore.listFilterFocusedPane()}
-					activeFilters={mrStore.currentListFilters()}
+					parameters={changeRequestStore.listFilterParameters()}
+					selectedParameterIndex={changeRequestStore.listFilterParameterIndex()}
+					selectedValueIndex={changeRequestStore.listFilterValueIndex()}
+					focusedPane={changeRequestStore.listFilterFocusedPane()}
+					activeFilters={changeRequestStore.currentListFilters()}
 				/>
 			</Show>
 
-			<Show when={mrStore.showListSortModal()}>
+			<Show when={changeRequestStore.showListSortModal()}>
 				<SortModal
-					parameters={mrStore.currentListSortRules()}
-					selectedIndex={mrStore.listSortSelectedIndex()}
+					parameters={changeRequestStore.currentListSortRules()}
+					selectedIndex={changeRequestStore.listSortSelectedIndex()}
 				/>
 			</Show>
 
 			<Show when={appStore.viewMode() === "issueScopePicker"}>
-				<IssueScopeModal
-					selectedIndex={issueStore.issueScopePickerIndex()}
-					onSelect={(idx) => issueStore.setIssueScopePickerIndex(idx)}
-					onSubmit={(scope: string) => {
-						const { issueActions } = props.actions;
-						issueActions.selectScope(scope as any);
-					}}
-					onCancel={() => {
-						appStore.setViewMode("table");
-						issueStore.setIssueScopePickerIndex(0);
-					}}
-				/>
+				<IssueScopeModal selectedIndex={issueStore.issueScopePickerIndex()} />
 			</Show>
 
 			<Show when={issueStore.showCommentModal()}>
@@ -295,25 +284,25 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={providerStore.showAddAppModal()}>
-				<AddAppModal
-					step={providerStore.addAppStep()}
-					providers={providerStore.addAppProviders()}
-					selectedProviderIndex={providerStore.addAppSelectedProviderIndex()}
-					searchQuery={providerStore.addAppSearchQuery()}
-					searchResults={providerStore.addAppSearchResults()}
-					selectedResultIndex={providerStore.addAppSelectedResultIndex()}
-					manualUrl={providerStore.addAppManualUrl()}
-					findRepoMode={providerStore.addAppFindRepoMode()}
-					findRepoModeIndex={providerStore.addAppFindRepoModeIndex()}
-					appName={providerStore.addAppName()}
-					branches={providerStore.addAppBranches()}
-					selectedBranchIndex={providerStore.addAppSelectedBranchIndex()}
-					branchFilterQuery={providerStore.addAppBranchFilter()}
-					loading={providerStore.addAppLoading()}
-					error={providerStore.addAppError()}
-					appType={providerStore.addAppAppType()}
-					appTypeIndex={providerStore.addAppAppTypeIndex()}
+			<Show when={providerStore.showAddRepositoryModal()}>
+				<AddRepositoryModal
+					step={providerStore.addRepositoryStep()}
+					providers={providerStore.addRepositoryProviders()}
+					selectedProviderIndex={providerStore.addRepositorySelectedProviderIndex()}
+					searchQuery={providerStore.addRepositorySearchQuery()}
+					searchResults={providerStore.addRepositorySearchResults()}
+					selectedResultIndex={providerStore.addRepositorySelectedResultIndex()}
+					manualUrl={providerStore.addRepositoryManualUrl()}
+					findRepoMode={providerStore.addRepositoryFindRepoMode()}
+					findRepoModeIndex={providerStore.addRepositoryFindRepoModeIndex()}
+					repositoryName={providerStore.addRepositoryName()}
+					branches={providerStore.addRepositoryBranches()}
+					selectedBranchIndex={providerStore.addRepositorySelectedBranchIndex()}
+					branchFilterQuery={providerStore.addRepositoryBranchFilter()}
+					loading={providerStore.addRepositoryLoading()}
+					error={providerStore.addRepositoryError()}
+					destinationType={providerStore.addRepositoryDestinationType()}
+					destinationTypeIndex={providerStore.addRepositoryDestinationTypeIndex()}
 				/>
 			</Show>
 
@@ -417,31 +406,31 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={uiStore.showScriptArgsModal()}>
-				<ScriptArgsModal
-					scriptName={
+			<Show when={uiStore.showTaskArgsModal()}>
+				<TaskArgsModal
+					taskName={
 						appStore.tableFilteredApps()[appStore.selectedIndex()]
 							?.displayName || ""
 					}
-					parameters={uiStore.scriptArgsParameters()}
+					parameters={uiStore.taskArgsParameters()}
 					values={uiStore.scriptArgValues()}
-					selectedIndex={uiStore.scriptArgsSelectedIndex()}
-					selectedValueIndex={uiStore.scriptArgsSelectedValueIndex()}
-					focusedPane={uiStore.scriptArgsFocusedPane()}
-					editing={uiStore.scriptArgsEditing()}
-					historyIndex={uiStore.scriptArgsHistoryCursor()}
-					historyTotal={uiStore.scriptArgsHistoryForCurrent().length}
-					error={uiStore.scriptArgsError()}
+					selectedIndex={uiStore.taskArgsSelectedIndex()}
+					selectedValueIndex={uiStore.taskArgsSelectedValueIndex()}
+					focusedPane={uiStore.taskArgsFocusedPane()}
+					editing={uiStore.taskArgsEditing()}
+					historyIndex={uiStore.taskArgsHistoryCursor()}
+					historyTotal={uiStore.taskArgsHistoryForCurrent().length}
+					error={uiStore.taskArgsError()}
 				/>
 			</Show>
 
-			<Show when={uiStore.showScriptAddModal()}>
-				<ScriptAddModal
-					mode={uiStore.scriptAddMode()}
-					targetPath={uiStore.scriptAddTargetPath()}
-					sourcePath={uiStore.scriptAddSourcePath()}
-					selectedField={uiStore.scriptAddSelectedField()}
-					error={uiStore.scriptAddError()}
+			<Show when={uiStore.showTaskAddModal()}>
+				<TaskAddModal
+					mode={uiStore.taskAddMode()}
+					targetPath={uiStore.taskAddTargetPath()}
+					sourcePath={uiStore.taskAddSourcePath()}
+					selectedField={uiStore.taskAddSelectedField()}
+					error={uiStore.taskAddError()}
 				/>
 			</Show>
 
@@ -482,60 +471,60 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				</box>
 			</Show>
 
-			<Show when={mrStore.showDiffModal() && mrStore.currentDiffFile()}>
+			<Show when={changeRequestStore.showDiffModal() && changeRequestStore.currentDiffFile()}>
 				<DiffViewModal
 					filePath={
-						mrStore.currentDiffFile()!.new_path ||
-						mrStore.currentDiffFile()!.old_path
+						changeRequestStore.currentDiffFile()!.new_path ||
+						changeRequestStore.currentDiffFile()!.old_path
 					}
-					diff={mrStore.currentDiffFile()!.diff}
-					currentFileIndex={mrStore.selectedChangedFileIndex()}
-					totalFiles={mrStore.mrChanges().length}
-					selectedLine={mrStore.diffModalSelectedLine()}
-					visualModeActive={mrStore.diffModalVisualMode()}
-					visualModeStart={mrStore.diffModalVisualStart()}
-					forceSplitView={mrStore.diffModalForceSplitView()}
-					isNewFile={mrStore.currentDiffFile()!.new_file}
-					isDeletedFile={mrStore.currentDiffFile()!.deleted_file}
-					commentMode={mrStore.showCommentModal()}
-					commentText={mrStore.commentText()}
-					discussions={mrStore.mrDiscussions()}
-					currentHeadSHA={mrStore.selectedMR()?.head_pipeline?.sha}
-					replyModeDiscussionId={mrStore.replyMode()}
-					replyText={mrStore.replyText()}
-					collapsedThreads={mrStore.collapsedThreads()}
-					onSelectedLineChange={mrStore.setDiffModalSelectedLine}
-					onScrollBoxReady={(sb) => { mrStore.diffModalScrollBoxRef = sb; }}
-					onReplyToDiscussion={mrActions.replyToDiscussion}
+					diff={changeRequestStore.currentDiffFile()!.diff}
+					currentFileIndex={changeRequestStore.selectedChangedFileIndex()}
+					totalFiles={changeRequestStore.crChanges().length}
+					selectedLine={changeRequestStore.diffModalSelectedLine()}
+					visualModeActive={changeRequestStore.diffModalVisualMode()}
+					visualModeStart={changeRequestStore.diffModalVisualStart()}
+					forceSplitView={changeRequestStore.diffModalForceSplitView()}
+					isNewFile={changeRequestStore.currentDiffFile()!.new_file}
+					isDeletedFile={changeRequestStore.currentDiffFile()!.deleted_file}
+					commentMode={changeRequestStore.showCommentModal()}
+					commentText={changeRequestStore.commentText()}
+					discussions={changeRequestStore.crDiscussions()}
+					currentHeadSHA={changeRequestStore.selectedChangeRequest()?.head_pipeline?.sha}
+					replyModeDiscussionId={changeRequestStore.replyMode()}
+					replyText={changeRequestStore.replyText()}
+					collapsedThreads={changeRequestStore.collapsedThreads()}
+					onSelectedLineChange={changeRequestStore.setDiffModalSelectedLine}
+					onScrollBoxReady={(sb) => { changeRequestStore.diffModalScrollBoxRef = sb; }}
+					onReplyToDiscussion={crActions.replyToDiscussion}
 					onClose={() => {
-						mrStore.setShowDiffModal(false);
-						mrStore.setCurrentDiffFile(null);
-						mrStore.setDiffModalSelectedLine(0);
-						mrStore.setDiffModalVisualMode(false);
-						mrStore.setDiffModalVisualStart(0);
-						mrStore.setDiffModalForceSplitView(false);
-						mrStore.diffModalScrollBoxRef = undefined;
+						changeRequestStore.setShowDiffModal(false);
+						changeRequestStore.setCurrentDiffFile(null);
+						changeRequestStore.setDiffModalSelectedLine(0);
+						changeRequestStore.setDiffModalVisualMode(false);
+						changeRequestStore.setDiffModalVisualStart(0);
+						changeRequestStore.setDiffModalForceSplitView(false);
+						changeRequestStore.diffModalScrollBoxRef = undefined;
 
 						if (appStore.previousViewMode() === "discussionsView") {
 							appStore.setViewMode("discussionsView");
 						}
 					}}
 					onNavigateFile={(direction) => {
-						const changes = mrStore.mrChanges();
+						const changes = changeRequestStore.crChanges();
 						if (!changes || changes.length === 0) return;
 
 						let newIndex: number;
 						if (direction === 1) {
 							newIndex =
-								(mrStore.selectedChangedFileIndex() + 1) % changes.length;
+								(changeRequestStore.selectedChangedFileIndex() + 1) % changes.length;
 						} else {
-							newIndex = mrStore.selectedChangedFileIndex() - 1;
+							newIndex = changeRequestStore.selectedChangedFileIndex() - 1;
 							if (newIndex < 0) newIndex = changes.length - 1;
 						}
 
-						mrStore.setSelectedChangedFileIndex(newIndex);
-						mrStore.setDiffModalSelectedLine(0);
-						mrStore.setCurrentDiffFile(changes[newIndex]);
+						changeRequestStore.setSelectedChangedFileIndex(newIndex);
+						changeRequestStore.setDiffModalSelectedLine(0);
+						changeRequestStore.setCurrentDiffFile(changes[newIndex]);
 					}}
 				/>
 			</Show>
@@ -572,27 +561,27 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={mrStore.mrAiVisible()}>
-				<MrAiReviewOverlay
-					loading={mrStore.mrAiLoading()}
-					streaming={mrStore.mrAiStreaming()}
-					summary={mrStore.mrAiSummary()}
-					error={mrStore.mrAiError()}
-					onDismiss={() => mrStore.setMrAiVisible(false)}
+			<Show when={changeRequestStore.crAiVisible()}>
+				<CrAiReviewOverlay
+					loading={changeRequestStore.crAiLoading()}
+					streaming={changeRequestStore.crAiStreaming()}
+					summary={changeRequestStore.crAiSummary()}
+					error={changeRequestStore.crAiError()}
+					onDismiss={() => changeRequestStore.setCrAiVisible(false)}
 					onScrollBoxReady={(sb) => {
-						mrStore.mrAiScrollBoxRef = sb;
+						changeRequestStore.crAiScrollBoxRef = sb;
 					}}
 				/>
 			</Show>
 
 			<Show
-				when={mrStore.showTestDetailModal() && mrStore.selectedTestForDetail()}
+				when={changeRequestStore.showTestDetailModal() && changeRequestStore.selectedTestForDetail()}
 			>
 				<TestDetailModal
-					test={mrStore.selectedTestForDetail()!}
-					copyStatus={mrStore.testDetailCopyStatus()}
+					test={changeRequestStore.selectedTestForDetail()!}
+					copyStatus={changeRequestStore.testDetailCopyStatus()}
 					onCopy={() => {}}
-					onClose={() => mrStore.setShowTestDetailModal(false)}
+					onClose={() => changeRequestStore.setShowTestDetailModal(false)}
 				/>
 			</Show>
 

@@ -1,5 +1,5 @@
-import { For, createMemo } from "solid-js";
-import { useTerminalDimensions } from "@opentui/solid";
+import { For, createMemo } from 'solid-js';
+import { useTerminalDimensions } from '@opentui/solid';
 import { GenericModal } from "./GenericModal";
 import { formatHelpText } from "./HelpText";
 import { themeColorForTheme, themeNames } from "../theme";

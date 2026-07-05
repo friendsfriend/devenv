@@ -37,7 +37,7 @@ func TestSaveStoresCredentialPlaceholdersAndEnvEntries(t *testing.T) {
 	}
 }
 
-func TestLoadLegacyClearTextProvider(t *testing.T) {
+func TestLoadReportsClearTextProviderCredentials(t *testing.T) {
 	dir := t.TempDir()
 	providers := filepath.Join(dir, "providers")
 	if err := os.MkdirAll(providers, 0755); err != nil {
@@ -48,11 +48,18 @@ func TestLoadLegacyClearTextProvider(t *testing.T) {
 	}
 	store := NewStore(providers, filepath.Join(dir, ".env"))
 	if err := store.Load(); err != nil {
-		t.Fatal(err)
+		t.Fatalf("load should not fail for invalid provider file: %v", err)
 	}
-	p, ok := store.Get("legacy")
-	if !ok || p.Username != "bob" || p.Token != "old" {
-		t.Fatalf("legacy provider not loaded: %#v ok=%v", p, ok)
+	if _, ok := store.Get("legacy"); ok {
+		t.Fatal("invalid provider should not be usable")
+	}
+	invalid := store.InvalidProviders()
+	if len(invalid) != 1 || invalid[0].Name != "legacy" || !strings.Contains(invalid[0].Message, "clear-text") {
+		t.Fatalf("invalid provider not reported: %#v", invalid)
+	}
+	username, token := store.CredentialsFor("legacy")
+	if username != "" || token != "" {
+		t.Fatalf("invalid provider credentials should be guarded, got %q %q", username, token)
 	}
 }
 

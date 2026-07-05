@@ -1,5 +1,5 @@
-import { Show } from "solid-js";
-import type { Issue, MergeRequest } from "@devenv/types";
+import { Show } from 'solid-js';
+import type { Issue, ChangeRequest } from '@devenv/types';
 import { uiColors } from "../colors";
 import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
@@ -8,7 +8,7 @@ import { WorkItemCard } from "./WorkItemCard";
 import { formatShortDate, getIssueStateColor } from "../statusUtils";
 
 type RefItem =
-	| { type: "mr"; data: MergeRequest }
+	| { type: "cr"; data: ChangeRequest }
 	| { type: "issue"; data: Issue };
 
 interface ReferencesViewProps {
@@ -22,14 +22,14 @@ interface ReferencesViewProps {
 }
 
 /**
- * ReferencesView Component — Full-screen sub-view of combined references (issues + MRs).
+ * ReferencesView Component — Full-screen sub-view of combined references (issues + CRs).
  */
 export function ReferencesView(props: ReferencesViewProps) {
 	// Layout header (2) + footer (3) + panel spacers/header (3).
 	const RESERVED_LINES = LAYOUT_CHROME_LINES + 3;
 
-	const typeLabel = (ref: RefItem) => ref.type === "mr" ? "MR" : "Issue";
-	const typeColor = (ref: RefItem) => ref.type === "mr" ? uiColors.primary : uiColors.textSecondary;
+	const typeLabel = (ref: RefItem) => ref.type === "cr" ? "CR" : "Issue";
+	const typeColor = (ref: RefItem) => ref.type === "cr" ? uiColors.primary : uiColors.textSecondary;
 
 	return (
 		<ContentPanel>
@@ -65,11 +65,11 @@ export function ReferencesView(props: ReferencesViewProps) {
 							items={props.references}
 							selectedIndex={props.selectedIndex}
 							reservedLines={RESERVED_LINES}
-							estimatedItemHeight={4}
+							estimatedItemHeight={2}
 							showScrollIndicator={false}
-							renderItem={(ref, isSelected) => (
+							renderItem={(ref, isSelected, index) => (
 								<WorkItemCard
-									marker={`${ref.type === "mr" ? "!" : "#"}${ref.data.iid}`}
+									marker={`${ref.type === "cr" ? "!" : "#"}${ref.data.iid}`}
 									prefix={`[${typeLabel(ref)}] `}
 									prefixColor={typeColor(ref)}
 									title={ref.data.title}
@@ -77,6 +77,7 @@ export function ReferencesView(props: ReferencesViewProps) {
 									statusColor={getIssueStateColor(ref.data.state)}
 									metadata={`@${ref.data.author.name} • updated ${formatShortDate(ref.data.updated_at)}`}
 									selected={isSelected()}
+									index={index}
 									runningTextEnabled={props.runningTextEnabled}
 									runningTextOffset={props.runningTextOffset}
 								/>

@@ -1,27 +1,19 @@
 package server
 
 import (
-	"bytes"
-	"context"
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 )
-
-// agentSpaceResponse is the JSON shape returned by /api/agent-spaces.
-type agentSpaceResponse struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	RepoDirs    []string `json:"repoDirs"`
-	HasAgent    bool     `json:"hasAgent"`
-}
 
 type agentSessionInfo struct {
 	ID          string `json:"id"`
@@ -34,279 +26,6 @@ type agentGroup struct {
 	Name     string             `json:"name"`
 	Model    string             `json:"model"`
 	Sessions []agentSessionInfo `json:"sessions"`
-}
-
-// handleGetAgentSpaces dynamically discovers agent spaces from the agents config directory.
-func (s *Server) handleGetAgentSpaces(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	rm := s.services.ResourcesManager()
-	discovered, err := rm.DiscoverAgentSpaces()
-	if err != nil {
-		log.Printf("[WARN] Failed to discover agent spaces: %v", err)
-		respondJSON(w, map[string]interface{}{"spaces": []agentSpaceResponse{}}, http.StatusOK)
-		return
-	}
-
-	spaces := make([]agentSpaceResponse, 0, len(discovered))
-	for _, d := range discovered {
-		spaces = append(spaces, agentSpaceResponse{
-			ID:       d.ID,
-			Name:     d.ID,
-			HasAgent: true,
-		})
-	}
-	respondJSON(w, map[string]interface{}{"spaces": spaces}, http.StatusOK)
-}
-
-type rawAgentSession struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Agent       string `json:"agent"`
-	Model       string `json:"model"`
-	TimeCreated int64  `json:"time_created"`
-	TimeUpdated int64  `json:"time_updated"`
-}
-
-func groupRawAgentSessions(rawRows []rawAgentSession) []agentGroup {
-	if len(rawRows) == 0 {
-		return []agentGroup{}
-	}
-
-	groupsByName := make(map[string]*agentGroup)
-	groupOrder := make([]string, 0)
-
-	for _, row := range rawRows {
-		agentName := strings.TrimSpace(row.Agent)
-		if agentName == "" {
-			agentName = "Unknown Agent"
-		}
-
-		model := strings.TrimSpace(row.Model)
-
-		group, exists := groupsByName[agentName]
-		if !exists {
-			group = &agentGroup{
-				Name:     agentName,
-				Model:    model,
-				Sessions: make([]agentSessionInfo, 0),
-			}
-			groupsByName[agentName] = group
-			groupOrder = append(groupOrder, agentName)
-		}
-
-		if group.Model == "" && model != "" {
-			group.Model = model
-		}
-
-		group.Sessions = append(group.Sessions, agentSessionInfo{
-			ID:          row.ID,
-			Title:       row.Title,
-			TimeCreated: row.TimeCreated,
-			TimeUpdated: row.TimeUpdated,
-		})
-	}
-
-	result := make([]agentGroup, 0, len(groupOrder))
-	for _, name := range groupOrder {
-		if group := groupsByName[name]; group != nil {
-			result = append(result, *group)
-		}
-	}
-
-	if len(result) == 0 {
-		return []agentGroup{}
-	}
-
-	return result
-}
-
-func (s *Server) queryAgentSessions() ([]agentGroup, error) {
-	if _, err := exec.LookPath("opencode"); err != nil {
-		return nil, fmt.Errorf("opencode not found in PATH")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	pathCmd := exec.CommandContext(ctx, "opencode", "db", "path")
-	pathOut, err := pathCmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("opencode db path failed: %w", err)
-	}
-	dbPath := strings.TrimSpace(string(pathOut))
-	if dbPath == "" {
-		return nil, fmt.Errorf("opencode db path returned empty path")
-	}
-
-	query := "SELECT s.id, s.title, json_extract(m.data, '$.agent') as agent, json_extract(m.data, '$.modelID') as model, s.time_created, s.time_updated FROM session s JOIN message m ON m.session_id = s.id AND json_extract(m.data, '$.role') = 'assistant' WHERE s.parent_id IS NULL GROUP BY s.id HAVING m.id = MAX(m.id) ORDER BY s.time_updated DESC"
-
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel2()
-
-	cmd := exec.CommandContext(ctx2, "sqlite3", dbPath, "--json", query)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		if ctx2.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("sqlite3 query timed out after 10s")
-		}
-		if stderr.Len() > 0 {
-			return nil, fmt.Errorf("sqlite3 query failed: %s", strings.TrimSpace(stderr.String()))
-		}
-		return nil, fmt.Errorf("sqlite3 query failed: %w", err)
-	}
-
-	var rawRows []rawAgentSession
-	if err := json.Unmarshal(stdout.Bytes(), &rawRows); err != nil {
-		return nil, fmt.Errorf("failed to parse sqlite3 output: %w", err)
-	}
-
-	return groupRawAgentSessions(rawRows), nil
-}
-
-func queryOpencodeAgents() ([]string, error) {
-	if _, err := exec.LookPath("opencode"); err != nil {
-		return nil, fmt.Errorf("opencode not found in PATH")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "opencode", "agent", "list")
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
-			return nil, fmt.Errorf("opencode agent list timed out after 10s")
-		}
-		if stderr.Len() > 0 {
-			return nil, fmt.Errorf("opencode agent list failed: %s", strings.TrimSpace(stderr.String()))
-		}
-		return nil, fmt.Errorf("opencode agent list failed: %w", err)
-	}
-
-	var agents []string
-	for _, line := range strings.Split(stdout.String(), "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		// Only accept agent header lines of the form "<name> (<type>)".
-		// Skip JSON fragments ({, [, }, ], "), numeric values, etc.
-		firstChar := line[0]
-		if firstChar == '{' || firstChar == '[' || firstChar == '}' || firstChar == ']' || firstChar == '"' {
-			continue
-		}
-		if !strings.Contains(line, " (") {
-			continue
-		}
-		typeStart := strings.Index(line, "(")
-		typeEnd := strings.Index(line, ")")
-		if typeStart == -1 || typeEnd == -1 || typeEnd <= typeStart {
-			continue
-		}
-		if line[typeStart+1:typeEnd] == "subagent" {
-			continue
-		}
-		name := strings.SplitN(line, " ", 2)[0]
-		if name != "" {
-			agents = append(agents, name)
-		}
-	}
-
-	if agents == nil {
-		agents = []string{}
-	}
-	return agents, nil
-}
-
-func (s *Server) handleGetOpencodeAgents(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	agents, err := queryOpencodeAgents()
-	if err != nil {
-		log.Printf("[WARN] Failed to list opencode agents: %v", err)
-		respondJSON(w, map[string]interface{}{"agents": []string{}}, http.StatusOK)
-		return
-	}
-
-	respondJSON(w, map[string]interface{}{"agents": agents}, http.StatusOK)
-}
-
-func (s *Server) handleGetAgentSessions(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	groups, err := s.queryAgentSessions()
-	if err != nil {
-		respondInternalError(w, err)
-		return
-	}
-
-	respondJSON(w, map[string]interface{}{"agents": groups}, http.StatusOK)
-}
-
-// handleExtractAgentFile returns the path to the opencode agent .md file for
-// the given space id from the config directory.
-// POST /api/agent-spaces/{id}/extract-agent
-func (s *Server) handleExtractAgentFile(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	spaceID := r.PathValue("id")
-	if spaceID == "" {
-		respondBadRequest(w, "missing space id")
-		return
-	}
-
-	rm := s.services.ResourcesManager()
-	_, err := rm.AgentFilePath(spaceID)
-	if err != nil {
-		respondNotFound(w, err.Error())
-		return
-	}
-
-	respondJSON(w, map[string]interface{}{
-		"agentsDir": rm.AgentsDir(),
-		"agentId":   spaceID,
-	}, http.StatusOK)
-}
-
-// handleExtractOpencodeConfig returns the path to opencode.json in the config directory.
-// POST /api/opencode-config/extract
-func (s *Server) handleExtractOpencodeConfig(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	rm := s.services.ResourcesManager()
-	configPath, err := rm.OpencodeConfigPath()
-	if err != nil {
-		respondInternalError(w, err)
-		return
-	}
-
-	respondJSON(w, map[string]interface{}{
-		"configPath": configPath,
-	}, http.StatusOK)
 }
 
 func slugify(s string) string {
@@ -323,4 +42,185 @@ func extractHostFromURL(rawURL string) string {
 		return ""
 	}
 	return parsed.Hostname()
+}
+
+// queryPiSessions reads pi session files from the pi agent sessions directory
+// and returns them grouped by CWD slug as AgentGroup entries.
+// Respects the PI_CODING_AGENT_DIR environment variable (default: ~/.pi/agent).
+func queryPiSessions() ([]agentGroup, error) {
+	if _, err := exec.LookPath("pi"); err != nil {
+		return []agentGroup{}, nil
+	}
+
+	// Respect PI_CODING_AGENT_DIR env var, fall back to ~/.pi/agent
+	agentDir := os.Getenv("PI_CODING_AGENT_DIR")
+	if agentDir == "" {
+		homedir, err := os.UserHomeDir()
+		if err != nil {
+			return []agentGroup{}, nil
+		}
+		agentDir = filepath.Join(homedir, ".pi", "agent")
+	}
+	sessionsBase := filepath.Join(agentDir, "sessions")
+
+	entries, err := os.ReadDir(sessionsBase)
+	if err != nil {
+		// Sessions dir doesn't exist yet — not an error
+		return []agentGroup{}, nil
+	}
+
+	groupsByName := make(map[string][]agentSessionInfo)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dirPath := filepath.Join(sessionsBase, entry.Name())
+		files, err := os.ReadDir(dirPath)
+		if err != nil {
+			continue
+		}
+
+		for _, f := range files {
+			if f.IsDir() || !strings.HasSuffix(f.Name(), ".jsonl") {
+				continue
+			}
+			filePath := filepath.Join(dirPath, f.Name())
+			info, cwd, err := parsePiSessionFile(filePath)
+			if err != nil {
+				continue
+			}
+			// Use the last path component of the actual cwd as the group name.
+			// Fall back to the directory slug if cwd is missing.
+			groupName := filepath.Base(cwd)
+			if groupName == "." || groupName == "" {
+				groupName = entry.Name()
+			}
+			groupsByName[groupName] = append(groupsByName[groupName], info)
+		}
+	}
+
+	groups := make([]agentGroup, 0, len(groupsByName))
+	for name, sessions := range groupsByName {
+		groups = append(groups, agentGroup{Name: name, Sessions: sessions})
+	}
+	return groups, nil
+}
+
+// parsePiSessionFile reads a pi session JSONL file and extracts the session
+// metadata plus the first user message as the title.
+// The session "id" is set to the full file path so the TUI can pass it
+// directly to `pi --session <path>`.
+func parsePiSessionFile(filePath string) (agentSessionInfo, string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return agentSessionInfo{}, "", err
+	}
+	defer f.Close()
+
+	type sessionHeader struct {
+		Timestamp string `json:"timestamp"`
+		Cwd       string `json:"cwd"`
+	}
+	type messageContent struct {
+		Type string `json:"type"`
+		Text string `json:"text"`
+	}
+	type innerMessage struct {
+		Role    string           `json:"role"`
+		Content []messageContent `json:"content"`
+	}
+	type entry struct {
+		Type    string       `json:"type"`
+		Message innerMessage `json:"message"`
+	}
+
+	var header sessionHeader
+	var firstUserText string
+
+	scanner := bufio.NewScanner(f)
+	// Cap individual line reads at 1 MB to avoid OOM on large tool-call lines.
+	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+
+		// Peek at "type" without full decode
+		var peek struct {
+			Type string `json:"type"`
+		}
+		if err := json.Unmarshal(line, &peek); err != nil {
+			continue
+		}
+
+		switch peek.Type {
+		case "session":
+			json.Unmarshal(line, &header) //nolint:errcheck
+		case "message":
+			if firstUserText != "" {
+				break
+			}
+			var e entry
+			if err := json.Unmarshal(line, &e); err != nil {
+				continue
+			}
+			if e.Message.Role == "user" {
+				for _, part := range e.Message.Content {
+					if part.Type == "text" && part.Text != "" {
+						firstUserText = part.Text
+						break
+					}
+				}
+			}
+		}
+
+		// Stop once we have both pieces
+		if header.Timestamp != "" && firstUserText != "" {
+			break
+		}
+	}
+
+	if header.Timestamp == "" {
+		return agentSessionInfo{}, "", fmt.Errorf("no session header found in %s", filePath)
+	}
+
+	t, _ := time.Parse(time.RFC3339Nano, header.Timestamp)
+	tMs := t.UnixMilli()
+
+	// Build a human title: first user message (truncated) or timestamp fallback
+	title := firstUserText
+	if title == "" {
+		title = t.Format("2006-01-02 15:04")
+	} else if len([]rune(title)) > 60 {
+		runes := []rune(title)
+		title = string(runes[:57]) + "..."
+	}
+	// Collapse newlines / tabs to spaces
+	title = strings.Join(strings.Fields(title), " ")
+
+	return agentSessionInfo{
+		ID:          filePath,
+		Title:       title,
+		TimeCreated: tMs,
+		TimeUpdated: tMs,
+	}, header.Cwd, nil
+}
+
+func (s *Server) handleGetPiSessions(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+	groups, err := queryPiSessions()
+	if err != nil {
+		log.Printf("[WARN] Failed to query pi sessions: %v", err)
+		respondJSON(w, map[string]interface{}{"agents": []agentGroup{}}, http.StatusOK)
+		return
+	}
+	if groups == nil {
+		groups = []agentGroup{}
+	}
+	respondJSON(w, map[string]interface{}{"agents": groups}, http.StatusOK)
 }

@@ -9,8 +9,8 @@ All logs live under `$DEVENV_HOME/logs/` (default `~/devenv/logs/`):
 ```
 ~/devenv/logs/
 ├── status.log              # Operation status log (structured)
-├── my-service.log          # Per-app command output logs
-├── postgres.log            # Per-infra service logs
+├── my-service.log          # Per-application command output logs
+├── postgres.log            # Per-infrastructure service logs
 └── shared-lib.log          # Per-library operation logs
 ```
 
@@ -23,14 +23,14 @@ The status log (`status.log`) records structured operation state changes. It is 
 2026-07-01 07:20:09|my-service|my-service|build|failed|Error: exit status 125
 ```
 
-Each entry includes timestamp, app ident, app name, operation, status, and message.
+Each entry includes timestamp, item ident, item name, operation, status, and message.
 
-## 3. Per-app logs
+## 3. Per-item logs
 
-Each app, library, and infrastructure service has its own log file:
+Each application, library, and infrastructure service has its own log file:
 
 ```
-~/devenv/logs/APP_IDENT.log
+~/devenv/logs/ITEM_IDENT.log
 ```
 
 These logs contain command input and full stdout/stderr from Docker/Podman operations (build, test, start, stop), git operations (clone, pull, push), and script execution.
@@ -53,8 +53,8 @@ tail -f ~/devenv/logs/status.log
 
 ## 5. Viewing logs in the TUI
 
-- Press `l` to view container logs for the selected app
-- Press `o` to view operation logs for the selected app
+- Press `l` to view container logs for the selected item
+- Press `o` to view operation logs for the selected item
 - Press `L` to toggle the status log maximized view
 
 See [Using the Log Viewer](using-log-viewer.md) for full keyboard shortcuts and features.
@@ -68,5 +68,5 @@ Press `e` while in the log viewer to open the current log file in `$EDITOR`.
 | Log Type | Location |
 |---|---|
 | Status/operation log | `~/devenv/logs/status.log` |
-| Per-app container logs | `~/devenv/logs/APP_IDENT.log` |
+| Per-item logs | `~/devenv/logs/ITEM_IDENT.log` |
 | Server log | `~/devenv/logs/status.log` |

@@ -1,6 +1,6 @@
 {
   "name": "@devenv/cli",
-  "version": "0.6.0",
+  "version": "0.9.0",
   "type": "module",
   "bin": {
     "devenv": "./src/spawn.ts"
@@ -9,8 +9,8 @@
     "@devenv/core": "workspace:*",
     "@devenv/types": "workspace:*",
     "@devenv/ui": "workspace:*",
-    "@opentui/core": "0.4.1",
-    "@opentui/solid": "0.4.1",
+    "@opentui/core": "0.4.2",
+    "@opentui/solid": "0.4.2",
     "commander": "^14.0.3",
     "solid-js": "^1.9.12"
   },

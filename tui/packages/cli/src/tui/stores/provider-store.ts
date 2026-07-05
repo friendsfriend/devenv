@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js';
-import type { AddAppStep, FindRepoMode, ConnectProviderStep } from '@devenv/ui';
+import type { AddRepositoryStep, FindRepoMode, ConnectProviderStep } from '@devenv/ui';
 import type { Provider, ProviderType, RepoSearchResult } from '@devenv/types';
 
 export function createProviderStore() {
@@ -16,24 +16,24 @@ export function createProviderStore() {
   const [connectProviderError, setConnectProviderError] = createSignal<string | null>(null);
   const [connectProviderSuccess, setConnectProviderSuccess] = createSignal<string | null>(null);
   const [connectProviderEditMode, setConnectProviderEditMode] = createSignal(false);
-  const [showAddAppModal, setShowAddAppModal] = createSignal(false);
-  const [addAppStep, setAddAppStep] = createSignal<AddAppStep>('selectProvider');
-  const [addAppProviders, setAddAppProviders] = createSignal<Array<{ name: string; type: string }>>([]);
-  const [addAppSelectedProviderIndex, setAddAppSelectedProviderIndex] = createSignal(0);
-  const [addAppSearchQuery, setAddAppSearchQuery] = createSignal('');
-  const [addAppSearchResults, setAddAppSearchResults] = createSignal<RepoSearchResult[]>([]);
-  const [addAppSelectedResultIndex, setAddAppSelectedResultIndex] = createSignal(0);
-  const [addAppManualUrl, setAddAppManualUrl] = createSignal('');
-  const [addAppFindRepoMode, setAddAppFindRepoMode] = createSignal<FindRepoMode>('selectMode');
-  const [addAppFindRepoModeIndex, setAddAppFindRepoModeIndex] = createSignal(0);
-  const [addAppName, setAddAppName] = createSignal('');
-  const [addAppBranches, setAddAppBranches] = createSignal<string[]>([]);
-  const [addAppSelectedBranchIndex, setAddAppSelectedBranchIndex] = createSignal(0);
-  const [addAppBranchFilter, setAddAppBranchFilter] = createSignal('');
-  const [addAppLoading, setAddAppLoading] = createSignal(false);
-  const [addAppError, setAddAppError] = createSignal<string | null>(null);
-  const [addAppAppType, setAddAppAppType] = createSignal<'APP' | 'LIB'>('APP');
-  const [addAppAppTypeIndex, setAddAppAppTypeIndex] = createSignal(0);
+  const [showAddRepositoryModal, setShowAddRepositoryModal] = createSignal(false);
+  const [addRepositoryStep, setAddRepositoryStep] = createSignal<AddRepositoryStep>('selectProvider');
+  const [addRepositoryProviders, setAddRepositoryProviders] = createSignal<Array<{ name: string; type: string }>>([]);
+  const [addRepositorySelectedProviderIndex, setAddRepositorySelectedProviderIndex] = createSignal(0);
+  const [addRepositorySearchQuery, setAddRepositorySearchQuery] = createSignal('');
+  const [addRepositorySearchResults, setAddRepositorySearchResults] = createSignal<RepoSearchResult[]>([]);
+  const [addRepositorySelectedResultIndex, setAddRepositorySelectedResultIndex] = createSignal(0);
+  const [addRepositoryManualUrl, setAddRepositoryManualUrl] = createSignal('');
+  const [addRepositoryFindRepoMode, setAddRepositoryFindRepoMode] = createSignal<FindRepoMode>('selectMode');
+  const [addRepositoryFindRepoModeIndex, setAddRepositoryFindRepoModeIndex] = createSignal(0);
+  const [addRepositoryName, setAddRepositoryName] = createSignal('');
+  const [addRepositoryBranches, setAddRepositoryBranches] = createSignal<string[]>([]);
+  const [addRepositorySelectedBranchIndex, setAddRepositorySelectedBranchIndex] = createSignal(0);
+  const [addRepositoryBranchFilter, setAddRepositoryBranchFilter] = createSignal('');
+  const [addRepositoryLoading, setAddRepositoryLoading] = createSignal(false);
+  const [addRepositoryError, setAddRepositoryError] = createSignal<string | null>(null);
+  const [addRepositoryDestinationType, setAddRepositoryDestinationType] = createSignal<'APP' | 'LIB'>('APP');
+  const [addRepositoryDestinationTypeIndex, setAddRepositoryDestinationTypeIndex] = createSignal(0);
   const [selectedProviderIndex, setSelectedProviderIndex] = createSignal(0);
 
   return {
@@ -63,42 +63,42 @@ export function createProviderStore() {
     setConnectProviderSuccess,
     connectProviderEditMode,
     setConnectProviderEditMode,
-    showAddAppModal,
-    setShowAddAppModal,
-    addAppStep,
-    setAddAppStep,
-    addAppProviders,
-    setAddAppProviders,
-    addAppSelectedProviderIndex,
-    setAddAppSelectedProviderIndex,
-    addAppSearchQuery,
-    setAddAppSearchQuery,
-    addAppSearchResults,
-    setAddAppSearchResults,
-    addAppSelectedResultIndex,
-    setAddAppSelectedResultIndex,
-    addAppManualUrl,
-    setAddAppManualUrl,
-    addAppFindRepoMode,
-    setAddAppFindRepoMode,
-    addAppFindRepoModeIndex,
-    setAddAppFindRepoModeIndex,
-    addAppName,
-    setAddAppName,
-    addAppBranches,
-    setAddAppBranches,
-    addAppSelectedBranchIndex,
-    setAddAppSelectedBranchIndex,
-    addAppBranchFilter,
-    setAddAppBranchFilter,
-    addAppLoading,
-    setAddAppLoading,
-    addAppError,
-    setAddAppError,
-    addAppAppType,
-    setAddAppAppType,
-    addAppAppTypeIndex,
-    setAddAppAppTypeIndex,
+    showAddRepositoryModal,
+    setShowAddRepositoryModal,
+    addRepositoryStep,
+    setAddRepositoryStep,
+    addRepositoryProviders,
+    setAddRepositoryProviders,
+    addRepositorySelectedProviderIndex,
+    setAddRepositorySelectedProviderIndex,
+    addRepositorySearchQuery,
+    setAddRepositorySearchQuery,
+    addRepositorySearchResults,
+    setAddRepositorySearchResults,
+    addRepositorySelectedResultIndex,
+    setAddRepositorySelectedResultIndex,
+    addRepositoryManualUrl,
+    setAddRepositoryManualUrl,
+    addRepositoryFindRepoMode,
+    setAddRepositoryFindRepoMode,
+    addRepositoryFindRepoModeIndex,
+    setAddRepositoryFindRepoModeIndex,
+    addRepositoryName,
+    setAddRepositoryName,
+    addRepositoryBranches,
+    setAddRepositoryBranches,
+    addRepositorySelectedBranchIndex,
+    setAddRepositorySelectedBranchIndex,
+    addRepositoryBranchFilter,
+    setAddRepositoryBranchFilter,
+    addRepositoryLoading,
+    setAddRepositoryLoading,
+    addRepositoryError,
+    setAddRepositoryError,
+    addRepositoryDestinationType,
+    setAddRepositoryDestinationType,
+    addRepositoryDestinationTypeIndex,
+    setAddRepositoryDestinationTypeIndex,
     selectedProviderIndex,
     setSelectedProviderIndex,
   };

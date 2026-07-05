@@ -3,7 +3,6 @@ package github
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -303,8 +302,8 @@ func NewIssuesClient(c Client, info *RepoInfo) issues.Client {
 	}
 }
 
-// issueToMR converts github.RepoInfo to issues.RepoInfo.
-func (ic *IssuesClient) issueToMR() *issues.RepoInfo {
+// issueToChangeRequest converts github.RepoInfo to issues.RepoInfo.
+func (ic *IssuesClient) issueToChangeRequest() *issues.RepoInfo {
 	return &issues.RepoInfo{
 		Owner: ic.info.Owner,
 		Repo:  ic.info.Repo,
@@ -866,6 +865,3 @@ func (ic *IssuesClient) AddComment(info *issues.RepoInfo, number int, body strin
 	result := convertGHIssueComment(ghComment)
 	return &result, nil
 }
-
-// ensure logger import is used
-var _ = log.Printf

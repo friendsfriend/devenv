@@ -1,13 +1,13 @@
-import { createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal } from 'solid-js';
 import type {
 	Issue,
 	IssueComment,
 	IssueScope,
-	MergeRequest,
-} from "@devenv/types";
+	ChangeRequest,
+} from '@devenv/types';
 
 export type ReferenceItem =
-	| { type: "mr"; data: MergeRequest }
+	| { type: "cr"; data: ChangeRequest }
 	| { type: "issue"; data: Issue };
 
 export function createIssueStore() {
@@ -53,13 +53,13 @@ export function createIssueStore() {
 		string[]
 	>([]);
 
-	// Linked MRs
-	const [linkedMRs, setLinkedMRs] = createSignal<MergeRequest[]>([]);
-	const [linkedMRsLoading, setLinkedMRsLoading] = createSignal(false);
-	const [linkedMRsError, setLinkedMRsError] = createSignal("");
-	const [selectedLinkedMRIndex, setSelectedLinkedMRIndex] = createSignal(0);
+	// Linked CRs
+	const [linkedChangeRequests, setLinkedCRs] = createSignal<ChangeRequest[]>([]);
+	const [linkedChangeRequestsLoading, setLinkedCRsLoading] = createSignal(false);
+	const [linkedChangeRequestsError, setLinkedCRsError] = createSignal("");
+	const [selectedLinkedCRIndex, setSelectedLinkedCRIndex] = createSignal(0);
 
-	// Unified References — merged list of referenced issues + linked MRs
+	// Unified References — merged list of referenced issues + linked CRs
 	const [references, setReferences] = createSignal<ReferenceItem[]>([]);
 	const [selectedReferenceIndex, setSelectedReferenceIndex] = createSignal(0);
 
@@ -171,15 +171,15 @@ export function createIssueStore() {
 		selectedTimelineIndex,
 		setSelectedTimelineIndex,
 
-		// Linked MRs
-		linkedMRs,
-		setLinkedMRs,
-		linkedMRsLoading,
-		setLinkedMRsLoading,
-		linkedMRsError,
-		setLinkedMRsError,
-		selectedLinkedMRIndex,
-		setSelectedLinkedMRIndex,
+		// Linked CRs
+		linkedChangeRequests,
+		setLinkedCRs,
+		linkedChangeRequestsLoading,
+		setLinkedCRsLoading,
+		linkedChangeRequestsError,
+		setLinkedCRsError,
+		selectedLinkedCRIndex,
+		setSelectedLinkedCRIndex,
 
 		// Referenced Issues
 		referencedIssues,

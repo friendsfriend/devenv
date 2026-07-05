@@ -1,6 +1,6 @@
 import { createSignal, onMount, createEffect, For, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
-import { useKeyboard, useTerminalDimensions } from '@opentui/solid';
+import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 
 export interface LogViewProps {
@@ -21,7 +21,7 @@ export interface LogViewProps {
  * 
  * Features:
  * - Scrollable viewport with wide content (prevents wrapping)
- * - Keyboard navigation: j/k (scroll), h/l (horizontal), u/d (page), g/G (top/bottom)
+ * - Keyboard navigation handled by parent-level keyboard router
  * - ESC to close (handled by parent)
  * - Auto-scroll to bottom when opened
  * - Uses Layout header for title, footer (StatusBar) for keybindings
@@ -56,62 +56,6 @@ export function LogView(props: LogViewProps) {
     const maxOffset = maxScrollOffset();
     setScrollOffset(maxOffset);
     setIsAtBottom(true);
-  });
-
-  // Keyboard navigation handlers with boundary checks
-  useKeyboard((event) => {
-    const totalLines = lines().length;
-    const currentOffset = scrollOffset();
-    const maxOffset = maxScrollOffset();
-
-    // Check for Shift+G (go to bottom) - OpenTUI may represent this differently
-    if ((event.name === 'G' || (event.name === 'g' && event.shift)) && event.shift !== false) {
-      setScrollOffset(maxOffset);
-      setIsAtBottom(true);
-      return;
-    }
-
-    switch (event.name) {
-      case 'j':
-      case 'Down':
-        // Scroll down one line (only if not at bottom)
-        if (currentOffset < maxOffset) {
-          const newOffset = currentOffset + 1;
-          setScrollOffset(newOffset);
-          setIsAtBottom(newOffset >= maxOffset);
-        }
-        break;
-      case 'k':
-      case 'Up':
-        // Scroll up one line (only if not at top)
-        if (currentOffset > 0) {
-          setScrollOffset(currentOffset - 1);
-          setIsAtBottom(false);
-        }
-        break;
-      case 'd':
-        // Scroll down half page (10 lines) - stop at bottom
-        if (currentOffset < maxOffset) {
-          const newOffset = Math.min(maxOffset, currentOffset + 10);
-          setScrollOffset(newOffset);
-          setIsAtBottom(newOffset >= maxOffset);
-        }
-        break;
-      case 'u':
-        // Scroll up half page (10 lines) - stop at top
-        if (currentOffset > 0) {
-          setScrollOffset(Math.max(0, currentOffset - 10));
-          setIsAtBottom(false);
-        }
-        break;
-      case 'g':
-        // Go to top (lowercase g only, without shift)
-        if (!event.shift) {
-          setScrollOffset(0);
-          setIsAtBottom(false);
-        }
-        break;
-    }
   });
 
   const lineStyle = (line: string): { fg: string; bg?: string; attributes?: number } => {

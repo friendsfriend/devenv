@@ -256,18 +256,18 @@ export async function addIssueComment(
 }
 
 /**
- * Get linked merge requests for an issue.
+ * Get linked change requests for an issue.
  */
-export async function getIssueLinkedMRs(
+export async function getIssueLinkedCRs(
 	deps: ClientDeps,
 	appIdent: string,
 	number: number,
 	sourceType?: string,
-): Promise<import("@devenv/types").MergeRequest[]> {
+): Promise<import("@devenv/types").ChangeRequest[]> {
 	const endpoint =
 		sourceType === "github"
-			? "github/issues/linked-mrs"
-			: "gitlab/issues/linked-mrs";
+			? "github/issues/linked-crs"
+			: "gitlab/issues/linked-crs";
 	const response = await deps.fetchFn(
 		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
 	);
@@ -276,7 +276,7 @@ export async function getIssueLinkedMRs(
 		await handleFetchError(response, deps.onError);
 	}
 
-	return (await response.json()) as import("@devenv/types").MergeRequest[];
+	return (await response.json()) as import("@devenv/types").ChangeRequest[];
 }
 
 /**
@@ -304,9 +304,9 @@ export async function getIssueReferencedIssues(
 }
 
 /**
- * Get linked issues for a merge request.
+ * Get linked issues for a change request.
  */
-export async function getMRLinkedIssues(
+export async function getCRLinkedIssues(
 	deps: ClientDeps,
 	appIdent: string,
 	number: number,
@@ -314,8 +314,8 @@ export async function getMRLinkedIssues(
 ): Promise<import("@devenv/types").Issue[]> {
 	const endpoint =
 		sourceType === "github"
-			? "github/mr/linked-issues"
-			: "gitlab/mr/linked-issues";
+			? "github/cr/linked-issues"
+			: "gitlab/cr/linked-issues";
 	const response = await deps.fetchFn(
 		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
 	);

@@ -35,9 +35,18 @@ type Store interface {
 	Load() error
 	Get(name string) (Provider, bool)
 	List() []Provider
+	InvalidProviders() []InvalidProvider
 	Save(p Provider) error
 	Delete(name string) error
 	CredentialsFor(name string) (username, token string)
+}
+
+type InvalidProvider struct {
+	Name    string `json:"name"`
+	Type    string `json:"type"`
+	File    string `json:"file"`
+	Reason  string `json:"reason"`
+	Message string `json:"message"`
 }
 
 type store struct {
@@ -45,6 +54,7 @@ type store struct {
 	envFilePath string
 	mu          sync.RWMutex
 	providers   map[string]Provider
+	invalid     map[string]InvalidProvider
 }
 
 func NewStore(dir string, envFilePath string) Store {
@@ -52,6 +62,7 @@ func NewStore(dir string, envFilePath string) Store {
 		dir:         dir,
 		envFilePath: envFilePath,
 		providers:   make(map[string]Provider),
+		invalid:     make(map[string]InvalidProvider),
 	}
 }
 
@@ -81,6 +92,7 @@ func (s *store) Load() error {
 	}
 
 	s.providers = make(map[string]Provider)
+	s.invalid = make(map[string]InvalidProvider)
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
 			continue
@@ -91,6 +103,25 @@ func (s *store) Load() error {
 			return fmt.Errorf("failed to read provider file %s: %w", entry.Name(), err)
 		}
 
+		var raw Provider
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return fmt.Errorf("failed to parse provider file %s: %w", entry.Name(), err)
+		}
+		if err := validateProviderFileCredentials(entry.Name(), raw); err != nil {
+			name := raw.Name
+			if name == "" {
+				name = strings.TrimSuffix(entry.Name(), ".json")
+			}
+			s.invalid[name] = InvalidProvider{
+				Name:    name,
+				Type:    raw.Type,
+				File:    entry.Name(),
+				Reason:  "clear-text-credentials",
+				Message: err.Error(),
+			}
+			continue
+		}
+
 		if envVars != nil {
 			data = []byte(resources.SubstituteVars(string(data), envVars))
 		}
@@ -98,6 +129,13 @@ func (s *store) Load() error {
 		var p Provider
 		if err := json.Unmarshal(data, &p); err != nil {
 			return fmt.Errorf("failed to parse provider file %s: %w", entry.Name(), err)
+		}
+
+		if isEnvPlaceholder(p.Username) {
+			p.Username = ""
+		}
+		if isEnvPlaceholder(p.Token) {
+			p.Token = ""
 		}
 
 		if p.Name == "" {
@@ -129,6 +167,16 @@ func (s *store) List() []Provider {
 	return result
 }
 
+func (s *store) InvalidProviders() []InvalidProvider {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]InvalidProvider, 0, len(s.invalid))
+	for _, p := range s.invalid {
+		result = append(result, p)
+	}
+	return result
+}
+
 // Save persists a provider to disk and updates the in-memory cache.
 // If a provider with the same name already exists, it is overwritten.
 func (s *store) Save(p Provider) error {
@@ -152,6 +200,7 @@ func (s *store) Save(p Provider) error {
 	}
 
 	s.providers[p.Name] = p
+	delete(s.invalid, p.Name)
 	return s.saveProviderLocked(p)
 }
 
@@ -160,11 +209,18 @@ func (s *store) Delete(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	fileName := name + ".json"
 	if _, exists := s.providers[name]; !exists {
-		return fmt.Errorf("provider %q not found", name)
+		invalidProvider, invalid := s.invalid[name]
+		if !invalid {
+			return fmt.Errorf("provider %q not found", name)
+		}
+		if invalidProvider.File != "" {
+			fileName = invalidProvider.File
+		}
 	}
 
-	filePath := filepath.Join(s.dir, name+".json")
+	filePath := filepath.Join(s.dir, fileName)
 	if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete provider file %s: %w", filePath, err)
 	}
@@ -176,6 +232,7 @@ func (s *store) Delete(name string) error {
 	}
 
 	delete(s.providers, name)
+	delete(s.invalid, name)
 	return nil
 }
 
@@ -244,6 +301,20 @@ func sanitizeProviderEnvName(name string) string {
 		}
 	}
 	return strings.Trim(b.String(), "_")
+}
+
+func validateProviderFileCredentials(fileName string, p Provider) error {
+	if p.Username != "" && !isEnvPlaceholder(p.Username) {
+		return fmt.Errorf("provider file %s contains clear-text username; move credentials to .env and use ${...} placeholders", fileName)
+	}
+	if p.Token != "" && !isEnvPlaceholder(p.Token) {
+		return fmt.Errorf("provider file %s contains clear-text token; move credentials to .env and use ${...} placeholders", fileName)
+	}
+	return nil
+}
+
+func isEnvPlaceholder(value string) bool {
+	return strings.HasPrefix(value, "${") && strings.HasSuffix(value, "}") && len(value) > 3
 }
 
 func validateProvider(p Provider) error {

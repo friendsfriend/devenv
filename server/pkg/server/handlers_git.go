@@ -296,7 +296,7 @@ func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reload app config from disk before processing so that any manual edits
-	// to definition files (e.g. adding worktreeMode) are always picked up
+	// to definition files (e.g. changing gitMode) are always picked up
 	// without requiring a server restart.
 	s.reloadAppConfig()
 

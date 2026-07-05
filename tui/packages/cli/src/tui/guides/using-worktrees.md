@@ -4,7 +4,7 @@ Worktree mode gives each branch its own directory, so you can switch instantly a
 
 ## 1. Single checkout vs worktrees
 
-By default, DevEnv manages one checkout per app — switching branches modifies the working tree in-place. **Worktree mode** gives each branch its own permanent directory:
+By default, DevEnv manages one checkout per repository — switching branches modifies the working tree in-place. **Worktree mode** gives each branch its own permanent directory:
 
 ```
 $DEVENV_HOME/
@@ -30,9 +30,9 @@ wt config shell install   # enables automatic directory switching
 
 ## 3. Enable worktree mode
 
-When adding a new app through the TUI (`a`), the wizard includes a worktree step after branch selection. Choose **Yes** for parallel checkouts.
+Set `"gitMode": "WORKTREE"` in the repository definition JSON at `~/.config/devenv/apps/definitions/IDENT.json` or `~/.config/devenv/libraries/definitions/IDENT.json`.
 
-You can also set `"worktreeMode": true` in the app definition JSON at `~/.config/devenv/apps/definitions/IDENT.json`.
+Repositories added through the TUI use single-checkout branch mode by default. To enable worktrees for those repositories, edit the definition JSON and restart DevEnv.
 
 ## 4. Switching branches
 
@@ -61,8 +61,8 @@ Commit this file to the repo — worktrunk runs the hook when creating new workt
 - Press `d` to delete the selected worktree
 - Press `Enter` to switch to a worktree
 
-## 7. Removing an app
+## 7. Removing a repository
 
-Press `d` in the TUI to remove an app. This deletes the entire app directory including all worktrees.
+Press `-` in the TUI to remove a repository. This deletes the entire repository directory including all worktrees.
 
 See the [worktrunk documentation](https://worktrunk.dev) for advanced configuration.

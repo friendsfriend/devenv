@@ -2,6 +2,25 @@ import { writeFileSync, appendFileSync, existsSync, mkdirSync, readFileSync } fr
 import { join } from 'path';
 import os from 'os';
 
+type FatalCleanupCallback = () => void;
+
+const fatalCleanupCallbacks = new Set<FatalCleanupCallback>();
+
+export function registerFatalCleanup(callback: FatalCleanupCallback): () => void {
+  fatalCleanupCallbacks.add(callback);
+  return () => fatalCleanupCallbacks.delete(callback);
+}
+
+function runFatalCleanup(): void {
+  for (const callback of fatalCleanupCallbacks) {
+    try {
+      callback();
+    } catch {
+      // Best-effort fatal cleanup only.
+    }
+  }
+}
+
 // Parse a .env file and return key-value pairs (no shell export required).
 function parseEnvFile(filePath: string): Record<string, string> {
   try {
@@ -35,8 +54,7 @@ function resolveDevenvHome(): string {
 }
 
 /**
- * Logger utility that captures console errors and writes to file
- * Follows OpenCode patterns for robust error logging
+ * Logger utility that captures console errors and writes to file.
  */
 export class Logger {
   private logFilePath: string;
@@ -163,11 +181,15 @@ Started: ${timestamp}
     //   return true;
     // }) as any;
 
-    // Capture uncaught exceptions - completely silent
+    // Capture uncaught exceptions - cleanup OpenTUI before allowing runtime to terminate.
     process.on('uncaughtException', (error: Error) => {
       this.writeToLog('UNCAUGHT_EXCEPTION', [error]);
-      // Silent exit - no console output
-      process.exit(1);
+      runFatalCleanup();
+      process.exitCode = 1;
+      process.removeAllListeners('uncaughtException');
+      queueMicrotask(() => {
+        throw error;
+      });
     });
 
     // Capture unhandled promise rejections - completely silent

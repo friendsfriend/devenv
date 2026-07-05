@@ -4,18 +4,19 @@ export type { RunningTextProps } from "./components/RunningText";
 export { StatusBar } from "./components/StatusBar";
 export { Layout } from "./components/Layout";
 export { ContentFrame, ContentStack, ContentPanel, GridLayout } from "./components/ContentStack";
-export { Table } from "./components/Table";
+export { Table, RepositoryTable, InfrastructureTable, TaskTable } from "./components/Table";
 export { LogView } from "./components/LogView";
 export { LogModal } from "./components/LogModal";
 export type { LogModalProps } from "./components/LogModal";
 export { LogAiOverlay } from "./components/LogAiOverlay";
 export type { LogAiOverlayProps } from "./components/LogAiOverlay";
-export { MrAiReviewOverlay } from "./components/MrAiReviewOverlay";
-export type { MrAiReviewOverlayProps } from "./components/MrAiReviewOverlay";
+export { CrAiReviewOverlay } from "./components/CrAiReviewOverlay";
+export type { CrAiReviewOverlayProps } from "./components/CrAiReviewOverlay";
 export { StatusLogView } from "./components/StatusLogView";
 export { IssueView } from "./components/IssueView";
 export { IssueDetailView } from "./components/IssueDetailView";
-export { IssueScopeModal } from "./components/IssueScopeModal";
+export { IssueScopeModal, ISSUE_SCOPE_OPTIONS } from "./components/IssueScopeModal";
+export type { IssueScopeOption } from "./components/IssueScopeModal";
 export { CloseReasonModal } from "./components/CloseReasonModal";
 export { CommentModal } from "./components/CommentModal";
 export type { CommentModalProps } from "./components/CommentModal";
@@ -23,12 +24,12 @@ export { LabelPickerModal } from "./components/LabelPickerModal";
 export type { LabelPickerModalProps } from "./components/LabelPickerModal";
 export { AssigneePickerModal } from "./components/AssigneePickerModal";
 export type { AssigneePickerModalProps } from "./components/AssigneePickerModal";
-export { MergeRequestView } from "./components/MergeRequestView";
-export { MergeRequestDetailView } from "./components/MergeRequestDetailView";
+export { ChangeRequestView } from "./components/ChangeRequestView";
+export { ChangeRequestDetailView } from "./components/ChangeRequestDetailView";
 export { TestResultsDetailView } from "./components/TestResultsDetailView";
 export { JobsDetailView } from "./components/JobsDetailView";
 export { ChangedFilesView } from "./components/ChangedFilesView";
-export { LinkedMRsView } from "./components/LinkedMRsView";
+export { LinkedCRsView } from "./components/LinkedCRsView";
 export { ReferencesView } from "./components/ReferencesView";
 export { DiscussionsView } from "./components/DiscussionsView";
 export { TimelineView, toTimelineItems, commentToItem } from "./components/TimelineView";
@@ -42,12 +43,12 @@ export type {
 	ConnectProviderModalProps,
 	ConnectProviderStep,
 } from "./components/ConnectProviderModal";
-export { AddAppModal } from "./components/AddAppModal";
+export { AddRepositoryModal } from "./components/AddRepositoryModal";
 export type {
-	AddAppModalProps,
-	AddAppStep,
+	AddRepositoryModalProps,
+	AddRepositoryStep,
 	FindRepoMode,
-} from "./components/AddAppModal";
+} from "./components/AddRepositoryModal";
 export { HelpView } from "./components/HelpView";
 export { ThemePickerView } from "./components/ThemePickerView";
 export type { ThemePickerViewProps } from "./components/ThemePickerView";
@@ -97,10 +98,12 @@ export type {
 } from "./components/EditorPickerView";
 export { WorktreeManagerModal } from "./components/WorktreeManagerModal";
 export type { WorktreeManagerModalProps } from "./components/WorktreeManagerModal";
-export { ScriptArgsModal } from "./components/ScriptArgsModal";
-export type { ScriptArgsModalProps } from "./components/ScriptArgsModal";
-export { ScriptAddModal } from "./components/ScriptAddModal";
-export type { ScriptAddModalProps } from "./components/ScriptAddModal";
+export { WorkItemCard } from "./components/WorkItemCard";
+export type { WorkItemCardProps } from "./components/WorkItemCard";
+export { TaskArgsModal } from "./components/TaskArgsModal";
+export type { TaskArgsModalProps } from "./components/TaskArgsModal";
+export { TaskAddModal } from "./components/TaskAddModal";
+export type { TaskAddModalProps } from "./components/TaskAddModal";
 export type { HeaderProps } from "./components/Header";
 export type { StatusBarProps } from "./components/StatusBar";
 export type { LayoutProps } from "./components/Layout";

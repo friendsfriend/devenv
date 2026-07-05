@@ -2,7 +2,7 @@ import type {
 	AppStore,
 	IssueStore,
 	LogStore,
-	MrStore,
+	ChangeRequestStore,
 	ProviderStore,
 	UiStore,
 	AgentStore,
@@ -12,7 +12,7 @@ import type {
 	AppActions,
 	IssueActions,
 	LogActions,
-	MrActions,
+	CrActions,
 	DockerActions,
 	GitActions,
 	ProviderActions,
@@ -21,13 +21,13 @@ import type {
 	PipelineActions,
 	HelpActions,
 } from "../actions";
-import type { TableColumn } from "@devenv/ui";
+import type { TableColumn } from '@devenv/ui';
 
 export interface ViewStores {
 	appStore: AppStore;
 	issueStore: IssueStore;
 	logStore: LogStore;
-	mrStore: MrStore;
+	changeRequestStore: ChangeRequestStore;
 	providerStore: ProviderStore;
 	uiStore: UiStore;
 	agentStore: AgentStore;
@@ -38,7 +38,7 @@ export interface ViewActions {
 	appActions: AppActions;
 	issueActions: IssueActions;
 	logActions: LogActions;
-	mrActions: MrActions;
+	crActions: CrActions;
 	dockerActions: DockerActions;
 	gitActions: GitActions;
 	providerActions: ProviderActions;

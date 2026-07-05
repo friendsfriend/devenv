@@ -1,41 +1,41 @@
 import type { DevEnvClient } from '@devenv/core';
 import type { Job } from '@devenv/types';
 import type { AppStore } from '../stores/app-store';
-import type { MrStore } from '../stores/mr-store';
+import type { ChangeRequestStore } from '../stores/cr-store';
 
 export function createPipelineActions(
   appStore: AppStore,
-  mrStore: MrStore,
+  changeRequestStore: ChangeRequestStore,
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
 ) {
   const loadPipelineJobs = async () => {
     const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
-    const mr = mrStore.selectedMR();
-    if (!app || !mr || !mr.head_pipeline) {
-      const msg = !app ? 'No app selected' : !mr ? 'No merge request selected' : 'No pipeline available for this merge request';
-      mrStore.setJobsError(msg);
-      mrStore.setJobsLoading(false);
-      if (!mr || !mr.head_pipeline) return;
+    const cr = changeRequestStore.selectedChangeRequest();
+    if (!app || !cr || !cr.head_pipeline) {
+      const msg = !app ? 'No app selected' : !cr ? 'No change request selected' : 'No pipeline available for this change request';
+      changeRequestStore.setJobsError(msg);
+      changeRequestStore.setJobsLoading(false);
+      if (!cr || !cr.head_pipeline) return;
     }
-    mrStore.setJobsLoading(true);
-    mrStore.setJobsError('');
-    mrStore.setCurrentPipelineId(mr!.head_pipeline!.id);
+    changeRequestStore.setJobsLoading(true);
+    changeRequestStore.setJobsError('');
+    changeRequestStore.setCurrentPipelineId(cr!.head_pipeline!.id);
     appStore.setViewMode('jobs');
     try {
-      mrStore.setJobs(await client.getPipelineJobs(app!.ident, mr!.head_pipeline!.id, app!.sourceType));
+      changeRequestStore.setJobs(await client.getPipelineJobs(app!.ident, cr!.head_pipeline!.id, app!.sourceType));
     } catch (e) {
-      mrStore.setJobsError(`Failed to load pipeline #${mr!.head_pipeline!.id}: ${e instanceof Error ? e.message : 'Unknown error'}`);
-      mrStore.setJobs([]);
+      changeRequestStore.setJobsError(`Failed to load pipeline #${cr!.head_pipeline!.id}: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      changeRequestStore.setJobs([]);
     } finally {
-      mrStore.setJobsLoading(false);
+      changeRequestStore.setJobsLoading(false);
     }
   };
 
   const organizeJobsByStage = () => {
     const byStage: Map<string, Job[]> = new Map();
     const stageFirstJobId: Map<string, number> = new Map();
-    for (const job of mrStore.jobs()) {
+    for (const job of changeRequestStore.jobs()) {
       const stage = job.stage || 'default';
       if (!byStage.has(stage)) {
         byStage.set(stage, []);
@@ -49,15 +49,15 @@ export function createPipelineActions(
     return stages.map((stage) => ({ name: stage, jobs: byStage.get(stage)! }));
   };
 
-  const backToMRDetail = () => {
-    mrStore.setJobs([]);
-    mrStore.setJobsError('');
-    mrStore.setCurrentPipelineId(null);
-    mrStore.setSelectedJobStageIndex(0);
-    mrStore.setSelectedJobIndex(0);
-    mrStore.setJobsSearchMode(false);
-    mrStore.setJobsSearchQuery('');
-    appStore.setViewMode('mergeRequestDetail');
+  const backToCRDetail = () => {
+    changeRequestStore.setJobs([]);
+    changeRequestStore.setJobsError('');
+    changeRequestStore.setCurrentPipelineId(null);
+    changeRequestStore.setSelectedJobStageIndex(0);
+    changeRequestStore.setSelectedJobIndex(0);
+    changeRequestStore.setJobsSearchMode(false);
+    changeRequestStore.setJobsSearchQuery('');
+    appStore.setViewMode('changeRequestDetail');
   };
 
   const retryJob = async (jobId: number, jobName: string) => {
@@ -82,7 +82,7 @@ export function createPipelineActions(
     }
   };
 
-  return { loadPipelineJobs, organizeJobsByStage, backToMRDetail, retryJob, cancelJob };
+  return { loadPipelineJobs, organizeJobsByStage, backToCRDetail, retryJob, cancelJob };
 }
 
 export type PipelineActions = ReturnType<typeof createPipelineActions>;

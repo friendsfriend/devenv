@@ -143,12 +143,7 @@ func NewContainer() (Container, error) {
 	}
 
 	resourcesManager := resources.NewManager(configDir)
-	if migrated, err := resourcesManager.MigrateLegacyActionResources(); err != nil {
-		return nil, fmt.Errorf("failed to migrate legacy action resources: %w", err)
-	} else if len(migrated) > 0 {
-		fmt.Fprintf(os.Stderr, "[INFO] migrated %d legacy action resource(s) into apps layout\n", len(migrated))
-	}
-	envFilePath, _ := resourcesManager.EnvFilePath()
+	envFilePath := filepath.Join(configDir, ".env")
 
 	providerStore := provider.NewStore(filepath.Join(configDir, "providers"), envFilePath)
 	if err := providerStore.Load(); err != nil {

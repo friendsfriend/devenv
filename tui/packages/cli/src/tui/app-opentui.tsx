@@ -4,14 +4,14 @@ import {
 	usePaste,
 	useRenderer,
 	useTerminalDimensions,
-} from "@opentui/solid";
-import { createCliRenderer } from "@opentui/core";
-import { setExitRenderer } from "./exit";
-import { onMount, createEffect, on, onCleanup } from "solid-js";
+} from '@opentui/solid';
+import { createCliRenderer } from '@opentui/core';
+import { setExitRenderer, getExitSignal } from "./exit";
+import { onMount, createEffect, on, onCleanup } from 'solid-js';
 import "opentui-spinner/solid";
 import { APP_VERSION } from "../version";
-import { createClient } from "@devenv/core";
-import type { App } from "@devenv/types";
+import { createClient, registerFatalCleanup } from '@devenv/core';
+import type { App } from '@devenv/types';
 import {
 	Header,
 	StatusBar,
@@ -19,13 +19,13 @@ import {
 	getSelectableRows,
 	setGlobalSelectionMouseUpHandler,
 	uiColors,
-} from "@devenv/ui";
+} from '@devenv/ui';
 import { createFrames } from "./spinner";
 import {
 	createAppStore,
 	createIssueStore,
 	createLogStore,
-	createMrStore,
+	createChangeRequestStore,
 	createProviderStore,
 	createUiStore,
 	createAgentStore,
@@ -35,7 +35,7 @@ import {
 	createAppActions,
 	createIssueActions,
 	createLogActions,
-	createMrActions,
+	createCrActions,
 	createDockerActions,
 	createGitActions,
 	createProviderActions,
@@ -49,13 +49,13 @@ import { setupLogEffects } from "./effects/log-effects";
 import { createColumns, createScriptColumns } from "./columns";
 import {
 	handleGlobalKeys,
-	handleAddAppModalKeys,
+	handleAddRepositoryModalKeys,
 	handleConnectProviderModalKeys,
 	handleDiffModalKeys,
 	handleLogModalKeys,
 	handleJobsKeys,
-	handleMrListKeys,
-	handleMrDetailKeys,
+	handleCrListKeys,
+	handleCrDetailKeys,
 	handleChangedFilesKeys,
 	handleTestResultsKeys,
 	handleDiscussionsKeys,
@@ -64,7 +64,7 @@ import {
 	handleWorktreeManagerKeys,
 	handleIssueListKeys,
 	handleIssueDetailKeys,
-	handleLinkedMRsKeys,
+	handleLinkedCRsKeys,
 	handleReferencesKeys,
 	handleTableKeys,
 	handlePaste,
@@ -82,11 +82,11 @@ import {
 import type { ViewStores, ViewActions } from "./views";
 import { applyTheme, loadCustomThemes, loadSystemTheme, loadThemeName, queryTerminalThemeColors } from "./theme-settings";
 
-export interface TUIAppProps {
+interface TUIAppProps {
 	serverUrl: string;
 }
 
-export function TUIApp(props: TUIAppProps) {
+function TUIApp(props: TUIAppProps) {
 	const dimensions = useTerminalDimensions();
 	const renderer = useRenderer();
 
@@ -94,7 +94,7 @@ export function TUIApp(props: TUIAppProps) {
 	const appStore = createAppStore();
 	const issueStore = createIssueStore();
 	const logStore = createLogStore();
-	const mrStore = createMrStore();
+	const changeRequestStore = createChangeRequestStore();
 	const providerStore = createProviderStore();
 	const uiStore = createUiStore();
 	const agentStore = createAgentStore();
@@ -122,9 +122,9 @@ export function TUIApp(props: TUIAppProps) {
 		showError,
 	);
 	const logActions = createLogActions(logStore, appStore, client, showError);
-	const mrActions = createMrActions(
+	const crActions = createCrActions(
 		appStore,
-		mrStore,
+		changeRequestStore,
 		uiStore,
 		client,
 		showError,
@@ -147,7 +147,7 @@ export function TUIApp(props: TUIAppProps) {
 	);
 	const pipelineActions = createPipelineActions(
 		appStore,
-		mrStore,
+		changeRequestStore,
 		client,
 		showError,
 	);
@@ -155,7 +155,7 @@ export function TUIApp(props: TUIAppProps) {
 		appStore,
 		issueStore,
 		logStore,
-		mrStore,
+		changeRequestStore,
 		uiStore,
 	);
 
@@ -167,10 +167,12 @@ export function TUIApp(props: TUIAppProps) {
 	const launchPi = (sessionPath: string | null) =>
 		agentActions.launchPi(sessionPath, renderer);
 
-	const getSelectedApp = (): App | undefined =>
-		(appStore.viewMode() === "table"
+	const getSelectedApp = (): App | undefined => {
+		const row = (appStore.viewMode() === "table"
 			? appStore.tableFilteredApps()
 			: appStore.filteredApps())[appStore.selectedIndex()];
+		return row?.rowKind === "app" ? row : undefined;
+	};
 
 	// --- Effects ---
 	setupLogEffects(logStore, client);
@@ -205,6 +207,7 @@ export function TUIApp(props: TUIAppProps) {
 			showError,
 			serverUrl: props.serverUrl,
 			refreshProviders: providerActions.refreshProviders,
+			abortSignal: getExitSignal(),
 		});
 	});
 
@@ -217,7 +220,7 @@ export function TUIApp(props: TUIAppProps) {
 		appStore,
 		issueStore,
 		logStore,
-		mrStore,
+		changeRequestStore,
 		providerStore,
 		uiStore,
 		agentStore,
@@ -227,7 +230,7 @@ export function TUIApp(props: TUIAppProps) {
 		appActions,
 		issueActions,
 		logActions,
-		mrActions,
+		crActions,
 		dockerActions,
 		gitActions,
 		providerActions,
@@ -247,18 +250,18 @@ export function TUIApp(props: TUIAppProps) {
 
 	useKeyboard(async (event) => {
 		if (await handleGlobalKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleAddAppModalKeys(event, kbStores, kbActions)) return;
+		if (await handleAddRepositoryModalKeys(event, kbStores, kbActions)) return;
 		if (await handleConnectProviderModalKeys(event, kbStores, kbActions))
 			return;
 		if (await handleDiffModalKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleLogModalKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleJobsKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleMrListKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleMrDetailKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleCrListKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleCrDetailKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleIssueTimelineKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleLinkedMRsKeys(event, kbStores, kbActions, kbCtx)) return;
+		if (await handleLinkedCRsKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleReferencesKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleChangedFilesKeys(event, kbStores, kbActions, kbCtx)) return;
 		if (await handleTestResultsKeys(event, kbStores, kbActions, kbCtx)) return;
@@ -276,7 +279,7 @@ export function TUIApp(props: TUIAppProps) {
 		appStore,
 		issueStore,
 		logStore,
-		mrStore,
+		changeRequestStore,
 		providerStore,
 		uiStore,
 		agentStore,
@@ -286,7 +289,7 @@ export function TUIApp(props: TUIAppProps) {
 		appActions,
 		issueActions,
 		logActions,
-		mrActions,
+		crActions,
 		dockerActions,
 		gitActions,
 		providerActions,
@@ -299,7 +302,7 @@ export function TUIApp(props: TUIAppProps) {
 	const headerDeps = {
 		appStore,
 		issueStore,
-		mrStore,
+		changeRequestStore,
 		appDetailStore,
 		helpActions,
 		getSelectedApp,
@@ -340,10 +343,10 @@ export function TUIApp(props: TUIAppProps) {
 							appStore.viewMode() === "providers"
 								? "Providers"
 								: appStore.viewMode() === "jobs"
-									? `Pipeline #${mrStore.currentPipelineId() || "N/A"} \u2022 ${mrStore.jobs().length} jobs`
-									: appStore.viewMode() === "mergeRequestDetail"
+									? `Pipeline #${changeRequestStore.currentPipelineId() || "N/A"} \u2022 ${changeRequestStore.jobs().length} jobs`
+									: appStore.viewMode() === "changeRequestDetail"
 										? `Branch: ${appStore.filteredApps()[appStore.selectedIndex()]?.branch || "unknown"}`
-										: appStore.viewMode() === "mergeRequests"
+										: appStore.viewMode() === "changeRequests"
 											? `Branch: ${appStore.filteredApps()[appStore.selectedIndex()]?.branch || "unknown"}`
 											: appStore.viewMode() !== "table"
 												? "Viewing Logs"
@@ -411,13 +414,21 @@ export async function startTUI(serverUrl: string) {
 		process.on("SIGINT", cleanup);
 		process.on("SIGTERM", cleanup);
 		process.on("SIGHUP", cleanup);
+		const unregisterFatalCleanup = registerFatalCleanup(cleanup);
+
+		const rendererDestroyed = new Promise<void>((resolve) => {
+			renderer.once("destroy", resolve);
+		});
 
 		try {
 			await render(() => <TUIApp serverUrl={serverUrl} />, renderer);
+			await rendererDestroyed;
 		} finally {
+			unregisterFatalCleanup();
 			process.off("SIGINT", cleanup);
 			process.off("SIGTERM", cleanup);
 			process.off("SIGHUP", cleanup);
+			cleanup();
 		}
 	} catch (error) {
 		console.error("Fatal error in TUI:", error);

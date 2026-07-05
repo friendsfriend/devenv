@@ -5,9 +5,12 @@ export type ProviderType = "github" | "gitlab";
 
 export interface Provider {
 	name: string;
-	type: ProviderType;
+	type: ProviderType | '';
 	username: string;
 	has_token: boolean;
+	invalid?: boolean;
+	reason?: string;
+	message?: string;
 }
 
 export interface ProviderCreateRequest {
@@ -38,12 +41,14 @@ export interface App {
 	gitStatus?: string;
 	operationStatus?: OperationStatus;
 	status?: "running" | "stopped" | "failed" | string;
+	// Transitional table fields. App rows do not populate these, but keeping them
+	// optional allows generic table/action helpers to inspect TableRow safely.
 	type?: InfraServiceType;
 	logPath?: string;
 	shellPath?: string;
 	powerShellPath?: string;
 	defaultRunner?: ScriptRunner;
-	resourceType?: "app" | "script-folder" | "script-file";
+	resourceType?: "script-folder" | "script-file";
 	scriptPath?: string;
 	scriptRelativePath?: string;
 	scriptDepth?: number;
@@ -52,6 +57,56 @@ export interface App {
 	interpreter?: string | null;
 	scriptParameters?: ScriptParameter[];
 }
+
+export interface AppTableRow extends App {
+	rowKind: "app";
+}
+
+export interface InfraTableRow extends InfraService {
+	rowKind: "infra";
+	// Non-infra row fields stay optional so generic table helpers can inspect rows safely.
+	localDirectoryPath?: string;
+	repositoryPath?: string;
+	branch?: string;
+	appType?: never;
+	sourceType?: never;
+	provider?: never;
+	resourceType?: never;
+	scriptPath?: never;
+	scriptRelativePath?: never;
+	scriptDepth?: never;
+	scriptExpanded?: never;
+	scriptExecutable?: never;
+	interpreter?: never;
+	scriptParameters?: never;
+}
+
+export interface TaskTableRow {
+	rowKind: "script";
+	ident: string;
+	displayName: string;
+	localDirectoryPath?: string;
+	repositoryPath?: string;
+	branch?: string;
+	appType?: never;
+	sourceType?: never;
+	provider?: never;
+	containerBaseName?: never;
+	nodeType: "folder" | "script";
+	resourceType: "script-folder" | "script-file";
+	scriptPath: string;
+	scriptRelativePath: string;
+	scriptDepth: number;
+	scriptExpanded?: boolean;
+	scriptExecutable: boolean;
+	interpreter?: string | null;
+	scriptParameters?: ScriptParameter[];
+	status?: string;
+	dockerInfo?: DockerInfo;
+	operationStatus?: OperationStatus;
+}
+
+export type TableRow = AppTableRow | InfraTableRow | TaskTableRow;
 
 export type AppAction = "build" | "test" | "run";
 export type ActionRuntime = "docker" | "shell" | "powershell" | "systemshell" | "kubernetes";
@@ -266,18 +321,18 @@ export interface ServerEvent {
 	timestamp: string;
 }
 
-// GitLab Merge Request types
+// GitLab Change Request types
 
-// MRListResult represents a paginated response from the merge request list endpoint.
-export interface MRListResult {
-	items: MergeRequest[];
+// ChangeRequestListResult represents a paginated response from the change request list endpoint.
+export interface ChangeRequestListResult {
+	items: ChangeRequest[];
 	totalCount: number;
 	totalPages: number;
 	currentPage: number;
 	perPage: number;
 }
 
-export interface MergeRequest {
+export interface ChangeRequest {
 	id: number;
 	iid: number;
 	title: string;
@@ -306,10 +361,10 @@ export interface MergeRequest {
 	blocking_discussions_resolved: boolean;
 	rebase_in_progress: boolean;
 	merge_error?: string; // error message if merge/rebase failed
-	approvals?: MRApprovals;
+	approvals?: ChangeRequestApprovals;
 }
 
-export interface MRApprovals {
+export interface ChangeRequestApprovals {
 	approvals_required: number;
 	approvals_left: number;
 	approved_by: Array<{
@@ -320,7 +375,7 @@ export interface MRApprovals {
 	}>;
 }
 
-export interface MRChange {
+export interface ChangeRequestChange {
 	old_path: string;
 	new_path: string;
 	a_mode: string;
@@ -525,7 +580,7 @@ export interface CreateAppRequest {
 	repositoryURL: string;
 	branch: string;
 	provider: string;
-	appType: "APP" | "LIB";
+	definitionLocation: "apps" | "libraries";
 }
 
 export interface WorktreeInfo {

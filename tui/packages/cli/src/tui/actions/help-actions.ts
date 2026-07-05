@@ -1,9 +1,9 @@
-import type { HelpSection } from "@devenv/ui";
+import type { HelpSection } from '@devenv/ui';
 import { KEYBINDS } from "../keyboard/registry";
 import type { AppStore } from "../stores/app-store";
 import type { IssueStore } from "../stores/issue-store";
 import type { LogStore } from "../stores/log-store";
-import type { MrStore } from "../stores/mr-store";
+import type { ChangeRequestStore } from "../stores/cr-store";
 import type { UiStore } from "../stores/ui-store";
 
 const COMMON_NAVIGATION_ITEMS: HelpSection["items"] = [
@@ -20,24 +20,24 @@ const COMMON_NAVIGATION_ITEMS: HelpSection["items"] = [
 // ponytail: context titles map, extend when new view modes are added
 const CONTEXT_TITLES: Record<string, string> = {
 	global: "Global",
-	table: "Application Table",
-	mergeRequests: "Merge Request List",
-	mergeRequestDetail: "Merge Request Detail",
+	table: "Repository Table",
+	changeRequests: "Change Request List",
+	changeRequestDetail: "Change Request Detail",
 	jobs: "Pipeline Jobs",
 	testResults: "Test Results",
 	changedFiles: "Changed Files",
 	discussionsView: "Discussions/Comments",
-	appDetail: "Application Details",
+	appDetail: "Repository Details",
 	providers: "Providers",
 	issues: "Issues",
 	issueDetail: "Issue Detail",
 	issueTimeline: "Issue Timeline",
 	issueScopePicker: "Issue Scope Picker",
-	linkedMRs: "Linked Merge Requests",
+	linkedChangeRequests: "Linked Change Requests",
 	referencedIssues: "Referenced Issues",
-	mrLinkedIssues: "MR Linked Issues",
+	changeRequestLinkedIssues: "CR Linked Issues",
 	references: "References",
-	agentView: "AI Agent",
+	agentView: "Pi Sessions",
 	sshPicker: "SSH Host Picker",
 	logModal: "Log Modal",
 	passphraseModal: "Passphrase Modal",
@@ -46,9 +46,9 @@ const CONTEXT_TITLES: Record<string, string> = {
 	diffModal: "Diff Modal",
 	worktreeManager: "Worktree Manager",
 	connectProvider: "Provider Connect Modal",
-	addAppModal: "Add App Modal",
-	scriptArgsModal: "Script Args Modal",
-	scriptAddModal: "Script Add Modal",
+	addRepositoryModal: "Add Repository Modal",
+	taskArgsModal: "Task Args Modal",
+	taskAddModal: "Task Add Modal",
 	editorPicker: "Editor Picker",
 	issueSubView: "Issue Sub-View",
 	firstSteps: "First Steps",
@@ -123,7 +123,7 @@ export function createHelpActions(
 	appStore: AppStore,
 	issueStore: IssueStore,
 	logStore: LogStore,
-	mrStore: MrStore,
+	changeRequestStore: ChangeRequestStore,
 	uiStore: UiStore,
 ) {
 	const showHelp = () => {
@@ -174,7 +174,7 @@ export function createHelpActions(
 			]);
 		if (appStore.viewMode() === "help") return getFooterKeybindsForContext("help");
 		if (appStore.viewMode() === "discussionsView") {
-			if (mrStore.replyMode())
+			if (changeRequestStore.replyMode())
 				return filterFooterKeybinds([
 					{ key: "Ctrl+Enter", action: "Submit Reply" },
 					{ key: "Esc", action: "Cancel Reply" },

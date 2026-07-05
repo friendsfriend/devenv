@@ -1,8 +1,8 @@
-# Adding a Script
+# Adding a Task
 
-DevEnv discovers executable scripts from `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`).
+DevEnv discovers runnable task files from `$DEVENV_HOME/scripts/` (default `~/devenv/scripts/`).
 
-## 1. Script discovery
+## 1. Task discovery
 
 Any executable file under `~/devenv/scripts/` is automatically discovered:
 
@@ -16,9 +16,9 @@ Any executable file under `~/devenv/scripts/` is automatically discovered:
 └── clean.sh
 ```
 
-## 2. Declare script parameters
+## 2. Declare task parameters
 
-Use the `--devenv-metadata` convention in a comment block to declare parameters. Scripts appear with their metadata in the TUI Scripts tab.
+Use the `--devenv-metadata` convention in a comment block to declare parameters. Tasks appear with their metadata in the TUI Tasks tab.
 
 ```python
 #!/usr/bin/env python3
@@ -60,17 +60,17 @@ Use the `--devenv-metadata` convention in a comment block to declare parameters.
 | `int` | Integer input | Port number, count |
 | `float` | Decimal input | Timeout in seconds |
 
-## 3. Using scripts in the TUI
+## 3. Using tasks in the TUI
 
-- Navigate to the **Scripts** tab (press `4` or Tab to cycle)
-- Press `Enter` to expand/collapse folders or run a script
-- Press `s` to run a script (with args if parameters exist)
+- Navigate to the **Tasks** tab (press `4` or Tab to cycle)
+- Press `Enter` to expand/collapse folders or run a task
+- Press `s` to run a task (with args if parameters exist)
 - Press `S` to run with custom arguments
-- Press `+` to add a new script
-- Press `-` to delete a script or folder
-- Press `e` to open the script in your editor
+- Press `+` to add a new task
+- Press `-` to delete a task or folder
+- Press `e` to open the task file in your editor
 
-## 4. Adding a script
+## 4. Adding a task
 
 Create the file, make it executable, and add metadata:
 
@@ -79,4 +79,4 @@ touch ~/devenv/scripts/my-script.sh
 chmod +x ~/devenv/scripts/my-script.sh
 ```
 
-Then press `r` in the Scripts tab to refresh the list.
+Then press `r` in the Tasks tab to refresh the list.

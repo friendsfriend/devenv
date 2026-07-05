@@ -1055,10 +1055,10 @@ func (s *Server) handleGitHubAddComment(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(comment)
 }
 
-// ─── Linked MRs Handlers ───────────────────────────────────────────────────
+// ─── Linked CRs Handlers ───────────────────────────────────────────────────
 
-// handleGitHubIssueLinkedMRs — GET /api/github/issues/{n}/linked-mrs
-func (s *Server) handleGitHubIssueLinkedMRs(w http.ResponseWriter, r *http.Request) {
+// handleGitHubIssueLinkedCRs — GET /api/github/issues/{n}/linked-crs
+func (s *Server) handleGitHubIssueLinkedCRs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
 		return
@@ -1090,9 +1090,9 @@ func (s *Server) handleGitHubIssueLinkedMRs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	mrs, err := issuesClient.GetIssueLinkedMRs(nil, number)
+	mrs, err := issuesClient.GetIssueLinkedChangeRequests(nil, number)
 	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked MRs: %v", err), http.StatusInternalServerError)
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked CRs: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -1100,8 +1100,8 @@ func (s *Server) handleGitHubIssueLinkedMRs(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(mrs)
 }
 
-// handleGitLabIssueLinkedMRs — GET /api/gitlab/issues/{n}/linked-mrs
-func (s *Server) handleGitLabIssueLinkedMRs(w http.ResponseWriter, r *http.Request) {
+// handleGitLabIssueLinkedCRs — GET /api/gitlab/issues/{n}/linked-crs
+func (s *Server) handleGitLabIssueLinkedCRs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
 		return
@@ -1133,9 +1133,9 @@ func (s *Server) handleGitLabIssueLinkedMRs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	mrs, err := issuesClient.GetIssueLinkedMRs(nil, number)
+	mrs, err := issuesClient.GetIssueLinkedChangeRequests(nil, number)
 	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked MRs: %v", err), http.StatusInternalServerError)
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked CRs: %v", err), http.StatusInternalServerError)
 		return
 	}
 
@@ -1194,10 +1194,10 @@ func (s *Server) handleGitLabAddComment(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(comment)
 }
 
-// ─── MR Linked Issues Handlers ───────────────────────────────────────────
+// ─── CR Linked Issues Handlers ───────────────────────────────────────────
 
-// handleGitHubMRLinkedIssues — GET /api/github/mr/{n}/linked-issues
-func (s *Server) handleGitHubMRLinkedIssues(w http.ResponseWriter, r *http.Request) {
+// handleGitHubCRLinkedIssues — GET /api/github/cr/{n}/linked-issues
+func (s *Server) handleGitHubCRLinkedIssues(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
 		return
@@ -1229,14 +1229,14 @@ func (s *Server) handleGitHubMRLinkedIssues(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Cast to concrete type to access GetMRLinkedIssues
+	// Cast to concrete type to access GetChangeRequestLinkedIssues
 	ghIssuesClient, ok := issuesClient.(*github.IssuesClient)
 	if !ok {
 		respondErrorMessage(w, "Failed to resolve GitHub issues client", http.StatusInternalServerError)
 		return
 	}
 
-	issues, err := ghIssuesClient.GetMRLinkedIssues(repoInfo, number)
+	issues, err := ghIssuesClient.GetChangeRequestLinkedIssues(repoInfo, number)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked issues: %v", err), http.StatusInternalServerError)
 		return
@@ -1246,8 +1246,8 @@ func (s *Server) handleGitHubMRLinkedIssues(w http.ResponseWriter, r *http.Reque
 	json.NewEncoder(w).Encode(issues)
 }
 
-// handleGitLabMRLinkedIssues — GET /api/gitlab/mr/{n}/linked-issues
-func (s *Server) handleGitLabMRLinkedIssues(w http.ResponseWriter, r *http.Request) {
+// handleGitLabCRLinkedIssues — GET /api/gitlab/cr/{n}/linked-issues
+func (s *Server) handleGitLabCRLinkedIssues(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)
 		return
@@ -1279,14 +1279,14 @@ func (s *Server) handleGitLabMRLinkedIssues(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Cast to concrete type to access GetMRLinkedIssues
+	// Cast to concrete type to access GetChangeRequestLinkedIssues
 	glIssuesClient, ok := issuesClient.(*gitlab.IssuesClient)
 	if !ok {
 		respondErrorMessage(w, "Failed to resolve GitLab issues client", http.StatusInternalServerError)
 		return
 	}
 
-	issues, err := glIssuesClient.GetMRLinkedIssues(projectInfo, number)
+	issues, err := glIssuesClient.GetChangeRequestLinkedIssues(projectInfo, number)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch linked issues: %v", err), http.StatusInternalServerError)
 		return
@@ -1395,5 +1395,3 @@ func (s *Server) handleGitLabIssueReferencedIssues(w http.ResponseWriter, r *htt
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(referenced)
 }
-
-var _ = log.Printf

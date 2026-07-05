@@ -60,24 +60,24 @@ export function createUiStore() {
   const [worktreeManagerAppId, setWorktreeManagerAppId] = createSignal<string | null>(null);
   const [worktreeManagerWorktrees, setWorktreeManagerWorktrees] = createSignal<WorktreeInfo[]>([]);
   const [worktreeManagerSelectedIndex, setWorktreeManagerSelectedIndex] = createSignal(0);
-  const [showScriptArgsModal, setShowScriptArgsModal] = createSignal(false);
-  const [showScriptAddModal, setShowScriptAddModal] = createSignal(false);
-  const [scriptAddMode, setScriptAddMode] = createSignal<'create' | 'link'>('create');
-  const [scriptAddTargetPath, setScriptAddTargetPath] = createSignal('');
-  const [scriptAddSourcePath, setScriptAddSourcePath] = createSignal('');
-  const [scriptAddSelectedField, setScriptAddSelectedField] = createSignal(0);
-  const [scriptAddError, setScriptAddError] = createSignal<string | null>(null);
-  const [scriptArgsError, setScriptArgsError] = createSignal<string | null>(null);
-  const [scriptArgsSelectedIndex, setScriptArgsSelectedIndex] = createSignal(0);
-  const [scriptArgsSelectedValueIndex, setScriptArgsSelectedValueIndex] = createSignal(0);
-  const [scriptArgsFocusedPane, setScriptArgsFocusedPane] = createSignal<'parameter' | 'value'>('parameter');
-  const [scriptArgsEditing, setScriptArgsEditing] = createSignal(false);
-  const [scriptArgsEditOriginalValue, setScriptArgsEditOriginalValue] = createSignal('');
-  const [scriptArgsTargetScript, setScriptArgsTargetScript] = createSignal<string | null>(null);
+  const [showTaskArgsModal, setShowTaskArgsModal] = createSignal(false);
+  const [showTaskAddModal, setShowTaskAddModal] = createSignal(false);
+  const [taskAddMode, setTaskAddMode] = createSignal<'create' | 'link'>('create');
+  const [taskAddTargetPath, setTaskAddTargetPath] = createSignal('');
+  const [taskAddSourcePath, setTaskAddSourcePath] = createSignal('');
+  const [taskAddSelectedField, setTaskAddSelectedField] = createSignal(0);
+  const [taskAddError, setTaskAddError] = createSignal<string | null>(null);
+  const [taskArgsError, setTaskArgsError] = createSignal<string | null>(null);
+  const [taskArgsSelectedIndex, setTaskArgsSelectedIndex] = createSignal(0);
+  const [taskArgsSelectedValueIndex, setTaskArgsSelectedValueIndex] = createSignal(0);
+  const [taskArgsFocusedPane, setTaskArgsFocusedPane] = createSignal<'parameter' | 'value'>('parameter');
+  const [taskArgsEditing, setTaskArgsEditing] = createSignal(false);
+  const [taskArgsEditOriginalValue, setTaskArgsEditOriginalValue] = createSignal('');
+  const [taskArgsTargetScript, setTaskArgsTargetScript] = createSignal<string | null>(null);
   const [scriptArgValues, setScriptArgValues] = createSignal<Record<string, string>>({});
-  const [scriptArgsHistory, setScriptArgsHistory] = createSignal<Record<string, Record<string, string>[]>>({});
-  const [scriptArgsHistoryCursor, setScriptArgsHistoryCursor] = createSignal(-1);
-  const [scriptArgsParameters, setScriptArgsParameters] = createSignal<import('@devenv/types').ScriptParameter[]>([]);
+  const [taskArgsHistory, setTaskArgsHistory] = createSignal<Record<string, Record<string, string>[]>>({});
+  const [taskArgsHistoryCursor, setTaskArgsHistoryCursor] = createSignal(-1);
+  const [taskArgsParameters, setTaskArgsParameters] = createSignal<import('@devenv/types').ScriptParameter[]>([]);
   const [showMarkdownModal, setShowMarkdownModal] = createSignal(false);
   const [markdownModalReturnToHelp, setMarkdownModalReturnToHelp] = createSignal(false);
   const [markdownModalTitle, setMarkdownModalTitle] = createSignal('');
@@ -98,10 +98,10 @@ export function createUiStore() {
     setShowErrorDialog(true);
   };
 
-  const scriptArgsHistoryForCurrent = createMemo(() => {
-    const key = scriptArgsTargetScript();
+  const taskArgsHistoryForCurrent = createMemo(() => {
+    const key = taskArgsTargetScript();
     if (!key) return [] as Record<string, string>[];
-    return scriptArgsHistory()[key] ?? [];
+    return taskArgsHistory()[key] ?? [];
   });
 
   return {
@@ -207,43 +207,43 @@ export function createUiStore() {
     setWorktreeManagerWorktrees,
     worktreeManagerSelectedIndex,
     setWorktreeManagerSelectedIndex,
-    showScriptArgsModal,
-    setShowScriptArgsModal,
-    showScriptAddModal,
-    setShowScriptAddModal,
-    scriptAddMode,
-    setScriptAddMode,
-    scriptAddTargetPath,
-    setScriptAddTargetPath,
-    scriptAddSourcePath,
-    setScriptAddSourcePath,
-    scriptAddSelectedField,
-    setScriptAddSelectedField,
-    scriptAddError,
-    setScriptAddError,
-    scriptArgsError,
-    setScriptArgsError,
-    scriptArgsSelectedIndex,
-    setScriptArgsSelectedIndex,
-    scriptArgsSelectedValueIndex,
-    setScriptArgsSelectedValueIndex,
-    scriptArgsFocusedPane,
-    setScriptArgsFocusedPane,
-    scriptArgsEditing,
-    setScriptArgsEditing,
-    scriptArgsEditOriginalValue,
-    setScriptArgsEditOriginalValue,
-    scriptArgsTargetScript,
-    setScriptArgsTargetScript,
+    showTaskArgsModal,
+    setShowTaskArgsModal,
+    showTaskAddModal,
+    setShowTaskAddModal,
+    taskAddMode,
+    setTaskAddMode,
+    taskAddTargetPath,
+    setTaskAddTargetPath,
+    taskAddSourcePath,
+    setTaskAddSourcePath,
+    taskAddSelectedField,
+    setTaskAddSelectedField,
+    taskAddError,
+    setTaskAddError,
+    taskArgsError,
+    setTaskArgsError,
+    taskArgsSelectedIndex,
+    setTaskArgsSelectedIndex,
+    taskArgsSelectedValueIndex,
+    setTaskArgsSelectedValueIndex,
+    taskArgsFocusedPane,
+    setTaskArgsFocusedPane,
+    taskArgsEditing,
+    setTaskArgsEditing,
+    taskArgsEditOriginalValue,
+    setTaskArgsEditOriginalValue,
+    taskArgsTargetScript,
+    setTaskArgsTargetScript,
     scriptArgValues,
     setScriptArgValues,
-    scriptArgsHistory,
-    setScriptArgsHistory,
-    scriptArgsHistoryCursor,
-    setScriptArgsHistoryCursor,
-    scriptArgsHistoryForCurrent,
-    scriptArgsParameters,
-    setScriptArgsParameters,
+    taskArgsHistory,
+    setTaskArgsHistory,
+    taskArgsHistoryCursor,
+    setTaskArgsHistoryCursor,
+    taskArgsHistoryForCurrent,
+    taskArgsParameters,
+    setTaskArgsParameters,
     showMarkdownModal,
     setShowMarkdownModal,
     markdownModalReturnToHelp,

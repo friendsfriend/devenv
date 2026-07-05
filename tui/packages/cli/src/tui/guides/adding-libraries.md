@@ -1,6 +1,6 @@
 # Adding Libraries
 
-Libraries use the same definition schema as apps but with `appType: "LIB"`. They appear in the **Libraries** tab of the TUI.
+Libraries use the same definition schema as apps, but their type is derived from their definition location under `libraries/definitions/`. They appear in the **Libraries** tab of the TUI.
 
 ## 1. Create the library definition
 
@@ -11,7 +11,6 @@ Create a JSON file at `~/.config/devenv/libraries/definitions/IDENT.json`:
   "ident": "shared-lib",
   "displayName": "Shared Library",
   "repositoryPath": "https://github.com/org/shared-lib.git",
-  "appType": "LIB",
   "provider": "my-github"
 }
 ```
@@ -19,7 +18,7 @@ Create a JSON file at `~/.config/devenv/libraries/definitions/IDENT.json`:
 Libraries support:
 - Git operations — clone, pull, push, fetch, branch switching, worktree management
 - Docker build (`B`) and test
-- Full MR/PR workflow
+- Full Change Request workflow
 - CI/CD pipeline jobs, logs, test results
 - Operation logs
 
@@ -56,5 +55,5 @@ RUN go test ./... -v
 - Switch to the **Libraries** tab (press `3` or Tab to cycle)
 - Use `s`/`S`/`R` is not available (no container lifecycle)
 - Use `B` to build the library
-- Use `m`/`M` for MR/PR workflow
+- Use `m`/`M` for Change Request workflow
 - Use `l` for operation logs

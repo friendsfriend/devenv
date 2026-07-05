@@ -1,8 +1,8 @@
-import { TextAttributes } from "@opentui/core";
-import type { ScrollBoxRenderable } from "@opentui/core";
+import { TextAttributes } from '@opentui/core';
+import type { ScrollBoxRenderable } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
-import { For, Show } from "solid-js";
-import type { Issue, IssueComment, MergeRequest } from "@devenv/types";
+import { For, Show } from 'solid-js';
+import type { Issue, IssueComment, ChangeRequest } from '@devenv/types';
 import { uiColors } from "../colors";
 import { ContentFrame } from "./ContentStack";
 import { getMarkdownSyntaxStyle } from "../markdownSyntax";
@@ -11,7 +11,7 @@ import { ScrollableContent } from './ScrollableContent';
 import { RunningText } from './RunningText';
 
 type RefItem =
-	| { type: "mr"; data: MergeRequest }
+	| { type: "cr"; data: ChangeRequest }
 	| { type: "issue"; data: Issue };
 
 interface IssueDetailViewProps {
@@ -19,9 +19,9 @@ interface IssueDetailViewProps {
 	comments: IssueComment[];
 	issueCommentsLoading: boolean;
 	error: string;
-	linkedMRs?: MergeRequest[];
-	linkedMRsLoading?: boolean;
-	linkedMRsError?: string;
+	linkedChangeRequests?: ChangeRequest[];
+	linkedChangeRequestsLoading?: boolean;
+	linkedChangeRequestsError?: string;
 	referencedIssues?: Issue[];
 	referencedIssuesLoading?: boolean;
 	referencedIssuesError?: string;
@@ -233,7 +233,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
 
-			{/* REFERENCES — combined issues + MRs */}
+			{/* REFERENCES — combined issues + CRs */}
 			<box
 				backgroundColor={uiColors.bgMantle}
 				style={{
@@ -254,7 +254,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					</text>
 				</box>
 
-				<Show when={props.linkedMRsLoading || props.referencedIssuesLoading}>
+				<Show when={props.linkedChangeRequestsLoading || props.referencedIssuesLoading}>
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
 						<text fg={uiColors.primary}>
 							{props.spinnerFrames && props.spinnerFrame !== undefined
@@ -266,7 +266,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 				<Show
 					when={
-						!props.linkedMRsLoading &&
+						!props.linkedChangeRequestsLoading &&
 						!props.referencedIssuesLoading &&
 						(!props.references || props.references.length === 0)
 					}
@@ -294,12 +294,12 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 								>
 									<text
 										fg={
-											ref.type === "mr"
+											ref.type === "cr"
 												? uiColors.primary
 												: uiColors.textSecondary
 										}
 									>
-										{ref.type === "mr" ? "!" : "#"}
+										{ref.type === "cr" ? "!" : "#"}
 										{ref.data.iid}
 									</text>
 									<text fg={uiColors.textSecondary}>

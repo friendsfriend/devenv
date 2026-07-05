@@ -98,7 +98,7 @@ export function calculateVisibleItems<T>(
   // Uniform-height path.
   // Keep the rendered window stable while the selection moves inside it.
   // Re-centering around the selected row on every keypress causes every row in
-  // MR/issue lists to churn during key repeat, making cursor movement laggy.
+  // CR/issue lists to churn during key repeat, making cursor movement laggy.
   const maxVisibleItems = Math.max(1, Math.floor(visibleHeight / estimatedItemHeight));
   const pageStart = Math.floor(clampedSelected / maxVisibleItems) * maxVisibleItems;
   const startIdx = Math.max(0, Math.min(pageStart, Math.max(0, totalItems - maxVisibleItems)));

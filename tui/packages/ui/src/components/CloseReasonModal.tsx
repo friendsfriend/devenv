@@ -1,4 +1,4 @@
-import { TextAttributes } from "@opentui/core";
+import { TextAttributes } from '@opentui/core';
 import { uiColors } from "../colors";
 import { ListViewModal } from "./ListViewModal";
 import { formatHelpText } from "./HelpText";

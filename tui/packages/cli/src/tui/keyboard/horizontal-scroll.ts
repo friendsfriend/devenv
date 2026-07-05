@@ -1,11 +1,11 @@
 import type { ScrollBoxRenderable } from '@opentui/core';
 import type { KeyboardEvent } from './types';
 
-export function isHorizontalScrollLeftKey(event: KeyboardEvent): boolean {
+function isHorizontalScrollLeftKey(event: KeyboardEvent): boolean {
   return !event.shift && (event.name === 'h' || event.sequence === 'h' || event.name === 'left' || event.name === 'Left');
 }
 
-export function isHorizontalScrollRightKey(event: KeyboardEvent): boolean {
+function isHorizontalScrollRightKey(event: KeyboardEvent): boolean {
   return !event.shift && (event.name === 'l' || event.sequence === 'l' || event.name === 'right' || event.name === 'Right');
 }
 

@@ -8,7 +8,7 @@ import type {
 
 /**
  * Handles keyboard events for the combined References sub-view:
- * - j/k navigation, Enter opens selected item (issue detail or MR detail)
+ * - j/k navigation, Enter opens selected item (issue detail or CR detail)
  * - ESC/q returns to issue detail
  */
 export async function handleReferencesKeys(
@@ -56,9 +56,9 @@ export async function handleReferencesKeys(
 
 		if (ref.type === "issue") {
 			void issueActions.showIssueDetail(ref.data);
-		} else if (ref.type === "mr") {
-			// Open MR detail via mrActions
-			actions.mrActions?.showMRDetail(ref.data as any);
+		} else if (ref.type === "cr") {
+			// Open CR detail via crActions
+			actions.crActions?.showCRDetail(ref.data as any);
 		}
 		return true;
 	}

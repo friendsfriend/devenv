@@ -14,14 +14,7 @@ import type {
 	StatusLogEntry,
 } from "@devenv/types";
 import type { ClientDeps, FetchFunction } from "./client-types";
-import {
-	getAgentSessions,
-	getAgentSpaces,
-	getOpencodeAgents,
-	getPiSessions,
-	resolveAgentFile,
-	resolveOpencodeConfig,
-} from "./agent-client";
+import { getPiSessions } from "./agent-client";
 import {
 	getApps,
 	getDockerInfo,
@@ -86,32 +79,32 @@ import {
 	addIssueComment,
 	getRepoLabels,
 	getRepoCollaborators,
-	getIssueLinkedMRs,
+	getIssueLinkedCRs,
 	getIssueReferencedIssues,
-	getMRLinkedIssues,
+	getCRLinkedIssues,
 } from "./issues-client";
 import {
 	analyzeLogsWithAI,
 	analyzeLogsWithAIStream,
-	analyzeMRWithAIStream,
+	analyzeCRWithAIStream,
 	getActionLog,
 	getOperationLogs,
 	getStatusLog,
 	addStatusLog,
 } from "./logs-client";
 import {
-	approveMergeRequest,
-	createMRComment,
-	getMergeRequests,
-	getMRChanges,
-	getMRDiscussions,
-	getMRVersions,
-	rebaseMR,
+	approveChangeRequest,
+	createCRComment,
+	getChangeRequests,
+	getChangeRequestChanges,
+	getCRDiscussions,
+	getCRVersions,
+	rebaseCR,
 	replyToDiscussion,
 	resolveDiscussion,
-	toggleMRApproval,
-	unapproveMergeRequest,
-} from "./mr-client";
+	toggleCRApproval,
+	unapproveChangeRequest,
+} from "./cr-client";
 import {
 	createProvider,
 	deleteProvider,
@@ -285,7 +278,7 @@ export class DevEnvClient {
 	): Promise<void> {
 		return addStatusLog(this.deps, entry);
 	}
-	getMergeRequests(
+	getChangeRequests(
 		appIdent: string,
 		state: string = "opened",
 		scope: "current" | "all" = "current",
@@ -296,8 +289,8 @@ export class DevEnvClient {
 		sort?: string,
 		direction?: "asc" | "desc",
 		labels?: string[],
-	): Promise<import("@devenv/types").MRListResult> {
-		return getMergeRequests(
+	): Promise<import("@devenv/types").ChangeRequestListResult> {
+		return getChangeRequests(
 			this.deps,
 			appIdent,
 			state,
@@ -420,12 +413,12 @@ export class DevEnvClient {
 		return getRepoCollaborators(this.deps, appIdent, sourceType);
 	}
 
-	getIssueLinkedMRs(
+	getIssueLinkedCRs(
 		appIdent: string,
 		number: number,
 		sourceType?: string,
-	): Promise<import("@devenv/types").MergeRequest[]> {
-		return getIssueLinkedMRs(this.deps, appIdent, number, sourceType);
+	): Promise<import("@devenv/types").ChangeRequest[]> {
+		return getIssueLinkedCRs(this.deps, appIdent, number, sourceType);
 	}
 
 	getIssueReferencedIssues(
@@ -436,12 +429,12 @@ export class DevEnvClient {
 		return getIssueReferencedIssues(this.deps, appIdent, number, sourceType);
 	}
 
-	getMRLinkedIssues(
+	getCRLinkedIssues(
 		appIdent: string,
 		number: number,
 		sourceType?: string,
 	): Promise<import("@devenv/types").Issue[]> {
-		return getMRLinkedIssues(this.deps, appIdent, number, sourceType);
+		return getCRLinkedIssues(this.deps, appIdent, number, sourceType);
 	}
 	getPipelineJobs(
 		appIdent: string,
@@ -457,19 +450,19 @@ export class DevEnvClient {
 	): Promise<import("@devenv/types").TestSummary> {
 		return getTestSummary(this.deps, appIdent, pipelineId, sourceType);
 	}
-	getMRChanges(
+	getChangeRequestChanges(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		sourceType?: string,
-	): Promise<import("@devenv/types").MRChange[]> {
-		return getMRChanges(this.deps, appIdent, mrIID, sourceType);
+	): Promise<import("@devenv/types").ChangeRequestChange[]> {
+		return getChangeRequestChanges(this.deps, appIdent, crIID, sourceType);
 	}
-	getMRVersions(appIdent: string, mrIID: number): Promise<any[]> {
-		return getMRVersions(this.deps, appIdent, mrIID);
+	getCRVersions(appIdent: string, crIID: number): Promise<any[]> {
+		return getCRVersions(this.deps, appIdent, crIID);
 	}
-	createMRComment(
+	createCRComment(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		body: string,
 		position?: {
 			baseSHA: string;
@@ -487,60 +480,60 @@ export class DevEnvClient {
 			};
 		},
 	): Promise<{ status: string; message: string }> {
-		return createMRComment(this.deps, appIdent, mrIID, body, position);
+		return createCRComment(this.deps, appIdent, crIID, body, position);
 	}
-	getMRDiscussions(
+	getCRDiscussions(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		sourceType?: string,
 	): Promise<import("@devenv/types").Discussion[]> {
-		return getMRDiscussions(this.deps, appIdent, mrIID, sourceType);
+		return getCRDiscussions(this.deps, appIdent, crIID, sourceType);
 	}
-	toggleMRApproval(
+	toggleCRApproval(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		sourceType?: string,
 	): Promise<void> {
-		return toggleMRApproval(this.deps, appIdent, mrIID, sourceType);
+		return toggleCRApproval(this.deps, appIdent, crIID, sourceType);
 	}
-	approveMergeRequest(
+	approveChangeRequest(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		sourceType?: string,
 	): Promise<void> {
-		return approveMergeRequest(this.deps, appIdent, mrIID, sourceType);
+		return approveChangeRequest(this.deps, appIdent, crIID, sourceType);
 	}
-	unapproveMergeRequest(
+	unapproveChangeRequest(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		sourceType?: string,
 	): Promise<void> {
-		return unapproveMergeRequest(this.deps, appIdent, mrIID, sourceType);
+		return unapproveChangeRequest(this.deps, appIdent, crIID, sourceType);
 	}
-	rebaseMR(appIdent: string, mrIID: number): Promise<void> {
-		return rebaseMR(this.deps, appIdent, mrIID);
+	rebaseCR(appIdent: string, crIID: number): Promise<void> {
+		return rebaseCR(this.deps, appIdent, crIID);
 	}
 	resolveDiscussion(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		discussionID: string,
 		resolveAction: "resolve" | "unresolve",
 	): Promise<{ status: string; message: string }> {
 		return resolveDiscussion(
 			this.deps,
 			appIdent,
-			mrIID,
+			crIID,
 			discussionID,
 			resolveAction,
 		);
 	}
 	replyToDiscussion(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		discussionID: string,
 		body: string,
 	): Promise<{ status: string; message: string }> {
-		return replyToDiscussion(this.deps, appIdent, mrIID, discussionID, body);
+		return replyToDiscussion(this.deps, appIdent, crIID, discussionID, body);
 	}
 	getJobLogs(
 		appIdent: string,
@@ -556,32 +549,28 @@ export class DevEnvClient {
 		logs: string,
 		prompt?: string,
 		onSessionId?: (sessionId: string) => void,
-		backend?: "opencode" | "pi",
 	): AsyncGenerator<string> {
 		return analyzeLogsWithAIStream(
 			this.deps,
 			logs,
 			prompt,
 			onSessionId,
-			backend,
 		);
 	}
-	analyzeMRWithAIStream(
+	analyzeCRWithAIStream(
 		appIdent: string,
-		mrIID: number,
+		crIID: number,
 		sourceBranch: string,
 		targetBranch: string,
 		prompt: string,
-		backend?: "opencode" | "pi",
 	): AsyncGenerator<string> {
-		return analyzeMRWithAIStream(
+		return analyzeCRWithAIStream(
 			this.deps,
 			appIdent,
-			mrIID,
+			crIID,
 			sourceBranch,
 			targetBranch,
 			prompt,
-			backend,
 		);
 	}
 	searchRepos(
@@ -704,31 +693,14 @@ export class DevEnvClient {
 	cancelJob(appIdent: string, jobId: number): Promise<void> {
 		return cancelJob(this.deps, appIdent, jobId);
 	}
-	subscribeToEvents(): AsyncGenerator<ServerEvent> {
-		return subscribeToEvents(this.deps);
+	subscribeToEvents(signal?: AbortSignal): AsyncGenerator<ServerEvent> {
+		return subscribeToEvents(this.deps, signal);
 	}
 	health(): Promise<boolean> {
 		return health(this.deps);
 	}
-	getAgentSpaces(): Promise<import("@devenv/types").AgentSpace[]> {
-		return getAgentSpaces(this.deps);
-	}
-	getAgentSessions(): Promise<import("@devenv/types").AgentGroup[]> {
-		return getAgentSessions(this.deps);
-	}
 	getPiSessions(): Promise<import("@devenv/types").AgentGroup[]> {
 		return getPiSessions(this.deps);
-	}
-	getOpencodeAgents(): Promise<string[]> {
-		return getOpencodeAgents(this.deps);
-	}
-	resolveAgentFile(
-		spaceId: string,
-	): Promise<{ agentsDir: string; agentId: string }> {
-		return resolveAgentFile(this.deps, spaceId);
-	}
-	resolveOpencodeConfig(): Promise<{ configPath: string }> {
-		return resolveOpencodeConfig(this.deps);
 	}
 }
 
