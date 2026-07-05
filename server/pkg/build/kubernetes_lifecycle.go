@@ -228,6 +228,29 @@ func (s *service) stopKubernetesPortForwards(appIdent string) {
 	}
 }
 
+func (s *service) ClearKubernetesRuntimeState() {
+	s.portForwardMu.Lock()
+	all := s.portForwards
+	s.portForwards = make(map[string][]*exec.Cmd)
+	s.portForwardMu.Unlock()
+	for _, cmds := range all {
+		for _, cmd := range cmds {
+			if cmd != nil && cmd.Process != nil {
+				_ = cmd.Process.Kill()
+				_, _ = cmd.Process.Wait()
+			}
+		}
+	}
+	s.lastRunMu.Lock()
+	for appIdent, runtime := range s.lastRunRuntime {
+		if runtime == resources.ActionRuntimeKubernetes {
+			delete(s.lastRunRuntime, appIdent)
+		}
+	}
+	s.lastKubernetes = make(map[string]*resources.KubernetesTargetMetadata)
+	s.lastRunMu.Unlock()
+}
+
 func (s *service) logSilentCommand(logPath, command string, args []string, envVars []string, workingDir, output string, err error) {
 	if logPath == "" {
 		return

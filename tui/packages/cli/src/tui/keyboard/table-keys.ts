@@ -363,6 +363,29 @@ export async function handleTableKeys(
 		return true;
 	}
 
+	if (appStore.activeTab() === "kubernetes") {
+		switch (key) {
+			case "s":
+				void dockerActions.createCluster();
+				return true;
+			case "S":
+				dockerActions.requestDeleteCluster();
+				return true;
+			case "R":
+				dockerActions.requestRecreateCluster();
+				return true;
+			case "r":
+				void dockerActions.refreshKubernetesCluster();
+				return true;
+			case "e":
+				void dockerActions.exportKubeconfig();
+				return true;
+			case "9":
+				utilActions.launchK9s();
+				return true;
+		}
+	}
+
 	switch (key) {
 		case "q":
 		case "Q":
@@ -409,6 +432,7 @@ export async function handleTableKeys(
 				if (tab === "applications") return "infrastructure";
 				if (tab === "infrastructure") return "libraries";
 				if (tab === "libraries") return "scripts";
+				if (tab === "scripts") return "kubernetes";
 				return "applications";
 			});
 			appStore.setSelectedIndex(0); // Reset selection when switching tabs
@@ -440,6 +464,12 @@ export async function handleTableKeys(
 			appStore.setTableSearchQuery("");
 			appStore.setTableSearchMode(false);
 			void appActions.loadScripts();
+			break;
+		case "5":
+			appStore.setActiveTab("kubernetes");
+			appStore.setSelectedIndex(0);
+			appStore.setTableSearchQuery("");
+			appStore.setTableSearchMode(false);
 			break;
 		case "down":
 		case "Down":

@@ -1,5 +1,6 @@
 import { Show } from 'solid-js';
 import { TextAttributes, RGBA } from '@opentui/core';
+import type { NotificationType } from '../stores/ui-store';
 import {
 	LogModal,
 	DiffViewModal,
@@ -585,21 +586,28 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={uiStore.copyStatus()}>
-				<box
-					position="absolute"
-					right={2}
-					bottom={1}
-					paddingLeft={2}
-					paddingRight={2}
-					paddingTop={0}
-					paddingBottom={0}
-					backgroundColor={uiColors.success}
-				>
-					<text fg={uiColors.bgBase} attributes={TextAttributes.BOLD}>
-						{uiStore.copyStatus()}
-					</text>
-				</box>
+			<Show when={uiStore.notification() !== null}>
+				{(() => {
+					const n = uiStore.notification()!;
+					const bgColor = n.type === 'success' ? uiColors.success : n.type === 'warning' ? uiColors.warning : n.type === 'error' ? uiColors.error : uiColors.info;
+					const icon = n.type === 'success' ? '✓ ' : n.type === 'warning' ? '! ' : n.type === 'error' ? '✗ ' : 'ℹ ';
+					return (
+						<box
+							position="absolute"
+							right={2}
+							bottom={1}
+							paddingLeft={2}
+							paddingRight={2}
+							paddingTop={0}
+							paddingBottom={0}
+							backgroundColor={bgColor}
+						>
+							<text fg={uiColors.bgBase} attributes={TextAttributes.BOLD}>
+								{icon}{n.message}
+							</text>
+						</box>
+					);
+				})()}
 			</Show>
 		</>
 	);

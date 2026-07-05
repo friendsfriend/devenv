@@ -119,6 +119,72 @@ export interface DependencyRef {
 	infra?: string;
 }
 
+export type KubernetesClusterState = "missing" | "running" | "degraded" | "unreachable";
+
+export interface KubernetesClusterStatus {
+	clusterName: string;
+	contextName: string;
+	provider: string;
+	exists: boolean;
+	reachable: boolean;
+	state: KubernetesClusterState;
+	kubernetesVersion?: string;
+	nodes: KubernetesClusterNodeSummary[];
+	namespaces: KubernetesNamespaceSummary[];
+	pods: KubernetesPodSummary;
+	releases: KubernetesDevEnvReleaseSummary[];
+	stats?: KubernetesClusterResourceStats;
+	warnings?: string[];
+	collectedAt: string;
+}
+
+export interface KubernetesClusterNodeSummary {
+	name: string;
+	ready: boolean;
+	role?: string;
+	kubeletVersion?: string;
+}
+
+export interface KubernetesNamespaceSummary {
+	name: string;
+	pods: number;
+}
+
+export interface KubernetesPodSummary {
+	total: number;
+	running: number;
+	pending: number;
+	succeeded: number;
+	failed: number;
+	unknown: number;
+}
+
+export interface KubernetesDevEnvReleaseSummary {
+	name: string;
+	namespace: string;
+	status: string;
+	chart?: string;
+	revision?: string;
+}
+
+export interface KubernetesClusterResourceStats {
+	cpuPercent: number;
+	memoryUsageBytes: number;
+	memoryLimitBytes: number;
+	memoryPercent: number;
+	nodes: KubernetesNodeResourceStats[];
+	collectedAt: string;
+}
+
+export interface KubernetesNodeResourceStats {
+	name: string;
+	containerName: string;
+	cpuPercent: number;
+	memoryUsageBytes: number;
+	memoryLimitBytes: number;
+	memoryPercent: number;
+}
+
 export interface KubernetesTargetMetadata {
 	chartPath: string;
 	release: string;

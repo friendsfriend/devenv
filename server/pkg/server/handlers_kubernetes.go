@@ -1,6 +1,86 @@
 package server
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+
+	"github.com/friendsfriend/devenv/pkg/docker"
+	k8s "github.com/friendsfriend/devenv/pkg/kubernetes"
+)
+
+func (s *Server) kubernetesClusterService() k8s.ClusterService {
+	runner := k8s.NewRunner(docker.Runtime{Name: docker.RuntimeName(), Command: docker.RuntimeCommand()})
+	return k8s.NewClusterService(runner)
+}
+
+func (s *Server) handleKubernetesClusterStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+	respondJSON(w, s.kubernetesClusterService().Status(r.Context()), http.StatusOK)
+}
+
+func (s *Server) handleKubernetesClusterCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+	log.Printf("[INFO] Kubernetes cluster create requested")
+	if err := s.kubernetesClusterService().Create(r.Context()); err != nil {
+		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondSuccess(w, s.kubernetesClusterService().Status(r.Context()), "Kubernetes cluster ready")
+}
+
+func (s *Server) handleKubernetesClusterDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		respondMethodNotAllowed(w)
+		return
+	}
+	log.Printf("[INFO] Kubernetes cluster delete requested")
+	if err := s.kubernetesClusterService().Delete(r.Context()); err != nil {
+		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	s.postKubernetesClusterDeleteCleanup()
+	respondSuccess(w, s.kubernetesClusterService().Status(r.Context()), "Kubernetes cluster deleted")
+}
+
+func (s *Server) handleKubernetesClusterRecreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+	log.Printf("[INFO] Kubernetes cluster recreate requested")
+	if err := s.kubernetesClusterService().Recreate(r.Context()); err != nil {
+		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondSuccess(w, s.kubernetesClusterService().Status(r.Context()), "Kubernetes cluster recreated")
+}
+
+func (s *Server) handleKubernetesClusterExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+	log.Printf("[INFO] Kubernetes kubeconfig export requested")
+	if err := s.kubernetesClusterService().ExportKubeconfig(r.Context()); err != nil {
+		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respondSuccess(w, nil, "Kubernetes kubeconfig exported")
+}
+
+func (s *Server) handleKubernetesClusterRefresh(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost && r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+	respondJSON(w, s.kubernetesClusterService().Status(r.Context()), http.StatusOK)
+}
 
 func (s *Server) handleKubernetesLogs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {

@@ -21,6 +21,7 @@ const COMMON_NAVIGATION_ITEMS: HelpSection["items"] = [
 const CONTEXT_TITLES: Record<string, string> = {
 	global: "Global",
 	table: "Repository Table",
+	kubernetes: "Kubernetes Cluster",
 	changeRequests: "Change Request List",
 	changeRequestDetail: "Change Request Detail",
 	jobs: "Pipeline Jobs",
@@ -161,8 +162,9 @@ export function createHelpActions(
 			};
 		}
 		const currentView = appStore.previousViewMode() ?? "table";
-		const title = CONTEXT_TITLES[currentView] ?? "Help";
-		return { title, sections: getSectionsForContext(currentView) };
+		const context = currentView === "table" && appStore.activeTab() === "kubernetes" ? "kubernetes" : currentView;
+		const title = CONTEXT_TITLES[context] ?? (context === "kubernetes" ? "Kubernetes" : "Help");
+		return { title, sections: getSectionsForContext(context) };
 	};
 
 	const getKeybinds = () => {
@@ -219,7 +221,8 @@ export function createHelpActions(
 		}
 
 		const viewMode = appStore.viewMode();
-		const binds = getFooterKeybindsForContext(viewMode);
+		const context = viewMode === "table" && appStore.activeTab() === "kubernetes" ? "kubernetes" : viewMode;
+		const binds = getFooterKeybindsForContext(context);
 		if (binds.length > 0) return binds;
 
 		// Fallback for table with sub-modes

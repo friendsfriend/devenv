@@ -78,6 +78,12 @@ func (r Runner) KindCreateClusterCommand() Command {
 	r = r.withDefaults()
 	return Command{Name: r.KindCommand, Args: []string{"create", "cluster", "--name", r.ClusterName}, Env: r.kindEnv()}
 }
+
+func (r Runner) KindDeleteClusterCommand() Command {
+	r = r.withDefaults()
+	return Command{Name: r.KindCommand, Args: []string{"delete", "cluster", "--name", r.ClusterName}, Env: r.kindEnv()}
+}
+
 func (r Runner) KubectlCommandFor(args ...string) Command {
 	r = r.withDefaults()
 	return Command{Name: r.KubectlCommand, Args: append([]string{"--context", r.ContextName}, args...)}

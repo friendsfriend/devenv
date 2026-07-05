@@ -1,0 +1,31 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`kubernetesClusterSummaryLines snapshots missing state 1`] = `
+[
+  "State: missing",
+  "Name: devenv  Context: kind-devenv  Provider: docker",
+  "Exists: no  Reachable: no  Version: n/a",
+  "Live usage unavailable",
+  "Pods: 0 total, 0 running, 0 failed",
+]
+`;
+
+exports[`kubernetesClusterSummaryLines snapshots running state with stats 1`] = `
+[
+  "State: running",
+  "Name: devenv  Context: kind-devenv  Provider: docker",
+  "Exists: yes  Reachable: yes  Version: v1.29.0",
+  "CPU 12.3%",
+  "Pods: 3 total, 3 running, 0 failed",
+]
+`;
+
+exports[`kubernetesClusterSummaryLines snapshots degraded stats-unavailable state 1`] = `
+[
+  "State: degraded",
+  "Name: devenv  Context: kind-devenv  Provider: docker",
+  "Exists: yes  Reachable: yes  Version: n/a",
+  "Live usage unavailable",
+  "Pods: 2 total, 1 running, 1 failed",
+]
+`;

@@ -73,6 +73,8 @@ export type { CenteredStateProps } from "./components/CenteredState";
 export { SearchHeader } from "./components/SearchHeader";
 export type { SearchHeaderProps } from "./components/SearchHeader";
 export { DetailSection } from "./components/DetailSection";
+export { KubernetesClusterView } from "./components/KubernetesClusterView";
+export type { KubernetesClusterViewProps } from "./components/KubernetesClusterView";
 export type { DetailSectionProps } from "./components/DetailSection";
 export { HelpText, formatHelpText, formatHelpTextLines } from "./components/HelpText";
 export { ScrollableContent, allowsKeyboardAxis } from "./components/ScrollableContent";

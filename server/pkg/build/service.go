@@ -66,6 +66,7 @@ type Service interface {
 	KubernetesRunStatus(appIdent string) string
 	KubernetesRunLogs(appIdent, localDir string) (string, error)
 	DiscoverKubernetesRunStatus(appIdent, localDir string) string
+	ClearKubernetesRuntimeState()
 	SetLastRunRuntime(appIdent string, runtime resources.ActionRuntime)
 	SetOnComplete(callback func(appIdent string))
 	ConfigureRunDependencies(apps appRegistry, infra infraStarter)

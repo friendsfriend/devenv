@@ -1,4 +1,4 @@
-import type { ActionTarget, AppAction, ContainerStats, ShellActionScriptRequest, ShellActionScriptResponse } from '@devenv/types';
+import type { ActionTarget, AppAction, ContainerStats, KubernetesClusterStatus, ShellActionScriptRequest, ShellActionScriptResponse } from '@devenv/types';
 import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 
@@ -121,6 +121,50 @@ export async function getKubernetesLogs(deps: ClientDeps, appIdent: string): Pro
     await handleFetchError(response, deps.onError);
   }
   return response.text();
+}
+
+export async function getKubernetesClusterStatus(deps: ClientDeps): Promise<KubernetesClusterStatus> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/kubernetes/cluster`, { method: 'GET' });
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+  return (await response.json()) as KubernetesClusterStatus;
+}
+
+async function invokeKubernetesClusterAction(deps: ClientDeps, path: string): Promise<KubernetesClusterStatus | void> {
+  const response = await deps.fetchFn(`${deps.baseUrl}${path}`, { method: 'POST' });
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+  const data = (await response.json()) as unknown;
+  if (data && typeof data === 'object' && 'data' in data) {
+    return (data as { data?: KubernetesClusterStatus }).data;
+  }
+  return data as KubernetesClusterStatus;
+}
+
+export async function createKubernetesCluster(deps: ClientDeps): Promise<KubernetesClusterStatus | void> {
+  return invokeKubernetesClusterAction(deps, '/api/kubernetes/cluster/create');
+}
+
+export async function deleteKubernetesCluster(deps: ClientDeps): Promise<KubernetesClusterStatus | void> {
+  return invokeKubernetesClusterAction(deps, '/api/kubernetes/cluster/delete');
+}
+
+export async function recreateKubernetesCluster(deps: ClientDeps): Promise<KubernetesClusterStatus | void> {
+  return invokeKubernetesClusterAction(deps, '/api/kubernetes/cluster/recreate');
+}
+
+export async function exportKubernetesKubeconfig(deps: ClientDeps): Promise<void> {
+  await invokeKubernetesClusterAction(deps, '/api/kubernetes/cluster/export-kubeconfig');
+}
+
+export async function refreshKubernetesCluster(deps: ClientDeps): Promise<KubernetesClusterStatus> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/kubernetes/cluster/refresh`, { method: 'POST' });
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+  return (await response.json()) as KubernetesClusterStatus;
 }
 
 export async function runApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string): Promise<void> {

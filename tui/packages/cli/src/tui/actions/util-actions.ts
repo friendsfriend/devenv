@@ -697,8 +697,7 @@ export function createUtilActions(
     process.stdout.write(finalOsc52);
     const success = copyToClipboard(selectedText);
     if (success) {
-      uiStore.setCopyStatus('✓ Copied');
-      setTimeout(() => uiStore.setCopyStatus(null), 2000);
+      uiStore.setNotification('Copied', 'success');
     }
     renderer.clearSelection();
   };

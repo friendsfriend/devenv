@@ -3,6 +3,9 @@ import type { ActionTarget, App, AppAction, WorktreeInfo } from '@devenv/types';
 import type { BranchInfo, AppDetailKind, EditorOption } from '@devenv/ui';
 import type { SshHost } from '@devenv/types';
 
+export type NotificationType = 'info' | 'success' | 'warning' | 'error';
+export interface Notification { message: string; type: NotificationType }
+
 export function createUiStore() {
   let markdownModalScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
   let helpKeybindScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
@@ -17,7 +20,11 @@ export function createUiStore() {
   const [showBranchSelector, setShowBranchSelector] = createSignal(false);
   const [branches, setBranches] = createSignal<BranchInfo[]>([]);
   const [branchSelectorIndex, setBranchSelectorIndex] = createSignal(0);
-  const [copyStatus, setCopyStatus] = createSignal<string | null>(null);
+  const [notification, setNotificationRaw] = createSignal<Notification | null>(null);
+  const setNotification = (msg: string, type: NotificationType = 'success') => {
+    setNotificationRaw({ message: msg, type });
+    setTimeout(() => setNotificationRaw(null), 3000);
+  };
   const [branchesLoading, setBranchesLoading] = createSignal(false);
   const [targetAppForBranch, setTargetAppForBranch] = createSignal<App | null>(null);
   const [branchFilterQuery, setBranchFilterQuery] = createSignal('');
@@ -125,8 +132,8 @@ export function createUiStore() {
     setBranches,
     branchSelectorIndex,
     setBranchSelectorIndex,
-    copyStatus,
-    setCopyStatus,
+    notification,
+    setNotification,
     branchesLoading,
     setBranchesLoading,
     targetAppForBranch,
