@@ -277,11 +277,10 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 							<WorkItemCard
 								marker={appMarker(app)}
 								prefix={`[${appKind(app)}] `}
-								prefixColor={isLib ? uiColors.textSecondary : uiColors.primary}
+								prefixColor={uiColors.primary}
 								title={app.displayName}
 								statusText={isLib ? '' : appStatus(app)}
 								statusColor={isLib ? uiColors.textMuted : appStatusColor(app)}
-								statusAttributes={isLib ? undefined : TextAttributes.BOLD}
 								statusSuffixText={appStatusSuffix(app)}
 								statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
 								metadata={appMetadata(app)}

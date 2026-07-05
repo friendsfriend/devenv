@@ -40,9 +40,9 @@ export function ContentRouter(props: ContentRouterProps) {
 		void dockerActions.refreshKubernetesCluster();
 	});
 
-	// Table shares content area with StatusLogView (6 lines below it).
+	// Table shares content area with StatusLogView (4 lines below it).
 	// Include three 1-line gutters: header-tabs, table-log, log-footer.
-	const STATUS_LOG_HEIGHT = 6;
+	const STATUS_LOG_HEIGHT = 4;
 	const TABLE_VIEW_GUTTERS = 3;
 	const TAB_BAR_LINES = 3;
 	const availableTableLines = Math.max(
@@ -583,7 +583,7 @@ export function ContentRouter(props: ContentRouterProps) {
 								<box style={{ flexShrink: 0 }}>
 									<StatusLogView
 										entries={appStore.statusLogEntries()}
-										height={6}
+										height={STATUS_LOG_HEIGHT}
 										width={props.dimensions.width}
 										isMaximized={false}
 									runningTextEnabled={props.runningTextEnabled}

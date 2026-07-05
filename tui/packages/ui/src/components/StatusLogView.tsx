@@ -19,7 +19,7 @@ export interface StatusLogViewProps {
  * Shows operations like pull, push, build, start, stop with status indicators
  */
 export function StatusLogView(props: StatusLogViewProps) {
-  const displayHeight = () => props.height || 6;
+  const displayHeight = () => props.height || 4;
   const displayWidth = () => props.width || 80;
 
   /**
@@ -138,8 +138,8 @@ export function StatusLogView(props: StatusLogViewProps) {
       return [];
     }
     
-    // Account for border/padding (2 lines)
-    const availableHeight = displayHeight() - 2;
+    // No border chrome: content area equals component height.
+    const availableHeight = displayHeight();
     
     if (entries.length <= availableHeight) {
       return entries;

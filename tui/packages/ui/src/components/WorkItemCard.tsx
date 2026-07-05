@@ -16,7 +16,6 @@ export interface WorkItemCardProps {
   prefixColor?: string;
   statusSuffixText?: string;
   statusSuffixColor?: string;
-  statusAttributes?: any;
   onMouseUp?: () => void;
   runningTextEnabled?: boolean;
   runningTextOffset?: number;
@@ -29,10 +28,13 @@ export function WorkItemCard(props: WorkItemCardProps) {
   const contentWidth = () => Math.max(1, dimensions().width - 4);
   const fixedPrefix = () => props.marker.length + 1 + (props.prefix?.length ?? 0);
 
+  /** Row-internal content width — subtracts 1 for ScrollableList scrollbar. */
+  const rowWidth = () => Math.max(1, contentWidth() - 1);
+
   /** Compute truncated status + its char width. */
   const statusDisplay = createMemo(() => {
     const full = (props.statusText ?? '') + (props.statusSuffixText ?? '');
-    const avail = contentWidth() - fixedPrefix() - MIN_TITLE_WIDTH - 1;
+    const avail = rowWidth() - fixedPrefix() - MIN_TITLE_WIDTH - 1;
     if (full.length <= avail) {
       const text = props.statusText ?? '';
       const suffix = props.statusSuffixText ?? '';
@@ -56,14 +58,7 @@ export function WorkItemCard(props: WorkItemCardProps) {
 
   /** Title width available after reserving space for prefix + status. */
   const titleWidth = () =>
-    Math.max(MIN_TITLE_WIDTH, contentWidth() - fixedPrefix() - statusDisplay().consumed - 1);
-
-  const titleTruncated = createMemo(() => {
-    const ttlWidth = titleWidth();
-    return props.title.length <= ttlWidth
-      ? props.title
-      : props.title.slice(0, Math.max(0, ttlWidth - 1)) + '…';
-  });
+    Math.max(MIN_TITLE_WIDTH, rowWidth() - fixedPrefix() - statusDisplay().consumed - 1);
 
   const bgColor = () => props.selected ? uiColors.bgSurface0 : uiColors.bgMantle;
 
@@ -89,36 +84,47 @@ export function WorkItemCard(props: WorkItemCardProps) {
           flexDirection: 'column',
           paddingLeft: 1,
           paddingRight: 1,
+          overflow: 'hidden',
         }}
       >
         {/* Line 1: [marker][prefix][title][spacer][status][suffix] */}
-        <box style={{ width: '100%', flexDirection: 'row' }}>
-          <text fg={uiColors.textSecondary}>{props.marker} </text>
-          <text fg={props.prefixColor ?? uiColors.textSecondary}>
+        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', overflow: 'hidden' }}>
+          <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>{props.marker} </text>
+          <text fg={props.prefixColor ?? uiColors.textPrimary} attributes={TextAttributes.BOLD}>
             {props.prefix ?? ''}
           </text>
-          <text fg={uiColors.textSecondary}>{titleTruncated()}</text>
+          <RunningText
+            text={props.title}
+            width={titleWidth()}
+            fg={uiColors.textPrimary}
+            attributes={TextAttributes.BOLD}
+            enabled={props.runningTextEnabled}
+            active={props.selected}
+            offset={props.runningTextOffset}
+          />
           <box style={{ flexGrow: 1, flexShrink: 1 }} />
           <text
             fg={props.statusColor}
-            attributes={props.statusAttributes}
+            attributes={TextAttributes.BOLD}
           >
             {statusDisplay().text}
           </text>
-          <text fg={props.statusSuffixColor ?? props.statusColor}>
+          <text fg={props.statusSuffixColor ?? props.statusColor} attributes={TextAttributes.BOLD}>
             {statusDisplay().suffix}
           </text>
         </box>
 
         {/* ── Line 2 ────────────────────────────────────────────── */}
-        <RunningText
-          text={props.metadata}
-          width={contentWidth()}
-          fg={uiColors.textMuted}
-          enabled={props.runningTextEnabled}
-          active={props.selected}
-          offset={props.runningTextOffset}
-        />
+        <box style={{ width: '100%', height: 1, flexShrink: 0, overflow: 'hidden' }}>
+          <RunningText
+            text={props.metadata}
+            width={rowWidth()}
+            fg={uiColors.textMuted}
+            enabled={props.runningTextEnabled}
+            active={props.selected}
+            offset={props.runningTextOffset}
+          />
+        </box>
       </box>
     </box>
   );
