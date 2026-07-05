@@ -693,8 +693,8 @@ export class DevEnvClient {
 	cancelJob(appIdent: string, jobId: number): Promise<void> {
 		return cancelJob(this.deps, appIdent, jobId);
 	}
-	subscribeToEvents(): AsyncGenerator<ServerEvent> {
-		return subscribeToEvents(this.deps);
+	subscribeToEvents(signal?: AbortSignal): AsyncGenerator<ServerEvent> {
+		return subscribeToEvents(this.deps, signal);
 	}
 	health(): Promise<boolean> {
 		return health(this.deps);

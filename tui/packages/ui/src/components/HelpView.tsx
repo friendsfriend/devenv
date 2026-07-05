@@ -174,7 +174,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
             items={props.guides ?? []}
             selectedIndex={props.selectedGuideIndex ?? 0}
             availableLines={guideListLines()}
-            estimatedItemHeight={4}
+            estimatedItemHeight={2}
             scrollIndicatorLabel="guides"
             renderItem={(guide, isSelected, absoluteIndex) => (
               <WorkItemCard
@@ -184,6 +184,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                 statusColor={uiColors.primary}
                 metadata={guide.description}
                 selected={isSelected()}
+                index={absoluteIndex}
                 onMouseUp={() => props.onGuideSelect?.(guide.key)}
                 runningTextEnabled={props.runningTextEnabled}
                 runningTextOffset={props.runningTextOffset}

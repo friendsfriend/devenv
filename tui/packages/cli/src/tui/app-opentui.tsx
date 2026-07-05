@@ -6,7 +6,7 @@ import {
 	useTerminalDimensions,
 } from '@opentui/solid';
 import { createCliRenderer } from '@opentui/core';
-import { setExitRenderer } from "./exit";
+import { setExitRenderer, getExitSignal } from "./exit";
 import { onMount, createEffect, on, onCleanup } from 'solid-js';
 import "opentui-spinner/solid";
 import { APP_VERSION } from "../version";
@@ -207,6 +207,7 @@ function TUIApp(props: TUIAppProps) {
 			showError,
 			serverUrl: props.serverUrl,
 			refreshProviders: providerActions.refreshProviders,
+			abortSignal: getExitSignal(),
 		});
 	});
 

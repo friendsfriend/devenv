@@ -91,9 +91,9 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
               items={props.changeRequests}
               selectedIndex={props.selectedIndex}
               reservedLines={RESERVED_LINES}
-              estimatedItemHeight={4}
+              estimatedItemHeight={2}
               showScrollIndicator={false}
-              renderItem={(cr, isSelected) => {
+              renderItem={(cr, isSelected, index) => {
                 const mergeStatus = getMergeStatusText(cr);
                 const pipeline = cr.head_pipeline?.status || '-';
                 return (
@@ -108,6 +108,8 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
                     statusSuffixColor={getPipelineStatusColor(cr.head_pipeline?.status)}
                     metadata={`@${cr.author.name} • updated ${formatShortDate(cr.updated_at)}`}
                     selected={isSelected()}
+                    index={index}
+                    onMouseUp={props.onSelectCR ? () => props.onSelectCR!(cr) : undefined}
                     runningTextEnabled={props.runningTextEnabled}
                     runningTextOffset={props.runningTextOffset}
                   />

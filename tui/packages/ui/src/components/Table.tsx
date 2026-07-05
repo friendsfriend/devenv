@@ -153,7 +153,6 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		const isLinkedWorktree = app.activeWorktree && app.activeWorktree !== app.mainWorktreeBranch;
 		return [
 			`${providerIcon(app)} ${app.provider || app.sourceType || "repo"}`,
-			gitStatusText(app),
 			isLinkedWorktree ? `worktree ${app.activeWorktree}` : undefined,
 			app.dockerInfo?.Ports,
 			app.repositoryPath,
@@ -268,26 +267,32 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 					reservedLines={
 						props.availableLines === undefined ? reservedLines() : undefined
 					}
-					estimatedItemHeight={4}
+					estimatedItemHeight={2}
 					showScrollIndicator={false}
-					renderItem={(app, isSelected, index) => (
-						<WorkItemCard
-							marker={appMarker(app)}
-							prefix={`[${appKind(app)}] `}
-							prefixColor={app.rowKind === "app" && app.appType === "APP" ? uiColors.primary : uiColors.textSecondary}
-							title={app.displayName}
-							statusText={appStatus(app)}
-							statusColor={appStatusColor(app)}
-							statusAttributes={TextAttributes.BOLD}
-							statusSuffixText={appStatusSuffix(app)}
-							statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
-							metadata={appMetadata(app)}
-							selected={isSelected()}
-							runningTextEnabled={props.runningTextEnabled}
-							runningTextOffset={props.runningTextOffset}
-							onMouseUp={() => props.onSelect?.(index)}
-						/>
-					)}
+					renderItem={(app, isSelected, index) => {
+						// Libraries are dev-dependencies — no container status,
+						// but git status / branch info is still relevant.
+						const isLib = app.rowKind === "app" && app.appType !== "APP";
+						return (
+							<WorkItemCard
+								marker={appMarker(app)}
+								prefix={`[${appKind(app)}] `}
+								prefixColor={isLib ? uiColors.textSecondary : uiColors.primary}
+								title={app.displayName}
+								statusText={isLib ? '' : appStatus(app)}
+								statusColor={isLib ? uiColors.textMuted : appStatusColor(app)}
+								statusAttributes={isLib ? undefined : TextAttributes.BOLD}
+								statusSuffixText={appStatusSuffix(app)}
+								statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
+								metadata={appMetadata(app)}
+								selected={isSelected()}
+								index={index}
+								runningTextEnabled={props.runningTextEnabled}
+								runningTextOffset={props.runningTextOffset}
+								onMouseUp={() => props.onSelect?.(index)}
+							/>
+						);
+					}}
 				/>
 			</Show>
 		</box>

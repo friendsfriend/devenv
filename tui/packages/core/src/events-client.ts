@@ -4,9 +4,12 @@ import { handleFetchError } from './error-handler';
 
 /**
  * Subscribe to server events (SSE).
+ * Pass optional AbortSignal to cancel the subscription gracefully.
  */
-export async function* subscribeToEvents(deps: ClientDeps): AsyncGenerator<ServerEvent> {
-  const response = await deps.sseFetchFn(`${deps.baseUrl}/api/events`);
+export async function* subscribeToEvents(deps: ClientDeps, signal?: AbortSignal): AsyncGenerator<ServerEvent> {
+  const response = await deps.sseFetchFn(`${deps.baseUrl}/api/events`, {
+    signal,
+  });
   if (!response.ok) {
     await handleFetchError(response, deps.onError);
     throw new Error(`Failed to subscribe to events: ${response.statusText}`);
@@ -17,11 +20,22 @@ export async function* subscribeToEvents(deps: ClientDeps): AsyncGenerator<Serve
     throw new Error('No response body');
   }
 
+  // If already aborted before we got the reader, bail early
+  if (signal?.aborted) {
+    await reader.cancel();
+    return;
+  }
+
   const decoder = new TextDecoder();
   let buffer = '';
 
+  // Cancel reader when the abort signal fires so the read loop breaks cleanly
+  const onAbort = () => { reader.cancel().catch(() => {}); };
+  signal?.addEventListener('abort', onAbort, { once: true });
+
   try {
     while (true) {
+      if (signal?.aborted) break;
       const { done, value } = await reader.read();
       if (done) break;
 
@@ -42,7 +56,8 @@ export async function* subscribeToEvents(deps: ClientDeps): AsyncGenerator<Serve
       }
     }
   } finally {
-    reader.releaseLock();
+    signal?.removeEventListener('abort', onAbort);
+    try { reader.releaseLock(); } catch { /* reader may have been cancelled */ }
   }
 }
 

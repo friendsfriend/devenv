@@ -65,9 +65,9 @@ export function ReferencesView(props: ReferencesViewProps) {
 							items={props.references}
 							selectedIndex={props.selectedIndex}
 							reservedLines={RESERVED_LINES}
-							estimatedItemHeight={4}
+							estimatedItemHeight={2}
 							showScrollIndicator={false}
-							renderItem={(ref, isSelected) => (
+							renderItem={(ref, isSelected, index) => (
 								<WorkItemCard
 									marker={`${ref.type === "cr" ? "!" : "#"}${ref.data.iid}`}
 									prefix={`[${typeLabel(ref)}] `}
@@ -77,6 +77,7 @@ export function ReferencesView(props: ReferencesViewProps) {
 									statusColor={getIssueStateColor(ref.data.state)}
 									metadata={`@${ref.data.author.name} • updated ${formatShortDate(ref.data.updated_at)}`}
 									selected={isSelected()}
+									index={index}
 									runningTextEnabled={props.runningTextEnabled}
 									runningTextOffset={props.runningTextOffset}
 								/>

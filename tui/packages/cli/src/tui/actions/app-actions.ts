@@ -41,11 +41,11 @@ export function createAppActions(
     }
   };
 
-  const subscribeToUpdates = async () => {
+  const subscribeToUpdates = async (signal?: AbortSignal) => {
     try {
       appStore.setLiveUpdatesActive(true);
       getLogger().write('INFO', 'Starting SSE subscription...');
-      for await (const event of client.subscribeToEvents()) {
+      for await (const event of client.subscribeToEvents(signal)) {
         if (event.type === 'connection.established') {
           appStore.setLiveUpdatesActive(true);
           continue;

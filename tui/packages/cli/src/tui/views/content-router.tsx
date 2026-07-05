@@ -78,6 +78,7 @@ export function ContentRouter(props: ContentRouterProps) {
 					totalPages={1}
 					totalCount={changeRequestStore.changeRequestLinkedIssues().length}
 					scope={"all"}
+					onSelectIssue={(issue) => void issueActions.showIssueDetail(issue)}
 					onClose={() => {
 						changeRequestStore.setSelectedCrLinkedIssueIndex(0);
 						appStore.setViewMode("changeRequestDetail");
@@ -95,6 +96,7 @@ export function ContentRouter(props: ContentRouterProps) {
 					totalPages={1}
 					totalCount={issueStore.referencedIssues().length}
 					scope={"all"}
+					onSelectIssue={(issue) => void issueActions.showIssueDetail(issue)}
 					onClose={() => issueActions.backToIssueDetailFromReferences()}
 				/>
 			) : appStore.viewMode() === "linkedChangeRequests" ? (
@@ -407,6 +409,7 @@ export function ContentRouter(props: ContentRouterProps) {
 										searchQuery={issueStore.issueSearchQuery()}
 										runningTextEnabled={props.runningTextEnabled}
 										runningTextOffset={props.runningTextOffset}
+										onSelectIssue={(issue) => void issueActions.showIssueDetail(issue)}
 										onClose={() => {
 											appStore.setViewMode("table");
 											issueStore.setIssues([]);

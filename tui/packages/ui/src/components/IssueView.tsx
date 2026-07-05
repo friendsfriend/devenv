@@ -1,4 +1,5 @@
 import { TextAttributes } from '@opentui/core';
+
 import { Show } from 'solid-js';
 import { uiColors } from "../colors";
 import type { Issue, IssueScope } from '@devenv/types';
@@ -90,9 +91,9 @@ export function IssueView(props: IssueViewProps) {
 							items={props.issues}
 							selectedIndex={props.selectedIndex}
 							reservedLines={RESERVED_LINES}
-							estimatedItemHeight={4}
+							estimatedItemHeight={2}
 							showScrollIndicator={false}
-							renderItem={(issue, isSelected) => {
+							renderItem={(issue, isSelected, index) => {
 								const labels = issue.labels ?? [];
 								const labelText = labels.length > 0
 									? labels.join(", ")
@@ -105,6 +106,8 @@ export function IssueView(props: IssueViewProps) {
 										statusColor={getIssueStateColor(issue.state)}
 										metadata={`@${issue.author.name} • ${labelText} • updated ${formatShortDate(issue.updated_at)}`}
 										selected={isSelected()}
+										index={index}
+										onMouseUp={props.onSelectIssue ? () => props.onSelectIssue!(issue) : undefined}
 										runningTextEnabled={props.runningTextEnabled}
 										runningTextOffset={props.runningTextOffset}
 									/>
