@@ -95,16 +95,17 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 		const stageMinJobId = new Map<string, number>();
 
 		for (const job of props.jobs) {
-			if (!grouped.has(job.stage)) {
-				grouped.set(job.stage, []);
-				stageMinJobId.set(job.stage, job.id);
+			const stage = (job.stage ?? "").trim() || "Default";
+			if (!grouped.has(stage)) {
+				grouped.set(stage, []);
+				stageMinJobId.set(stage, job.id);
 			}
-			grouped.get(job.stage)!.push(job);
+			grouped.get(stage)!.push(job);
 
 			// Track the minimum job ID for this stage
-			const currentMin = stageMinJobId.get(job.stage)!;
+			const currentMin = stageMinJobId.get(stage)!;
 			if (job.id < currentMin) {
-				stageMinJobId.set(job.stage, job.id);
+				stageMinJobId.set(stage, job.id);
 			}
 		}
 

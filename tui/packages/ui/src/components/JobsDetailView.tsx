@@ -44,7 +44,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
     const stageFirstJobId: Map<string, number> = new Map();
     
     for (const job of props.jobs) {
-      const stage = job.stage || 'default';
+      const stage = (job.stage ?? '').trim() || 'Default';
       if (!byStage.has(stage)) {
         byStage.set(stage, []);
         // Track the first (lowest ID) job for each stage to determine order
@@ -127,8 +127,11 @@ export function JobsDetailView(props: JobsDetailViewProps) {
           backgroundColor={uiColors.bgBase}
           style={{
             width: '100%',
+            height: 3,
+            flexShrink: 0,
             flexDirection: 'row',
             gap: 1,
+            overflow: 'hidden',
           }}
         >
           <For each={organizedJobs()}>

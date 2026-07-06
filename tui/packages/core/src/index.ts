@@ -101,6 +101,7 @@ import {
 import {
 	approveChangeRequest,
 	createCRComment,
+	getChangeRequest,
 	getChangeRequests,
 	getChangeRequestChanges,
 	getCRDiscussions,
@@ -455,6 +456,13 @@ export class DevEnvClient {
 		sourceType?: string,
 	): Promise<import("@devenv/types").TestSummary> {
 		return getTestSummary(this.deps, appIdent, pipelineId, sourceType);
+	}
+	getChangeRequest(
+		appIdent: string,
+		crIID: number,
+		sourceType?: string,
+	): Promise<import("@devenv/types").ChangeRequest> {
+		return getChangeRequest(this.deps, appIdent, crIID, sourceType);
 	}
 	getChangeRequestChanges(
 		appIdent: string,

@@ -161,6 +161,52 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 	json.NewEncoder(w).Encode(result)
 }
 
+func (s *Server) handleGitHubPullRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	prNumberStr := r.URL.Query().Get("crIID")
+
+	if appIdent == "" || prNumberStr == "" {
+		respondBadRequest(w, "appIdent and crIID parameters required")
+		return
+	}
+
+	prNumber, err := strconv.Atoi(prNumberStr)
+	if err != nil || prNumber <= 0 {
+		respondBadRequest(w, "Invalid crIID")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+	if targetApp.RepositoryPath == "" {
+		respondBadRequest(w, "App has no repository path")
+		return
+	}
+
+	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	pr, err := ghClient.GetPullRequest(repoInfo, prNumber)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch pull request: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(pr)
+}
+
 func (s *Server) handleGitHubPRChanges(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)

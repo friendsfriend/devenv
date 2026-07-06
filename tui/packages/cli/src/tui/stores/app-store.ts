@@ -174,8 +174,8 @@ export function createAppStore() {
 	const [showTableSortModal, setShowTableSortModal] = createSignal(false);
 	const [tableSortSelectedIndex, setTableSortSelectedIndex] = createSignal(0);
 	const appSortRules = (): TableSortRule[] => [
-		{ key: "status", label: "Status", direction: "asc" },
-		{ key: "git", label: "Git", direction: "asc" },
+		{ key: "status", label: "Status", direction: "none" },
+		{ key: "git", label: "Git", direction: "none" },
 		{ key: "name", label: "Name", direction: "none" },
 	];
 	const scriptSortRules = (): TableSortRule[] => [

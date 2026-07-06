@@ -22,6 +22,7 @@ import (
 // It provides merge/pull request operations for GitHub repositories.
 type Client interface {
 	changerequest.Client
+	GetPullRequest(info *RepoInfo, prNumber int) (*ChangeRequest, error)
 }
 
 type client struct {
@@ -243,8 +244,8 @@ type ChangeRequest struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
 	} `json:"author"`
-	// GitHub has no server-side pipeline — head_pipeline will always be nil.
-	// We keep the field for JSON compatibility with the TUI.
+	// GitHub has no GitLab-style pipeline, but we expose the latest matching
+	// Actions workflow run as head_pipeline for TUI compatibility.
 	HeadPipeline *struct {
 		ID     int    `json:"id"`
 		Status string `json:"status"`
@@ -1517,9 +1518,9 @@ func mapRunStatusToGitLab(run ghWorkflowRun) string {
 // convertActionJob converts a ghActionJob into the GitLab Job shape that the TUI expects.
 // workflowName is used as the "stage" field.
 func convertActionJob(job ghActionJob, workflowName string) gitlab.Job {
-	stage := workflowName
+	stage := strings.TrimSpace(workflowName)
 	if stage == "" {
-		stage = "build"
+		stage = "Default"
 	}
 
 	run := ghWorkflowRun{Status: job.Status, Conclusion: job.Conclusion}
@@ -2116,7 +2117,7 @@ func convertActionJobToChangeRequest(job ghActionJob) changerequest.Job {
 	return changerequest.Job{
 		ID:         job.ID,
 		Name:       job.Name,
-		Stage:      "build",
+		Stage:      "Default",
 		Status:     mapJobStatusToGitLab(job),
 		WebURL:     job.HTMLURL,
 		StartedAt:  &startedAt,

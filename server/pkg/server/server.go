@@ -200,6 +200,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/gitlab/job-retry", s.handleGitLabJobRetry)
 	mux.HandleFunc("/api/gitlab/job-cancel", s.handleGitLabJobCancel)
 	mux.HandleFunc("/api/github/pull-requests", s.handleGitHubPullRequests)
+	mux.HandleFunc("/api/github/pull-request", s.handleGitHubPullRequest)
 	mux.HandleFunc("/api/github/pr-changes", s.handleGitHubPRChanges)
 	mux.HandleFunc("/api/github/pr-discussions", s.handleGitHubPRDiscussions)
 	mux.HandleFunc("/api/github/pr-approve", s.handleGitHubPRApprove)

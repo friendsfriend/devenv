@@ -36,7 +36,7 @@ export function createPipelineActions(
     const byStage: Map<string, Job[]> = new Map();
     const stageFirstJobId: Map<string, number> = new Map();
     for (const job of changeRequestStore.jobs()) {
-      const stage = job.stage || 'default';
+      const stage = (job.stage ?? '').trim() || 'Default';
       if (!byStage.has(stage)) {
         byStage.set(stage, []);
         stageFirstJobId.set(stage, job.id);
