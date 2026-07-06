@@ -75,6 +75,8 @@ export type { SearchHeaderProps } from "./components/SearchHeader";
 export { DetailSection } from "./components/DetailSection";
 export { KubernetesClusterView } from "./components/KubernetesClusterView";
 export type { KubernetesClusterViewProps } from "./components/KubernetesClusterView";
+export { ResourceTimelineCharts } from "./components/ResourceTimelineCharts";
+export type { ResourceTimelineChartsProps, TimelineMetric } from "./components/ResourceTimelineCharts";
 export type { DetailSectionProps } from "./components/DetailSection";
 export { HelpText, formatHelpText, formatHelpTextLines } from "./components/HelpText";
 export { ScrollableContent, allowsKeyboardAxis } from "./components/ScrollableContent";

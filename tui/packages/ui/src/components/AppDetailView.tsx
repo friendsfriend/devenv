@@ -1,12 +1,12 @@
 import { TextAttributes } from '@opentui/core';
-import { Show, For, createMemo } from 'solid-js';
-import { useTerminalDimensions } from '@opentui/solid';
+import { Show, For } from 'solid-js';
 import { uiColors } from '../colors';
 import { ContentFrame } from './ContentStack';
 import { DetailSection } from './DetailSection';
 import type { App, ChangeRequest, ContainerStats } from '@devenv/types';
 import { ScrollableContent } from './ScrollableContent';
 import { getStatusStyle } from '../statusUtils';
+import { ResourceTimelineCharts } from './ResourceTimelineCharts';
 
 export type AppDetailKind = 'app' | 'library' | 'infra';
 
@@ -24,44 +24,6 @@ interface AppDetailViewProps {
 }
 
 export function AppDetailView(props: AppDetailViewProps) {
-  const dimensions = useTerminalDimensions();
-
-  const labelWidth = 5;
-
-  const sparklineWidth = createMemo(() => {
-    const termWidth = dimensions().width;
-    const rightPct = props.kind === 'infra' ? 0.65 : 0.50;
-    const panelWidth = Math.floor(termWidth * rightPct);
-    return Math.max(5, panelWidth - 4 - labelWidth);
-  });
-
-  const toHalfBlockSparkline = (values: number[]): { topRow: string; bottomRow: string } => {
-    const width = sparklineWidth();
-    const topChars = [' ', '▂', '▄', '▆', '█'];
-    const botChars = [' ', '▂', '▄', '▆', '█'];
-
-    if (values.length === 0) {
-      return { topRow: ' '.repeat(width), bottomRow: ' '.repeat(width) };
-    }
-
-    const display = values.length > width ? values.slice(-width) : values;
-    const pad = width - display.length;
-
-    let top = '';
-    let bot = '';
-    for (const value of display) {
-      const clamped = Math.max(0, Math.min(100, value));
-      const height = Math.round((clamped / 100) * 8);
-      const botLevel = height === 0 ? 1 : Math.min(height, 4);
-      const topLevel = Math.max(0, height - 4);
-      bot += botChars[botLevel];
-      top += topChars[topLevel];
-    }
-
-    const padStr = ' '.repeat(pad);
-    return { topRow: padStr + top, bottomRow: padStr + bot };
-  };
-
   const formatMB = (bytes: number): string => {
     const mb = Math.round(bytes / (1024 * 1024));
     return `${mb}MB`;
@@ -257,8 +219,9 @@ export function AppDetailView(props: AppDetailViewProps) {
             backgroundColor={uiColors.bgMantle}
             style={{
               width: '100%',
-              height: 9,
-              flexShrink: 0,
+              flexGrow: 1,
+              flexBasis: 0,
+              minHeight: 0,
               flexDirection: 'column',
               overflow: 'hidden',
             }}
@@ -268,61 +231,31 @@ export function AppDetailView(props: AppDetailViewProps) {
                 Container Stats
               </text>
             </box>
-            <ScrollableContent
-            axes={["x", "y"]}
-              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+            <Show
+              when={props.latestStats}
+              fallback={
+                <box style={{ paddingLeft: 1, paddingRight: 1, flexGrow: 1 }}>
+                  <text fg={uiColors.textMuted}>No container running</text>
+                </box>
+              }
             >
-              <Show
-                when={props.latestStats}
-                fallback={
-                  <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted}>No container running</text>
-                  </box>
-                }
-              >
-                {(stats) => {
-                  const cpuSpark = () => toHalfBlockSparkline(props.statsHistory);
-                  const memSpark = () => toHalfBlockSparkline(props.memHistory);
-                  return (
-                    <>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>CPU  </text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.primary}>{cpuSpark().topRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textSecondary}>{stats().cpuPercent.toFixed(1)}%</text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.primary}>{cpuSpark().bottomRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ height: 1 }} />
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>MEM  </text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.success}>{memSpark().topRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textSecondary}>{formatMB(stats().memoryUsage)}/{formatMB(stats().memoryLimit)}</text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.success}>{memSpark().bottomRow}</text>
-                        </box>
-                      </box>
-                    </>
-                  );
-                }}
-              </Show>
-            </ScrollableContent>
+              {(stats) => (
+                <ResourceTimelineCharts
+                  cpu={{
+                    title: 'CPU',
+                    value: `${stats().cpuPercent.toFixed(1)}%`,
+                    values: props.statsHistory,
+                    color: uiColors.primary,
+                  }}
+                  memory={{
+                    title: 'MEM',
+                    value: `${formatMB(stats().memoryUsage)}/${formatMB(stats().memoryLimit)}`,
+                    values: props.memHistory,
+                    color: uiColors.success,
+                  }}
+                />
+              )}
+            </Show>
           </box>
 
           <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />

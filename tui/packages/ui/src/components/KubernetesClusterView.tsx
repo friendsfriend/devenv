@@ -1,10 +1,10 @@
 import { TextAttributes } from '@opentui/core';
-import { For, Show, createMemo } from 'solid-js';
-import { useTerminalDimensions } from '@opentui/solid';
+import { For, Show } from 'solid-js';
 import type { KubernetesClusterStatus } from '@devenv/types';
 
 import { ScrollableContent } from './ScrollableContent';
 import { uiColors } from '../colors';
+import { ResourceTimelineCharts } from './ResourceTimelineCharts';
 
 export interface KubernetesClusterViewProps {
   status?: KubernetesClusterStatus | null;
@@ -33,25 +33,6 @@ export function kubernetesClusterSummaryLines(status?: KubernetesClusterStatus |
   return lines;
 }
 
-function toHalfBlockSparkline(values: number[], width: number): { topRow: string; bottomRow: string } {
-  const topChars = [' ', '▂', '▄', '▆', '█'];
-  const botChars = [' ', '▂', '▄', '▆', '█'];
-  if (values.length === 0) return { topRow: ' '.repeat(width), bottomRow: ' '.repeat(width) };
-  const display = values.length > width ? values.slice(-width) : values;
-  const pad = width - display.length;
-  let top = '';
-  let bot = '';
-  for (const value of display) {
-    const clamped = Math.max(0, Math.min(100, value));
-    const height = Math.round((clamped / 100) * 8);
-    const botLevel = height === 0 ? 1 : Math.min(height, 4);
-    const topLevel = Math.max(0, height - 4);
-    bot += botChars[botLevel];
-    top += topChars[topLevel];
-  }
-  return { topRow: ' '.repeat(pad) + top, bottomRow: ' '.repeat(pad) + bot };
-}
-
 function formatMB(bytes: number): string {
   const mb = Math.round(bytes / (1024 * 1024));
   return `${mb}MB`;
@@ -61,13 +42,6 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
   const s = () => props.status;
   const state = () => s()?.state ?? 'missing';
   const stats = () => s()?.stats;
-  const dimensions = useTerminalDimensions();
-  const labelWidth = 5;
-  const sparklineWidth = createMemo(() => {
-    const termWidth = dimensions().width;
-    const panelWidth = Math.floor(termWidth * 0.5);
-    return Math.max(5, panelWidth - 4 - labelWidth);
-  });
 
   return (
     <>
@@ -163,59 +137,31 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
                 Resources
               </text>
             </box>
-            <ScrollableContent
-              axes={['x', 'y']}
-              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
-            >
-              <Show when={stats() !== undefined} fallback={
-                <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No container resources — cluster may be missing or using podman</text>
-                </box>
-              }>
-                {(() => {
-                  const st = stats()!;
-                  const cpuSpark = () => toHalfBlockSparkline(props.cpuHistory ?? [], sparklineWidth());
-                  const memSpark = () => toHalfBlockSparkline(props.memoryHistory ?? [], sparklineWidth());
-                  return (
-                    <>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>CPU  </text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.primary}>{cpuSpark().topRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textSecondary}>{st.cpuPercent.toFixed(1)}%</text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.primary}>{cpuSpark().bottomRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ height: 1 }} />
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>MEM  </text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.success}>{memSpark().topRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textSecondary}>{formatMB(st.memoryUsageBytes)}/{formatMB(st.memoryLimitBytes)}</text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.success}>{memSpark().bottomRow}</text>
-                        </box>
-                      </box>
-                    </>
-                  );
-                })()}
-              </Show>
-            </ScrollableContent>
+            <Show when={stats() !== undefined} fallback={
+              <box style={{ paddingLeft: 1, paddingRight: 1, flexGrow: 1 }}>
+                <text fg={uiColors.textMuted}>No container resources — cluster may be missing or using podman</text>
+              </box>
+            }>
+              {(() => {
+                const st = stats()!;
+                return (
+                  <ResourceTimelineCharts
+                    cpu={{
+                      title: 'CPU',
+                      value: `${st.cpuPercent.toFixed(1)}%`,
+                      values: props.cpuHistory ?? [],
+                      color: uiColors.primary,
+                    }}
+                    memory={{
+                      title: 'MEM',
+                      value: `${formatMB(st.memoryUsageBytes)}/${formatMB(st.memoryLimitBytes)}`,
+                      values: props.memoryHistory ?? [],
+                      color: uiColors.success,
+                    }}
+                  />
+                );
+              })()}
+            </Show>
           </box>
         </box>
 
