@@ -25,6 +25,17 @@ export interface ProviderUpdateRequest {
 	token?: string;
 }
 
+export interface AppRunTargetInfo {
+	runtime: ActionRuntime | string;
+	launchMode?: LaunchMode | string;
+	label?: string;
+	profile?: string;
+	targetId?: string;
+	sourcePath?: string;
+	startedAt: string;
+	display: string;
+}
+
 export interface App {
 	ident: string;
 	displayName: string;
@@ -40,6 +51,7 @@ export interface App {
 	dockerInfo?: DockerInfo;
 	gitStatus?: string;
 	operationStatus?: OperationStatus;
+	runTargetInfo?: AppRunTargetInfo;
 	status?: "running" | "stopped" | "failed" | string;
 	// Transitional table fields. App rows do not populate these, but keeping them
 	// optional allows generic table/action helpers to inspect TableRow safely.
@@ -236,6 +248,7 @@ export interface AppStatus {
 	branch?: string;
 	activeWorktree?: string;
 	operationStatus?: OperationStatus; // NEW: Current operation status
+	runTargetInfo?: AppRunTargetInfo | null;
 	status?: "running" | "stopped" | "failed" | string;
 }
 

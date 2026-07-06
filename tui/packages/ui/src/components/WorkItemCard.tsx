@@ -16,6 +16,8 @@ export interface WorkItemCardProps {
   prefixColor?: string;
   statusSuffixText?: string;
   statusSuffixColor?: string;
+  rightMetadata?: string;
+  rightMetadataColor?: string;
   onMouseUp?: () => void;
   runningTextEnabled?: boolean;
   runningTextOffset?: number;
@@ -59,6 +61,20 @@ export function WorkItemCard(props: WorkItemCardProps) {
   /** Title width available after reserving space for prefix + status. */
   const titleWidth = () =>
     Math.max(MIN_TITLE_WIDTH, rowWidth() - fixedPrefix() - statusDisplay().consumed - 1);
+
+  const rightMetadataDisplay = createMemo(() => {
+    const text = props.rightMetadata ?? '';
+    const max = Math.max(0, Math.floor(rowWidth() * 0.45));
+    if (!text || max === 0) return '';
+    if (text.length <= max) return text;
+    return text.slice(0, Math.max(1, max - 1)) + '…';
+  });
+
+  const metadataWidth = () => {
+    const right = rightMetadataDisplay();
+    const gap = right ? 1 : 0;
+    return Math.max(1, rowWidth() - right.length - gap);
+  };
 
   const bgColor = () => props.selected ? uiColors.bgSurface0 : uiColors.bgMantle;
 
@@ -115,15 +131,19 @@ export function WorkItemCard(props: WorkItemCardProps) {
         </box>
 
         {/* ── Line 2 ────────────────────────────────────────────── */}
-        <box style={{ width: '100%', height: 1, flexShrink: 0, overflow: 'hidden' }}>
+        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', overflow: 'hidden' }}>
           <RunningText
             text={props.metadata}
-            width={rowWidth()}
+            width={metadataWidth()}
             fg={uiColors.textMuted}
             enabled={props.runningTextEnabled}
             active={props.selected}
             offset={props.runningTextOffset}
           />
+          <box style={{ flexGrow: 1, flexShrink: 1 }} />
+          <text fg={props.rightMetadataColor ?? uiColors.textMuted}>
+            {rightMetadataDisplay()}
+          </text>
         </box>
       </box>
     </box>

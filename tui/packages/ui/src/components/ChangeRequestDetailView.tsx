@@ -7,6 +7,7 @@ import { getMarkdownSyntaxStyle } from "../markdownSyntax";
 import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
 import { ScrollableContent } from './ScrollableContent';
 import { RunningText } from './RunningText';
+import { DetailSection } from './DetailSection';
 import type {
 	Issue,
 	ChangeRequest,
@@ -163,8 +164,8 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					}}
 				>
 				{/* METADATA PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					header={<RunningText text={cr().title} width={lineWidth()} fg={uiColors.textPrimary} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />}
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -173,10 +174,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 						overflow: "hidden",
 					}}
 				>
-					{/* Title - Fixed header outside scrollbox */}
-					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-						<RunningText text={cr().title} width={lineWidth()} fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
-					</box>
 
 					{/* Scrollable content */}
 					<ScrollableContent
@@ -383,13 +380,13 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							)}
 						</For>
 					</ScrollableContent>
-				</box>
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* STATUS PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Status"
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -405,16 +402,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							minHeight: 0,
 						}}
 					>
-						{/* Title */}
-						<box style={{ height: 1, paddingLeft: 1, paddingRight: 1 }}>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Status
-							</text>
-						</box>
-
 						{/* Merge Status */}
 						<box
 							style={{
@@ -596,13 +583,13 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</box>
 						</Show>
 					</ScrollableContent>
-				</box>
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* CHANGED FILES PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Changed Files"
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -614,20 +601,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Changed Files
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.changesLoading}>
 							<box
@@ -710,7 +683,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</For>
 						</ScrollableContent>
 					</Show>
-				</box>
+				</DetailSection>
 			</box>
 
 			{/* RIGHT COLUMN: Pipeline Jobs + Test Results */}
@@ -724,8 +697,8 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 				}}
 			>
 				{/* PIPELINE JOBS PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Pipeline Jobs"
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -736,20 +709,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Pipeline Jobs
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.jobsLoading}>
 							<box
@@ -839,13 +798,13 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</For>
 						</ScrollableContent>
 					</Show>
-				</box>
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* DISCUSSIONS PANEL - Fixed height summary */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Discussions"
 					style={{
 						width: "100%",
 						height: 6,
@@ -856,20 +815,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Discussions
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.discussionsLoading}>
 							<box
@@ -963,13 +908,13 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</box>
 						</Show>
 					</box>
-				</box>
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* TEST RESULTS PANEL - Fixed height summary */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Test Results"
 					style={{
 						width: "100%",
 						height: 8,
@@ -980,20 +925,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Test Results
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.testLoading}>
 							<box
@@ -1106,7 +1037,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</box>
 						</Show>
 					</box>
-				</box>
+				</DetailSection>
 			</box>
 		</box>
 	</ContentFrame>

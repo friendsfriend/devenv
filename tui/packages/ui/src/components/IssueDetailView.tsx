@@ -9,6 +9,7 @@ import { getMarkdownSyntaxStyle } from "../markdownSyntax";
 import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
 import { ScrollableContent } from './ScrollableContent';
 import { RunningText } from './RunningText';
+import { DetailSection } from './DetailSection';
 
 type RefItem =
 	| { type: "cr"; data: ChangeRequest }
@@ -66,8 +67,8 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 				}}
 			>
 			{/* METADATA PANEL */}
-			<box
-				backgroundColor={uiColors.bgMantle}
+			<DetailSection
+				header={<RunningText text={issue().title} width={lineWidth()} fg={uiColors.textPrimary} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />}
 				style={{
 					width: "100%",
 					flexGrow: 1,
@@ -76,10 +77,6 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					overflow: "hidden",
 				}}
 			>
-				{/* Title */}
-				<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-					<RunningText text={issue().title} width={lineWidth()} fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
-				</box>
 
 				<ScrollableContent
 					onScrollBoxReady={(r) => props.onDetailScrollBoxReady?.(r)}
@@ -229,13 +226,13 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 						<RunningText text={issue().web_url} width={lineWidth()} fg={uiColors.primary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
 					</box>
 				</ScrollableContent>
-			</box>
+			</DetailSection>
 
 			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
 
 			{/* REFERENCES — combined issues + CRs */}
-			<box
-				backgroundColor={uiColors.bgMantle}
+			<DetailSection
+				title={`References${props.references && props.references.length > 0 ? ` (${props.references.length})` : ""}`}
 				style={{
 					width: "100%",
 					flexGrow: 0,
@@ -245,14 +242,6 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					overflow: "hidden",
 				}}
 			>
-				<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-					<text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-						References
-						{props.references && props.references.length > 0
-							? ` (${props.references.length})`
-							: ""}
-					</text>
-				</box>
 
 				<Show when={props.linkedChangeRequestsLoading || props.referencedIssuesLoading}>
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
@@ -328,13 +317,13 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 						</Show>
 					</ScrollableContent>
 				</Show>
-			</box>
+			</DetailSection>
 
 			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
 
 			{/* COMMENTS PANEL */}
-			<box
-				backgroundColor={uiColors.bgMantle}
+			<DetailSection
+				title={`Comments${props.comments.length > 0 ? ` (${props.comments.length})` : ""}`}
 				style={{
 					width: "100%",
 					flexGrow: 0,
@@ -344,12 +333,6 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					overflow: "hidden",
 				}}
 			>
-				<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-					<text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-						Comments
-						{props.comments.length > 0 ? ` (${props.comments.length})` : ""}
-					</text>
-				</box>
 
 				<Show when={props.issueCommentsLoading}>
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
@@ -410,7 +393,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 						</For>
 					</ScrollableContent>
 				</Show>
-			</box>
+			</DetailSection>
 		</box>
 		</ContentFrame>
 	);

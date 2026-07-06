@@ -180,6 +180,7 @@ func NewContainer() (Container, error) {
 	statusManager := status.NewManagerWithLogger(logger, appManager)
 
 	buildService := build.NewService(resourcesManager, executor, statusManager)
+	buildService.ConfigureStateStore(stateStore)
 	operationsService := operations.NewService(dockerClient, executor, statusManager, resourcesManager, envFilePath)
 	buildService.ConfigureRunDependencies(appManager, operationsService)
 

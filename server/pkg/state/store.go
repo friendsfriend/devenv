@@ -17,7 +17,7 @@ import (
 	_ "modernc.org/sqlite" // pure-Go SQLite driver
 )
 
-const schemaVersion = 3
+const schemaVersion = 4
 
 // AppState holds the mutable runtime state for a single application.
 type AppState struct {
@@ -32,6 +32,18 @@ type AppState struct {
 	// worktree when it was first cloned.  It is discovered at clone time and
 	// must never be written to the static config JSON files.
 	MainWorktreeBranch string
+}
+
+// AppRunTargetInfo holds persisted app run target metadata.
+type AppRunTargetInfo struct {
+	Runtime    string
+	LaunchMode string
+	Label      string
+	Profile    string
+	TargetID   string
+	SourcePath string
+	StartedAt  string
+	Display    string
 }
 
 // Store provides read/write access to the runtime state database.
@@ -55,6 +67,15 @@ type Store interface {
 
 	// SetAppState upserts branch, active worktree, and main worktree branch at once.
 	SetAppState(s AppState) error
+
+	// GetAppRunTargetInfo returns persisted run target info for an app.
+	GetAppRunTargetInfo(ident string) (AppRunTargetInfo, bool, error)
+
+	// SetAppRunTargetInfo persists run target info for an app.
+	SetAppRunTargetInfo(ident string, info AppRunTargetInfo) error
+
+	// ClearAppRunTargetInfo clears persisted run target info for an app.
+	ClearAppRunTargetInfo(ident string) error
 
 	// GetScriptArgsHistory returns newest-first script argument entries for a script path.
 	GetScriptArgsHistory(relativePath string, limit int) ([]map[string]string, error)
@@ -140,6 +161,13 @@ func (s *sqliteStore) migrate() error {
 		current = 3
 	}
 
+	if current < 4 {
+		if err := s.applyV4(); err != nil {
+			return err
+		}
+		current = 4
+	}
+
 	if _, err := s.db.Exec(`
 		INSERT INTO schema_meta (key, value) VALUES ('version', ?)
 		ON CONFLICT(key) DO UPDATE SET value = excluded.value
@@ -196,6 +224,26 @@ func (s *sqliteStore) applyV3() error {
 		ON script_args_history(script_relative_path, id DESC)
 	`); err != nil {
 		return fmt.Errorf("creating script_args_history index: %w", err)
+	}
+	return nil
+}
+
+// applyV4 adds persisted app run target metadata.
+func (s *sqliteStore) applyV4() error {
+	columns := []string{
+		"run_target_runtime TEXT NOT NULL DEFAULT ''",
+		"run_target_launch_mode TEXT NOT NULL DEFAULT ''",
+		"run_target_label TEXT NOT NULL DEFAULT ''",
+		"run_target_profile TEXT NOT NULL DEFAULT ''",
+		"run_target_id TEXT NOT NULL DEFAULT ''",
+		"run_target_source_path TEXT NOT NULL DEFAULT ''",
+		"run_target_started_at TEXT NOT NULL DEFAULT ''",
+		"run_target_display TEXT NOT NULL DEFAULT ''",
+	}
+	for _, column := range columns {
+		if _, err := s.db.Exec(`ALTER TABLE app_state ADD COLUMN ` + column); err != nil {
+			return fmt.Errorf("adding app run target column %q: %w", column, err)
+		}
 	}
 	return nil
 }
@@ -285,6 +333,76 @@ func (s *sqliteStore) SetAppState(st AppState) error {
 	`, st.Ident, st.Branch, st.ActiveWorktree, st.MainWorktreeBranch)
 	if err != nil {
 		return fmt.Errorf("state: SetAppState(%q): %w", st.Ident, err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) GetAppRunTargetInfo(ident string) (AppRunTargetInfo, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var info AppRunTargetInfo
+	row := s.db.QueryRow(`
+		SELECT run_target_runtime, run_target_launch_mode, run_target_label, run_target_profile,
+		       run_target_id, run_target_source_path, run_target_started_at, run_target_display
+		FROM app_state
+		WHERE ident = ?
+	`, ident)
+	err := row.Scan(&info.Runtime, &info.LaunchMode, &info.Label, &info.Profile, &info.TargetID, &info.SourcePath, &info.StartedAt, &info.Display)
+	if err == sql.ErrNoRows {
+		return AppRunTargetInfo{}, false, nil
+	}
+	if err != nil {
+		return AppRunTargetInfo{}, false, fmt.Errorf("state: GetAppRunTargetInfo(%q): %w", ident, err)
+	}
+	if info.Display == "" {
+		return AppRunTargetInfo{}, false, nil
+	}
+	return info, true, nil
+}
+
+func (s *sqliteStore) SetAppRunTargetInfo(ident string, info AppRunTargetInfo) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		INSERT INTO app_state (
+			ident, branch, active_worktree, main_worktree_branch,
+			run_target_runtime, run_target_launch_mode, run_target_label, run_target_profile,
+			run_target_id, run_target_source_path, run_target_started_at, run_target_display
+		)
+		VALUES (?, '', '', '', ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(ident) DO UPDATE SET
+			run_target_runtime     = excluded.run_target_runtime,
+			run_target_launch_mode = excluded.run_target_launch_mode,
+			run_target_label       = excluded.run_target_label,
+			run_target_profile     = excluded.run_target_profile,
+			run_target_id          = excluded.run_target_id,
+			run_target_source_path = excluded.run_target_source_path,
+			run_target_started_at  = excluded.run_target_started_at,
+			run_target_display     = excluded.run_target_display,
+			updated_at             = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+	`, ident, info.Runtime, info.LaunchMode, info.Label, info.Profile, info.TargetID, info.SourcePath, info.StartedAt, info.Display)
+	if err != nil {
+		return fmt.Errorf("state: SetAppRunTargetInfo(%q): %w", ident, err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) ClearAppRunTargetInfo(ident string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		UPDATE app_state SET
+			run_target_runtime = '', run_target_launch_mode = '', run_target_label = '',
+			run_target_profile = '', run_target_id = '', run_target_source_path = '',
+			run_target_started_at = '', run_target_display = '',
+			updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+		WHERE ident = ?
+	`, ident)
+	if err != nil {
+		return fmt.Errorf("state: ClearAppRunTargetInfo(%q): %w", ident, err)
 	}
 	return nil
 }

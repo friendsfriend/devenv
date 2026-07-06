@@ -1,4 +1,4 @@
-import { TextAttributes, type BoxRenderable } from '@opentui/core';
+import { RGBA, TextAttributes, type BoxRenderable, type OptimizedBuffer } from '@opentui/core';
 import { For, createMemo, createSignal } from 'solid-js';
 import { uiColors } from '../colors';
 
@@ -37,18 +37,6 @@ function padOrTrim(value: string, width: number): string {
   return value.padEnd(width, ' ');
 }
 
-function hexToRgb(hex: string): { r: number; g: number; b: number } {
-  const value = hex.trim().replace(/^#/, '');
-  if (/^[0-9a-fA-F]{6}$/.test(value)) {
-    return {
-      r: parseInt(value.slice(0, 2), 16),
-      g: parseInt(value.slice(2, 4), 16),
-      b: parseInt(value.slice(4, 6), 16),
-    };
-  }
-  return { r: 255, g: 255, b: 255 };
-}
-
 function visibleValues(values: number[], cellWidth: number): number[] {
   const safeWidth = Math.max(1, cellWidth);
   const display = values.length > safeWidth ? values.slice(-safeWidth) : values;
@@ -76,9 +64,9 @@ function valueRange(values: number[], autoScale: boolean): { min: number; max: n
   return { min: clamp(min, 0, 100), max: clamp(max, 0, 100) };
 }
 
-function sampleValue(values: number[], pixelX: number, pixelWidth: number): number {
+function sampleValue(values: number[], subpixelX: number): number {
   if (values.length === 0) return NaN;
-  const cellX = pixelX / 2;
+  const cellX = subpixelX / 2;
   const left = Math.floor(cellX);
   const right = Math.min(values.length - 1, left + 1);
   const t = cellX - left;
@@ -86,67 +74,61 @@ function sampleValue(values: number[], pixelX: number, pixelWidth: number): numb
   const b = values[right];
   if (!Number.isFinite(a)) return NaN;
   if (!Number.isFinite(b)) return a;
-  if (pixelWidth <= 2) return a;
   return a + (b - a) * t;
 }
 
-function makePixelBuffer(values: number[], cellWidth: number, cellHeight: number, color: string, autoScale: boolean): Uint8Array {
+const BRAILLE_DOTS = [
+  [0x01, 0x08],
+  [0x02, 0x10],
+  [0x04, 0x20],
+  [0x40, 0x80],
+];
+
+function brailleChar(mask: number): string {
+  return mask === 0 ? ' ' : String.fromCharCode(0x2800 + mask);
+}
+
+function makeBrailleRows(values: number[], cellWidth: number, cellHeight: number, autoScale: boolean): string[] {
   const safeCellWidth = Math.max(1, cellWidth);
   const safeCellHeight = Math.max(1, cellHeight);
-  const pixelWidth = safeCellWidth * 2;
-  const pixelHeight = safeCellHeight * 2;
-  const pixels = new Uint8Array(pixelWidth * pixelHeight * 4);
-  const fg = hexToRgb(color);
-  const bg = hexToRgb(uiColors.bgMantle);
+  const subpixelWidth = safeCellWidth * 2;
+  const subpixelHeight = safeCellHeight * 4;
+  const masks = Array.from({ length: safeCellHeight }, () => Array.from({ length: safeCellWidth }, () => 0));
   const display = visibleValues(values, safeCellWidth);
   const range = valueRange(display, autoScale);
   const span = Math.max(0.1, range.max - range.min);
 
-  for (let y = 0; y < pixelHeight; y++) {
-    for (let x = 0; x < pixelWidth; x++) {
-      const value = sampleValue(display, x, pixelWidth);
-      const idx = (y * pixelWidth + x) * 4;
-      let r = bg.r;
-      let g = bg.g;
-      let b = bg.b;
+  for (let x = 0; x < subpixelWidth; x++) {
+    const value = sampleValue(display, x);
+    if (!Number.isFinite(value)) continue;
 
-      if (Number.isFinite(value)) {
-        const normalized = clamp((value - range.min) / span, 0, 1);
-        const yFromBottom = pixelHeight - 1 - y;
-        const lineY = normalized * (pixelHeight - 1);
-        const distance = Math.abs(yFromBottom - lineY);
-        const strokeRadius = 0.55;
-        const alpha = clamp(1 - distance / strokeRadius, 0, 1);
-        if (alpha > 0) {
-          r = bg.r + (fg.r - bg.r) * alpha;
-          g = bg.g + (fg.g - bg.g) * alpha;
-          b = bg.b + (fg.b - bg.b) * alpha;
-        }
-      }
+    const normalized = clamp((value - range.min) / span, 0, 1);
+    const lineY = normalized * (subpixelHeight - 1);
+    const yFromTop = subpixelHeight - 1 - Math.round(lineY);
+    const cellX = Math.floor(x / 2);
+    const cellY = Math.floor(yFromTop / 4);
+    const dotX = x % 2;
+    const dotY = yFromTop % 4;
 
-      pixels[idx] = Math.round(r);
-      pixels[idx + 1] = Math.round(g);
-      pixels[idx + 2] = Math.round(b);
-      pixels[idx + 3] = 255;
-    }
+    masks[cellY]![cellX]! |= BRAILLE_DOTS[dotY]![dotX]!;
   }
 
-  return pixels;
+  return masks.map((row) => row.map(brailleChar).join(''));
 }
 
-function renderMetricPixels(metric: TimelineMetric, autoScale: boolean) {
-  return function renderAfter(this: BoxRenderable, buffer: any) {
+function renderMetricBraille(metric: TimelineMetric, autoScale: boolean) {
+  const fg = RGBA.fromHex(metric.color);
+  const bg = RGBA.fromHex(uiColors.bgMantle);
+
+  return function renderAfter(this: BoxRenderable, buffer: OptimizedBuffer) {
     const width = Math.max(1, this.width ?? 0);
     const height = Math.max(1, this.height ?? 0);
-    const pixels = makePixelBuffer(metric.values, width, height, metric.color, autoScale);
-    buffer.drawSuperSampleBuffer(
-      this.screenX,
-      this.screenY,
-      pixels,
-      pixels.length,
-      'rgba8unorm',
-      width * 2 * 4,
-    );
+    const rows = makeBrailleRows(metric.values, width, height, autoScale);
+
+    buffer.fillRect(this.screenX, this.screenY, width, height, bg);
+    rows.forEach((row, index) => {
+      buffer.drawText(row, this.screenX, this.screenY + index, fg, bg);
+    });
   };
 }
 
@@ -200,7 +182,7 @@ export function ResourceTimelineCharts(props: ResourceTimelineChartsProps) {
       </box>
       <box style={{ width: labelGap(), height: '100%', flexShrink: 0 }} />
       <box
-        renderAfter={renderMetricPixels(metric, autoScale())}
+        renderAfter={renderMetricBraille(metric, autoScale())}
         backgroundColor={uiColors.bgMantle}
         style={{ width: graphWidth(), height: metricRows(), flexShrink: 0, overflow: 'hidden' }}
       />

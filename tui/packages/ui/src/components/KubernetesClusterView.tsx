@@ -75,7 +75,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             }}
           >
             <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={stateColor(state())} attributes={TextAttributes.BOLD}>Cluster</text>
+              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Cluster</text>
               <Show when={props.loading}><text fg={uiColors.textMuted}> refreshing...</text></Show>
             </box>
             <ScrollableContent

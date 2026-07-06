@@ -83,6 +83,7 @@ func (stubGitRepository) RemoveWorktree(app gitpkg.App, branch string) error { r
 type stubServicesContainer struct {
 	dockerClient  docker.Client
 	gitRepository gitpkg.Repository
+	buildService  build.Service
 }
 
 func (c *stubServicesContainer) DockerClient() docker.Client           { return c.dockerClient }
@@ -95,7 +96,7 @@ func (c *stubServicesContainer) ResourcesManager() resources.Manager   { return 
 func (c *stubServicesContainer) AppManager() app.Manager               { return nil }
 func (c *stubServicesContainer) StateStore() state.Store               { return nil }
 func (c *stubServicesContainer) Executor() *operations.Executor        { return nil }
-func (c *stubServicesContainer) BuildService() build.Service           { return nil }
+func (c *stubServicesContainer) BuildService() build.Service           { return c.buildService }
 func (c *stubServicesContainer) OperationsService() operations.Service { return nil }
 
 var _ services.Container = (*stubServicesContainer)(nil)

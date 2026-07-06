@@ -69,6 +69,7 @@ type AppStatusResponse struct {
 	ActiveWorktree  string           `json:"activeWorktree,omitempty"`
 	OperationStatus *OperationStatus `json:"operationStatus,omitempty"`
 	Status          string           `json:"status,omitempty"`
+	RunTargetInfo   interface{}      `json:"runTargetInfo,omitempty"`
 }
 
 type InfraServiceResponse struct {
@@ -444,17 +445,11 @@ func (s *Server) startGitPoller() {
 			opStatus := s.opStatus[app.Ident]
 			s.opStatusMu.RUnlock()
 
+			appRunStatus := s.appRuntimeStatus(app.Ident, dockerInfo)
 			s.BroadcastEvent(Event{
-				Type: "status.updated",
-				Properties: map[string]interface{}{
-					"ident":           app.Ident,
-					"dockerInfo":      dockerInfo,
-					"gitStatus":       gitStatus,
-					"branch":          branch,
-					"operationStatus": opStatus,
-					"status":          s.appRuntimeStatus(app.Ident, dockerInfo),
-				},
-				Timestamp: time.Now(),
+				Type:       "status.updated",
+				Properties: s.appStatusEventProperties(app.Ident, dockerInfo, gitStatus, branch, opStatus, appRunStatus),
+				Timestamp:  time.Now(),
 			})
 
 			log.Printf("[Git poller] Change detected for %s — branch: %s, gitStatus: %s", app.Ident, branch, gitStatus)
@@ -497,17 +492,11 @@ func (s *Server) startReconciliationPoller() {
 				opStatus := s.opStatus[app.Ident]
 				s.opStatusMu.RUnlock()
 
+				appRunStatus := s.appRuntimeStatus(app.Ident, dockerInfo)
 				s.BroadcastEvent(Event{
-					Type: "status.updated",
-					Properties: map[string]interface{}{
-						"ident":           app.Ident,
-						"dockerInfo":      dockerInfo,
-						"gitStatus":       gitStatus,
-						"branch":          branch,
-						"operationStatus": opStatus,
-						"status":          s.appRuntimeStatus(app.Ident, dockerInfo),
-					},
-					Timestamp: time.Now(),
+					Type:       "status.updated",
+					Properties: s.appStatusEventProperties(app.Ident, dockerInfo, gitStatus, branch, opStatus, appRunStatus),
+					Timestamp:  time.Now(),
 				})
 			}
 		}
@@ -625,16 +614,9 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 
 		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
 		s.BroadcastEvent(Event{
-			Type: "status.updated",
-			Properties: map[string]interface{}{
-				"ident":           appIdent,
-				"dockerInfo":      dockerInfo,
-				"gitStatus":       gitStatus,
-				"branch":          currentBranch,
-				"operationStatus": opStatus,
-				"status":          appRunStatus,
-			},
-			Timestamp: time.Now(),
+			Type:       "status.updated",
+			Properties: s.appStatusEventProperties(appIdent, dockerInfo, gitStatus, currentBranch, opStatus, appRunStatus),
+			Timestamp:  time.Now(),
 		})
 		log.Printf("[DEBUG] Broadcasted status update for app %s - Docker: %s, Branch: %s", appIdent, dockerInfo.Status, currentBranch)
 		return
@@ -696,14 +678,7 @@ func (s *Server) broadcastAppStatusWithBranch(appIdent, knownBranch string) {
 		s.opStatusMu.RUnlock()
 
 		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
-		props := map[string]interface{}{
-			"ident":           appIdent,
-			"dockerInfo":      dockerInfo,
-			"gitStatus":       gitStatus,
-			"branch":          branch,
-			"operationStatus": opStatus,
-			"status":          appRunStatus,
-		}
+		props := s.appStatusEventProperties(appIdent, dockerInfo, gitStatus, branch, opStatus, appRunStatus)
 		if targetApp.ActiveWorktree != "" {
 			props["activeWorktree"] = targetApp.ActiveWorktree
 		}
@@ -739,6 +714,23 @@ func (s *Server) broadcastAppStatusWithRetry(appIdent string, prevDockerStatus s
 			}
 		}
 	}()
+}
+
+func (s *Server) appStatusEventProperties(appIdent string, dockerInfo docker.Info, gitStatus, branch string, opStatus *OperationStatus, appRunStatus string) map[string]interface{} {
+	props := map[string]interface{}{
+		"ident":           appIdent,
+		"dockerInfo":      dockerInfo,
+		"gitStatus":       gitStatus,
+		"branch":          branch,
+		"operationStatus": opStatus,
+		"status":          appRunStatus,
+	}
+	if s.services != nil && s.services.BuildService() != nil {
+		if info, ok := s.services.BuildService().RunTargetInfo(appIdent); ok {
+			props["runTargetInfo"] = info
+		}
+	}
+	return props
 }
 
 func (s *Server) appRuntimeStatus(appIdent string, dockerInfo docker.Info) string {

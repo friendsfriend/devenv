@@ -65,6 +65,10 @@ export interface TableProps<T = string> {
  * - Keyboard navigation support
  * - / search: filters rows (no highlighting)
  */
+export function appRunTargetRightMetadata(app: TableRow): string | undefined {
+	return app.rowKind === "app" ? app.runTargetInfo?.display : undefined;
+}
+
 function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: string; runningLabel?: string }) {
 	const providerIcon = (app: TableRow) => {
 		if (app.rowKind !== "app") return "";
@@ -123,7 +127,10 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		if (app.rowKind === "script") {
 			return app.interpreter ? ` • ${app.interpreter}` : "";
 		}
-		const details = [gitStatusText(app), app.rowKind === "app" && app.branch ? `branch ${app.branch}` : undefined, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
+		const details = [
+			gitStatusText(app),
+			app.rowKind === "app" && app.branch ? `branch ${app.branch}` : undefined,
+		].filter(Boolean).join(" • ");
 		return details ? ` • ${details}` : "";
 	};
 
@@ -155,7 +162,6 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 			`${providerIcon(app)} ${app.provider || app.sourceType || "repo"}`,
 			isLinkedWorktree ? `worktree ${app.activeWorktree}` : undefined,
 			app.dockerInfo?.Ports,
-			app.repositoryPath,
 		].filter(Boolean).join(" • ");
 	};
 
@@ -284,6 +290,8 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 								statusSuffixText={appStatusSuffix(app)}
 								statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
 								metadata={appMetadata(app)}
+								rightMetadata={appRunTargetRightMetadata(app)}
+								rightMetadataColor={uiColors.textMuted}
 								selected={isSelected()}
 								index={index}
 								runningTextEnabled={props.runningTextEnabled}

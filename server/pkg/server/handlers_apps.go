@@ -143,7 +143,7 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 		opStatus := s.getOperationStatus(a.Ident)
 
 		appRunStatus := s.appRuntimeStatus(a.Ident, dockerInfo)
-		statuses = append(statuses, AppStatusResponse{
+		resp := AppStatusResponse{
 			Ident:           a.Ident,
 			DockerInfo:      &dockerInfo,
 			GitStatus:       gitStatus,
@@ -151,7 +151,13 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 			ActiveWorktree:  a.ActiveWorktree,
 			OperationStatus: opStatus,
 			Status:          appRunStatus,
-		})
+		}
+		if s.services != nil && s.services.BuildService() != nil {
+			if info, ok := s.services.BuildService().RunTargetInfo(a.Ident); ok {
+				resp.RunTargetInfo = info
+			}
+		}
+		statuses = append(statuses, resp)
 	}
 
 	w.Header().Set("Content-Type", "application/json")

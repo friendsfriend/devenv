@@ -58,6 +58,7 @@ func (s *service) StopAppWithStatus(a *app.App, targetID string) {
 			return
 		}
 	}
+	s.ClearRunTargetInfo(a.Ident)
 	callback("stop successful")
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)
@@ -94,5 +95,7 @@ func (s *service) stopRunTarget(a *app.App, target resources.ActionTarget, logPa
 		}
 	default:
 		callback(fmt.Sprintf("Error: unsupported runtime %s", target.Runtime))
+		return
 	}
+	s.ClearRunTargetInfo(a.Ident)
 }

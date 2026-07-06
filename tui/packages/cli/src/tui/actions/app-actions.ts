@@ -33,6 +33,10 @@ export function createAppActions(
           };
           if (status.activeWorktree) updated.activeWorktree = status.activeWorktree;
           else delete updated.activeWorktree;
+          if ('runTargetInfo' in status) {
+            if (status.runTargetInfo == null) delete updated.runTargetInfo;
+            else updated.runTargetInfo = status.runTargetInfo;
+          }
           return updated;
         }),
       );
@@ -52,7 +56,7 @@ export function createAppActions(
         }
 
         if (event.type === 'status.updated') {
-          const { ident, dockerInfo, branch, gitStatus, operationStatus, activeWorktree, status, logPath } = event.properties;
+          const { ident, dockerInfo, branch, gitStatus, operationStatus, activeWorktree, status, logPath, runTargetInfo } = event.properties;
           appStore.setLastUpdateTime(new Date());
           appStore.setApps((prevApps) =>
             prevApps.map((app) => {
@@ -67,6 +71,10 @@ export function createAppActions(
               if ('operationStatus' in event.properties) {
                 if (operationStatus == null) delete updated.operationStatus;
                 else updated.operationStatus = operationStatus;
+              }
+              if ('runTargetInfo' in event.properties) {
+                if (runTargetInfo == null) delete updated.runTargetInfo;
+                else updated.runTargetInfo = runTargetInfo;
               }
               return updated;
             }),

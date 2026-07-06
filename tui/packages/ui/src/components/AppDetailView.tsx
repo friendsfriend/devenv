@@ -23,6 +23,18 @@ interface AppDetailViewProps {
   changeRequestsLoading: boolean;
 }
 
+export function appRunTargetDetailRows(app: App): Array<{ label: string; value: string }> {
+  const info = app.runTargetInfo;
+  if (!info?.display) return [];
+  const rows = [{ label: 'Run Target', value: info.display }];
+  if (info.startedAt) {
+    const date = new Date(info.startedAt);
+    if (!Number.isNaN(date.getTime())) rows.push({ label: 'Started', value: date.toLocaleString() });
+  }
+  if (info.sourcePath) rows.push({ label: 'Source', value: info.sourcePath });
+  return rows;
+}
+
 export function AppDetailView(props: AppDetailViewProps) {
   const formatMB = (bytes: number): string => {
     const mb = Math.round(bytes / (1024 * 1024));
@@ -30,6 +42,8 @@ export function AppDetailView(props: AppDetailViewProps) {
   };
 
   const recentLogLines = () => props.logs.split('\n').slice(-10);
+
+  const runTargetRows = () => appRunTargetDetailRows(props.app);
 
   const hasDocker = () => props.kind === 'app' || props.kind === 'infra';
   const hasGit = () => props.kind === 'app' || props.kind === 'library';
@@ -66,8 +80,8 @@ export function AppDetailView(props: AppDetailViewProps) {
           }}
         >
         {/* Info Panel */}
-        <box
-          backgroundColor={uiColors.bgMantle}
+        <DetailSection
+          title={props.app.displayName}
           style={{
             width: '100%',
             flexGrow: 1,
@@ -76,11 +90,6 @@ export function AppDetailView(props: AppDetailViewProps) {
             overflow: 'hidden',
           }}
         >
-          <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-            <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-              {props.app.displayName}
-            </text>
-          </box>
           <ScrollableContent
             axes={["x", "y"]}
             style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
@@ -100,6 +109,17 @@ export function AppDetailView(props: AppDetailViewProps) {
                 <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Repository: </text>
                 <text fg={uiColors.textSecondary}>{props.app.repositoryPath}</text>
               </box>
+            </Show>
+
+            <Show when={props.kind === 'app' && runTargetRows().length > 0}>
+              <For each={runTargetRows()}>
+                {(row) => (
+                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>{row.label}: </text>
+                    <text fg={uiColors.textSecondary}>{row.value}</text>
+                  </box>
+                )}
+              </For>
             </Show>
 
             <Show when={hasGit()}>
@@ -155,7 +175,7 @@ export function AppDetailView(props: AppDetailViewProps) {
               </box>
             </Show>
           </ScrollableContent>
-        </box>
+        </DetailSection>
 
         <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
@@ -163,7 +183,6 @@ export function AppDetailView(props: AppDetailViewProps) {
         <Show when={hasCRs()}>
           <DetailSection
             title="Open Change Requests"
-            titleColor={uiColors.borderHighlight}
             style={{
               width: '100%',
               flexGrow: 1,
@@ -215,8 +234,8 @@ export function AppDetailView(props: AppDetailViewProps) {
           }}
         >
           {/* Stats Panel */}
-          <box
-            backgroundColor={uiColors.bgMantle}
+          <DetailSection
+            title="Container Stats"
             style={{
               width: '100%',
               flexGrow: 1,
@@ -226,11 +245,6 @@ export function AppDetailView(props: AppDetailViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-                Container Stats
-              </text>
-            </box>
             <Show
               when={props.latestStats}
               fallback={
@@ -256,13 +270,13 @@ export function AppDetailView(props: AppDetailViewProps) {
                 />
               )}
             </Show>
-          </box>
+          </DetailSection>
 
           <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
           {/* Logs Panel */}
-          <box
-            backgroundColor={uiColors.bgMantle}
+          <DetailSection
+            title="Container Logs"
             style={{
               width: '100%',
               flexGrow: 1,
@@ -271,11 +285,6 @@ export function AppDetailView(props: AppDetailViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-                Container Logs
-              </text>
-            </box>
             <ScrollableContent
             axes={["x", "y"]}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
@@ -297,7 +306,7 @@ export function AppDetailView(props: AppDetailViewProps) {
                 </For>
               </Show>
             </ScrollableContent>
-          </box>
+          </DetailSection>
         </box>
       </Show>
     </box>
