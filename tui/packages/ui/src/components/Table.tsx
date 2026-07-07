@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For, Show, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import type { TableRow } from '@devenv/types';

@@ -3,14 +3,16 @@ package cmd
 import (
 	"log"
 
+	"github.com/friendsfriend/devenv/pkg/version"
 	"github.com/spf13/cobra"
 )
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "devenv",
-	Short: "Contains commands to start and manage a local development environment",
-	Long:  "Contains commands to start and manage a local development environment",
+	Use:     "devenv",
+	Short:   "Contains commands to start and manage a local development environment",
+	Long:    "Contains commands to start and manage a local development environment",
+	Version: version.Version,
 	Run: func(cmd *cobra.Command, args []string) {
 		// The TUI is now a separate TypeScript binary that spawns this server
 		// Use 'devenv server' to start the HTTP API server directly

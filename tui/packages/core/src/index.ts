@@ -94,6 +94,7 @@ import {
 	analyzeLogsWithAIStream,
 	analyzeCRWithAIStream,
 	getActionLog,
+	getLogHistory,
 	getOperationLogs,
 	getStatusLog,
 	addStatusLog,
@@ -273,6 +274,9 @@ export class DevEnvClient {
 	}
 	getActionLog(appIdent: string): Promise<string> {
 		return getActionLog(this.deps, appIdent);
+	}
+	getLogHistory(type: "action" | "operation", appIdent: string, before?: number, limit: number = 1000) {
+		return getLogHistory(this.deps, type, appIdent, before, limit);
 	}
 	getStatusLog(limit: number = 50): Promise<StatusLogEntry[]> {
 		return getStatusLog(this.deps, limit);

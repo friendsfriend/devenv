@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { Show, createSignal, onMount, onCleanup } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';

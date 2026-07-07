@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { Show, For, createMemo, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';

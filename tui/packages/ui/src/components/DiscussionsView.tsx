@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import type { Discussion, ChangeRequestChange } from '@devenv/types';
 import { TimelineView, toTimelineItems } from './TimelineView';
 

@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 
 import { Show } from 'solid-js';

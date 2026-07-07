@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For, Show } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import type { StatusLogEntry } from '@devenv/types';

@@ -114,6 +114,24 @@ function appGitRank(app: TableRow): number {
 	return status.includes("+") || status.includes("~") || status.includes("-") || status.includes("*") ? 0 : 1;
 }
 
+function tableSearchText(app: TableRow): string {
+	return [
+		app.ident,
+		app.displayName,
+		app.localDirectoryPath,
+		app.repositoryPath,
+		app.branch,
+		app.containerBaseName,
+		app.status,
+		app.dockerInfo?.Status,
+		app.rowKind === "app" ? app.provider : "",
+		app.rowKind === "app" ? app.sourceType : "",
+		app.rowKind === "script" ? app.scriptRelativePath : "",
+		app.rowKind === "script" ? app.interpreter : "",
+		app.rowKind === "infra" ? app.type : "",
+	].filter(Boolean).join("\n").toLowerCase();
+}
+
 function compareByRule(a: TableRow, b: TableRow, rule: TableSortRule): number {
 	let result = 0;
 	if (rule.key === "status") result = appStatusRank(a) - appStatusRank(b);
@@ -338,14 +356,9 @@ export function createAppStore() {
 	const filteredApps = createMemo(() => sortApps(applyTableFilters(filteredAppsUnsorted()), tableSortRules()));
 
 	const tableFilteredApps = createMemo(() => {
-		const q = tableSearchQuery().toLowerCase();
-		const items = q
-			? filteredApps().filter((app) =>
-				Object.values(app).some(
-					(v) => v != null && String(v).toLowerCase().includes(q),
-				),
-			)
-			: filteredApps();
+		const q = tableSearchQuery().trim().toLowerCase();
+		const filtered = applyTableFilters(filteredAppsUnsorted());
+		const items = q ? filtered.filter((app) => tableSearchText(app).includes(q)) : filtered;
 		return sortApps(items, tableSortRules());
 	});
 

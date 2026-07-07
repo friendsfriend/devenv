@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import type { ScrollBoxRenderable } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
@@ -10,6 +11,7 @@ import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
 import { ScrollableContent } from './ScrollableContent';
 import { RunningText } from './RunningText';
 import { DetailSection } from './DetailSection';
+import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
 
 type RefItem =
 	| { type: "cr"; data: ChangeRequest }
@@ -54,6 +56,67 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 	const issue = () => props.issue;
 	const lineWidth = () => Math.max(1, dimensions().width - 4);
 	const referenceTitleWidth = () => Math.max(1, lineWidth() - 8);
+	const metadataRows = (): PropertyRow[] => {
+		const rows: PropertyRow[] = [
+			{
+				label: "State",
+				value: propertyBadges([{
+					label: issue().state,
+					highlight: issue().state === "open" || issue().state === "opened" ? "positive" : "secondary",
+				}]),
+			},
+		];
+
+		if ((issue().labels ?? []).length > 0) {
+			rows.push({
+				label: "Labels",
+				value: propertyBadges((issue().labels ?? []).map((label) => ({ label, highlight: "highlight" }))),
+			});
+		}
+
+		rows.push({
+			label: "Assignees",
+			value: propertyBadges(
+				(issue().assignees ?? []).length > 0
+					? (issue().assignees ?? []).map((assignee) => ({ label: assignee.name, highlight: "primary" }))
+					: [{ label: "unassigned", highlight: "secondary" }],
+			),
+		});
+
+		const milestoneTitle = issue().milestone?.title;
+		if (milestoneTitle) rows.push({ label: "Milestone", value: milestoneTitle });
+		if (issue().updated_at) rows.push({ label: "Updated", value: formatDate(issue().updated_at) });
+		if (issue().created_at) rows.push({ label: "Created", value: formatDate(issue().created_at) });
+		if (issue().author?.name) rows.push({ label: "Author", value: issue().author.name, valueHighlight: "secondary" });
+
+		if (issue().description && issue().description.trim() !== "") {
+			rows.push({
+				label: "Description",
+				layout: "block",
+				value: (
+					<code
+						filetype="markdown"
+						content={containsHtml(issue().description!)
+							? gitlabHtmlToMarkdown(issue().description!)
+							: issue().description!}
+						syntaxStyle={getMarkdownSyntaxStyle()}
+						drawUnstyledText={true}
+						fg={uiColors.textSecondary}
+					/>
+				),
+			});
+		}
+
+		if (issue().web_url) {
+			rows.push({
+				label: "URL",
+				value: <RunningText text={issue().web_url} width={lineWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />,
+				labelHighlight: "secondary",
+			});
+		}
+
+		return rows;
+	};
 
 	return (
 		<ContentFrame>
@@ -86,145 +149,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 						minHeight: 0,
 					}}
 				>
-					{/* State */}
-					<box
-						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-					>
-						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-							State:{" "}
-						</text>
-						<text
-							fg={
-								issue().state === "open" || issue().state === "opened"
-									? uiColors.success
-									: uiColors.textMuted
-							}
-							attributes={TextAttributes.BOLD}
-						>
-							{issue().state}
-						</text>
-					</box>
-
-					{/* Author */}
-					<box
-						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-					>
-						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-							Author:{" "}
-						</text>
-						<text fg={uiColors.textPrimary}>{issue().author.name}</text>
-					</box>
-
-					{/* Labels */}
-					<Show when={(issue().labels ?? []).length > 0}>
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Labels:{" "}
-							</text>
-							<text fg={uiColors.textSecondary}>
-								{(issue().labels ?? []).join(", ")}
-							</text>
-						</box>
-					</Show>
-
-					{/* Assignees */}
-					<Show when={(issue().assignees ?? []).length > 0}>
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Assignees:{" "}
-							</text>
-							<For each={issue().assignees ?? []}>
-								{(a) => (
-									<text fg={uiColors.primary}>
-										{a.name}
-										{a !==
-										(issue().assignees ?? [])[
-											(issue().assignees ?? []).length - 1
-										]
-											? ", "
-											: ""}
-									</text>
-								)}
-							</For>
-						</box>
-					</Show>
-
-					{/* Milestone */}
-					<Show when={issue().milestone != null}>
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Milestone:{" "}
-							</text>
-							<text fg={uiColors.textSecondary}>
-								{issue().milestone!.title}
-							</text>
-						</box>
-					</Show>
-
-					{/* Created */}
-					<box
-						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-					>
-						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-							Created:{" "}
-						</text>
-						<text fg={uiColors.textSecondary}>
-							{formatDate(issue().created_at)}
-						</text>
-					</box>
-
-					{/* Updated */}
-					<box
-						style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-					>
-						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-							Updated:{" "}
-						</text>
-						<text fg={uiColors.textSecondary}>
-							{formatDate(issue().updated_at)}
-						</text>
-					</box>
-
-					{/* Description */}
-					<Show when={issue().description && issue().description.trim() !== ""}>
-						<box style={{ marginTop: 1, paddingLeft: 1, paddingRight: 1 }}>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Description:
-							</text>
-						</box>
-						<box style={{ paddingLeft: 3, paddingRight: 1 }}>
-							<code
-								filetype="markdown"
-								content={containsHtml(issue().description!)
-									? gitlabHtmlToMarkdown(issue().description!)
-									: issue().description!}
-								syntaxStyle={getMarkdownSyntaxStyle()}
-								drawUnstyledText={true}
-								fg={uiColors.textSecondary}
-						/>
-						</box>
-					</Show>
-
-					{/* URL */}
-					<box
-						style={{
-							marginTop: 1,
-							flexDirection: "row",
-							paddingLeft: 1,
-							paddingRight: 1,
-						}}
-					>
-						<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-							URL:{" "}
-						</text>
-						<RunningText text={issue().web_url} width={lineWidth()} fg={uiColors.primary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
-					</box>
+					<PropertiesList rows={metadataRows()} labelWidth={12} />
 				</ScrollableContent>
 			</DetailSection>
 

@@ -31,6 +31,7 @@ import {
 	SortModal,
 	HelpView,
 	ThemePickerView,
+	ProvidersView,
 	themeNames,
 	uiColors,
 } from '@devenv/ui';
@@ -52,6 +53,20 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 
 	return (
 		<>
+			<Show when={appStore.viewMode() === "providers"}>
+				<ProvidersView
+					providers={providerStore.providers()}
+					loading={providerStore.providersLoading()}
+					error={providerStore.providersError()}
+					selectedProviderIndex={providerStore.selectedProviderIndex()}
+					onClose={() => {
+						appStore.setViewMode("table");
+						providerStore.setProviders([]);
+						providerStore.setProvidersError("");
+					}}
+				/>
+			</Show>
+
 			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddRepositoryModal() && !uiStore.showMarkdownModal()}>
 				<FirstStepsView appStore={appStore} providerStore={providerStore} />
 			</Show>
@@ -534,6 +549,10 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				<LogModal
 					title={logStore.logTitle()}
 					logs={logStore.logs()}
+					logLines={logStore.logLines()}
+					historyLoading={logStore.logHistoryLoading()}
+					historyHasMore={logStore.logHistoryHasMore()}
+					historyError={logStore.logHistoryError()}
 					onScrollBoxReady={(sb) => {
 						logStore.logScrollBoxRef = sb;
 						// Read the actual scrollTop and viewport height after the first

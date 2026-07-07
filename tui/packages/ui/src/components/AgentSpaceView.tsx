@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { Show, createMemo } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import type { AgentGroup, AgentSessionInfo } from '@devenv/types';

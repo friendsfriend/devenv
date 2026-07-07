@@ -123,8 +123,11 @@ func ExtractRepoInfo(gitURL string) (*RepoInfo, error) {
 // --- GitHub API raw types (used internally for unmarshalling) ---
 
 type ghPRBranch struct {
-	Ref string `json:"ref"` // branch name
-	SHA string `json:"sha"`
+	Ref  string `json:"ref"` // branch name
+	SHA  string `json:"sha"`
+	Repo *struct {
+		DefaultBranch string `json:"default_branch"`
+	} `json:"repo,omitempty"`
 }
 
 type ghUser struct {
@@ -230,17 +233,18 @@ type ghTimelineEvent struct {
 // Field names and JSON tags are identical to the GitLab client's ChangeRequest struct
 // so the TUI can consume both sources transparently.
 type ChangeRequest struct {
-	ID           int       `json:"id"`
-	IID          int       `json:"iid"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	SourceBranch string    `json:"source_branch"`
-	TargetBranch string    `json:"target_branch"`
-	State        string    `json:"state"` // opened, merged, closed
-	WebURL       string    `json:"web_url"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Author       struct {
+	ID            int       `json:"id"`
+	IID           int       `json:"iid"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	SourceBranch  string    `json:"source_branch"`
+	TargetBranch  string    `json:"target_branch"`
+	DefaultBranch string    `json:"default_branch,omitempty"`
+	State         string    `json:"state"` // opened, merged, closed
+	WebURL        string    `json:"web_url"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Author        struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
 	} `json:"author"`
@@ -382,6 +386,13 @@ func mergeableToChangeRequestStatus(pr ghPR) (mergeStatus, detailedMergeStatus s
 	return "cannot_be_merged", pr.MergeableState, false
 }
 
+func defaultBranchFromPR(pr ghPR) string {
+	if pr.Base.Repo != nil {
+		return pr.Base.Repo.DefaultBranch
+	}
+	return ""
+}
+
 func convertPR(pr ghPR, approvals *MergeRequestApprovals, latestRun *ghWorkflowRun) ChangeRequest {
 	mergeStatus, detailedMergeStatus, hasConflicts := mergeableToChangeRequestStatus(pr)
 	state := prStateToChangeRequestState(pr)
@@ -393,6 +404,7 @@ func convertPR(pr ghPR, approvals *MergeRequestApprovals, latestRun *ghWorkflowR
 		Description:                 pr.Body,
 		SourceBranch:                pr.Head.Ref,
 		TargetBranch:                pr.Base.Ref,
+		DefaultBranch:               defaultBranchFromPR(pr),
 		State:                       state,
 		WebURL:                      pr.HTMLURL,
 		CreatedAt:                   pr.CreatedAt,
@@ -436,6 +448,7 @@ func convertPRToChangeRequest(pr ghPR, approvals *MergeRequestApprovals, latestR
 		Description:                 pr.Body,
 		SourceBranch:                pr.Head.Ref,
 		TargetBranch:                pr.Base.Ref,
+		DefaultBranch:               defaultBranchFromPR(pr),
 		State:                       state,
 		WebURL:                      pr.HTMLURL,
 		CreatedAt:                   pr.CreatedAt,

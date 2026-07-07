@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { createMemo, For, Show } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import type { TextChunk } from '@opentui/core';
@@ -14,6 +15,11 @@ export interface LogModalProps {
   title: string;
   /** Raw log text — newline-separated */
   logs: string;
+  /** Optional pre-split log lines. Avoids splitting large logs every render. */
+  logLines?: readonly string[];
+  historyLoading?: boolean;
+  historyHasMore?: boolean;
+  historyError?: string | null;
   /**
    * Called once on mount with the ScrollBoxRenderable so the parent can call
    * scrollBy / scrollTo directly (same imperative pattern as DiffViewModal).
@@ -124,7 +130,7 @@ export function LogModal(props: LogModalProps) {
     height: renderer.height,
   });
 
-  const lines = createMemo(() => props.logs.split('\n'));
+  const lines = createMemo(() => props.logLines ? [...props.logLines] : props.logs.split('\n'));
   const lineCount = () => lines().length;
 
   // All lines are passed to <For>; OpenTUI viewportCulling handles off-screen clipping.
@@ -166,7 +172,7 @@ export function LogModal(props: LogModalProps) {
         </Show>
       </box>
       <text fg={uiColors.textMuted}>
-        {String(lineCount())} lines
+        {props.historyLoading ? 'loading older… • ' : ''}{String(lineCount())} lines{props.historyHasMore ? ' • older logs available' : ''}
       </text>
     </box>
   );
@@ -211,6 +217,21 @@ export function LogModal(props: LogModalProps) {
         stickyStart="bottom"
       >
         <box paddingLeft={1} paddingRight={1}>
+          <Show when={props.historyError}>
+            <box flexDirection="row" style={{ flexShrink: 0, height: 1, minWidth: '100%' }}>
+              <text fg={uiColors.warning}>Failed to load older logs: {props.historyError}</text>
+            </box>
+          </Show>
+          <Show when={props.historyLoading}>
+            <box flexDirection="row" style={{ flexShrink: 0, height: 1, minWidth: '100%' }}>
+              <text fg={uiColors.textMuted}>Loading older logs…</text>
+            </box>
+          </Show>
+          <Show when={!props.historyLoading && !props.historyHasMore && lineCount() > 0}>
+            <box flexDirection="row" style={{ flexShrink: 0, height: 1, minWidth: '100%' }}>
+              <text fg={uiColors.textMuted}>Start of log</text>
+            </box>
+          </Show>
           <For each={lines()}>
             {(line, localIndex) => {
               const index = localIndex;

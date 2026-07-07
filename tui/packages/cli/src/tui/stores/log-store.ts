@@ -2,8 +2,30 @@ import { createMemo, createSignal } from 'solid-js';
 import { stripAnsi } from '@devenv/ui';
 
 export function createLogStore() {
-  const [logs, setLogs] = createSignal<string>('');
+  const [logLines, setLogLines] = createSignal<string[]>([]);
+  const logs = createMemo(() => logLines().join('\n'));
+  const setLogs = (value: string | ((prev: string) => string)) => {
+    const next = typeof value === 'function' ? value(logs()) : value;
+    setLogLines(next ? next.split('\n') : []);
+  };
+  const appendLogLine = (line: string, maxLines = 5000) => {
+    setLogLines((prev) => {
+      const next = [...prev, line];
+      return next.length > maxLines ? next.slice(next.length - maxLines) : next;
+    });
+  };
+  const prependLogLines = (lines: string[], maxLines = 20000) => {
+    if (lines.length === 0) return;
+    setLogLines((prev) => {
+      const next = [...lines, ...prev];
+      return next.length > maxLines ? next.slice(0, maxLines) : next;
+    });
+  };
   const [logTitle, setLogTitle] = createSignal<string>('');
+  const [logHistoryCursor, setLogHistoryCursor] = createSignal<number | null>(null);
+  const [logHistoryHasMore, setLogHistoryHasMore] = createSignal(false);
+  const [logHistoryLoading, setLogHistoryLoading] = createSignal(false);
+  const [logHistoryError, setLogHistoryError] = createSignal<string | null>(null);
   const [showLogModal, setShowLogModal] = createSignal(false);
   const [logScrollTop, setLogScrollTop] = createSignal(0);
   const [logViewportHeight, setLogViewportHeight] = createSignal(40);
@@ -47,8 +69,20 @@ export function createLogStore() {
   return {
     logs,
     setLogs,
+    logLines,
+    setLogLines,
+    appendLogLine,
+    prependLogLines,
     logTitle,
     setLogTitle,
+    logHistoryCursor,
+    setLogHistoryCursor,
+    logHistoryHasMore,
+    setLogHistoryHasMore,
+    logHistoryLoading,
+    setLogHistoryLoading,
+    logHistoryError,
+    setLogHistoryError,
     showLogModal,
     setShowLogModal,
     logScrollTop,

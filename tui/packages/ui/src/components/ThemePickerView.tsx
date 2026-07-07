@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For, createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { GenericModal } from "./GenericModal";

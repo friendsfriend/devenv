@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';

@@ -1,9 +1,12 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
 import { uiColors } from '../colors';
 import type { TestCase } from '@devenv/types';
 import { GenericModal } from './GenericModal';
 import { HelpText } from './HelpText';
+import { Badge } from './Badge';
+import { PropertiesList, type PropertyRow } from './PropertiesList';
 
 interface TestDetailModalProps {
   test: TestCase & { suiteName?: string };
@@ -53,6 +56,15 @@ export function TestDetailModal(props: TestDetailModalProps) {
   };
 
   const display = () => getStatusDisplay(props.test.status);
+  const statusHighlight = () => {
+    switch (props.test.status.toLowerCase()) {
+      case 'success': return 'positive' as const;
+      case 'failed':
+      case 'error': return 'negative' as const;
+      case 'skipped': return 'secondary' as const;
+      default: return 'secondary' as const;
+    }
+  };
   const isFailed = () => props.test.status === 'failed' || props.test.status === 'error';
 
   // The text that would be copied — same logic as what's rendered in the output sections
@@ -72,12 +84,7 @@ export function TestDetailModal(props: TestDetailModalProps) {
             {props.copyStatus}
           </text>
         </Show>
-        <text
-          fg={display().color}
-          attributes={isFailed() ? TextAttributes.BOLD : undefined}
-        >
-          {display().label}
-        </text>
+        <Badge text={display().label} highlight={statusHighlight()} />
       </box>
     </box>
   );
@@ -90,6 +97,16 @@ export function TestDetailModal(props: TestDetailModalProps) {
       ]} />
     </box>
   );
+
+  const detailRows = (): PropertyRow[] => {
+    const rows: PropertyRow[] = [
+      { label: 'Test', value: props.test.name, valueHighlight: 'primary' },
+      { label: 'Duration', value: formatTime(props.test.execution_time), valueHighlight: 'secondary' },
+    ];
+    if (props.test.suiteName) rows.push({ label: 'Suite', value: props.test.suiteName, valueHighlight: 'secondary' });
+    rows.push({ label: 'Class', value: props.test.classname, valueHighlight: 'secondary' });
+    return rows;
+  };
 
   return (
     <GenericModal
@@ -120,33 +137,7 @@ export function TestDetailModal(props: TestDetailModalProps) {
             paddingBottom: 1,
           }}
         >
-          {/* Test Name */}
-          <box flexDirection="row" gap={1}>
-            <text fg={uiColors.textMuted} width={10} flexShrink={0}>Test:</text>
-            <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-              {props.test.name}
-            </text>
-          </box>
-
-          {/* Class Name */}
-          <box flexDirection="row" gap={1}>
-            <text fg={uiColors.textMuted} width={10} flexShrink={0}>Class:</text>
-            <text fg={uiColors.textSecondary}>{props.test.classname}</text>
-          </box>
-
-          {/* Suite Name */}
-          <Show when={props.test.suiteName}>
-            <box flexDirection="row" gap={1}>
-              <text fg={uiColors.textMuted} width={10} flexShrink={0}>Suite:</text>
-              <text fg={uiColors.textSecondary}>{props.test.suiteName}</text>
-            </box>
-          </Show>
-
-          {/* Execution Time */}
-          <box flexDirection="row" gap={1}>
-            <text fg={uiColors.textMuted} width={10} flexShrink={0}>Duration:</text>
-            <text fg={uiColors.textSecondary}>{formatTime(props.test.execution_time)}</text>
-          </box>
+          <PropertiesList labelWidth={10} rows={detailRows()} />
         </box>
 
         {/* Stack Trace / Failure Message */}

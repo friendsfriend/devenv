@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { type JSX } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { createMemo } from 'solid-js';

@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { For, Show, createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
@@ -147,34 +148,46 @@ export function TimelineView(props: TimelineViewProps) {
     return item.notes.length > 0 && item.notes[0].system;
   };
 
+  const itemMeta = createMemo(() => {
+    const meta = new Map<TimelineItem, { isSystem: boolean; latest: number; resolved: boolean; outdated: boolean }>();
+    for (const item of props.items) {
+      const system = isSystemItem(item);
+      let latest = 0;
+      for (const note of item.notes) {
+        const noteTime = new Date(note.created_at).getTime();
+        if (noteTime > latest) latest = noteTime;
+      }
+      const resolvableNotes = item.notes.filter(n => n.resolvable);
+      const resolved = resolvableNotes.length > 0 && resolvableNotes.every(n => n.resolved);
+      const outdated = !!props.currentHeadSHA && !!item.position && item.position.head_sha !== props.currentHeadSHA;
+      meta.set(item, { isSystem: system, latest, resolved, outdated });
+    }
+    return meta;
+  });
+
+  const metaFor = (item: TimelineItem) => itemMeta().get(item) ?? { isSystem: isSystemItem(item), latest: 0, resolved: false, outdated: false };
+
   // Sort by newest first (based on most recent note)
   const sortedItems = createMemo(() => {
+    const meta = itemMeta();
     const filtered = props.showOnlyComments
-      ? props.items.filter(d => !isSystemItem(d))
+      ? props.items.filter(d => !meta.get(d)?.isSystem)
       : props.items;
-    return [...filtered].sort((a, b) => {
-      const aLatest = a.notes.reduce((latest, note) => {
-        const noteTime = new Date(note.created_at).getTime();
-        return noteTime > latest ? noteTime : latest;
-      }, 0);
-      const bLatest = b.notes.reduce((latest, note) => {
-        const noteTime = new Date(note.created_at).getTime();
-        return noteTime > latest ? noteTime : latest;
-      }, 0);
-      return bLatest - aLatest;
-    });
+    return [...filtered].sort((a, b) => (meta.get(b)?.latest ?? 0) - (meta.get(a)?.latest ?? 0));
   });
 
   const selectedItem = createMemo(() => {
     return sortedItems()[props.selectedIndex];
   });
 
+  const sortedItemHeights = createMemo(() => sortedItems().map(d => metaFor(d).isSystem ? 2 : 4));
+
   // Virtual scrolling
   const visibleItems = createMemo(() => {
     const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 2;
     const visibleHeight = dimensions().height - RESERVED_LINES;
     const items = sortedItems();
-    const itemHeights = items.map(d => isSystemItem(d) ? 2 : 4);
+    const itemHeights = sortedItemHeights();
     const result = calculateVisibleItems(items, {
       totalItems: items.length,
       selectedIndex: props.selectedIndex,
@@ -248,11 +261,7 @@ export function TimelineView(props: TimelineViewProps) {
     return pos.new_line ? `Line ${pos.new_line}` : pos.old_line ? `Line ${pos.old_line}` : '';
   };
 
-  const getItemResolved = (item: TimelineItem): boolean => {
-    const resolvableNotes = item.notes.filter(n => n.resolvable);
-    if (resolvableNotes.length === 0) return false;
-    return resolvableNotes.every(n => n.resolved);
-  };
+  const getItemResolved = (item: TimelineItem): boolean => metaFor(item).resolved;
 
   // ── Diff snippet (CR only) ────────────────────────────────────────────
 
@@ -320,13 +329,18 @@ export function TimelineView(props: TimelineViewProps) {
   // ── Stats ─────────────────────────────────────────────────────────────
 
   const stats = createMemo(() => {
+    let systemNotes = 0;
+    let resolved = 0;
+    let outdated = 0;
+    for (const item of props.items) {
+      const meta = metaFor(item);
+      if (meta.isSystem) systemNotes++;
+      else if (meta.resolved) resolved++;
+      if (meta.outdated) outdated++;
+    }
     const total = props.items.length;
-    const systemNotes = props.items.filter(d => isSystemItem(d)).length;
     const userComments = total - systemNotes;
-    const userItems = props.items.filter(d => !isSystemItem(d));
-    const resolved = userItems.filter(d => getItemResolved(d)).length;
-    const open = userItems.length - resolved;
-    const outdated = props.items.filter(d => isItemOutdated(d)).length;
+    const open = userComments - resolved;
     return { total, systemNotes, userComments, resolved, open, outdated };
   });
 

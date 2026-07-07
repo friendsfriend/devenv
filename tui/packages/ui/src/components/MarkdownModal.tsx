@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { ScrollBoxRenderable } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';

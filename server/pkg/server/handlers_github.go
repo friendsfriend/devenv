@@ -146,6 +146,12 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	for i := range result.ChangeRequests {
+		if result.ChangeRequests[i].DefaultBranch == "" {
+			result.ChangeRequests[i].DefaultBranch = targetApp.MainWorktreeBranch
+		}
+	}
+
 	if len(result.ChangeRequests) == 0 {
 		var errorMsg string
 		if sourceBranchFilter != "" {
@@ -201,6 +207,10 @@ func (s *Server) handleGitHubPullRequest(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch pull request: %v", err), http.StatusInternalServerError)
 		return
+	}
+
+	if pr.DefaultBranch == "" {
+		pr.DefaultBranch = targetApp.MainWorktreeBranch
 	}
 
 	w.Header().Set("Content-Type", "application/json")

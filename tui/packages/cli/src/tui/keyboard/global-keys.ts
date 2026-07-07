@@ -58,7 +58,7 @@ export async function handleGlobalKeys(
   const { renderer, launchPi } = ctx;
 
   // GLOBAL: Escape closes the opentui console overlay if it is visible
-  if ((event.name === 'escape' || event.name === 'Escape') && renderer.console.visible) {
+  if ((event.name === 'escape' || event.name === 'Escape') && renderer.console?.visible) {
     renderer.console.hide();
     return true;
   }
@@ -67,8 +67,11 @@ export async function handleGlobalKeys(
   // Legacy terminals encode Ctrl+/ as Ctrl+_ (\x1f); Kitty can report '/'.
   if (event.ctrl && !event.shift && !event.meta && !event.super
     && (event.name === '/' || event.name === '_' || event.sequence === '\x1f' || event.raw === '\x1f')) {
-    renderer.console.toggle();
-    return true;
+    if (renderer.console) {
+      renderer.console.toggle();
+      return true;
+    }
+    return false;
   }
 
   // GLOBAL: Ctrl+R toggles running text for focused/overflowing UI fields.
@@ -395,7 +398,7 @@ export async function handleGlobalKeys(
       return true;
     }
     _lastCtrlCTime = now;
-    if (ctx.renderer.console.visible) {
+    if (ctx.renderer.console?.visible) {
       return copyText(getConsoleText(ctx.renderer), uiStore);
     }
     const selection = ctx.renderer.getSelection();
@@ -410,7 +413,7 @@ export async function handleGlobalKeys(
   // GLOBAL: Ctrl+Shift+C, Cmd+C, or Super+C — copy selection to clipboard.
   if ((event.ctrl && event.shift || event.meta || event.super) && (event.name === 'c' || event.name === 'C')) {
     _lastCtrlCTime = 0;
-    if (ctx.renderer.console.visible) {
+    if (ctx.renderer.console?.visible) {
       return copyText(getConsoleText(ctx.renderer), uiStore);
     }
     const selection = ctx.renderer.getSelection();

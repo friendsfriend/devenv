@@ -14,7 +14,7 @@ const baseApp: App = {
 };
 
 describe('run target info rendering helpers', () => {
-  test('detail rows include display and optional source', () => {
+  test('detail rows include rough running since time', () => {
     const rows = appRunTargetDetailRows({
       ...baseApp,
       runTargetInfo: {
@@ -29,8 +29,9 @@ describe('run target info rendering helpers', () => {
       },
     });
 
-    expect(rows[0]).toEqual({ label: 'Run Target', value: '[tmux] bun build (default)' });
-    expect(rows.some((row) => row.label === 'Source' && row.value === '/repo/app/package.json')).toBe(true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].label).toBe('Since');
+    expect(rows[0].value).toContain('1/2/2026');
   });
 
   test('detail rows hidden when missing', () => {

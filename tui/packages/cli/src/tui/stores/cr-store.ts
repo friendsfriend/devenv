@@ -166,7 +166,17 @@ export function createChangeRequestStore() {
 	const listFilterParameters = createMemo(() => {
 		const target = listControlTarget();
 		if (!target) return [];
-		const source = target === "changedFiles" ? changedFilesFiltered() : target === "jobs" ? jobs() : (crTestSummary()?.test_suites ?? []).flatMap((s) => s.test_cases.map((t) => ({ ...t, suiteName: s.name })));
+		const source = target === "changedFiles"
+			? applyFilters(
+				(changedFilesSearchQuery().toLowerCase()
+					? crChanges().filter((c) => [c.new_path, c.old_path].some((v) => v && v.toLowerCase().includes(changedFilesSearchQuery().toLowerCase())))
+					: crChanges()),
+				"changedFiles",
+				changedFileValue,
+			)
+			: target === "jobs"
+				? jobs()
+				: (crTestSummary()?.test_suites ?? []).flatMap((s) => s.test_cases.map((t) => ({ ...t, suiteName: s.name })));
 		const rules = listSortRules()[target];
 		return rules.map((rule) => {
 			const counts = new Map<string, number>();
@@ -178,7 +188,7 @@ export function createChangeRequestStore() {
 		});
 	});
 
-	const selectedTestForDetail = createMemo(() => {
+	const sortedTestsForDetail = createMemo(() => {
 		const testSuites = crTestSummary()?.test_suites || [];
 		const allTests: Array<TestCase & { suiteName: string }> = [];
 		for (const suite of testSuites) {
@@ -195,8 +205,10 @@ export function createChangeRequestStore() {
 			if (classCompare !== 0) return classCompare;
 			return a.name.localeCompare(b.name);
 		});
-		return allTests[selectedTestIndex()] ?? null;
+		return allTests;
 	});
+
+	const selectedTestForDetail = createMemo(() => sortedTestsForDetail()[selectedTestIndex()] ?? null);
 
 	return {
 		changeRequests,

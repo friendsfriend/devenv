@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { RGBA, ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { isDiffFileAddedOrDeleted } from '@devenv/core';
 import { useRenderer } from '@opentui/solid';
@@ -282,81 +283,58 @@ export function DiffViewModal(props: DiffViewModalProps) {
     return lineIndex >= start && lineIndex <= end;
   };
 
-  // Helper: Get comments for a specific line
-  const getCommentsForLine = (line: DiffLine): Discussion[] => {
-    if (!props.discussions || props.discussions.length === 0) {
-      return [];
-    }
-    
-    const matches = props.discussions.filter(discussion => {
+  const commentIndex = createMemo(() => {
+    const index = new Map<string, Discussion[]>();
+    const add = (key: string, discussion: Discussion) => {
+      const bucket = index.get(key);
+      if (bucket) bucket.push(discussion);
+      else index.set(key, [discussion]);
+    };
+
+    for (const discussion of props.discussions ?? []) {
       // Position can be at discussion level or first note level (GitLab inconsistency)
       const position = discussion.position || (discussion.notes && discussion.notes.length > 0 ? discussion.notes[0].position : null);
-      
-      if (!position) {
-        return false; // Skip non-diff comments
+      if (!position) continue;
+      if (position.new_path !== props.filePath && position.old_path !== props.filePath) continue;
+      if (position.new_line) add(`new:${position.new_line}`, discussion);
+      if (position.old_line) add(`old:${position.old_line}`, discussion);
+    }
+
+    return index;
+  });
+
+  const commentsForKeys = (keys: string[]): Discussion[] => {
+    const seen = new Set<string>();
+    const matches: Discussion[] = [];
+    for (const key of keys) {
+      for (const discussion of commentIndex().get(key) ?? []) {
+        if (seen.has(discussion.id)) continue;
+        seen.add(discussion.id);
+        matches.push(discussion);
       }
-      
-      // Match file path
-      const matchesFile = 
-        position.new_path === props.filePath || 
-        position.old_path === props.filePath;
-      
-      if (!matchesFile) return false;
-      
-      // Match line number based on line type
-      if (line.type === 'added' && line.newLineNum) {
-        return position.new_line === line.newLineNum;
-      } else if (line.type === 'removed' && line.oldLineNum) {
-        return position.old_line === line.oldLineNum;
-      } else if (line.type === 'context') {
-        // Context lines can match either old or new line
-        return position.new_line === line.newLineNum || position.old_line === line.oldLineNum;
-      }
-      
-      return false;
-    });
-    
+    }
     return matches;
+  };
+
+  // Helper: Get comments for a specific line
+  const getCommentsForLine = (line: DiffLine): Discussion[] => {
+    if (line.type === 'added' && line.newLineNum) return commentsForKeys([`new:${line.newLineNum}`]);
+    if (line.type === 'removed' && line.oldLineNum) return commentsForKeys([`old:${line.oldLineNum}`]);
+    if (line.type === 'context') {
+      const keys: string[] = [];
+      if (line.newLineNum) keys.push(`new:${line.newLineNum}`);
+      if (line.oldLineNum) keys.push(`old:${line.oldLineNum}`);
+      return commentsForKeys(keys);
+    }
+    return [];
   };
 
   // Helper: Get comments for a split view line (checks both old and new line)
   const getCommentsForSplitLine = (line: SplitDiffLine): Discussion[] => {
-    if (!props.discussions || props.discussions.length === 0) {
-      return [];
-    }
-    
-    const matches = props.discussions.filter(discussion => {
-      const position = discussion.position || (discussion.notes && discussion.notes.length > 0 ? discussion.notes[0].position : null);
-      
-      if (!position) {
-        return false;
-      }
-      
-      // Match file path
-      const matchesFile = 
-        position.new_path === props.filePath || 
-        position.old_path === props.filePath;
-      
-      if (!matchesFile) return false;
-      
-      // Check old line (removed or context)
-      if (line.oldLine && line.oldLine.lineNum) {
-        if (position.old_line === line.oldLine.lineNum) {
-          return true;
-        }
-      }
-      
-      // Check new line (added or context)
-      if (line.newLine && line.newLine.lineNum) {
-        if (position.new_line === line.newLine.lineNum) {
-          return true;
-        }
-      }
-      
-      return false;
-    });
-    
-    return matches;
+    const keys: string[] = [];
+    if (line.oldLine?.lineNum) keys.push(`old:${line.oldLine.lineNum}`);
+    if (line.newLine?.lineNum) keys.push(`new:${line.newLine.lineNum}`);
+    return commentsForKeys(keys);
   };
 
   // Helper: Check if a comment is outdated (code changed since comment was made)

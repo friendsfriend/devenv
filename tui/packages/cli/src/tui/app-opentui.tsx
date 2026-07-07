@@ -185,15 +185,35 @@ function TUIApp(props: TUIAppProps) {
 		minAlpha: 0.3,
 	});
 
+	const hasActiveSpinner = () =>
+		appStore.loading() ||
+		appStore.startupState().phase !== "complete" ||
+		appStore.exampleConfigLoading() ||
+		!!appStore.operationInProgressForApp() ||
+		appStore.filteredApps().some((app) => app.operationStatus?.status === "active") ||
+		changeRequestStore.crLoading() ||
+		changeRequestStore.crChangesLoading() ||
+		changeRequestStore.crTestLoading() ||
+		changeRequestStore.crJobsForDetailLoading() ||
+		changeRequestStore.crDiscussionsLoading() ||
+		changeRequestStore.jobsLoading() ||
+		changeRequestStore.crAiLoading() ||
+		logStore.logAiLoading() ||
+		logStore.logAiStreaming();
+
 	const spinnerInterval = setInterval(() => {
-		appStore.setSpinnerFrame((prev) => (prev + 1) % spinnerFrames.length);
-	}, 40);
-	const runningTextInterval = setInterval(() => {
-		if (uiStore.runningTextEnabled()) uiStore.setRunningTextOffset((prev) => prev + 1);
-	}, 160);
-	onCleanup(() => {
-		clearInterval(spinnerInterval);
-		clearInterval(runningTextInterval);
+		if (hasActiveSpinner()) {
+			appStore.setSpinnerFrame((prev) => (prev + 1) % spinnerFrames.length);
+		}
+	}, 80);
+	onCleanup(() => clearInterval(spinnerInterval));
+
+	createEffect(() => {
+		if (!uiStore.runningTextEnabled()) return;
+		const runningTextInterval = setInterval(() => {
+			uiStore.setRunningTextOffset((prev) => prev + 1);
+		}, 160);
+		onCleanup(() => clearInterval(runningTextInterval));
 	});
 
 	/* selectedLine removed — no cursor line / visual mode */
@@ -383,21 +403,27 @@ export async function startTUI(serverUrl: string) {
 		const terminalThemeColors = await queryTerminalThemeColors();
 		loadSystemTheme(terminalThemeColors);
 
+		const useConsole = process.env.DEVENV_TUI_CONSOLE === "1";
 		const renderer = await createCliRenderer({
+			targetFps: 60,
+			gatherStats: true,
 			exitOnCtrlC: false,
+			consoleMode: useConsole ? "console-overlay" : "disabled",
 			useKittyKeyboard: {},
-			consoleOptions: {
-				keyBindings: [
-					// Kitty protocol may send uppercase 'C' for Ctrl+Shift+C
-					{ name: "c", ctrl: true, shift: true, action: "copy-selection" },
-					{ name: "C", ctrl: true, shift: true, action: "copy-selection" },
-				],
-				onCopySelection: (text: string) => {
-					import("@devenv/core")
-						.then(({ copyToClipboard }) => copyToClipboard(text))
-						.catch(() => {});
+			...(useConsole ? {
+				consoleOptions: {
+					keyBindings: [
+						// Kitty protocol may send uppercase 'C' for Ctrl+Shift+C
+						{ name: "c", ctrl: true, shift: true, action: "copy-selection" },
+						{ name: "C", ctrl: true, shift: true, action: "copy-selection" },
+					],
+					onCopySelection: (text: string) => {
+						import("@devenv/core")
+							.then(({ copyToClipboard }) => copyToClipboard(text))
+							.catch(() => {});
+					},
 				},
-			},
+			} : {}),
 		});
 
 		setExitRenderer(renderer);

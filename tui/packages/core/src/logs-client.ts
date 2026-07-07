@@ -30,6 +30,37 @@ export async function getActionLog(deps: ClientDeps, appIdent: string): Promise<
   return await response.text();
 }
 
+export interface LogHistoryPage {
+  lines: string[];
+  nextBefore: number;
+  hasMore: boolean;
+}
+
+export async function getLogHistory(
+  deps: ClientDeps,
+  type: 'action' | 'operation',
+  appIdent: string,
+  before?: number,
+  limit: number = 1000,
+): Promise<LogHistoryPage> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (before !== undefined) params.set('before', String(before));
+  const response = await deps.fetchFn(
+    `${deps.baseUrl}/api/logs/history/${type}/${encodeURIComponent(appIdent)}?${params.toString()}`
+  );
+
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+
+  const data = (await response.json()) as Partial<LogHistoryPage>;
+  return {
+    lines: data.lines ?? [],
+    nextBefore: data.nextBefore ?? 0,
+    hasMore: !!data.hasMore,
+  };
+}
+
 /**
  * Get recent status log entries
  */

@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
 import { uiColors } from '../colors';

@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { Show } from 'solid-js';
 import type { Issue, ChangeRequest } from '@devenv/types';
 import { uiColors } from "../colors";

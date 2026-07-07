@@ -144,6 +144,7 @@ export interface KubernetesClusterStatus {
 	nodes: KubernetesClusterNodeSummary[];
 	namespaces: KubernetesNamespaceSummary[];
 	pods: KubernetesPodSummary;
+	podList?: KubernetesPodListItem[];
 	releases: KubernetesDevEnvReleaseSummary[];
 	stats?: KubernetesClusterResourceStats;
 	warnings?: string[];
@@ -169,6 +170,12 @@ export interface KubernetesPodSummary {
 	succeeded: number;
 	failed: number;
 	unknown: number;
+}
+
+export interface KubernetesPodListItem {
+	name: string;
+	namespace: string;
+	status: string;
 }
 
 export interface KubernetesDevEnvReleaseSummary {
@@ -418,6 +425,7 @@ export interface ChangeRequest {
 	description: string;
 	source_branch: string;
 	target_branch: string;
+	default_branch?: string;
 	state: string; // opened, merged, closed
 	web_url: string;
 	created_at: string;

@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import type { ScrollBoxRenderable } from '@opentui/core';
 import type { JSX } from 'solid-js';
 import { SCROLLBAR_OPTIONS } from '../colors';

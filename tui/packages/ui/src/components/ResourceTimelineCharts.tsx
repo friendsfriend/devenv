@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { RGBA, TextAttributes, type BoxRenderable, type OptimizedBuffer } from '@opentui/core';
 import { For, createMemo, createSignal } from 'solid-js';
 import { uiColors } from '../colors';

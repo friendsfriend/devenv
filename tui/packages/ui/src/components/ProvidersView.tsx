@@ -1,9 +1,11 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, For } from 'solid-js';
 import { uiColors } from '../colors';
 import type { Provider } from '@devenv/types';
-import { ContentPanel } from './ContentStack';
 import { CenteredState } from './CenteredState';
+import { GenericModal } from './GenericModal';
+import { formatHelpText } from './HelpText';
 
 interface ProvidersViewProps {
   providers: Provider[];
@@ -25,7 +27,19 @@ export function ProvidersView(props: ProvidersViewProps) {
   };
 
   return (
-    <ContentPanel>
+    <GenericModal
+      title="Providers"
+      helpText={formatHelpText([
+        { key: 'j/k', action: 'Navigate' },
+        { key: 'a', action: 'Add' },
+        { key: 'e', action: 'Edit' },
+        { key: 'd', action: 'Delete' },
+        { key: 'Esc', action: 'Close' },
+      ])}
+      widthPercent={0.65}
+      heightPercent={0.55}
+      onBackdropClick={props.onClose}
+    >
       <Show when={props.loading}>
         <CenteredState message="Loading providers..." color={uiColors.primary} />
       </Show>
@@ -35,22 +49,7 @@ export function ProvidersView(props: ProvidersViewProps) {
       </Show>
 
       <Show when={!props.loading && !props.error}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            flexDirection: 'column',
-            paddingLeft: 2,
-            paddingRight: 2,
-          }}
-        >
-          <box style={{ width: '100%' }}>
-            <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-              Providers
-            </text>
-            <text fg={uiColors.textMuted}>{'  (a: add, e: edit, d: delete)'}</text>
-          </box>
-
+        <box style={{ width: '100%', height: '100%', flexDirection: 'column' }}>
           <Show when={props.providers.length === 0}>
             <box style={{ width: '100%', height: 1, flexShrink: 0 }}>
               <text fg={uiColors.textMuted}>No providers configured. Press 'a' to add one.</text>
@@ -99,6 +98,6 @@ export function ProvidersView(props: ProvidersViewProps) {
           </For>
         </box>
       </Show>
-</ContentPanel>
+    </GenericModal>
   );
 }

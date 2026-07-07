@@ -310,6 +310,51 @@ func (s *Server) handleActionLog(w http.ResponseWriter, r *http.Request) {
 	w.Write(content)
 }
 
+func (s *Server) handleLogHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/logs/history/")
+	parts := strings.SplitN(path, "/", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		respondBadRequest(w, "Log type and app ident required")
+		return
+	}
+	logType, appIdent := parts[0], parts[1]
+	if logType != "action" && logType != "operation" {
+		respondBadRequest(w, "Unsupported log history type")
+		return
+	}
+
+	limit := 1000
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if _, err := fmt.Sscanf(raw, "%d", &limit); err != nil || limit < 1 {
+			respondBadRequest(w, "Invalid limit parameter")
+			return
+		}
+	}
+	before := int64(0)
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		if _, err := fmt.Sscanf(raw, "%d", &before); err != nil || before < 0 {
+			respondBadRequest(w, "Invalid before parameter")
+			return
+		}
+	}
+
+	lines, nextBefore, hasMore, err := s.services.Logger().ReadAppLogHistory(appIdent, before, limit)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to read log history: %v", err), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]interface{}{
+		"lines":      lines,
+		"nextBefore": nextBefore,
+		"hasMore":    hasMore,
+	}, http.StatusOK)
+}
+
 func (s *Server) handleStatusLog(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:

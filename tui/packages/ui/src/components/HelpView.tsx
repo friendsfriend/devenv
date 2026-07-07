@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { createMemo, For, Show, type JSX } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';

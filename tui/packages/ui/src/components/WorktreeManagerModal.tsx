@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import type { WorktreeInfo } from '@devenv/types';
 import { uiColors } from '../colors';

@@ -16,7 +16,6 @@ import {
 	TimelineView,
 	TestResultsDetailView,
 	JobsDetailView,
-	ProvidersView,
 	HelpView,
 	AppDetailView,
 	uiColors,
@@ -29,7 +28,7 @@ import type { ContentRouterProps } from "./types";
 import { StartupSplash } from "./startup-splash";
 
 export function ContentRouter(props: ContentRouterProps) {
-	const { appStore, issueStore, changeRequestStore, providerStore, appDetailStore } =
+	const { appStore, issueStore, changeRequestStore, appDetailStore } =
 		props.stores;
 	const { helpActions, issueActions, pipelineActions, logActions, crActions, dockerActions } =
 		props.actions;
@@ -182,38 +181,12 @@ export function ContentRouter(props: ContentRouterProps) {
 																										appDetailStore.appDetailApp()
 																									}
 																									fallback={
-																										<Show
-																											when={
-																												appStore.viewMode() ===
-																												"providers"
-																											}
-																											fallback={
-																												<box
-																													style={{
-																														width: "100%",
-																														height: "100%",
-																													}}
-																												/>
-																											}
-																										>
-																											<ProvidersView
-																												providers={providerStore.providers()}
-																												loading={providerStore.providersLoading()}
-																												error={providerStore.providersError()}
-																												selectedProviderIndex={providerStore.selectedProviderIndex()}
-																												onClose={() => {
-																													appStore.setViewMode(
-																														"table",
-																													);
-																													providerStore.setProviders(
-																														[],
-																													);
-																													providerStore.setProvidersError(
-																														"",
-																													);
-																												}}
-																											/>
-																										</Show>
+																										<box
+																			style={{
+																				width: "100%",
+																				height: "100%",
+																			}}
+																		/>
 																									}
 																								>
 																									<AppDetailView
@@ -548,27 +521,62 @@ export function ContentRouter(props: ContentRouterProps) {
 									</Show>
 									<Show
 										when={appStore.activeTab() === "kubernetes"}
-										fallback={(() => {
-											const TableComponent = appStore.activeTab() === "scripts"
-												? TaskTable
-												: appStore.activeTab() === "infrastructure"
-													? InfrastructureTable
-													: RepositoryTable;
-											return <TableComponent
-												apps={appStore.tableFilteredApps()}
-												columns={tableColumns()}
-												selectedIndex={appStore.selectedIndex()}
-												onSelect={appStore.setSelectedIndex}
-												showBorder={true}
-												availableLines={availableTableLines}
-												searchMode={appStore.tableSearchMode()}
-												searchQuery={appStore.tableSearchQuery()}
-												spinnerFrames={props.spinnerFrames}
-												spinnerFrame={appStore.spinnerFrame}
-												runningTextEnabled={props.runningTextEnabled}
-												runningTextOffset={props.runningTextOffset}
-											/>;
-										})()}
+										fallback={
+											<Show
+												when={appStore.activeTab() === "scripts"}
+												fallback={
+													<Show
+														when={appStore.activeTab() === "infrastructure"}
+														fallback={
+															<RepositoryTable
+																apps={appStore.tableFilteredApps()}
+																columns={tableColumns()}
+																selectedIndex={appStore.selectedIndex()}
+																onSelect={appStore.setSelectedIndex}
+																showBorder={true}
+																availableLines={availableTableLines}
+																searchMode={appStore.tableSearchMode()}
+																searchQuery={appStore.tableSearchQuery()}
+																spinnerFrames={props.spinnerFrames}
+																spinnerFrame={appStore.spinnerFrame}
+																runningTextEnabled={props.runningTextEnabled}
+																runningTextOffset={props.runningTextOffset}
+															/>
+														}
+													>
+														<InfrastructureTable
+															apps={appStore.tableFilteredApps()}
+															columns={tableColumns()}
+															selectedIndex={appStore.selectedIndex()}
+															onSelect={appStore.setSelectedIndex}
+															showBorder={true}
+															availableLines={availableTableLines}
+															searchMode={appStore.tableSearchMode()}
+															searchQuery={appStore.tableSearchQuery()}
+															spinnerFrames={props.spinnerFrames}
+															spinnerFrame={appStore.spinnerFrame}
+															runningTextEnabled={props.runningTextEnabled}
+															runningTextOffset={props.runningTextOffset}
+														/>
+													</Show>
+												}
+											>
+												<TaskTable
+													apps={appStore.tableFilteredApps()}
+													columns={tableColumns()}
+													selectedIndex={appStore.selectedIndex()}
+													onSelect={appStore.setSelectedIndex}
+													showBorder={true}
+													availableLines={availableTableLines}
+													searchMode={appStore.tableSearchMode()}
+													searchQuery={appStore.tableSearchQuery()}
+													spinnerFrames={props.spinnerFrames}
+													spinnerFrame={appStore.spinnerFrame}
+													runningTextEnabled={props.runningTextEnabled}
+													runningTextOffset={props.runningTextOffset}
+												/>
+											</Show>
+										}
 									>
 										<KubernetesClusterView
 											status={appStore.kubernetesClusterStatus()}

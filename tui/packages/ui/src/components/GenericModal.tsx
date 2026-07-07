@@ -1,9 +1,20 @@
+/** @jsxImportSource @opentui/solid */
 import { For, JSX, createMemo } from 'solid-js';
 import { RGBA } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { TextAttributes } from '@opentui/core';
 import { invokeGlobalSelectionMouseUpHandler } from '../selectionCopy';
+
+function hexToRgba(hex: string, alpha: number): RGBA {
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) return RGBA.fromHex(hex);
+
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+  return RGBA.fromValues(r, g, b, alpha);
+}
 
 function wrapHelpText(text: string, maxWidth: number): string[] {
   if (!text) return [''];
@@ -85,12 +96,12 @@ export function GenericModal(props: GenericModalProps) {
       flexDirection="column"
       justifyContent="center"
       alignItems="center"
-      backgroundColor={RGBA.fromInts(0, 0, 0, 150)}
+      backgroundColor={RGBA.fromValues(0, 0, 0, 0.35)}
       onMouseUp={() => props.onBackdropClick?.()}
     >
       {/* Dialog box */}
       <box
-        backgroundColor={uiColors.bgMantle}
+        backgroundColor={hexToRgba(uiColors.bgMantle, 0.92)}
         width={dialogWidth()}
         height={dialogHeight()}
         flexDirection="column"

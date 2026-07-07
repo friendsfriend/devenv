@@ -10,7 +10,12 @@ type LogEffectStore = {
     sourceType?: string;
   };
   showLogModal: () => boolean;
+  logs: () => string;
+  logLines: () => string[];
+  setLogLines: (value: string[] | ((prev: string[]) => string[])) => void;
   setLogs: (value: string | ((prev: string) => string)) => void;
+  appendLogLine: (line: string, maxLines?: number) => void;
+  logHistoryCursor: () => number | null;
 };
 
 let logStreamAbortController: AbortController | null = null;
@@ -27,7 +32,7 @@ export function setupLogEffects(logStore: LogEffectStore, client: DevEnvClient) 
       client.streamContainerLogs(
         params.containerID,
         controller.signal,
-        (line: string) => logStore.setLogs((prev) => (prev ? `${prev}\n${line}` : line)),
+        (line: string) => logStore.appendLogLine(line),
         (err: Error) => {
           if (err.name !== 'AbortError') console.error('Log stream error:', err);
         },
@@ -48,7 +53,7 @@ export function setupLogEffects(logStore: LogEffectStore, client: DevEnvClient) 
         params.appIdent,
         params.jobId,
         controller.signal,
-        (line: string) => logStore.setLogs((prev) => (prev ? `${prev}\n${line}` : line)),
+        (line: string) => logStore.appendLogLine(line),
         (err: Error) => {
           if (err.name !== 'AbortError') console.error('Job log stream error:', err);
         },
@@ -60,18 +65,46 @@ export function setupLogEffects(logStore: LogEffectStore, client: DevEnvClient) 
       return;
     }
 
+    let inFlight = false;
+    let lastPolledText = logStore.logs();
+
+    const updatePolledLogs = (text: string) => {
+      if (text === lastPolledText) return;
+      lastPolledText = text;
+      if (logStore.logHistoryCursor() === null) {
+        logStore.setLogs(text);
+        return;
+      }
+      const incoming = text ? text.split('\n') : [];
+      const current = logStore.logLines();
+      let overlap = Math.min(incoming.length, current.length);
+      while (overlap > 0) {
+        const currentTail = current.slice(current.length - overlap).join('\n');
+        const incomingHead = incoming.slice(0, overlap).join('\n');
+        if (currentTail === incomingHead) break;
+        overlap--;
+      }
+      const suffix = incoming.slice(overlap);
+      if (suffix.length > 0) logStore.setLogLines((prev) => [...prev, ...suffix].slice(-20000));
+    };
+
     const intervalId = setInterval(async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
         if (params.type === 'operation' && params.appIdent) {
-          logStore.setLogs(await client.getOperationLogs(params.appIdent, 1000));
+          updatePolledLogs(await client.getOperationLogs(params.appIdent, 1000));
         } else if (params.type === 'action' && params.appIdent) {
-          logStore.setLogs(await client.getActionLog(params.appIdent));
+          updatePolledLogs(await client.getActionLog(params.appIdent));
         } else if (params.type === 'kubernetes' && params.appIdent) {
-          logStore.setLogs(await client.getKubernetesLogs(params.appIdent));
+          updatePolledLogs(await client.getKubernetesLogs(params.appIdent));
         } else if (params.type === 'job' && params.jobId) {
-          logStore.setLogs(await client.getJobLogs(params.appIdent || '', params.jobId, params.sourceType));
+          updatePolledLogs(await client.getJobLogs(params.appIdent || '', params.jobId, params.sourceType));
         }
-      } catch {}
+      } catch {
+      } finally {
+        inFlight = false;
+      }
     }, 1000);
 
     onCleanup(() => clearInterval(intervalId));

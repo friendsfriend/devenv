@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';

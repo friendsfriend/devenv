@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { For, Show } from 'solid-js';
 import type { KubernetesClusterStatus } from '@devenv/types';
@@ -5,6 +6,7 @@ import type { KubernetesClusterStatus } from '@devenv/types';
 import { ScrollableContent } from './ScrollableContent';
 import { uiColors } from '../colors';
 import { ResourceTimelineCharts } from './ResourceTimelineCharts';
+import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
 
 export interface KubernetesClusterViewProps {
   status?: KubernetesClusterStatus | null;
@@ -15,10 +17,10 @@ export interface KubernetesClusterViewProps {
   height?: number;
 }
 
-function stateColor(state?: string): string {
-  if (state === 'running') return uiColors.success;
-  if (state === 'degraded' || state === 'unreachable') return uiColors.warning;
-  return uiColors.textMuted;
+function stateHighlight(state?: string) {
+  if (state === 'running') return 'positive' as const;
+  if (state === 'degraded' || state === 'unreachable') return 'warning' as const;
+  return 'secondary' as const;
 }
 
 export function kubernetesClusterSummaryLines(status?: KubernetesClusterStatus | null): string[] {
@@ -42,6 +44,33 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
   const s = () => props.status;
   const state = () => s()?.state ?? 'missing';
   const stats = () => s()?.stats;
+  const clusterRows = (): PropertyRow[] => [
+    { label: 'State', value: propertyBadges([{ label: state(), highlight: stateHighlight(state()) }]) },
+    { label: 'Name', value: s()?.clusterName ?? 'devenv' },
+    { label: 'Context', value: s()?.contextName ?? 'kind-devenv' },
+    { label: 'Provider', value: s()?.provider || 'unknown', valueHighlight: 'secondary' },
+    { label: 'Exists', value: s()?.exists ? 'yes' : 'no', valueHighlight: s()?.exists ? 'positive' : 'negative' },
+    { label: 'Reachable', value: s()?.reachable ? 'yes' : 'no', valueHighlight: s()?.reachable ? 'positive' : 'negative' },
+    { label: 'Version', value: s()?.kubernetesVersion || 'n/a' },
+  ];
+  const podsText = () => `${s()?.pods.total ?? 0} total, ${s()?.pods.running ?? 0} running, ${s()?.pods.failed ?? 0} failed`;
+  const podStatusHighlight = (status: string) => {
+    if (status === 'Running' || status === 'Succeeded') return 'positive' as const;
+    if (status === 'Failed') return 'negative' as const;
+    if (status === 'Pending') return 'warning' as const;
+    return 'secondary' as const;
+  };
+  const workloadRows = (): PropertyRow[] => [
+    {
+      label: 'Pods',
+      value: (s()?.pods.failed ?? 0) > 0 ? propertyBadges([{ label: podsText(), highlight: 'negative' }]) : podsText(),
+    },
+    {
+      label: 'Namespaces',
+      value: (s()?.namespaces ?? []).map((ns) => `${ns.name}(${ns.pods})`).join(', ') || 'none',
+      valueHighlight: (s()?.namespaces ?? []).length > 0 ? 'secondary' : 'secondary',
+    },
+  ];
 
   return (
     <>
@@ -82,38 +111,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
-              <Show when={props.error} fallback={
-                <>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>State: </text>
-                    <text fg={stateColor(state())}>{state()}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Name: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.clusterName ?? 'devenv'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Context: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.contextName ?? 'kind-devenv'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Provider: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.provider || 'unknown'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Exists: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.exists ? 'yes' : 'no'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Reachable: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.reachable ? 'yes' : 'no'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Version: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.kubernetesVersion || 'n/a'}</text>
-                  </box>
-                </>
-              }>
+              <Show when={props.error} fallback={<PropertiesList rows={clusterRows()} labelWidth={10} />}>
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
                   <text fg={uiColors.error}>Error: {props.error}</text>
                 </box>
@@ -174,7 +172,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             flexDirection: 'column',
           }}
         >
-          {/* Nodes Panel */}
+          {/* Pods Panel */}
           <box
             backgroundColor={uiColors.bgMantle}
             style={{
@@ -187,25 +185,23 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
           >
             <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
               <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                Nodes
+                Pods
               </text>
             </box>
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
-              <Show when={(s()?.nodes.length ?? 0) > 0} fallback={
+              <Show when={(s()?.podList?.length ?? 0) > 0} fallback={
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No node data</text>
+                  <text fg={uiColors.textMuted}>No pod data</text>
                 </box>
               }>
-                <For each={s()?.nodes ?? []}>{(node) => (
-                  <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={node.ready ? uiColors.success : uiColors.error}>{node.ready ? '✓' : '×'}</text>
-                    <text fg={uiColors.textSecondary}>  {node.name}</text>
-                    <Show when={node.kubeletVersion}>
-                      <text fg={uiColors.textMuted}>  {node.kubeletVersion}</text>
-                    </Show>
+                <For each={s()?.podList ?? []}>{(pod) => (
+                  <box style={{ height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                    <box style={{ width: '45%', flexShrink: 0 }}><text fg={uiColors.textPrimary}>{pod.name}</text></box>
+                    <box style={{ width: '20%', flexShrink: 0 }}><text fg={podStatusHighlight(pod.status) === 'positive' ? uiColors.success : podStatusHighlight(pod.status) === 'negative' ? uiColors.error : podStatusHighlight(pod.status) === 'warning' ? uiColors.warning : uiColors.textMuted}>{pod.status}</text></box>
+                    <text fg={uiColors.textSecondary}>{pod.namespace}</text>
                   </box>
                 )}</For>
               </Show>
@@ -232,14 +228,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
-              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Pods: </text>
-                <text fg={uiColors.textSecondary}>{s()?.pods.total ?? 0} total, {s()?.pods.running ?? 0} running, {s()?.pods.failed ?? 0} failed</text>
-              </box>
-              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Namespaces: </text>
-                <text fg={uiColors.textSecondary}>{(s()?.namespaces ?? []).map((ns) => `${ns.name}(${ns.pods})`).join(', ') || 'none'}</text>
-              </box>
+              <PropertiesList rows={workloadRows()} labelWidth={12} />
               <Show when={(s()?.releases.length ?? 0) > 0} fallback={
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
                   <text fg={uiColors.textMuted}>No DevEnv Helm releases</text>
