@@ -37,6 +37,8 @@ type Logger interface {
 	ReadAppLogs(appIdent string, maxEntries int) (string, error)
 	// ReadAppLogHistory reads older raw command log lines for a specific app before a byte offset.
 	ReadAppLogHistory(appIdent string, beforeOffset int64, maxLines int) (lines []string, nextBeforeOffset int64, hasMore bool, err error)
+	// CleanOldLogEntries removes entries in the unified status log older than maxAge.
+	CleanOldLogEntries(maxAge time.Duration) error
 	// RunCommandWithLogging executes a command and logs the result.
 	RunCommandWithLogging(appIdent, command string, args []string, envVars []string, workingDir string) (error, string)
 	// RunCommandWithLoggingToFile executes a command and streams stdout/stderr to logPath.
@@ -557,6 +559,64 @@ func (l *fileLogger) readIndividualAppLog(appIdent string, maxEntries int) (stri
 		lines = lines[len(lines)-maxLines:]
 	}
 	return strings.Join(lines, "\n"), nil
+}
+
+func (l *fileLogger) CleanOldLogEntries(maxAge time.Duration) error {
+	logFilePath := l.logFilePath
+
+	info, err := os.Stat(logFilePath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// If the file is newer than maxAge, skip entirely
+	if time.Since(info.ModTime()) < maxAge {
+		return nil
+	}
+
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
+		return nil
+	}
+
+	cutoff := time.Now().Add(-maxAge)
+	var kept []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) < 2 {
+			kept = append(kept, line)
+			continue
+		}
+		ts, err := time.Parse("2006-01-02 15:04:05", parts[0])
+		if err != nil {
+			// Can't parse timestamp — keep the line to be safe
+			kept = append(kept, line)
+			continue
+		}
+		if ts.After(cutoff) || ts.Equal(cutoff) {
+			kept = append(kept, line)
+		}
+	}
+
+	if len(kept) == len(lines) {
+		return nil // nothing to remove
+	}
+
+	// Write filtered lines back
+	output := strings.Join(kept, "\n") + "\n"
+	return os.WriteFile(logFilePath, []byte(output), 0644)
 }
 
 // logCommandToIndividualFile maintains backward compatibility with individual app log files

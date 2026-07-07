@@ -88,6 +88,7 @@ type service struct {
 	executor       commandRunner
 	statusMgr      status.Manager
 	OnComplete     func(appIdent string)
+	homeDir        string
 	tmuxMu         sync.Mutex
 	tmuxRuns       map[string]ShellTmuxRunState
 	portForwardMu  sync.Mutex
@@ -103,11 +104,12 @@ type service struct {
 	infraStarter   infraStarter
 }
 
-func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr status.Manager) Service {
+func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr status.Manager, homeDir string) Service {
 	return &service{
 		resourceMgr:    resourceMgr,
 		executor:       exec,
 		statusMgr:      statusMgr,
+		homeDir:        homeDir,
 		tmuxRuns:       make(map[string]ShellTmuxRunState),
 		activeLogMap:   make(map[string]string),
 		lastRunRuntime: make(map[string]resources.ActionRuntime),
@@ -788,6 +790,12 @@ func (s *service) startOperationLog(appIdent, operation string) (string, error) 
 	}
 	s.activeLogMap[appIdent] = path
 	s.activeLogMu.Unlock()
+
+	// Clear the persistent individual app log so the operation view shows
+	// only the current operation's output.
+	persistentPath := filepath.Join(s.homeDir, "logs", appIdent+".log")
+	os.Remove(persistentPath)
+
 	return path, nil
 }
 

@@ -66,7 +66,6 @@ export function EditorPickerView(props: EditorPickerViewProps) {
       heightPercent={0.3}
       items={props.options}
       selectedIndex={props.selectedIndex}
-      reservedHeight={4}
       scrollIndicatorLabel="editors"
       renderItem={(option, isSelected) => (
         <EditorRow option={option} isSelected={isSelected()} />

@@ -275,7 +275,7 @@ export class DevEnvClient {
 	getActionLog(appIdent: string): Promise<string> {
 		return getActionLog(this.deps, appIdent);
 	}
-	getLogHistory(type: "action" | "operation", appIdent: string, before?: number, limit: number = 1000) {
+	getLogHistory(type: import("./logs-client").LogHistoryType, appIdent: string, before?: number, limit: number = 1000) {
 		return getLogHistory(this.deps, type, appIdent, before, limit);
 	}
 	getStatusLog(limit: number = 50): Promise<StatusLogEntry[]> {
@@ -749,6 +749,7 @@ export function createClient(
 }
 
 export type { FetchFunction };
+export type { LogHistoryType } from "./logs-client";
 export * from "@devenv/types";
 export * from "./logger";
 export * from "./custom-fetch";

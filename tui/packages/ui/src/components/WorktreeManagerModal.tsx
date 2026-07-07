@@ -73,7 +73,6 @@ export function WorktreeManagerModal(props: WorktreeManagerModalProps) {
       items={props.worktrees}
       selectedIndex={props.selectedIndex}
       estimatedItemHeight={2}
-      reservedHeight={4}
       scrollIndicatorLabel="worktrees"
       emptyContent={
         <text fg={uiColors.textSecondary}>No worktrees found for this repository.</text>

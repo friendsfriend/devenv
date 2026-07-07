@@ -52,7 +52,6 @@ export function CloseReasonModal(props: CloseReasonModalProps) {
 			heightPercent={0.35}
 			items={REASON_ITEMS}
 			selectedIndex={props.selectedIndex}
-			reservedHeight={3}
 			scrollIndicatorLabel="reasons"
 			renderItem={(item, isSelected) => (
 				<ReasonRow label={item} isSelected={isSelected()} />

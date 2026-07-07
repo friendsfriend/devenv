@@ -190,7 +190,7 @@ function TUIApp(props: TUIAppProps) {
 		appStore.startupState().phase !== "complete" ||
 		appStore.exampleConfigLoading() ||
 		!!appStore.operationInProgressForApp() ||
-		appStore.filteredApps().some((app) => app.operationStatus?.status === "active") ||
+		appStore.hasActiveOperation() ||
 		changeRequestStore.crLoading() ||
 		changeRequestStore.crChangesLoading() ||
 		changeRequestStore.crTestLoading() ||

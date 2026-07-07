@@ -29,11 +29,9 @@ export interface ListViewModalProps<T> {
   estimatedItemHeight?: number;
 
   /**
-   * Additional lines of chrome rendered inside the modal **above** the list
-   * (e.g. the `header` slot).  GenericModal's own chrome (title row, help-text
-   * row, top/bottom padding = 4 lines) is already accounted for automatically.
-   *
-   * Default: `2`  (matches the historical `reservedHeight = 6 − 4` default).
+   * Lines consumed by the optional `header` slot above the list.
+   * Only needed when `header` is provided and has fixed known height.
+   * Defaults to `0` (no header reservation).
    */
   reservedHeight?: number;
 
@@ -120,7 +118,7 @@ export function ListViewModal<T>(props: ListViewModalProps<T>): JSX.Element {
    * `props.reservedHeight` covers extra slot content above the list (default 2).
    */
   const availableLines = createMemo(() =>
-    Math.max(4, dialogHeight() - (3 + helpLineCount()) - (props.reservedHeight ?? 2)),
+    Math.max(4, dialogHeight() - (3 + helpLineCount()) - (props.header ? (props.reservedHeight ?? 2) : 0)),
   );
 
   return (

@@ -65,7 +65,6 @@ export function AssigneePickerModal(props: AssigneePickerModalProps) {
 					heightPercent={0.5}
 					items={props.collaborators}
 					selectedIndex={props.selectedIndex}
-					reservedHeight={3}
 					scrollIndicatorLabel="collaborators"
 					renderItem={(item, isSelected) => (
 						<AssigneeRow

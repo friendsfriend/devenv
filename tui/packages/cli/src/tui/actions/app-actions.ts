@@ -184,24 +184,20 @@ export function createAppActions(
   };
 
   const loadScripts = async (focusRelativePath?: string) => {
-    try {
-      const data = await client.getScripts();
-      appStore.setScriptsTree(data.scripts || []);
-      appStore.setAllScriptFoldersExpanded();
+    const data = await client.getScripts();
+    appStore.setScriptsTree(data.scripts || []);
+    appStore.setAllScriptFoldersExpanded();
 
-      if (!focusRelativePath) return;
-      const normalizedFocus = normalizeScriptRelativePath(focusRelativePath);
-      const rows = appStore.tableFilteredApps();
-      let targetPath = normalizedFocus;
-      let idx = rows.findIndex((row) => row.scriptRelativePath === targetPath);
-      while (idx < 0 && targetPath.includes('/')) {
-        targetPath = parentScriptPath(targetPath);
-        idx = rows.findIndex((row) => row.scriptRelativePath === targetPath);
-      }
-      if (idx >= 0) appStore.setSelectedIndex(idx);
-    } catch (e) {
-      showError('Failed to Load Tasks', e instanceof Error ? e.message : 'Unknown error');
+    if (!focusRelativePath) return;
+    const normalizedFocus = normalizeScriptRelativePath(focusRelativePath);
+    const rows = appStore.tableFilteredApps();
+    let targetPath = normalizedFocus;
+    let idx = rows.findIndex((row) => row.scriptRelativePath === targetPath);
+    while (idx < 0 && targetPath.includes('/')) {
+      targetPath = parentScriptPath(targetPath);
+      idx = rows.findIndex((row) => row.scriptRelativePath === targetPath);
     }
+    if (idx >= 0) appStore.setSelectedIndex(idx);
   };
 
   const openAddTaskModal = () => {

@@ -14,12 +14,12 @@ func TestRunTargetInfoPersistsToStateStore(t *testing.T) {
 	}
 	defer store.Close()
 
-	svc := NewService(nil, nil, nil)
+	svc := NewService(nil, nil, nil, "")
 	svc.ConfigureStateStore(store)
 	target := resources.ActionTarget{ID: "app/app/run/shell/default", Runtime: resources.ActionRuntimeShell, LaunchMode: resources.LaunchModeTmux, Label: "bun build", Profile: "default", SourcePath: "/repo/package.json"}
 	svc.SetRunTargetInfo("app", target)
 
-	reloaded := NewService(nil, nil, nil)
+	reloaded := NewService(nil, nil, nil, "")
 	reloaded.ConfigureStateStore(store)
 	info, ok := reloaded.RunTargetInfo("app")
 	if !ok {
@@ -30,7 +30,7 @@ func TestRunTargetInfoPersistsToStateStore(t *testing.T) {
 	}
 
 	reloaded.ClearRunTargetInfo("app")
-	cleared := NewService(nil, nil, nil)
+	cleared := NewService(nil, nil, nil, "")
 	cleared.ConfigureStateStore(store)
 	if _, ok := cleared.RunTargetInfo("app"); ok {
 		t.Fatal("expected run target info cleared from state store")

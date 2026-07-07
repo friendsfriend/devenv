@@ -1,16 +1,18 @@
 /** @jsxImportSource @opentui/solid */
-import { createMemo } from 'solid-js';
+import { Show, createMemo, type JSXElement } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
+import { Badge } from './Badge';
 import { RunningText } from './RunningText';
 
 export interface WorkItemCardProps {
   marker: string;
   title: string;
   statusText: string;
-  statusColor: string;
-  metadata: string;
+  statusColor?: string;
+  statusBadgeHighlight?: string;
+  metadata: string | JSXElement;
   selected: boolean;
   index: number;
   prefix?: string;
@@ -120,12 +122,13 @@ export function WorkItemCard(props: WorkItemCardProps) {
             offset={props.runningTextOffset}
           />
           <box style={{ flexGrow: 1, flexShrink: 1 }} />
-          <text
-            fg={props.statusColor}
-            attributes={TextAttributes.BOLD}
-          >
-            {statusDisplay().text}
-          </text>
+          <Show when={props.statusBadgeHighlight} fallback={
+            <text fg={props.statusColor} attributes={TextAttributes.BOLD}>
+              {statusDisplay().text}
+            </text>
+          }>
+            <Badge text={statusDisplay().text} highlight={props.statusBadgeHighlight as any} />
+          </Show>
           <text fg={props.statusSuffixColor ?? props.statusColor} attributes={TextAttributes.BOLD}>
             {statusDisplay().suffix}
           </text>
@@ -133,14 +136,19 @@ export function WorkItemCard(props: WorkItemCardProps) {
 
         {/* ── Line 2 ────────────────────────────────────────────── */}
         <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', overflow: 'hidden' }}>
-          <RunningText
-            text={props.metadata}
-            width={metadataWidth()}
-            fg={uiColors.textMuted}
-            enabled={props.runningTextEnabled}
-            active={props.selected}
-            offset={props.runningTextOffset}
-          />
+          <Show
+            when={typeof props.metadata === 'string'}
+            fallback={<box style={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>{props.metadata}</box>}
+          >
+            <RunningText
+              text={props.metadata as string}
+              width={metadataWidth()}
+              fg={uiColors.textMuted}
+              enabled={props.runningTextEnabled}
+              active={props.selected}
+              offset={props.runningTextOffset}
+            />
+          </Show>
           <box style={{ flexGrow: 1, flexShrink: 1 }} />
           <text fg={props.rightMetadataColor ?? uiColors.textMuted}>
             {rightMetadataDisplay()}

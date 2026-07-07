@@ -36,9 +36,11 @@ export interface LogHistoryPage {
   hasMore: boolean;
 }
 
+export type LogHistoryType = 'action' | 'operation' | 'script' | 'status';
+
 export async function getLogHistory(
   deps: ClientDeps,
-  type: 'action' | 'operation',
+  type: LogHistoryType,
   appIdent: string,
   before?: number,
   limit: number = 1000,

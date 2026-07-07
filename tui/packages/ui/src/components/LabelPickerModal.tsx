@@ -64,7 +64,6 @@ export function LabelPickerModal(props: LabelPickerModalProps) {
 					heightPercent={0.5}
 					items={props.labels}
 					selectedIndex={props.selectedIndex}
-					reservedHeight={3}
 					scrollIndicatorLabel="labels"
 					renderItem={(item, isSelected) => (
 						<LabelRow

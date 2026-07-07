@@ -331,19 +331,11 @@ export async function handleGlobalKeys(
       return true;
     }
     if (isDownKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i === 0 ? 1 : 4);
+      appStore.setFirstStepsSelectedIndex((i) => Math.min(i + 1, 4));
       return true;
     }
     if (isUpKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i === 4 ? 1 : 0);
-      return true;
-    }
-    if (isLeftKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i >= 2 && i <= 3 ? i - 1 : i);
-      return true;
-    }
-    if (isRightKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i >= 1 && i <= 2 ? i + 1 : i);
+      appStore.setFirstStepsSelectedIndex((i) => Math.max(i - 1, 0));
       return true;
     }
     if (event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter') {

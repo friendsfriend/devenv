@@ -358,8 +358,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Esc", "q"], description: "Back to issue detail", context: "references", category: "General" },
 
 	// ========== First Steps Overlay ==========
-	{ keys: ["←/→"], description: "Navigate steps", context: "firstSteps", category: "Navigation" },
-	{ keys: ["↑/↓"], description: "Switch row", context: "firstSteps", category: "Navigation" },
+	{ keys: ["↑/↓"], description: "Navigate steps", context: "firstSteps", category: "Navigation" },
 	{ keys: ["1-4", "?", "h"], description: "Jump to step by number / open help", context: "firstSteps", category: "Actions" },
 	{ keys: ["Enter"], description: "Run selected step", context: "firstSteps", category: "Actions" },
 	{ keys: ["Esc"], description: "Dismiss", context: "firstSteps", category: "General" },

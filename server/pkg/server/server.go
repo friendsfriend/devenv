@@ -149,6 +149,7 @@ func (s *Server) Start() error {
 	go s.startScriptHealthPoller()
 	go s.startKubernetesStatusWatchers()
 	go s.startKubernetesClusterPoller()
+	go s.startStatusLogCleanup()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/apps", s.handleGetApps)
@@ -387,19 +388,55 @@ func (s *Server) findIdentByContainerName(containerName string) string {
 	return ""
 }
 
+func (s *Server) startStatusLogCleanup() {
+	// Clean old entries daily (runs 1h after startup, then every 24h)
+	const cleanupInterval = 24 * time.Hour
+	const maxAge = 3 * 24 * time.Hour
+
+	timer := time.NewTimer(1 * time.Hour)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			if logger := s.services.Logger(); logger != nil {
+				_ = logger.CleanOldLogEntries(maxAge)
+			}
+			timer.Reset(cleanupInterval)
+		}
+	}
+}
+
 func (s *Server) startScriptHealthPoller() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+
+	// Track last-known run-active flag / script status to avoid redundant broadcasts.
+	previousApp := make(map[string]bool)
+	previousInfra := make(map[string]string)
+
 	for range ticker.C {
 		for i := range s.apps {
-			_ = s.services.BuildService().IsShellTmuxRunActive(s.apps[i].Ident)
+			// Always run for side effects (tmux session cleanup/update)
+			active := s.services.BuildService().IsShellTmuxRunActive(s.apps[i].Ident)
+			// Only broadcast when tmux run state actually changed
+			prev, ok := previousApp[s.apps[i].Ident]
+			if ok && prev == active {
+				continue
+			}
+			previousApp[s.apps[i].Ident] = active
 			s.broadcastAppStatus(s.apps[i].Ident)
 		}
 		for i := range s.infraServices {
 			if s.infraServices[i].Type != app.InfraServiceTypeScript {
 				continue
 			}
-			_, _ = s.services.OperationsService().ScriptInfrastructureStatus(s.infraServices[i].Ident)
+			status, _ := s.services.OperationsService().ScriptInfrastructureStatus(s.infraServices[i].Ident)
+			prev, ok := previousInfra[s.infraServices[i].Ident]
+			if ok && prev == status {
+				continue
+			}
+			previousInfra[s.infraServices[i].Ident] = status
 			s.broadcastAppStatus(s.infraServices[i].Ident)
 		}
 	}
@@ -834,9 +871,26 @@ func (i *infraServiceAdapter) GetContainerBaseName() string { return i.service.G
 
 func (s *Server) setOperationStatus(appIdent, operation, status, message string) {
 	s.opStatusMu.Lock()
-	defer s.opStatusMu.Unlock()
 
 	s.opStatus[appIdent] = &OperationStatus{Operation: operation, Status: status, Message: message}
+
+	s.opStatusMu.Unlock()
+
+	// Log to status log
+	if logger := s.services.Logger(); logger != nil {
+		appName := appIdent
+		if app := s.findAppByIdent(appIdent); app != nil {
+			appName = app.DisplayName
+		}
+		logOpType := logging.OperationType(operation)
+		logStatusType := logging.StatusCompleted
+		if status == "active" {
+			logStatusType = logging.StatusInProgress
+		} else if status == "failed" {
+			logStatusType = logging.StatusFailed
+		}
+		_ = logger.LogStatus(appIdent, appName, logOpType, logStatusType, message)
+	}
 
 	s.BroadcastEvent(Event{
 		Type: "operation.status.changed",
@@ -935,7 +989,6 @@ func (s *Server) updateOrCreateRepoWithStatus(targetApp *app.App, callback func(
 		actualBranch, err := s.services.GitRepository().UpdateOrCreateRepo(gitApp)
 		if err != nil {
 			statusCallback("Failed: " + err.Error())
-			s.services.Logger().LogStatus(targetApp.Ident, targetApp.DisplayName, logging.OpCheckout, logging.StatusFailed, err.Error())
 		} else {
 			// Record the actual branch that was checked out as the primary
 			// worktree branch. This may differ from the requested branch when
@@ -946,7 +999,6 @@ func (s *Server) updateOrCreateRepoWithStatus(targetApp *app.App, callback func(
 				}
 			}
 			statusCallback("Checkout completed")
-			s.services.Logger().LogStatus(targetApp.Ident, targetApp.DisplayName, logging.OpCheckout, logging.StatusCompleted, "Repository updated successfully")
 		}
 		if callback != nil {
 			callback()

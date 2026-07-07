@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -316,17 +317,13 @@ func (s *Server) handleLogHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	path := strings.TrimPrefix(r.URL.Path, "/api/logs/history/")
-	parts := strings.SplitN(path, "/", 2)
+	rawPath := strings.TrimPrefix(r.URL.Path, "/api/logs/history/")
+	parts := strings.SplitN(rawPath, "/", 2)
 	if len(parts) != 2 || parts[1] == "" {
 		respondBadRequest(w, "Log type and app ident required")
 		return
 	}
 	logType, appIdent := parts[0], parts[1]
-	if logType != "action" && logType != "operation" {
-		respondBadRequest(w, "Unsupported log history type")
-		return
-	}
 
 	limit := 1000
 	if raw := r.URL.Query().Get("limit"); raw != "" {
@@ -343,7 +340,25 @@ func (s *Server) handleLogHistory(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	lines, nextBefore, hasMore, err := s.services.Logger().ReadAppLogHistory(appIdent, before, limit)
+	var (
+		lines      []string
+		nextBefore int64
+		hasMore    bool
+		err        error
+	)
+
+	switch logType {
+	case "action", "operation", "script":
+		// action, operation, and script infra logs are all file-backed in {homeDir}/logs/{appIdent}.log
+		lines, nextBefore, hasMore, err = s.services.Logger().ReadAppLogHistory(appIdent, before, limit)
+	case "status":
+		statusLogPath := filepath.Join(s.services.HomeDir(), "logs", "status.log")
+		lines, nextBefore, hasMore, err = logging.ReadLinesBefore(statusLogPath, before, limit)
+	default:
+		respondBadRequest(w, "Unsupported log history type")
+		return
+	}
+
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to read log history: %v", err), http.StatusInternalServerError)
 		return

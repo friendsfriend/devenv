@@ -75,7 +75,6 @@ export function ActionTargetPickerView(props: ActionTargetPickerProps) {
       items={props.targets}
       selectedIndex={props.selectedIndex}
       loading={props.loading}
-      reservedHeight={4}
       scrollIndicatorLabel="targets"
       emptyContent={<text fg={uiColors.textSecondary}>No targets available</text>}
       renderItem={(target, isSelected) => (

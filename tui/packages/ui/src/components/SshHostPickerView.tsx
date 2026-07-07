@@ -89,7 +89,6 @@ export function SshHostPickerView(props: SshHostPickerViewProps) {
       heightPercent={HEIGHT_PERCENT}
       items={filteredHosts()}
       selectedIndex={clampedIndex()}
-      reservedHeight={4}
       filterPlaceholder="filter hosts..."
       scrollIndicatorLabel="hosts"
       filterQuery={props.filterQuery}

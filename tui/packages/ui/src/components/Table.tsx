@@ -1,6 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { For, Show, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
+import { HighlightedText } from './Highlight';
 import type { TableRow } from '@devenv/types';
 import { uiColors } from "../colors";
 import { CenteredState } from "./CenteredState";
@@ -135,6 +136,21 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		return details ? ` • ${details}` : "";
 	};
 
+	const appStatusHighlight = (app: TableRow) => {
+		if (app.operationStatus?.status) {
+			switch (app.operationStatus.status) {
+				case "active": return undefined;
+				case "completed": return "positive" as const;
+				case "failed": return "negative" as const;
+				case "pending": return undefined;
+			}
+		}
+		const status = (app.status || app.dockerInfo?.Status || "not found").toLowerCase();
+		if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "positive" as const;
+		if (status.includes("failed") || status.includes("error")) return "negative" as const;
+		return undefined;
+	};
+
 	const appStatusColor = (app: TableRow) => {
 		if (app.operationStatus?.status) {
 			switch (app.operationStatus.status) {
@@ -155,15 +171,23 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 			return `${app.scriptRelativePath}${app.nodeType === "script" && params ? ` • ${params} params` : ""}`;
 		}
 		if (app.rowKind === "infra") {
-			return [app.containerBaseName, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
+			const parts: Array<string | JSX.Element> = [app.containerBaseName ?? ""];
+			if (app.dockerInfo?.Ports) parts.push(<HighlightedText text={app.dockerInfo.Ports} highlight="highlight" />);
+			return parts.length === 1 ? parts[0] as string : <box style={{ flexDirection: 'row', gap: 1 }}>{parts}</box>;
 		}
 
 		const isLinkedWorktree = app.activeWorktree && app.activeWorktree !== app.mainWorktreeBranch;
-		return [
-			`${providerIcon(app)} ${app.provider || app.sourceType || "repo"}`,
-			isLinkedWorktree ? `worktree ${app.activeWorktree}` : undefined,
-			app.dockerInfo?.Ports,
-		].filter(Boolean).join(" • ");
+		const hasUnknownProvider = app.rowKind === "app" && providerIcon(app) === "?" && !app.provider;
+		const parts: Array<string | JSX.Element> = [`${providerIcon(app)} ${app.provider || app.sourceType || "repo"}`];
+		if (isLinkedWorktree) parts.push(`worktree ${app.activeWorktree}`);
+		if (app.dockerInfo?.Ports) parts.push(<HighlightedText text={app.dockerInfo.Ports} highlight="highlight" />);
+		if (parts.length === 1) return hasUnknownProvider ? <HighlightedText text={parts[0] as string} highlight="negative" /> : parts[0] as string;
+		return (
+			<box style={{ flexDirection: 'row', gap: 1 }}>
+				<HighlightedText text={parts[0] as string} highlight={hasUnknownProvider ? "negative" : "secondary"} />
+				{parts.slice(1)}
+			</box>
+		);
 	};
 
 	/**
@@ -287,12 +311,13 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 								prefixColor={uiColors.primary}
 								title={app.displayName}
 								statusText={isLib ? '' : appStatus(app)}
-								statusColor={isLib ? uiColors.textMuted : appStatusColor(app)}
+								statusColor={appStatusColor(app)}
+								statusBadgeHighlight={isLib ? undefined : appStatusHighlight(app)}
 								statusSuffixText={appStatusSuffix(app)}
-								statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
+								statusSuffixColor={gitStatus(app) === '✓' ? uiColors.textMuted : (gitStatus(app) === 'x' || gitStatus(app) === '...' || gitStatus(app) === 'error') ? uiColors.error : getGitStatusStyle(gitStatus(app)).color}
 								metadata={appMetadata(app)}
 								rightMetadata={appRunTargetRightMetadata(app)}
-								rightMetadataColor={uiColors.textMuted}
+								rightMetadataColor={uiColors.highlight}
 								selected={isSelected()}
 								index={index}
 								runningTextEnabled={props.runningTextEnabled}

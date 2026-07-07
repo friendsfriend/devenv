@@ -140,7 +140,6 @@ export function AgentSpaceView(props: AgentSpaceViewProps) {
       selectedIndex={selectedFlatIndex()}
       loading={props.sessionsLoading}
       loadingText="Loading sessions..."
-      reservedHeight={4}
       filterPlaceholder="filter sessions..."
       scrollIndicatorLabel="sessions"
       filterQuery={props.filterQuery}

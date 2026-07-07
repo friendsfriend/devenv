@@ -119,9 +119,7 @@ export function ContentRouter(props: ContentRouterProps) {
 					runningTextEnabled={props.runningTextEnabled}
 					runningTextOffset={props.runningTextOffset}
 				/>
-			) : appStore.loading() ? (
-				<StartupSplash appStore={appStore} />
-			) : appStore.error() ? (
+			) : appStore.error() && !appStore.loading() ? (
 				<box
 					style={{
 						width: "100%",
@@ -603,6 +601,9 @@ export function ContentRouter(props: ContentRouterProps) {
 					</Show>
 				</Show>
 			)}
+			<Show when={appStore.loading()}>
+				<StartupSplash appStore={appStore} spinnerFrames={props.spinnerFrames} spinnerFrame={appStore.spinnerFrame} />
+			</Show>
 		</>
 	);
 }

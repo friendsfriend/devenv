@@ -398,6 +398,13 @@ func (s *service) startOperationLog(ident, operation string) (string, error) {
 	}
 	s.activeLogMap[ident] = path
 	s.activeLogMu.Unlock()
+
+	// Clear the persistent individual app log so the operation view shows
+	// only the current operation's output. The full output will be written
+	// again by RunCommandWithLoggingToFile as the command runs.
+	persistentPath := filepath.Join(s.homeDir, "logs", ident+".log")
+	os.Remove(persistentPath)
+
 	return path, nil
 }
 

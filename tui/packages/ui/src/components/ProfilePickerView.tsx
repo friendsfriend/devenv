@@ -63,7 +63,6 @@ export function ProfilePickerView(props: ProfilePickerProps) {
       items={allOptions()}
       selectedIndex={props.selectedIndex}
       loading={props.loading}
-      reservedHeight={4}
       scrollIndicatorLabel="profiles"
       emptyContent={
         <text fg={uiColors.textSecondary}>No profiles available</text>

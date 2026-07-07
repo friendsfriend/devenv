@@ -24,7 +24,7 @@ export function createLogActions(
     logStore.setLogHistoryError(null);
   };
 
-  const initializeHistoricalLog = async (type: 'action' | 'operation', appIdent: string, fallback: () => Promise<string>) => {
+  const initializeHistoricalLog = async (type: import('@devenv/core').LogHistoryType, appIdent: string, fallback: () => Promise<string>) => {
     resetLogHistory();
     const page = await client.getLogHistory(type, appIdent, undefined, 1000);
     if (page.lines.length > 0) {

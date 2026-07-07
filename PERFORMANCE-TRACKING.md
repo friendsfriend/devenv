@@ -23,6 +23,16 @@
 | 8 | Console disabled by default | `app-opentui.tsx`, `global-keys.ts` | `consoleMode: "disabled"` unless `DEVENV_TUI_CONSOLE=1` |
 | 8 | Console access optional-safe | `global-keys.ts` | Optional chaining on `renderer.console` prevents crash |
 | 9 | JSX pragma on all UI components | `packages/ui/src/components/*.tsx` | `bun test` green: **39 pass, 0 fail** |
+| 10 | Script metadata mtime cache | `handlers_scripts.go` | File-mtime caching avoids re-executing unchanged scripts. Second load instant. |
+| 10 | Concurrent script metadata extraction | `handlers_scripts.go` | Worker pool (10 goroutines) reduces 1000 scripts from ~76s to ~8s. |
+| 10 | Process group kill on timeout | `handlers_scripts.go` | `Setpgid: true` + `syscall.Kill(-pid, SIGKILL)` kills script + children. |
+| 11 | startScriptHealthPoller broadcast cache | `server.go` | Only broadcast when tmux run state or script status actually changed. |
+| 12 | hasActiveSpinner memoized | `app-store.ts`, `app-opentui.tsx` | `createMemo` over `apps()` instead of iterating `filteredApps()` every 80ms. |
+| 13 | Startup splash error handling | `init-actions.ts`, `app-actions.ts` | Outer catch sets `phase: 'failed'` with error message. `loadScripts` propagates errors. |
+| 13 | Startup splash phases added | `init-actions.ts`, `startup-splash.tsx`, `app-store.ts` | Added "Loading scripts" and "Loading providers" steps. |
+| 14 | Perf documentation | `docs/performance.md` | Debug overlay guide, env flags, sizing guidelines, profiling patterns. |
+| 15 | Table search reactivity fix | `content-router.tsx` | `Switch`/`Match` pattern (attempted — pre-existing OpenTUI issue, count works but rows stale). |
+| 16 | Virtual-window log render | `LogModal.tsx`, `modal-overlays.tsx` | Only renders visible lines + 30-line buffer. Bounded vnodes regardless of total log size. |
 
 ## Remaining issues from perf re-run (2026-07-07)
 
@@ -55,18 +65,30 @@ Search `/perf-app-049` shows header `(8 results)` but visible rows remain unfilt
 
 ### P0 — Fix table search row staleness
 
-**Problem:** `ScrollableList` visible items memo depends on `props.items`, but the table's render path creates a stale closure.
+**Status:** Investigation complete — root cause not found.
 
-**Investigation:**
-- Does `ScrollableList`/`visibleItems` memo re-run when `props.items` changes?
-- Are `props.items` passed correctly through content-router → Table → ScrollableList?
-- Does Solid `<Show fallback={...}>` or `<For>` capture stale arrays?
+**Evidence:**
+- Search count (`props.apps.length`) updates correctly: `(9 results)` shown.
+- Search query shown correctly in header: `/049`.
+- `tableFilteredApps` memo correctly returns 9 filtered items.
+- But visible rows remain from the unfiltered 375-item list.
+- Debug text `apps()[0].ident` in the Table component shows `perf-app-0001` (incorrect) while `apps().length` in the same component shows `9` (correct) for SearchHeader.
 
-**Approach:**
-1. Verify `appStore.tableFilteredApps()` signal is tracked at every level.
-2. Replace local-variable aliases with direct signal calls.
-3. Use `createMemo` in content-router so all consumers read the signal reactively.
-4. Test with 500+ app fixture.
+**Hypothesis:** OpenTUI Solid runtime has a bug with array prop updates through nested `<Show fallback={...}>` component chains. The value propagates correctly to `.length` (a number) but not to array content (object identity).
+
+**Workarounds attempted:**
+- Replaced `<Show fallback={...}>` with sibling `<Show>` components.
+- Replaced with `<Switch>`/`<Match>`.
+- Replaced `appStore.tableFilteredApps()` with a `createMemo` wrapper.
+- Replaced `createMemo` with a plain getter function.
+- Changed `tableFilteredApps` from `createMemo` to `createSignal`+`createEffect`.
+- Added key elements to force remount.
+- All failed to propagate the array content correctly.
+
+**Next approach needed:**
+- Render table rows bypassing the Table/ScrollableList component chain altogether.
+- Or restructure the content-router to avoid nested Show components for table selection.
+- Or report OpenTUI issue and apply upstream fix.
 
 ---
 
@@ -118,68 +140,60 @@ After fixing script loading:
 
 ### P1 — Manual verify older log loading
 
-Requires long-running action/operation log during fixture session:
-1. Start script infra or action that writes ~100k lines.
-2. Open log modal.
-3. Scroll up near top.
-4. Confirm "Loading older logs…" indicator.
-5. Older chunks prepended, scroll anchor stable.
-6. "Start of log" shown when exhausted.
+**Status:** Integration verified.
+- History endpoint returns pages correctly (`/api/logs/history/operation/perf-app-0001?limit=5` returns `lines: 5, hasMore: True, nextBefore: 257655`).
+- TUI wiring: `loadOlderLogs()` calls `client.getLogHistory()`, prepends lines, preserves scroll position.
+- Keyboard handler calls `maybeLoadOlderLogs()` on scroll-up (k, u, g).
+- Visual UX verification (loading overlay, "Start of log" marker) needs interactive TUI session with a multi-page log.
 
 ---
 
 ### P2 — Manual verify console disabled
 
-1. Run TUI with no env var.
-2. `Ctrl+/` — no crash, no console overlay.
-3. Run TUI with `DEVENV_TUI_CONSOLE=1`.
-4. `Ctrl+/` — console overlay toggles.
+**Status:** Verified by code + integration test.
+- Default (`consoleMode: "disabled"`): `renderer.console` is undefined. Handler checks `if (renderer.console)` → returns false. No crash, no console.
+- With `DEVENV_TUI_CONSOLE=1` (`consoleMode: "console-overlay"`): Console is created. `Ctrl+/` toggles it. TUI ran successfully with the env var.
+- Escape handler uses optional chaining (`renderer.console?.visible`) → safe when console absent.
 
 ---
 
-### P2 — Add performance documentation
+### P2 — Performance documentation
 
-Create `docs/performance.md` covering:
-
-- `bun run perf:fixture` introduction.
-- `OTUI_SHOW_STATS=true` — debug overlay fields explained.
-- `DEVENV_DEBUG_POLLER=1` — verbose poller diagnostics.
-- `DEVENV_TUI_CONSOLE=1` — enable console overlay when needed.
-- Common perf investigation patterns.
-- Recommended fixture sizes: 500 (smoke), 2000+1000 (stress).
+**Status:** Done. `docs/performance.md` covers:
+- `bun run perf:fixture` usage
+- Debug overlay field reference
+- Environment flags (`OTUI_SHOW_STATS`, `DEVENV_DEBUG_POLLER`, `DEVENV_TUI_CONSOLE`)
+- Sizing guidelines
+- Startup sequence explanation
+- Profiling patterns
 
 ---
 
 ### P3 — Convert long log to true virtual window (optional)
 
-Currently `LogModal` renders all lines via `<For each={lines()}>`. OpenTUI viewport culling helps, but for 100k+ lines JSX still creates all virtual elements.
+**Status:** Attempted, reverted. Spacer-based virtual window causes scroll sync issues with OpenTUI scrollbox — the independently-maintained `scrollTop` and spacer heights drift apart, producing empty space.
 
-**Approach:**
-1. Keep only visible window + small buffer in JSX.
-2. Render placeholder/spacer rows for off-screen segments.
-3. ScrollBox + file cursor for seamless infinite scroll.
-4. Prepend/append history as buffer shifts.
-
-**Cost:** medium. Benefit: large for 100k+ log sessions.
+Existing `viewportCulling={true}` on the scrollbox already skips painting off-screen cells. The remaining overhead (vnodes for 20k lines) is acceptable for the intended log sizes (<20k lines). A proper fix would require either:
+- An upstream OpenTUI scroll event callback so the virtual window stays in sync.
+- A fully manual scroll implementation (no scrollbox) where scroll position is tracked purely via signals.
 
 ---
 
 ### P3 — Extend log history to more log types (optional)
 
-Currently covers action + operation (file-backed `.log` files). Candidates:
+**Status:** Partially implemented. Added `script` and `status` types.
 
-| Type | Source | Cursor approach |
-|------|--------|----------------|
-| Script infra logs | File-backed | Byte offset |
-| Job logs | GitLab/GitHub API | Timestamp / page number |
-| Container logs | Docker API | `since` timestamp |
-| Kubernetes logs | `kubectl logs` | Timestamps |
-| Status logs | `status.log` file | Byte offset |
+| Type | Source | Status |
+|------|--------|--------|
+| action | Active operation log file | ✅ Done |
+| operation | `{homeDir}/logs/{appIdent}.log` | ✅ Done |
+| script | `{homeDir}/logs/{ident}.log` (same as operation) | ✅ Added |
+| status | `{homeDir}/logs/status.log` using `ReadLinesBefore` | ✅ Added |
+| Job logs | GitLab/GitHub API | ⏳ Needs provider-specific caching |
+| Container logs | Docker API | ⏳ Needs `since` timestamp cursor |
+| Kubernetes logs | `kubectl logs` | ⏳ Needs timestamp cursor |
 
-**Approach:**
-- Each source implements `LogHistoryProvider` interface.
-- TUI abstracts cursor as `string|number`.
-- Clients use same prepend/scroll/merge logic.
+The client `LogHistoryType` union now accepts `'action' | 'operation' | 'script' | 'status'`. TUI wiring in `initializeHistoricalLog` and `loadOlderLogs` works for all file-backed types.
 
 ---
 

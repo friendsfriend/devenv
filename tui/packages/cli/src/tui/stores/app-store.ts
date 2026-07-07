@@ -52,6 +52,8 @@ export type StartupPhase =
 	| "server-ready"
 	| "loading-applications"
 	| "loading-infrastructure"
+	| "loading-scripts"
+	| "loading-providers"
 	| "complete"
 	| "failed";
 
@@ -215,6 +217,9 @@ export function createAppStore() {
 	const [statusLogMaximized, setStatusLogMaximized] = createSignal(false);
 	const [operationInProgressForApp, setOperationInProgressForApp] =
 		createSignal<string | null>(null);
+	const hasActiveOperation = createMemo(() =>
+		apps().some((app) => app.operationStatus?.status === "active"),
+	);
 	const [spinnerFrame, setSpinnerFrame] = createSignal(0);
 	const [startupState, setStartupState] = createSignal<StartupState>({
 		phase: "connecting",
@@ -467,6 +472,7 @@ export function createAppStore() {
 		setStatusLogMaximized,
 		operationInProgressForApp,
 		setOperationInProgressForApp,
+		hasActiveOperation,
 		spinnerFrame,
 		setSpinnerFrame,
 		scriptsTree,

@@ -58,7 +58,6 @@ export function IssueScopeModal(props: IssueScopeModalProps) {
 			heightPercent={0.4}
 			items={ISSUE_SCOPE_OPTIONS.map((option) => option.label)}
 			selectedIndex={props.selectedIndex}
-			reservedHeight={3}
 			scrollIndicatorLabel="scopes"
 			renderItem={(item, isSelected) => (
 				<ScopeRow label={item} isSelected={isSelected()} />
