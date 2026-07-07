@@ -9,6 +9,7 @@ import { SearchHeader } from './SearchHeader';
 import { ContentPanel } from './ContentStack';
 import { FilterStatusBar } from './FilterStatusBar';
 import { HighlightedText, highlightColor } from './Highlight';
+import { Badge } from './Badge';
 
 interface TestResultsDetailViewProps {
   testSuites?: TestSuite[];
@@ -20,6 +21,7 @@ interface TestResultsDetailViewProps {
   searchQuery?: string;
   filterSummary?: string;
   sortSummary?: string;
+  testResultsUnsupported?: boolean;
 }
 
 /**
@@ -82,22 +84,6 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
   const hasFilterStatus = () => !!props.filterSummary || !!props.sortSummary;
   const reservedLines = () => LAYOUT_CHROME_LINES + 2 + 2 + 2 + 1 + (hasFilterStatus() ? 1 : 0);
 
-  // Get status icon and color
-  const getStatusDisplay = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'success':
-        return { icon: '✓', color: highlightColor('positive') };
-      case 'failed':
-        return { icon: '✗', color: highlightColor('negative') };
-      case 'error':
-        return { icon: '⚠', color: highlightColor('negative') };
-      case 'skipped':
-        return { icon: '○', color: highlightColor('secondary') };
-      default:
-        return { icon: '?', color: highlightColor('secondary') };
-    }
-  };
-
   // Format execution time
   const formatTime = (seconds: number) => {
     if (seconds < 1) {
@@ -122,7 +108,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
       </Show>
 
       <Show when={!props.loading && !props.error && (!props.testSuites || props.testSuites.length === 0)}>
-        <CenteredState message="No test results available" color={highlightColor('secondary')} height={1} />
+        <CenteredState message={props.testResultsUnsupported ? 'Test results are only available for GitLab CI' : 'No test results available'} color={highlightColor('secondary')} height={1} />
       </Show>
 
       {/* Test Results Table */}
@@ -161,40 +147,36 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
             estimatedItemHeight={1}
             showScrollIndicator={false}
             renderItem={(test, isSelected) => {
-              const display = getStatusDisplay(test.status);
-              const isFailed = test.status === 'failed' || test.status === 'error';
+              const statusHighlight = test.status === 'failed' || test.status === 'error' ? 'negative' as const : test.status === 'success' ? 'positive' as const : test.status === 'skipped' ? 'secondary' as const : 'warning' as const;
               const testName = `${test.classname}.${test.name}`;
               return (
                 <box
-                  backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+                  backgroundColor={isSelected() ? uiColors.bgSurface0 : undefined}
                   style={{
                     width: '100%',
                     height: 1,
                     flexDirection: 'row',
-                    paddingLeft: 1,
-                    paddingRight: 1,
                   }}
                 >
-                  <box style={{ width: '65%' }}>
-                    <text
-                      fg={isSelected() ? uiColors.textPrimary : display.color}
-                      attributes={isFailed ? TextAttributes.BOLD : undefined}
-                    >
-                      {testName}
-                    </text>
-                  </box>
-                  <box style={{ width: '15%' }}>
-                    <text fg={isSelected() ? uiColors.textPrimary : uiColors.textMuted}>
-                      {formatTime(test.execution_time)}
-                    </text>
-                  </box>
-                  <box style={{ width: '20%' }}>
-                    <text
-                      fg={isSelected() ? uiColors.textPrimary : display.color}
-                      attributes={isFailed ? TextAttributes.BOLD : undefined}
-                    >
-                      {test.status}
-                    </text>
+                  {/* Accent marker */}
+                  <box
+                    backgroundColor={isSelected() ? uiColors.highlight : undefined}
+                    style={{ width: 2, flexShrink: 0 }}
+                  />
+                  <box style={{ flexGrow: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                    <box style={{ width: '65%' }}>
+                      <text fg={highlightColor(isSelected() ? 'primary' : 'secondary')}>
+                        {testName}
+                      </text>
+                    </box>
+                    <box style={{ width: '15%' }}>
+                      <text fg={highlightColor('secondary')}>
+                        {formatTime(test.execution_time)}
+                      </text>
+                    </box>
+                    <box style={{ width: '20%' }}>
+                      <Badge text={test.status} highlight={statusHighlight} />
+                    </box>
                   </box>
                 </box>
               );

@@ -5,6 +5,7 @@ import { GenericModal } from "./GenericModal";
 import { formatHelpText } from "./HelpText";
 import { themeColorForTheme, themeNames } from "../theme";
 import { uiColors } from "../colors";
+import { highlightColor } from './Highlight';
 
 export interface ThemePickerViewProps {
   selectedIndex: number;
@@ -82,7 +83,7 @@ export function ThemePickerView(props: ThemePickerViewProps) {
           }}
         </For>
         <box style={{ width: "100%", height: 1, flexDirection: "row" }}>
-          <text fg={uiColors.textMuted}>{showing()}</text>
+          <text fg={highlightColor('secondary')}>{showing()}</text>
         </box>
       </box>
     </GenericModal>

@@ -23,6 +23,8 @@ import (
 type Client interface {
 	changerequest.Client
 	GetPullRequest(info *RepoInfo, prNumber int) (*ChangeRequest, error)
+	GetWorkflowRunByID(info *RepoInfo, runID int64) (*ghWorkflowRun, error)
+	GetCheckRunsForRef(info *RepoInfo, ref string) ([]ghCheckRun, error)
 }
 
 type client struct {
@@ -1504,13 +1506,21 @@ type ghActionJob struct {
 	RunID       int       `json:"run_id"`
 }
 
+type ghCheckRun struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Output struct {
+		Summary string `json:"summary"`
+	} `json:"output"`
+}
+
 // mapRunStatusToGitLab maps a GitHub Actions workflow run's status/conclusion to
 // a GitLab-compatible pipeline status string.
 func mapRunStatusToGitLab(run ghWorkflowRun) string {
 	switch run.Status {
 	case "queued", "waiting", "pending":
 		return "pending"
-	case "in_progress":
+	case "in progress":
 		return "running"
 	case "completed":
 		switch run.Conclusion {
@@ -1954,6 +1964,70 @@ func generateLineCode(filePath string, newLine *int, oldLine *int) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
+
+func (c *client) GetWorkflowRunByID(info *RepoInfo, runID int64) (*ghWorkflowRun, error) {
+	if info == nil {
+		return nil, fmt.Errorf("repo info is nil")
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/runs/%d",
+		info.Owner, info.Repo, runID)
+
+	resp, err := c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch workflow run: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var run ghWorkflowRun
+	if err := json.Unmarshal(body, &run); err != nil {
+		return nil, fmt.Errorf("failed to parse workflow run: %w", err)
+	}
+
+	return &run, nil
+}
+
+func (c *client) GetCheckRunsForRef(info *RepoInfo, ref string) ([]ghCheckRun, error) {
+	if info == nil {
+		return nil, fmt.Errorf("repo info is nil")
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s/check-runs",
+		info.Owner, info.Repo, ref)
+
+	resp, err := c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch check runs: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		TotalCount int          `json:"total_count"`
+		CheckRuns  []ghCheckRun `json:"check_runs"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse check runs: %w", err)
+	}
+
+	return result.CheckRuns, nil
+}
+
 // ValidateConnection implements changerequest.Client.ValidateConnection.
 func (c *client) ValidateConnection(info *changerequest.RepoInfo) error {
 	apiURL := "https://api.github.com/user"
@@ -2143,7 +2217,7 @@ func mapJobStatusToGitLab(job ghActionJob) string {
 	switch job.Status {
 	case "queued", "waiting", "pending":
 		return "pending"
-	case "in_progress":
+	case "in progress":
 		return "running"
 	case "completed":
 		switch job.Conclusion {

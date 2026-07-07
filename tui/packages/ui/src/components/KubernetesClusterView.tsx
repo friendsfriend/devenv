@@ -5,6 +5,7 @@ import type { KubernetesClusterStatus } from '@devenv/types';
 
 import { ScrollableContent } from './ScrollableContent';
 import { uiColors } from '../colors';
+import { highlightColor } from './Highlight';
 import { ResourceTimelineCharts } from './ResourceTimelineCharts';
 import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
 
@@ -104,8 +105,8 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             }}
           >
             <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Cluster</text>
-              <Show when={props.loading}><text fg={uiColors.textMuted}> refreshing...</text></Show>
+              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>Cluster</text>
+              <Show when={props.loading}><text fg={highlightColor('secondary')}> refreshing...</text></Show>
             </box>
             <ScrollableContent
               axes={['x', 'y']}
@@ -113,7 +114,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             >
               <Show when={props.error} fallback={<PropertiesList rows={clusterRows()} labelWidth={10} />}>
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.error}>Error: {props.error}</text>
+                  <text fg={highlightColor('negative')}>Error: {props.error}</text>
                 </box>
               </Show>
             </ScrollableContent>
@@ -131,13 +132,13 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             }}
           >
             <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
+              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>
                 Resources
               </text>
             </box>
             <Show when={stats() !== undefined} fallback={
               <box style={{ paddingLeft: 1, paddingRight: 1, flexGrow: 1 }}>
-                <text fg={uiColors.textMuted}>No container resources — cluster may be missing or using podman</text>
+                <text fg={highlightColor('secondary')}>No container resources — cluster may be missing or using podman</text>
               </box>
             }>
               {(() => {
@@ -184,7 +185,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             }}
           >
             <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
+              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>
                 Pods
               </text>
             </box>
@@ -194,14 +195,14 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             >
               <Show when={(s()?.podList?.length ?? 0) > 0} fallback={
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No pod data</text>
+                  <text fg={highlightColor('secondary')}>No pod data</text>
                 </box>
               }>
                 <For each={s()?.podList ?? []}>{(pod) => (
                   <box style={{ height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <box style={{ width: '45%', flexShrink: 0 }}><text fg={uiColors.textPrimary}>{pod.name}</text></box>
-                    <box style={{ width: '20%', flexShrink: 0 }}><text fg={podStatusHighlight(pod.status) === 'positive' ? uiColors.success : podStatusHighlight(pod.status) === 'negative' ? uiColors.error : podStatusHighlight(pod.status) === 'warning' ? uiColors.warning : uiColors.textMuted}>{pod.status}</text></box>
-                    <text fg={uiColors.textSecondary}>{pod.namespace}</text>
+                    <box style={{ width: '45%', flexShrink: 0 }}><text fg={highlightColor('primary')}>{pod.name}</text></box>
+                    <box style={{ width: '20%', flexShrink: 0 }}><text fg={podStatusHighlight(pod.status) === 'positive' ? highlightColor('positive') : podStatusHighlight(pod.status) === 'negative' ? highlightColor('negative') : podStatusHighlight(pod.status) === 'warning' ? highlightColor('warning') : highlightColor('secondary')}>{pod.status}</text></box>
+                    <text fg={highlightColor('secondary')}>{pod.namespace}</text>
                   </box>
                 )}</For>
               </Show>
@@ -220,7 +221,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             }}
           >
             <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
+              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>
                 Workloads
               </text>
             </box>
@@ -231,13 +232,13 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               <PropertiesList rows={workloadRows()} labelWidth={12} />
               <Show when={(s()?.releases.length ?? 0) > 0} fallback={
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No DevEnv Helm releases</text>
+                  <text fg={highlightColor('secondary')}>No DevEnv Helm releases</text>
                 </box>
               }>
                 <For each={s()?.releases ?? []}>{(release) => (
                   <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textSecondary}>{release.namespace}/{release.name}</text>
-                    <text fg={uiColors.textMuted}>  {release.status} {release.chart || ''}</text>
+                    <text fg={highlightColor('secondary')}>{release.namespace}/{release.name}</text>
+                    <text fg={highlightColor('secondary')}>  {release.status} {release.chart || ''}</text>
                   </box>
                 )}</For>
               </Show>

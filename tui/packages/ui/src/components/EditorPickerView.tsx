@@ -3,6 +3,7 @@ import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export type EditorChoice = 'nvim' | 'vscode' | 'intellij';
 
@@ -46,7 +47,7 @@ function EditorRow(props: {
       >
         {cursor()}{props.option.label}
       </text>
-      <text fg={uiColors.textSecondary}>
+      <text fg={highlightColor('secondary')}>
         {'  '}{props.option.description}
       </text>
     </box>

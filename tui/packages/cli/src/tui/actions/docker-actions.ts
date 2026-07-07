@@ -229,7 +229,7 @@ export function createDockerActions(
     uiStore.setLoadingModalMessage('Creating Kubernetes cluster...');
     uiStore.setShowLoadingModal(true);
     try {
-      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in_progress', Message: 'Creating managed kind cluster...' });
+      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in progress', Message: 'Creating managed kind cluster...' });
       await client.createKubernetesCluster();
       await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'completed', Message: 'Kubernetes cluster ready' });
       await refreshKubernetesCluster();
@@ -258,7 +258,7 @@ export function createDockerActions(
       uiStore.setLoadingModalMessage('Deleting Kubernetes cluster...');
       uiStore.setShowLoadingModal(true);
       try {
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in_progress', Message: 'Deleting managed kind cluster...' });
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in progress', Message: 'Deleting managed kind cluster...' });
         await client.deleteKubernetesCluster();
         appStore.setKubernetesCPUHistory([]);
         appStore.setKubernetesMemoryHistory([]);
@@ -281,9 +281,9 @@ export function createDockerActions(
       uiStore.setLoadingModalMessage('Recreating Kubernetes cluster...');
       uiStore.setShowLoadingModal(true);
       try {
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in_progress', Message: 'Deleting managed kind cluster...' });
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in progress', Message: 'Deleting managed kind cluster...' });
         await client.deleteKubernetesCluster();
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in_progress', Message: 'Creating fresh kind cluster...' });
+        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in progress', Message: 'Creating fresh kind cluster...' });
         await client.createKubernetesCluster();
         appStore.setKubernetesCPUHistory([]);
         appStore.setKubernetesMemoryHistory([]);

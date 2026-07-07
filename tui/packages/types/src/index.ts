@@ -615,7 +615,7 @@ export interface StatusLogEntry {
 	AppIdent: string;
 	AppName: string;
 	Operation: string; // pull, push, fetch, build, start, stop
-	Status: string; // pending, in_progress, active, completed, failed
+	Status: string; // pending, in progress, active, completed, failed
 	Message: string;
 }
 

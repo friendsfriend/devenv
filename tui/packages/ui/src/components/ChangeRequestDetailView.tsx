@@ -26,6 +26,7 @@ interface ChangeRequestDetailViewProps {
 	testSummary?: TestSummary;
 	testLoading?: boolean;
 	testError?: string;
+	testResultsUnsupported?: boolean;
 	changes?: ChangeRequestChange[];
 	changesLoading?: boolean;
 	changesError?: string;
@@ -742,7 +743,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 								paddingLeft={1}
 								paddingRight={1}
 							>
-								<text fg={uiColors.textMuted}>No test results available</text>
+								<text fg={uiColors.textSecondary}>{props.testResultsUnsupported ? 'Test results are only available for GitLab CI' : 'No test results available'}</text>
 							</box>
 						</Show>
 

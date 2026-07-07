@@ -5,6 +5,7 @@ import { routePastedText } from './paste-handler';
 import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
 import { themeNames } from '@devenv/ui';
 import { applyTheme, saveThemeName } from '../theme-settings';
+import type { AppStore } from '../stores/app-store';
 /**
  * Handles global keys that apply regardless of view mode:
  * - ESC to close console overlay
@@ -85,8 +86,8 @@ export async function handleGlobalKeys(
 
   const diffTextInputActive = changeRequestStore.showDiffModal() && (changeRequestStore.showCommentModal() || !!changeRequestStore.replyMode());
 
-  // GLOBAL: Shift+T opens theme picker. Do not intercept text input in diff comments/replies.
-  if (!diffTextInputActive && !uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
+  // TABLE ONLY: Shift+T opens theme picker. Do not intercept text input in diff comments/replies.
+  if ((stores.appStore as unknown as AppStore).viewMode() === 'table' && !diffTextInputActive && !uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
     const current = uiStore.activeThemeName();
     uiStore.setThemePickerOriginalTheme(current);
     uiStore.setThemePickerFilterActive(false);

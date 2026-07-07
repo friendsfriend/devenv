@@ -4,6 +4,7 @@ import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export interface BranchInfo {
   name: string;
@@ -123,7 +124,7 @@ export function BranchSelectorView(props: BranchSelectorProps) {
           <text style={{ fg: uiColors.textSecondary }}>
             Current:{' '}
           </text>
-          <text fg={uiColors.success} attributes={TextAttributes.BOLD}>
+          <text fg={highlightColor('positive')} attributes={TextAttributes.BOLD}>
             {props.currentBranch}
           </text>
         </box>
@@ -135,15 +136,15 @@ export function BranchSelectorView(props: BranchSelectorProps) {
             <Show
               when={filterQuery()}
               fallback={
-                <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>No branches found</text>
+                <text fg={highlightColor('highlight')} attributes={TextAttributes.BOLD}>No branches found</text>
               }
             >
-              <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>No branches matching "{filterQuery()}"</text>
+              <text fg={highlightColor('highlight')} attributes={TextAttributes.BOLD}>No branches matching "{filterQuery()}"</text>
             </Show>
           }
         >
-          <text fg={uiColors.textSecondary}>No existing branch matches "{filterQuery()}".</text>
-          <text fg={uiColors.success} attributes={TextAttributes.BOLD}>Press Enter to create a new worktree on branch "{filterQuery()}".</text>
+          <text fg={highlightColor('secondary')}>No existing branch matches "{filterQuery()}".</text>
+          <text fg={highlightColor('positive')} attributes={TextAttributes.BOLD}>Press Enter to create a new worktree on branch "{filterQuery()}".</text>
         </Show>
       }
       renderItem={(branchInfo, isSelected) => {

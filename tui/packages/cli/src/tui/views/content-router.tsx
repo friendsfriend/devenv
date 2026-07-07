@@ -238,6 +238,9 @@ export function ContentRouter(props: ContentRouterProps) {
 																						}
 																						searchMode={changeRequestStore.testSearchMode()}
 																						searchQuery={changeRequestStore.testSearchQuery()}
+																						testResultsUnsupported={selectedAppSourceType() === 'github'}
+																						filterSummary={listFilterSummary(changeRequestStore.currentListFilters())}
+																						sortSummary={listSortSummary(changeRequestStore.currentListSortRules())}
 																					/>
 																				</Show>
 																			}
@@ -293,6 +296,7 @@ export function ContentRouter(props: ContentRouterProps) {
 																}
 																testLoading={changeRequestStore.crTestLoading()}
 																testError={changeRequestStore.crTestError()}
+																testResultsUnsupported={selectedAppSourceType() === 'github'}
 																changes={changeRequestStore.crChanges()}
 																changesLoading={changeRequestStore.crChangesLoading()}
 																changesError={changeRequestStore.crChangesError()}
@@ -463,6 +467,11 @@ export function ContentRouter(props: ContentRouterProps) {
 								height={30}
 								width={props.dimensions.width}
 								isMaximized={true}
+								sortDesc={appStore.statusLogSortDesc()}
+								filterSummary={appStore.statusLogSortDesc() ? 'status' : ''}
+								sortSummary={appStore.statusLogSortDesc() ? 'newest' : ''}
+								searchMode={appStore.statusLogSearchMode()}
+								searchQuery={appStore.statusLogSearchQuery()}
 								runningTextEnabled={props.runningTextEnabled}
 								runningTextOffset={props.runningTextOffset}
 							/>

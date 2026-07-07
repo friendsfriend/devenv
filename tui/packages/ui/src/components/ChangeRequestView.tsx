@@ -1,7 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
-import { uiColors } from '../colors';
 import type { ChangeRequest } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
@@ -48,10 +47,10 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
   const reservedLines = () => LAYOUT_CHROME_LINES + 3 + (hasFilterStatus() ? 1 : 0);
 
   const getMergeStatusText = (cr: ChangeRequest) => {
-    if (cr.has_conflicts) return { text: '✗', fg: uiColors.error };
-    if (cr.merge_status === 'can_be_merged') return { text: '✓', fg: uiColors.success };
-    if (cr.draft || cr.work_in_progress) return { text: '○', fg: uiColors.warning };
-    return { text: '○', fg: uiColors.textMuted };
+    if (cr.has_conflicts) return { text: '✗', fg: highlightColor('negative') };
+    if (cr.merge_status === 'can_be_merged') return { text: '✓', fg: highlightColor('positive') };
+    if (cr.draft || cr.work_in_progress) return { text: '○', fg: highlightColor('warning') };
+    return { text: '○', fg: highlightColor('secondary') };
   };
 
   const stateHighlight = (state: string) => {

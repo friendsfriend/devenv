@@ -3,6 +3,7 @@ import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export interface ProfilePickerProps {
   profiles: string[];
@@ -31,7 +32,7 @@ function ProfileRow(props: {
       }}
     >
       <text
-        fg={uiColors.textPrimary}
+        fg={highlightColor('primary')}
         attributes={props.isSelected ? TextAttributes.BOLD : undefined}
       >
         {cursor()}{props.label}
@@ -65,7 +66,7 @@ export function ProfilePickerView(props: ProfilePickerProps) {
       loading={props.loading}
       scrollIndicatorLabel="profiles"
       emptyContent={
-        <text fg={uiColors.textSecondary}>No profiles available</text>
+        <text fg={highlightColor('secondary')}>No profiles available</text>
       }
       renderItem={(item, isSelected) => (
         <ProfileRow label={item} isSelected={isSelected()} />

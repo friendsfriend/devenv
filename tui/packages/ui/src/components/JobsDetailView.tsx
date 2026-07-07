@@ -7,13 +7,18 @@ import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { ContentPanel } from './ContentStack';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
-import { getPipelineStatusColor } from '../statusUtils';
+
+import { Badge } from './Badge';
+import { FilterStatusBar } from './FilterStatusBar';
+import { HighlightedText, highlightColor } from './Highlight';
 
 interface JobsDetailViewProps {
   jobs: Job[];
   pipelineId: number;
   selectedStageIndex: number;  // Parent-controlled
   selectedJobIndex: number;    // Parent-controlled
+  filterSummary?: string;
+  sortSummary?: string;
   onClose: () => void;
   onViewJobLogs?: (jobId: number, jobName: string) => void;
   onRetryJob?: (jobId: number, jobName: string) => void;
@@ -92,7 +97,17 @@ export function JobsDetailView(props: JobsDetailViewProps) {
   //   Stage tabs bar                         = 3
   //   Table header row                       = 1
   //                                   Total  = 9
-  const RESERVED_LINES = LAYOUT_CHROME_LINES + 3 + 1;
+  const hasFilterStatus = () => !!props.filterSummary || !!props.sortSummary;
+  const reservedLines = () => LAYOUT_CHROME_LINES + 3 + 1 + (hasFilterStatus() ? 1 : 0);
+  const jobStatusHighlight = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'success': return 'positive' as const;
+      case 'failed': return 'negative' as const;
+      case 'running': return 'highlight' as const;
+      case 'pending': case 'created': case 'manual': case 'scheduled': return 'warning' as const;
+      default: return 'secondary' as const;
+    }
+  };
 
   // Format duration
   const formatDuration = (job: Job): string => {
@@ -110,15 +125,15 @@ export function JobsDetailView(props: JobsDetailViewProps) {
   return (
     <ContentPanel>
       <Show when={props.loading}>
-        <CenteredState message="Loading pipeline jobs..." color={uiColors.primary} />
+        <CenteredState message="Loading pipeline jobs..." color={highlightColor('highlight')} />
       </Show>
 
       <Show when={!props.loading && props.error}>
-        <CenteredState message={props.error!} color={uiColors.error} />
+        <CenteredState message={props.error!} color={highlightColor('negative')} />
       </Show>
 
       <Show when={!props.loading && !props.error && props.jobs.length === 0}>
-        <CenteredState message="No jobs found for this pipeline" />
+        <CenteredState message="No jobs found for this pipeline" color={highlightColor('secondary')} />
       </Show>
 
       {/* Jobs Table */}
@@ -150,7 +165,7 @@ export function JobsDetailView(props: JobsDetailViewProps) {
                   }}
                 >
                   <text
-                    fg={isActive() ? uiColors.primary : uiColors.textMuted}
+                    fg={isActive() ? highlightColor('highlight') : highlightColor('secondary')}
                     attributes={isActive() ? TextAttributes.BOLD : undefined}
                   >
                     {stage.name} ({stage.jobs.length})
@@ -165,16 +180,16 @@ export function JobsDetailView(props: JobsDetailViewProps) {
         <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={currentStageJobs().length}>
               <>
                 <box style={{ width: '15%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Status</text>
+                  <HighlightedText text="Status" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
                 <box style={{ width: '50%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Job Name</text>
+                  <HighlightedText text="Job Name" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
                 <box style={{ width: '15%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Duration</text>
+                  <HighlightedText text="Duration" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
                 <box style={{ width: '20%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>ID</text>
+                  <HighlightedText text="ID" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
               </>
         </SearchHeader>
@@ -183,36 +198,39 @@ export function JobsDetailView(props: JobsDetailViewProps) {
         <ScrollableList<Job>
           items={currentStageJobs()}
           selectedIndex={props.selectedJobIndex}
-          reservedLines={RESERVED_LINES}
+          reservedLines={reservedLines()}
           estimatedItemHeight={1}
           showScrollIndicator={false}
-          emptyContent={<text fg={uiColors.textMuted}>No jobs in this stage</text>}
+          emptyContent={<HighlightedText text="No jobs in this stage" highlight="secondary" />}
           renderItem={(job, isSelected) => (
             <box
-              backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+              backgroundColor={isSelected() ? uiColors.bgSurface0 : undefined}
               style={{
                 width: '100%',
                 height: 1,
                 flexDirection: 'row',
-                paddingLeft: 1,
-                paddingRight: 1,
               }}
             >
-              <box style={{ width: '15%' }}>
-                <text fg={getPipelineStatusColor(job.status)} attributes={TextAttributes.BOLD}>
-                  {job.status.toUpperCase()}
-                </text>
-              </box>
-              <box style={{ width: '50%' }}>
-                <text style={{ fg: isSelected() ? uiColors.textPrimary : uiColors.textSecondary }}>
-                  {job.name}
-                </text>
-              </box>
-              <box style={{ width: '15%' }}>
-                <text style={{ fg: uiColors.textSecondary }}>{formatDuration(job)}</text>
-              </box>
-              <box style={{ width: '20%' }}>
-                <text style={{ fg: uiColors.textMuted }}>#{job.id}</text>
+              {/* Accent marker */}
+              <box
+                backgroundColor={isSelected() ? uiColors.highlight : undefined}
+                style={{ width: 2, flexShrink: 0 }}
+              />
+              <box style={{ flexGrow: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                <box style={{ width: '15%' }}>
+                  <Badge text={job.status} highlight={jobStatusHighlight(job.status)} />
+                </box>
+                <box style={{ width: '50%' }}>
+                  <text fg={highlightColor(isSelected() ? 'primary' : 'secondary')}>
+                    {job.name}
+                  </text>
+                </box>
+                <box style={{ width: '15%' }}>
+                  <text fg={highlightColor('secondary')}>{formatDuration(job)}</text>
+                </box>
+                <box style={{ width: '20%' }}>
+                  <text fg={highlightColor('secondary')}>#{job.id}</text>
+                </box>
               </box>
             </box>
           )}

@@ -5,6 +5,7 @@ import type { SshHost } from '@devenv/types';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export interface SshHostPickerViewProps {
   hosts: SshHost[];
@@ -48,7 +49,7 @@ function HostRow(props: { host: SshHost; isSelected: boolean }) {
       >
         {props.host.alias}
       </text>
-      <text fg={uiColors.textMuted}>{'  '}{target()}</text>
+      <text fg={highlightColor('secondary')}>{'  '}{target()}</text>
     </box>
   );
 }
@@ -98,10 +99,10 @@ export function SshHostPickerView(props: SshHostPickerViewProps) {
         <Show
           when={props.hosts.length === 0}
           fallback={
-            <text fg={uiColors.textMuted}>No hosts match filter</text>
+            <text fg={highlightColor('secondary')}>No hosts match filter</text>
           }
         >
-          <text fg={uiColors.textMuted}>No hosts found in ~/.ssh/config</text>
+          <text fg={highlightColor('secondary')}>No hosts found in ~/.ssh/config</text>
         </Show>
       }
       renderItem={(host, isSelected) => (

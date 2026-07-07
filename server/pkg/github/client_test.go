@@ -340,7 +340,7 @@ func TestMapRunStatus(t *testing.T) {
 		conclusion string
 		want       string
 	}{
-		{name: "in_progress", status: "in_progress", conclusion: "", want: "running"},
+		{name: "in progress", status: "in progress", conclusion: "", want: "running"},
 		{name: "queued", status: "queued", conclusion: "", want: "pending"},
 		{name: "waiting", status: "waiting", conclusion: "", want: "pending"},
 		{name: "pending", status: "pending", conclusion: "", want: "pending"},

@@ -213,6 +213,9 @@ export function createAppStore() {
 		StatusLogEntry[]
 	>([]);
 	const [statusLogMaximized, setStatusLogMaximized] = createSignal(false);
+	const [statusLogSearchMode, setStatusLogSearchMode] = createSignal(false);
+	const [statusLogSearchQuery, setStatusLogSearchQuery] = createSignal("");
+	const [statusLogSortDesc, setStatusLogSortDesc] = createSignal(false);
 	const [operationInProgressForApp, setOperationInProgressForApp] =
 		createSignal<string | null>(null);
 	const hasActiveOperation = createMemo(() =>
@@ -468,6 +471,12 @@ export function createAppStore() {
 		setStatusLogEntries,
 		statusLogMaximized,
 		setStatusLogMaximized,
+		statusLogSearchMode,
+		setStatusLogSearchMode,
+		statusLogSearchQuery,
+		setStatusLogSearchQuery,
+		statusLogSortDesc,
+		setStatusLogSortDesc,
 		operationInProgressForApp,
 		setOperationInProgressForApp,
 		hasActiveOperation,

@@ -66,7 +66,7 @@ const (
 
 	// Status types
 	StatusPending    StatusType = "pending"
-	StatusInProgress StatusType = "in_progress"
+	StatusInProgress StatusType = "in progress"
 	StatusCompleted  StatusType = "completed"
 	StatusFailed     StatusType = "failed"
 	StatusCancelled  StatusType = "cancelled"

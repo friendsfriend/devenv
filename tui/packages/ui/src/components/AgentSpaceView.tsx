@@ -5,6 +5,7 @@ import type { AgentGroup, AgentSessionInfo } from '@devenv/types';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export interface AgentSpaceViewProps {
   piAgentGroups: AgentGroup[];
@@ -69,7 +70,7 @@ function RowView(props: { row: FlatRow; isSelected: boolean }) {
       style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1 }}
     >
       <text fg={props.isSelected ? uiColors.primary : uiColors.textSecondary}>{cursor()} </text>
-      <text fg={uiColors.textMuted} style={{ flexShrink: 0 }}>
+      <text fg={highlightColor('secondary')} style={{ flexShrink: 0 }}>
         {`[${props.row.agentName}] `}
       </text>
       <text
@@ -79,7 +80,7 @@ function RowView(props: { row: FlatRow; isSelected: boolean }) {
       >
         {props.row.session.title || '(untitled)'}
       </text>
-      <text fg={uiColors.textMuted}>
+      <text fg={highlightColor('secondary')}>
         {` ${formatRelativeTime(props.row.session.timeUpdated)}`}
       </text>
     </box>
@@ -145,7 +146,7 @@ export function AgentSpaceView(props: AgentSpaceViewProps) {
       filterQuery={props.filterQuery}
       filterActive={props.filterActive}
       onFilterChange={props.onFilterChange}
-      emptyContent={<text fg={uiColors.textMuted}>No sessions found.</text>}
+      emptyContent={<text fg={highlightColor('secondary')}>No sessions found.</text>}
       renderItem={(item, isSelected) => (
         <RowView row={item} isSelected={isSelected()} />
       )}

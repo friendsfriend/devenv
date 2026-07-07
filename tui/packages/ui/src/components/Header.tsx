@@ -2,6 +2,7 @@
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
+import { highlightColor } from './Highlight';
 import { RunningText } from './RunningText';
 
 export type HeaderDetail = Record<string, string | number | undefined | null>;
@@ -23,10 +24,10 @@ const TITLE_WIDTH = 0;
 const RIGHT_WIDTH = 24;
 
 const colorForSeverity = (severity: HeaderProps['severity']) => {
-  if (severity === 'success') return uiColors.success;
-  if (severity === 'warning') return uiColors.warning;
-  if (severity === 'error') return uiColors.error;
-  return uiColors.primary;
+  if (severity === 'success') return highlightColor('positive');
+  if (severity === 'warning') return highlightColor('warning');
+  if (severity === 'error') return highlightColor('negative');
+  return highlightColor('highlight');
 };
 
 const formatDetail = (detail: HeaderDetail | undefined, fallback?: string) => {
@@ -61,7 +62,7 @@ export function Header(props: HeaderProps) {
           <text fg={colors.mauve} attributes={TextAttributes.BOLD}>DΞV</text>
         </box>
         <box style={{ width: middleWidth() }}>
-          <RunningText text={primaryDetail()} width={middleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+          <RunningText text={primaryDetail()} width={middleWidth()} fg={highlightColor('secondary')} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
         <box style={{ flexGrow: 1 }} />
         <box style={{ width: rightWidth() }}>
@@ -73,11 +74,11 @@ export function Header(props: HeaderProps) {
           <text fg={colors.peach} attributes={TextAttributes.BOLD}>ΞNV</text>
         </box>
         <box style={{ width: middleWidth() }}>
-          <RunningText text={secondaryDetail()} width={middleWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+          <RunningText text={secondaryDetail()} width={middleWidth()} fg={highlightColor('secondary')} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
         <box style={{ flexGrow: 1 }} />
         <box style={{ width: rightWidth() }}>
-          <RunningText text={helpText()} width={rightWidth()} align="right" fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+          <RunningText text={helpText()} width={rightWidth()} align="right" fg={highlightColor('secondary')} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
         </box>
       </box>
     </box>
