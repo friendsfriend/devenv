@@ -154,15 +154,12 @@ export async function handleCrListKeys(
     return true;
   }
 
-  // s to toggle CR state — works even when list is empty (lets user switch filter)
+  // s cycles state filter: opened → merged → closed → all → opened
   if (event.name === 's' && !event.shift && !event.ctrl) {
-    const current = changeRequestStore.crState();
-    const next =
-      current === 'opened' ? 'closed' :
-      current === 'closed' ? 'all' :
-      'opened';
-    changeRequestStore.setCrState(next);
-    void crActions.loadAllChangeRequests(1, undefined, next);
+    const current = changeRequestStore.crListFilters().state?.[0] ?? 'opened';
+    const next = current === 'opened' ? 'merged' : current === 'merged' ? 'closed' : current === 'closed' ? 'all' : 'opened';
+    changeRequestStore.setCrListFilters({ ...changeRequestStore.crListFilters(), state: next === 'all' ? [] : [next] });
+    void crActions.loadAllChangeRequests();
     return true;
   }
 

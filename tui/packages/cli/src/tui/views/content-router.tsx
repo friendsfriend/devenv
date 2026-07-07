@@ -327,7 +327,7 @@ export function ContentRouter(props: ContentRouterProps) {
 														searchQuery={changeRequestStore.crSearchQuery()}
 														currentPage={changeRequestStore.currentPage()}
 														totalPages={changeRequestStore.totalPages()}
-														state={changeRequestStore.crState()}
+														state={changeRequestStore.crListFilters().state?.[0] ?? 'opened'}
 														sourceType={selectedAppSourceType()}
 														filterSummary={listFilterSummary(changeRequestStore.crListFilters())}
 														sortSummary={listSortSummary(changeRequestStore.crListSortRules())}
@@ -383,8 +383,8 @@ export function ContentRouter(props: ContentRouterProps) {
 										currentPage={issueStore.currentPage()}
 										totalPages={issueStore.totalPages()}
 										totalCount={issueStore.totalCount()}
-										scope={issueStore.issueScope()}
-										state={issueStore.issueState()}
+										scope={(issueStore.issueListFilters().scope?.[0] ?? 'all') as any}
+										state={issueStore.issueListFilters().state?.[0] ?? 'open'}
 										filterSummary={listFilterSummary(issueStore.issueListFilters())}
 										sortSummary={listSortSummary(issueStore.issueListSortRules())}
 										searchMode={issueStore.issueSearchMode()}

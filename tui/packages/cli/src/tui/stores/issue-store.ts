@@ -37,7 +37,7 @@ export function createIssueStore() {
 	const [issueSearchMode, setIssueSearchMode] = createSignal(false);
 	const [issueSearchQuery, setIssueSearchQuery] = createSignal("");
 	const [issueSearchTerm, setIssueSearchTerm] = createSignal("");
-	const [issueListFilters, setIssueListFilters] = createSignal<Record<string, string[]>>({ labels: [] });
+	const [issueListFilters, setIssueListFilters] = createSignal<Record<string, string[]>>({ state: ["open"], labels: [] });
 	const [issueListFilterParameterIndex, setIssueListFilterParameterIndex] = createSignal(0);
 	const [issueListFilterValueIndex, setIssueListFilterValueIndex] = createSignal(0);
 	const [issueListFilterFocusedPane, setIssueListFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
@@ -50,12 +50,7 @@ export function createIssueStore() {
 		{ key: "title", label: "Title", direction: "none" },
 	]);
 
-	// Scope
-	const [issueScope, setIssueScope] = createSignal<IssueScope>("all");
-	const [issueScopePickerIndex, setIssueScopePickerIndex] = createSignal(0);
 
-	// State filter: "open", "closed", "all"
-	const [issueState, setIssueState] = createSignal<string>("open");
 
 	// Detail state
 	const [issueDetailLoading, setIssueDetailLoading] = createSignal(false);
@@ -131,11 +126,26 @@ export function createIssueStore() {
 	});
 
 	const issueListFilterParameters = createMemo(() => {
-		const counts = new Map<string, number>();
+		const stateValues = [
+			{ value: "open", label: "open" },
+			{ value: "closed", label: "closed" },
+			{ value: "all", label: "all" },
+		];
+		const scopeValues = [
+			{ value: "all", label: "All issues" },
+			{ value: "created-by-me", label: "Created by me" },
+			{ value: "assigned-to-me", label: "Assigned to me" },
+			{ value: "no-assignee", label: "No assignee" },
+		];
+		const labelCounts = new Map<string, number>();
 		for (const issue of issues()) {
-			for (const label of issue.labels ?? []) counts.set(label, (counts.get(label) ?? 0) + 1);
+			for (const label of issue.labels ?? []) labelCounts.set(label, (labelCounts.get(label) ?? 0) + 1);
 		}
-		return [{ key: "labels", label: "Labels", values: Array.from(counts.entries()).map(([value, count]) => ({ value, label: value, count })) }];
+		return [
+			{ key: "state", label: "State", values: stateValues },
+			{ key: "scope", label: "Scope", values: scopeValues },
+			{ key: "labels", label: "Labels", values: Array.from(labelCounts.entries()).map(([value, count]) => ({ value, label: value, count })) },
+		];
 	});
 	const activeIssueListSort = createMemo(() => issueListSortRules().find((rule) => rule.direction !== "none"));
 
@@ -219,12 +229,6 @@ export function createIssueStore() {
 		issueListSortSelectedIndex,
 		setIssueListSortSelectedIndex,
 		activeIssueListSort,
-		issueScope,
-		setIssueScope,
-		issueScopePickerIndex,
-		setIssueScopePickerIndex,
-		issueState,
-		setIssueState,
 		issueDetailLoading,
 		setIssueDetailLoading,
 		issueDetailError,

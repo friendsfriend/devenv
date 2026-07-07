@@ -9,6 +9,7 @@ import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
 import { FilterStatusBar } from './FilterStatusBar';
 import { HighlightedText, highlightColor } from './Highlight';
+import { Badge } from './Badge';
 
 interface ChangedFilesViewProps {
   changes: ChangeRequestChange[];
@@ -103,7 +104,7 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
         {/* Table Header */}
         <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.changes.length}>
               <>
-                <box style={{ width: '17%' }}>
+                <box style={{ width: 5 }}>
                   <HighlightedText text="Type" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
                 <box style={{ width: '58%' }}>
@@ -134,37 +135,40 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
             const filePath = getFilePath(change);
             return (
               <box
-                backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+                backgroundColor={isSelected() ? uiColors.bgSurface0 : undefined}
                 style={{
                   width: '100%',
                   height: 1,
                   flexDirection: 'row',
-                  paddingLeft: 1,
-                  paddingRight: 1,
                 }}
               >
-                {/* Type */}
-                <box style={{ width: '17%' }}>
-                  <text fg={highlightColor(changeType.highlight)} attributes={TextAttributes.BOLD}>
-                    {changeType.type}
-                  </text>
-                </box>
-                {/* File Path */}
-                <box style={{ width: '58%' }}>
-                  <text
-                    fg={highlightColor(isSelected() ? 'primary' : 'secondary')}
-                    attributes={isSelected() ? TextAttributes.BOLD : undefined}
-                  >
-                    {filePath}
-                  </text>
-                </box>
-                {/* Stats */}
-                <box style={{ width: '25%' }}>
-                  <text fg={highlightColor(isSelected() ? 'primary' : 'secondary')}>
-                    <span style={{ fg: highlightColor('positive') }}>+{change.lines_added || 0}</span>
-                    {' '}
-                    <span style={{ fg: highlightColor('negative') }}>-{change.lines_deleted || 0}</span>
-                  </text>
+                {/* Accent marker strip */}
+                <box
+                  backgroundColor={isSelected() ? uiColors.highlight : undefined}
+                  style={{ width: 2, flexShrink: 0 }}
+                />
+                <box style={{ flexGrow: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                  {/* Type */}
+                  <box style={{ width: 5 }}>
+                    <Badge text={changeType.type} highlight={changeType.highlight} />
+                  </box>
+                  {/* File Path */}
+                  <box style={{ width: '58%' }}>
+                    <text
+                      fg={highlightColor(isSelected() ? 'primary' : 'secondary')}
+                      attributes={isSelected() ? TextAttributes.BOLD : undefined}
+                    >
+                      {filePath}
+                    </text>
+                  </box>
+                  {/* Stats */}
+                  <box style={{ width: '25%' }}>
+                    <text fg={highlightColor(isSelected() ? 'primary' : 'secondary')}>
+                      <span style={{ fg: highlightColor('positive') }}>+{change.lines_added || 0}</span>
+                      {' '}
+                      <span style={{ fg: highlightColor('negative') }}>-{change.lines_deleted || 0}</span>
+                    </text>
+                  </box>
                 </box>
               </box>
             );

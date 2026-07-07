@@ -106,8 +106,7 @@ export function createCrActions(
 		const app = getSelectedApp();
 		if (!app) return;
 		const p = page ?? changeRequestStore.currentPage();
-		const s = state ?? changeRequestStore.crListFilters().state?.[0] ?? changeRequestStore.crState();
-		changeRequestStore.setCrState(s);
+		const s = state ?? changeRequestStore.crListFilters().state?.[0] ?? "opened";
 		changeRequestStore.setCrLoading(true);
 		changeRequestStore.setCrError("");
 		changeRequestStore.setSelectedCRIndex(0);
@@ -385,7 +384,7 @@ export function createCrActions(
 			await client.toggleCRApproval(app.ident, cr.iid, app.sourceType);
 			const fetched = await client.getChangeRequests(
 				app.ident,
-				changeRequestStore.crState(),
+				changeRequestStore.crListFilters().state?.[0] ?? 'opened',
 				"all",
 				app.sourceType,
 				changeRequestStore.currentPage(),
@@ -417,7 +416,7 @@ export function createCrActions(
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			const fetched = await client.getChangeRequests(
 				app.ident,
-				changeRequestStore.crState(),
+				changeRequestStore.crListFilters().state?.[0] ?? 'opened',
 				"all",
 				app.sourceType,
 				changeRequestStore.currentPage(),

@@ -27,8 +27,6 @@ export function createChangeRequestStore() {
 	const [totalCount, setTotalCount] = createSignal(0);
 	const [perPage, setPerPage] = createSignal(50);
 
-	// State filter: "opened", "merged", "closed", "all"
-	const [crState, setCrState] = createSignal<string>("opened");
 	// Active server-side search term (set when user presses Enter in search mode)
 	const [searchTerm, setSearchTerm] = createSignal("");
 	const [selectedChangeRequest, setSelectedCR] = createSignal<ChangeRequest | null>(null);
@@ -90,7 +88,7 @@ export function createChangeRequestStore() {
 		createSignal(false);
 	const [crSearchMode, setCrSearchMode] = createSignal(false);
 	const [crSearchQuery, setCrSearchQuery] = createSignal("");
-	const [crListFilters, setCrListFilters] = createSignal<Record<string, string[]>>({ state: [] });
+	const [crListFilters, setCrListFilters] = createSignal<Record<string, string[]>>({ state: ["opened"] });
 	const [crListFilterParameterIndex, setCrListFilterParameterIndex] = createSignal(0);
 	const [crListFilterValueIndex, setCrListFilterValueIndex] = createSignal(0);
 	const [crListFilterFocusedPane, setCrListFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
@@ -141,9 +139,13 @@ export function createChangeRequestStore() {
 
 	const currentListFilters = createMemo(() => listFilters()[listControlTarget() ?? "changedFiles"]);
 	const crListFilterParameters = createMemo(() => {
-		const counts = new Map<string, number>();
-		for (const cr of changeRequests()) counts.set(cr.state, (counts.get(cr.state) ?? 0) + 1);
-		return [{ key: "state", label: "State", values: Array.from(counts.entries()).map(([value, count]) => ({ value, label: value, count })) }];
+		const stateValues = [
+			{ value: "opened", label: "opened" },
+			{ value: "merged", label: "merged" },
+			{ value: "closed", label: "closed" },
+			{ value: "all", label: "all" },
+		];
+		return [{ key: "state", label: "State", values: stateValues }];
 	});
 	const activeCrListSort = createMemo(() => crListSortRules().find((rule) => rule.direction !== "none"));
 	const currentListSortRules = createMemo(() => listSortRules()[listControlTarget() ?? "changedFiles"]);
@@ -246,8 +248,7 @@ export function createChangeRequestStore() {
 		setPerPage,
 		searchTerm,
 		setSearchTerm,
-		crState,
-		setCrState,
+
 		selectedChangeRequest,
 		setSelectedCR,
 		selectedChangeRequestIndex,

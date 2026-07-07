@@ -22,7 +22,6 @@ import {
 	TaskArgsModal,
 	TaskAddModal,
 	CrAiReviewOverlay,
-	IssueScopeModal,
 	CloseReasonModal,
 	CommentModal,
 	LabelPickerModal,
@@ -232,11 +231,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={appStore.viewMode() === "issueScopePicker"}>
-				<IssueScopeModal selectedIndex={issueStore.issueScopePickerIndex()} />
-			</Show>
-
-			<Show when={issueStore.showCommentModal()}>
+<Show when={issueStore.showCommentModal()}>
 				<CommentModal
 					text={issueStore.commentText()}
 					submitting={issueStore.issueSubmitting()}

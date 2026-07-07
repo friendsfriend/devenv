@@ -520,9 +520,9 @@ export async function handleTableKeys(
 				crActions.loadAllChangeRequests();
 			break;
 		case "i":
-			// Open issue scope picker (lowercase i)
+			// Open issues for current project (lowercase i)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				appStore.setViewMode("issueScopePicker");
+				void issueActions.loadAllIssues();
 			break;
 		case "I":
 			// Load all issues directly (uppercase I / Shift+I)

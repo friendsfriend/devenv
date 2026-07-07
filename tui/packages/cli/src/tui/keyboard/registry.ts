@@ -335,9 +335,6 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Esc", "q"], description: "Back to issue detail", context: "issueTimeline", category: "General" },
 
 	// ========== Issue scope picker ==========
-	{ keys: ["j/k", "↑/↓"], description: "Navigate scopes", context: "issueScopePicker", category: "Navigation" },
-	{ keys: ["Enter"], description: "Select scope", context: "issueScopePicker", category: "Actions" },
-	{ keys: ["Esc", "q"], description: "Back to table", context: "issueScopePicker", category: "General" },
 
 	// ========== Issue sub-views ==========
 	{ keys: ["j/k", "↑/↓"], description: "Navigate list", context: "changeRequestLinkedIssues", category: "Navigation" },
