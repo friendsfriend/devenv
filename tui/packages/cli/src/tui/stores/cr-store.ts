@@ -90,6 +90,18 @@ export function createChangeRequestStore() {
 		createSignal(false);
 	const [crSearchMode, setCrSearchMode] = createSignal(false);
 	const [crSearchQuery, setCrSearchQuery] = createSignal("");
+	const [crListFilters, setCrListFilters] = createSignal<Record<string, string[]>>({ state: [] });
+	const [crListFilterParameterIndex, setCrListFilterParameterIndex] = createSignal(0);
+	const [crListFilterValueIndex, setCrListFilterValueIndex] = createSignal(0);
+	const [crListFilterFocusedPane, setCrListFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
+	const [showCrListFilterModal, setShowCrListFilterModal] = createSignal(false);
+	const [showCrListSortModal, setShowCrListSortModal] = createSignal(false);
+	const [crListSortSelectedIndex, setCrListSortSelectedIndex] = createSignal(0);
+	const [crListSortRules, setCrListSortRules] = createSignal<SortRule[]>([
+		{ key: "updated", label: "Updated", direction: "desc" },
+		{ key: "created", label: "Created", direction: "none" },
+		{ key: "title", label: "Title", direction: "none" },
+	]);
 	const [changedFilesSearchMode, setChangedFilesSearchMode] =
 		createSignal(false);
 	const [changedFilesSearchQuery, setChangedFilesSearchQuery] =
@@ -128,6 +140,12 @@ export function createChangeRequestStore() {
 	let crAiLastScrollTop = 0;
 
 	const currentListFilters = createMemo(() => listFilters()[listControlTarget() ?? "changedFiles"]);
+	const crListFilterParameters = createMemo(() => {
+		const counts = new Map<string, number>();
+		for (const cr of changeRequests()) counts.set(cr.state, (counts.get(cr.state) ?? 0) + 1);
+		return [{ key: "state", label: "State", values: Array.from(counts.entries()).map(([value, count]) => ({ value, label: value, count })) }];
+	});
+	const activeCrListSort = createMemo(() => crListSortRules().find((rule) => rule.direction !== "none"));
 	const currentListSortRules = createMemo(() => listSortRules()[listControlTarget() ?? "changedFiles"]);
 	const setCurrentListFilters = (value: Record<string, string[]> | ((filters: Record<string, string[]>) => Record<string, string[]>)) => {
 		const target = listControlTarget();
@@ -318,6 +336,24 @@ export function createChangeRequestStore() {
 		setCrSearchMode,
 		crSearchQuery,
 		setCrSearchQuery,
+		crListFilters,
+		setCrListFilters,
+		crListFilterParameters,
+		crListFilterParameterIndex,
+		setCrListFilterParameterIndex,
+		crListFilterValueIndex,
+		setCrListFilterValueIndex,
+		crListFilterFocusedPane,
+		setCrListFilterFocusedPane,
+		showCrListFilterModal,
+		setShowCrListFilterModal,
+		showCrListSortModal,
+		setShowCrListSortModal,
+		crListSortRules,
+		setCrListSortRules,
+		crListSortSelectedIndex,
+		setCrListSortSelectedIndex,
+		activeCrListSort,
 		changedFilesSearchMode,
 		setChangedFilesSearchMode,
 		changedFilesSearchQuery,

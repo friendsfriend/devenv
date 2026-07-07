@@ -57,8 +57,9 @@ export function LabelPickerModal(props: LabelPickerModalProps) {
 					title="Select Labels"
 					helpText={formatHelpText([
 						{ key: "j/k", action: "Navigate" },
-						{ key: "Enter", action: "Toggle" },
-						{ key: "Esc", action: "Confirm" },
+						{ key: "Space", action: "Toggle" },
+						{ key: "Enter", action: "Confirm" },
+						{ key: "Esc", action: "Cancel" },
 					])}
 					widthPercent={0.35}
 					heightPercent={0.5}

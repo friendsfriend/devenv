@@ -8,6 +8,7 @@ import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { SearchHeader } from "./SearchHeader";
 import { WorkItemCard } from "./WorkItemCard";
+import { FilterStatusBar } from './FilterStatusBar';
 import { formatStatus, getGitStatusStyle, getStatusStyle } from "../statusUtils";
 
 export interface TableColumn {
@@ -52,6 +53,8 @@ export interface TableProps<T = string> {
 	availableLines?: number;
 	spinnerFrames?: string[];
 	spinnerFrame?: () => number;
+	filterSummary?: string;
+	sortSummary?: string;
 	runningTextEnabled?: boolean;
 	runningTextOffset?: number;
 }
@@ -208,6 +211,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		if (props.showBorder !== false) lines -= 2;
 		if (props.tabs && props.tabs.length > 0) lines -= 3;
 		lines -= 1; // list header
+		if (props.filterSummary || props.sortSummary) lines -= 1;
 		return Math.max(1, lines);
 	};
 
@@ -216,6 +220,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		let lines = LAYOUT_CHROME_LINES + 1;
 		if (props.showBorder !== false) lines += 2;
 		if (props.tabs && props.tabs.length > 0) lines += 3;
+		if (props.filterSummary || props.sortSummary) lines += 1;
 		return lines;
 	};
 
@@ -279,6 +284,8 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 					</box>
 				</box>
 			</SearchHeader>
+
+			<FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
 
 			{/* Table Body — virtual scroll keeps selected row always visible */}
 			<Show

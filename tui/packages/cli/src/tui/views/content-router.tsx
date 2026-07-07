@@ -7,7 +7,6 @@ import {
 	StatusLogView,
 	IssueView,
 	IssueDetailView,
-	LinkedCRsView,
 	ReferencesView,
 	ChangeRequestView,
 	ChangeRequestDetailView,
@@ -57,11 +56,27 @@ export function ContentRouter(props: ContentRouterProps) {
 					)
 				: props.columns;
 
+	const selectedAppSourceType = () => {
+		const row = appStore.filteredApps()[appStore.selectedIndex()];
+		return row?.rowKind === "app" ? row.sourceType : undefined;
+	};
+	const listFilterSummary = (filters: Record<string, string[]>) =>
+		Object.entries(filters).filter(([, values]) => values.length > 0).map(([key, values]) => `${key}: ${values.join(",")}`).join(" • ");
+	const listSortSummary = (rules: Array<{ label: string; direction: string }>) => {
+		const active = rules.find((rule) => rule.direction !== "none");
+		if (!active) return "";
+		const dir = active.direction === "asc" ? "↑" : "↓";
+		return `${active.label} ${dir}`;
+	};
+	const tableFilterSummary = () => listFilterSummary(appStore.tableFilters());
+	const tableSortSummary = () => listSortSummary(appStore.tableSortRules());
+
 	return (
 		<>
 			{appStore.viewMode() === "references" ? (
 				<ReferencesView
-					references={issueStore.references()}
+					references={issueStore.referencesFiltered()}
+					allReferencesCount={issueStore.references().length}
 					selectedIndex={issueStore.selectedReferenceIndex()}
 					loading={
 						issueStore.linkedChangeRequestsLoading() ||
@@ -71,8 +86,10 @@ export function ContentRouter(props: ContentRouterProps) {
 						issueStore.linkedChangeRequestsError() || issueStore.referencedIssuesError()
 					}
 					onClose={() => issueActions.backToIssueDetailFromReferences()}
-				runningTextEnabled={props.runningTextEnabled}
-				runningTextOffset={props.runningTextOffset}
+					activeFilters={issueStore.referenceFilters()}
+					sortRules={issueStore.referenceSortRules()}
+					runningTextEnabled={props.runningTextEnabled}
+					runningTextOffset={props.runningTextOffset}
 				/>
 			) : appStore.viewMode() === "changeRequestLinkedIssues" ? (
 				<IssueView
@@ -92,32 +109,6 @@ export function ContentRouter(props: ContentRouterProps) {
 						changeRequestStore.setSelectedCrLinkedIssueIndex(0);
 						appStore.setViewMode("changeRequestDetail");
 					}}
-				/>
-			) : appStore.viewMode() === "referencedIssues" ? (
-				<IssueView
-					issues={issueStore.referencedIssues()}
-					selectedIndex={issueStore.selectedReferencedIssueIndex()}
-					onSelectedIndexChange={issueStore.setSelectedReferencedIssueIndex}
-					runningTextEnabled={props.runningTextEnabled}
-					runningTextOffset={props.runningTextOffset}
-					loading={issueStore.referencedIssuesLoading()}
-					error={issueStore.referencedIssuesError()}
-					currentPage={1}
-					totalPages={1}
-					totalCount={issueStore.referencedIssues().length}
-					scope={"all"}
-					onSelectIssue={(issue) => void issueActions.showIssueDetail(issue)}
-					onClose={() => issueActions.backToIssueDetailFromReferences()}
-				/>
-			) : appStore.viewMode() === "linkedChangeRequests" ? (
-				<LinkedCRsView
-					changeRequests={issueStore.linkedChangeRequests()}
-					selectedIndex={issueStore.selectedLinkedCRIndex()}
-					loading={issueStore.linkedChangeRequestsLoading()}
-					error={issueStore.linkedChangeRequestsError()}
-					onClose={() => {}}
-					runningTextEnabled={props.runningTextEnabled}
-					runningTextOffset={props.runningTextOffset}
 				/>
 			) : appStore.error() && !appStore.loading() ? (
 				<box
@@ -287,6 +278,8 @@ export function ContentRouter(props: ContentRouterProps) {
 																		}}
 																		searchMode={changeRequestStore.changedFilesSearchMode()}
 																		searchQuery={changeRequestStore.changedFilesSearchQuery()}
+																		filterSummary={listFilterSummary(changeRequestStore.currentListFilters())}
+																		sortSummary={listSortSummary(changeRequestStore.currentListSortRules())}
 																	/>
 																</Show>
 															}
@@ -335,6 +328,9 @@ export function ContentRouter(props: ContentRouterProps) {
 														currentPage={changeRequestStore.currentPage()}
 														totalPages={changeRequestStore.totalPages()}
 														state={changeRequestStore.crState()}
+														sourceType={selectedAppSourceType()}
+														filterSummary={listFilterSummary(changeRequestStore.crListFilters())}
+														sortSummary={listSortSummary(changeRequestStore.crListSortRules())}
 													runningTextEnabled={props.runningTextEnabled}
 													runningTextOffset={props.runningTextOffset}
 													/>
@@ -389,6 +385,8 @@ export function ContentRouter(props: ContentRouterProps) {
 										totalCount={issueStore.totalCount()}
 										scope={issueStore.issueScope()}
 										state={issueStore.issueState()}
+										filterSummary={listFilterSummary(issueStore.issueListFilters())}
+										sortSummary={listSortSummary(issueStore.issueListSortRules())}
 										searchMode={issueStore.issueSearchMode()}
 										searchQuery={issueStore.issueSearchQuery()}
 										runningTextEnabled={props.runningTextEnabled}
@@ -537,6 +535,8 @@ export function ContentRouter(props: ContentRouterProps) {
 																searchQuery={appStore.tableSearchQuery()}
 																spinnerFrames={props.spinnerFrames}
 																spinnerFrame={appStore.spinnerFrame}
+																filterSummary={tableFilterSummary()}
+																sortSummary={tableSortSummary()}
 																runningTextEnabled={props.runningTextEnabled}
 																runningTextOffset={props.runningTextOffset}
 															/>
@@ -553,6 +553,8 @@ export function ContentRouter(props: ContentRouterProps) {
 															searchQuery={appStore.tableSearchQuery()}
 															spinnerFrames={props.spinnerFrames}
 															spinnerFrame={appStore.spinnerFrame}
+															filterSummary={tableFilterSummary()}
+															sortSummary={tableSortSummary()}
 															runningTextEnabled={props.runningTextEnabled}
 															runningTextOffset={props.runningTextOffset}
 														/>
@@ -570,6 +572,8 @@ export function ContentRouter(props: ContentRouterProps) {
 													searchQuery={appStore.tableSearchQuery()}
 													spinnerFrames={props.spinnerFrames}
 													spinnerFrame={appStore.spinnerFrame}
+													filterSummary={tableFilterSummary()}
+													sortSummary={tableSortSummary()}
 													runningTextEnabled={props.runningTextEnabled}
 													runningTextOffset={props.runningTextOffset}
 												/>

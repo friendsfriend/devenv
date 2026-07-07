@@ -239,6 +239,11 @@ export async function handleTableKeys(
 			appStore.setSelectedIndex(0);
 			return true;
 		}
+		if (key === "x") {
+			appStore.setTableFilters({});
+			appStore.setSelectedIndex(0);
+			return true;
+		}
 		if (key === "j" || key === "down") {
 			if (appStore.tableFilterFocusedPane() === "parameter") {
 				appStore.setTableFilterParameterIndex((i) => Math.min(params.length - 1, i + 1));
@@ -283,6 +288,11 @@ export async function handleTableKeys(
 		const selected = appStore.tableSortSelectedIndex();
 		if (key === "escape" || key === "esc" || event.sequence === "\x1b" || key === "return" || key === "enter") {
 			appStore.setShowTableSortModal(false);
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		if (key === "x") {
+			appStore.setTableSortRules((current) => current.map((rule) => ({ ...rule, direction: "none" })));
 			appStore.setSelectedIndex(0);
 			return true;
 		}

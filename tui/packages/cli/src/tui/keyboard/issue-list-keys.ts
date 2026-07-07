@@ -1,5 +1,5 @@
 import { ISSUE_SCOPE_OPTIONS } from '@devenv/ui';
-import { isDownKey, isUpKey } from './nav-keys';
+import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
 import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 import type {
 	KeyboardEvent,
@@ -20,7 +20,6 @@ export async function handleIssueListKeys(
 	if (
 		appStore.viewMode() !== "issues" &&
 		appStore.viewMode() !== "issueScopePicker" &&
-		appStore.viewMode() !== "referencedIssues" &&
 		appStore.viewMode() !== "changeRequestLinkedIssues"
 	) {
 		return false;
@@ -103,48 +102,6 @@ export async function handleIssueListKeys(
 		return true;
 	}
 
-	// Referenced issues sub-view
-	if (appStore.viewMode() === "referencedIssues") {
-		const refIssues = issueStore.referencedIssues();
-		const selectedIdx = issueStore.selectedReferencedIssueIndex();
-
-		if (isDownKey(event)) {
-			issueStore.setSelectedReferencedIssueIndex(
-				Math.min(selectedIdx + 1, refIssues.length - 1),
-			);
-			return true;
-		}
-		if (isUpKey(event)) {
-			issueStore.setSelectedReferencedIssueIndex(Math.max(selectedIdx - 1, 0));
-			return true;
-		}
-		if (event.name === "g" && !event.ctrl) {
-			issueStore.setSelectedReferencedIssueIndex(0);
-			return true;
-		}
-		if (
-			(event.name === "G" || (event.name === "g" && event.shift)) &&
-			!event.ctrl
-		) {
-			issueStore.setSelectedReferencedIssueIndex(
-				Math.max(0, refIssues.length - 1),
-			);
-			return true;
-		}
-		if (event.name === "return" || event.name === "enter") {
-			const issue = refIssues[selectedIdx];
-			if (issue) {
-				void issueActions.showIssueDetail(issue);
-			}
-			return true;
-		}
-		if (event.name === "escape" || event.name === "q") {
-			issueActions.backToIssueDetailFromReferences();
-			return true;
-		}
-		return true;
-	}
-
 	// Issue list view mode
 	if (appStore.viewMode() === "issues") {
 		const issues = issueStore.issues();
@@ -180,6 +137,54 @@ export async function handleIssueListKeys(
 			}
 			return true;
 		}
+
+		if (issueStore.showIssueListFilterModal()) {
+			const params = issueStore.issueListFilterParameters();
+			const param = params[issueStore.issueListFilterParameterIndex()];
+			const values = param?.values ?? [];
+			if (event.name === "x") { issueStore.setIssueListFilters({ labels: [] }); issueStore.setSelectedIssueIndex(0); void issueActions.loadAllIssues(issueStore.issueScope(), 1, issueStore.issueSearchTerm() || undefined); return true; }
+			if (isLeftKey(event)) { issueStore.setIssueListFilterFocusedPane("parameter"); return true; }
+			if (isRightKey(event)) { issueStore.setIssueListFilterFocusedPane("value"); return true; }
+			if (isDownKey(event)) {
+				if (issueStore.issueListFilterFocusedPane() === "parameter") { issueStore.setIssueListFilterParameterIndex(Math.min(issueStore.issueListFilterParameterIndex() + 1, params.length - 1)); issueStore.setIssueListFilterValueIndex(0); }
+				else issueStore.setIssueListFilterValueIndex(Math.min(issueStore.issueListFilterValueIndex() + 1, values.length - 1));
+				return true;
+			}
+			if (isUpKey(event)) {
+				if (issueStore.issueListFilterFocusedPane() === "parameter") { issueStore.setIssueListFilterParameterIndex(Math.max(issueStore.issueListFilterParameterIndex() - 1, 0)); issueStore.setIssueListFilterValueIndex(0); }
+				else issueStore.setIssueListFilterValueIndex(Math.max(issueStore.issueListFilterValueIndex() - 1, 0));
+				return true;
+			}
+			if (event.name === "space" || event.sequence === " ") {
+				const value = values[issueStore.issueListFilterValueIndex()]?.value;
+				if (param && value) {
+					const filters = { ...issueStore.issueListFilters() };
+					const current = filters[param.key] ?? [];
+					filters[param.key] = current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+					issueStore.setIssueListFilters(filters);
+					issueStore.setSelectedIssueIndex(0);
+					void issueActions.loadAllIssues(issueStore.issueScope(), 1, issueStore.issueSearchTerm() || undefined);
+				}
+				return true;
+			}
+			if (event.name === "enter" || event.name === "return" || event.name === "escape" || event.name === "q") { issueStore.setShowIssueListFilterModal(false); return true; }
+			return true;
+		}
+
+		if (issueStore.showIssueListSortModal()) {
+			const rules = issueStore.issueListSortRules();
+			const idx = issueStore.issueListSortSelectedIndex();
+			const cycle = (d: "asc" | "desc" | "none") => d === "none" ? "asc" : d === "asc" ? "desc" : "none";
+			if (event.name === "x") { issueStore.setIssueListSortRules(rules.map((rule) => ({ ...rule, direction: "none" }))); void issueActions.loadAllIssues(issueStore.issueScope(), 1, issueStore.issueSearchTerm() || undefined); return true; }
+			if (isDownKey(event)) { issueStore.setIssueListSortSelectedIndex(Math.min(idx + 1, rules.length - 1)); return true; }
+			if (isUpKey(event)) { issueStore.setIssueListSortSelectedIndex(Math.max(idx - 1, 0)); return true; }
+			if (event.name === "space" || event.sequence === " ") { issueStore.setIssueListSortRules(rules.map((rule, i) => i === idx ? { ...rule, direction: cycle(rule.direction) } : rule)); void issueActions.loadAllIssues(issueStore.issueScope(), 1, issueStore.issueSearchTerm() || undefined); return true; }
+			if (event.name === "enter" || event.name === "return" || event.name === "escape" || event.name === "q") { issueStore.setShowIssueListSortModal(false); return true; }
+			return true;
+		}
+
+		if (event.name === "F" || (event.name === "f" && event.shift)) { issueStore.setShowIssueListFilterModal(true); return true; }
+		if (event.name === "O" || (event.name === "o" && event.shift)) { issueStore.setShowIssueListSortModal(true); return true; }
 
 		// Navigation
 		if (isDownKey(event)) {

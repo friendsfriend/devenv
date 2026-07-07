@@ -31,6 +31,7 @@ export async function handleChangedFilesKeys(
       changeRequestStore.setSelectedChangedFileIndex(0);
       return true;
     }
+    if (event.name === 'x') { changeRequestStore.setCurrentListFilters({}); changeRequestStore.setSelectedChangedFileIndex(0); return true; }
     if (isDownKey(event)) {
       if (changeRequestStore.listFilterFocusedPane() === 'parameter') {
         changeRequestStore.setListFilterParameterIndex(i => Math.min(params.length - 1, i + 1));
@@ -67,6 +68,7 @@ export async function handleChangedFilesKeys(
       changeRequestStore.setSelectedChangedFileIndex(0);
       return true;
     }
+    if (event.name === 'x') { changeRequestStore.setCurrentListSortRules(rules.map(rule => ({ ...rule, direction: 'none' }))); changeRequestStore.setSelectedChangedFileIndex(0); return true; }
     if (isDownKey(event)) { changeRequestStore.setListSortSelectedIndex(i => Math.min(rules.length - 1, i + 1)); return true; }
     if (isUpKey(event)) { changeRequestStore.setListSortSelectedIndex(i => Math.max(0, i - 1)); return true; }
     if (event.sequence === ' ') {

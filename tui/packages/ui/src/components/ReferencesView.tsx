@@ -7,6 +7,8 @@ import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { CenteredState } from "./CenteredState";
 import { WorkItemCard } from "./WorkItemCard";
 import { formatShortDate, getIssueStateColor } from "../statusUtils";
+import { highlightColor, HighlightedText } from "./Highlight";
+import { FilterStatusBar } from './FilterStatusBar';
 
 type RefItem =
 	| { type: "cr"; data: ChangeRequest }
@@ -14,10 +16,13 @@ type RefItem =
 
 interface ReferencesViewProps {
 	references: RefItem[];
+	allReferencesCount?: number;
 	selectedIndex: number;
 	loading: boolean;
 	error: string;
 	onClose: () => void;
+	activeFilters?: Record<string, string[]>;
+	sortRules?: Array<{ key: string; label: string; direction: "asc" | "desc" | "none" }>;
 	runningTextEnabled?: boolean;
 	runningTextOffset?: number;
 }
@@ -26,37 +31,61 @@ interface ReferencesViewProps {
  * ReferencesView Component — Full-screen sub-view of combined references (issues + CRs).
  */
 export function ReferencesView(props: ReferencesViewProps) {
-	// Layout header (2) + footer (3) + panel spacers/header (3).
-	const RESERVED_LINES = LAYOUT_CHROME_LINES + 3;
+	const hasFilterStatus = () => !!filterSummary() || !!sortSummary();
+	const reservedLines = () => LAYOUT_CHROME_LINES + 3 + (hasFilterStatus() ? 1 : 0);
 
 	const typeLabel = (ref: RefItem) => ref.type === "cr" ? "CR" : "Issue";
-	const typeColor = (ref: RefItem) => ref.type === "cr" ? uiColors.primary : uiColors.textSecondary;
+	const typeHighlight = (ref: RefItem) => ref.type === "cr" ? "highlight1" as const : "highlight2" as const;
+	const stateHighlight = (state: string) => {
+		if (state === "opened" || state === "open") return "positive" as const;
+		if (state === "merged") return "highlight1" as const;
+		if (state === "closed") return "secondary" as const;
+		return "warning" as const;
+	};
+	const filterSummary = () => {
+		const filters = props.activeFilters ?? {};
+		const parts = Object.entries(filters)
+			.filter(([, values]) => values.length > 0)
+			.map(([key, values]) => `${key}: ${values.join(",")}`);
+		return parts.length ? `filters ${parts.join(" • ")}` : "";
+	};
+	const sortSummary = () => {
+		const active = (props.sortRules ?? []).filter((rule) => rule.direction !== "none");
+		if (active.length === 0) return "";
+		return active.map((rule) => `${rule.label} ${rule.direction === "asc" ? "↑" : "↓"}`).join(" • ");
+	};
+	const countSummary = () => props.allReferencesCount !== undefined && props.allReferencesCount !== props.references.length
+		? `${props.references.length}/${props.allReferencesCount} loaded`
+		: `${props.references.length} loaded`;
 
 	return (
 		<ContentPanel>
 			<Show when={props.loading}>
-				<CenteredState message="Loading references..." color={uiColors.primary} />
+				<CenteredState message="Loading references..." color={highlightColor("highlight")} />
 			</Show>
 
 			<Show when={!props.loading && props.error}>
-				<CenteredState message={props.error} color={uiColors.error} />
+				<CenteredState message={props.error} color={highlightColor("negative")} />
 			</Show>
 
 			<Show when={!props.loading && !props.error}>
-				<box
-					backgroundColor={uiColors.bgSurface1}
-					style={{
-						width: "100%",
-						height: 1,
-						flexDirection: "row",
-						paddingLeft: 1,
-						paddingRight: 1,
-					}}
-				>
-					<text fg={uiColors.textPrimary}>References</text>
-					<box style={{ width: "auto", marginLeft: "auto" }}>
-						<text fg={uiColors.textMuted}>{`${props.references.length} loaded`}</text>
+				<box style={{ width: "100%", flexDirection: "column" }}>
+					<box
+						backgroundColor={uiColors.bgSurface1}
+						style={{
+							width: "100%",
+							height: 1,
+							flexDirection: "row",
+							paddingLeft: 1,
+							paddingRight: 1,
+						}}
+					>
+						<HighlightedText text="References" highlight="primary" />
+						<box style={{ width: "auto", marginLeft: "auto" }}>
+							<HighlightedText text={countSummary()} highlight="secondary" />
+						</box>
 					</box>
+					<FilterStatusBar filterSummary={filterSummary()} sortSummary={sortSummary()} />
 				</box>
 
 				<Show
@@ -65,17 +94,17 @@ export function ReferencesView(props: ReferencesViewProps) {
 						<ScrollableList<RefItem>
 							items={props.references}
 							selectedIndex={props.selectedIndex}
-							reservedLines={RESERVED_LINES}
+							reservedLines={reservedLines()}
 							estimatedItemHeight={2}
 							showScrollIndicator={false}
 							renderItem={(ref, isSelected, index) => (
 								<WorkItemCard
 									marker={`${ref.type === "cr" ? "!" : "#"}${ref.data.iid}`}
-									prefix={`[${typeLabel(ref)}] `}
-									prefixColor={typeColor(ref)}
+									prefixBadge={{ text: typeLabel(ref), highlight: typeHighlight(ref) }}
 									title={ref.data.title}
 									statusText={ref.data.state}
 									statusColor={getIssueStateColor(ref.data.state)}
+									statusBadgeHighlight={stateHighlight(ref.data.state)}
 									metadata={`@${ref.data.author.name} • updated ${formatShortDate(ref.data.updated_at)}`}
 									selected={isSelected()}
 									index={index}
@@ -86,7 +115,7 @@ export function ReferencesView(props: ReferencesViewProps) {
 						/>
 					}
 				>
-					<CenteredState message="No references" />
+					<CenteredState message="No references" color={highlightColor("secondary")} />
 				</Show>
 			</Show>
 		</ContentPanel>

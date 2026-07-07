@@ -106,7 +106,7 @@ export function createCrActions(
 		const app = getSelectedApp();
 		if (!app) return;
 		const p = page ?? changeRequestStore.currentPage();
-		const s = state ?? changeRequestStore.crState();
+		const s = state ?? changeRequestStore.crListFilters().state?.[0] ?? changeRequestStore.crState();
 		changeRequestStore.setCrState(s);
 		changeRequestStore.setCrLoading(true);
 		changeRequestStore.setCrError("");
@@ -121,6 +121,8 @@ export function createCrActions(
 				p,
 				changeRequestStore.perPage(),
 				search,
+				changeRequestStore.activeCrListSort()?.key,
+				changeRequestStore.activeCrListSort()?.direction as "asc" | "desc" | undefined,
 			);
 			changeRequestStore.setChangeRequests(result.items);
 			changeRequestStore.setTotalPages(result.totalPages);

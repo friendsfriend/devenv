@@ -27,8 +27,6 @@ export type ViewMode =
 	| "issueDetail"
 	| "issueTimeline"
 	| "issueScopePicker"
-	| "linkedChangeRequests"
-	| "referencedIssues"
 	| "changeRequestLinkedIssues"
 	| "references";
 

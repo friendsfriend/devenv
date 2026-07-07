@@ -61,6 +61,9 @@ export function createIssueActions(
 				issueStore.perPage(),
 				search,
 				s,
+				issueStore.activeIssueListSort()?.key,
+				issueStore.activeIssueListSort()?.direction as "asc" | "desc" | undefined,
+				issueStore.issueListFilters().labels,
 			);
 			issueStore.setIssues(result.items);
 			// Derive totalPages from totalCount/perPage when server doesn't provide it.
@@ -266,7 +269,7 @@ export function createIssueActions(
 			issueStore.setIssueSubmitting(false);
 			issueStore.setShowLabelPicker(false);
 			issueStore.setSelectedIssue(issue);
-			void loadAllIssues(issueStore.issueScope());
+			issueStore.setIssues(issueStore.issues().map((item) => item.iid === issue.iid ? issue : item));
 		} catch (e) {
 			issueStore.setIssueSubmitError(errMsg(e));
 			issueStore.setIssueSubmitting(false);
@@ -399,6 +402,7 @@ export function createIssueActions(
 	const openLabelPicker = () => {
 		issueStore.setIssueSubmitError("");
 		issueStore.setLabelPickerIndex(0);
+		issueStore.setLabelPickerSelectedLabels(issueStore.selectedIssue()?.labels ?? []);
 		void fetchRepoLabels();
 		issueStore.setShowLabelPicker(true);
 	};
@@ -435,7 +439,9 @@ export function createIssueActions(
 	};
 
 	const showLinkedCRsSubView = () => {
-		appStore.setViewMode("linkedChangeRequests");
+		issueStore.setReferenceFilters({ type: ["cr"], state: [] });
+		issueStore.setSelectedReferenceIndex(0);
+		appStore.setViewMode("references");
 	};
 
 	const backToIssueDetailFromLinkedCRs = () => {
@@ -444,10 +450,14 @@ export function createIssueActions(
 	};
 
 	const showReferencedIssuesSubView = () => {
-		appStore.setViewMode("referencedIssues");
+		issueStore.setReferenceFilters({ type: ["issue"], state: [] });
+		issueStore.setSelectedReferenceIndex(0);
+		appStore.setViewMode("references");
 	};
 
 	const showReferencesSubView = () => {
+		issueStore.setReferenceFilters({ type: [], state: [] });
+		issueStore.setSelectedReferenceIndex(0);
 		appStore.setViewMode("references");
 	};
 

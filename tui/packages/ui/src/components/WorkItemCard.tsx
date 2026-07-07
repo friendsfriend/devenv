@@ -1,9 +1,10 @@
 /** @jsxImportSource @opentui/solid */
-import { Show, createMemo, type JSXElement } from 'solid-js';
+import { For, Show, createMemo, type JSXElement } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { Badge } from './Badge';
+import type { Highlight } from './Highlight';
 import { RunningText } from './RunningText';
 
 export interface WorkItemCardProps {
@@ -12,11 +13,20 @@ export interface WorkItemCardProps {
   statusText: string;
   statusColor?: string;
   statusBadgeHighlight?: string;
+  /** Replaces statusText/statusBadgeHighlight rendering when multiple status badges are needed. */
+  statusBadges?: Array<{ text: string | number; highlight?: Highlight }>;
   metadata: string | JSXElement;
+  /** Badge content shown on the right side of the metadata line. Prefer this over JSX for stable sizing. */
+  metadataBadges?: Array<{ text: string | number; highlight?: Highlight }>;
+  /** Content shown on the right side of the metadata line, after the spacer. */
+  metadataRight?: string | JSXElement;
+  /** Rendered character width of metadataRight when it is JSX. Required for stable row alignment. */
+  metadataRightWidth?: number;
   selected: boolean;
   index: number;
   prefix?: string;
   prefixColor?: string;
+  prefixBadge?: { text: string | number; highlight?: Highlight };
   statusSuffixText?: string;
   statusSuffixColor?: string;
   rightMetadata?: string;
@@ -31,7 +41,7 @@ const MIN_TITLE_WIDTH = 12;
 export function WorkItemCard(props: WorkItemCardProps) {
   const dimensions = useTerminalDimensions();
   const contentWidth = () => Math.max(1, dimensions().width - 4);
-  const fixedPrefix = () => props.marker.length + 1 + (props.prefix?.length ?? 0);
+  const fixedPrefix = () => props.marker.length + 1 + (props.prefixBadge ? String(props.prefixBadge.text).length + 3 : (props.prefix?.length ?? 0));
 
   /** Row-internal content width — subtracts 1 for ScrollableList scrollbar. */
   const rowWidth = () => Math.max(1, contentWidth() - 1);
@@ -61,9 +71,25 @@ export function WorkItemCard(props: WorkItemCardProps) {
     };
   });
 
+  const statusBadgesWidth = () => {
+    const badges = props.statusBadges ?? [];
+    if (badges.length === 0) return 0;
+    return badges.reduce((sum, badge) => sum + String(badge.text).length + 2, 0) + Math.max(0, badges.length - 1);
+  };
+
+  const statusRightWidth = () => {
+    const badgesWidth = statusBadgesWidth();
+    if (badgesWidth > 0) return badgesWidth;
+    const status = statusDisplay();
+    const textWidth = props.statusBadgeHighlight && status.text ? status.text.length + 2 : status.text.length;
+    const suffixWidth = status.suffix.length;
+    const gap = textWidth > 0 && suffixWidth > 0 ? 1 : 0;
+    return textWidth + suffixWidth + gap;
+  };
+
   /** Title width available after reserving space for prefix + status. */
   const titleWidth = () =>
-    Math.max(MIN_TITLE_WIDTH, rowWidth() - fixedPrefix() - statusDisplay().consumed - 1);
+    Math.max(MIN_TITLE_WIDTH, rowWidth() - fixedPrefix() - statusRightWidth() - 1);
 
   const rightMetadataDisplay = createMemo(() => {
     const text = props.rightMetadata ?? '';
@@ -73,11 +99,23 @@ export function WorkItemCard(props: WorkItemCardProps) {
     return text.slice(0, Math.max(1, max - 1)) + '…';
   });
 
-  const metadataWidth = () => {
-    const right = rightMetadataDisplay();
-    const gap = right ? 1 : 0;
-    return Math.max(1, rowWidth() - right.length - gap);
+  const metadataBadgesWidth = () => {
+    const badges = props.metadataBadges ?? [];
+    if (badges.length === 0) return 0;
+    return badges.reduce((sum, badge) => sum + String(badge.text).length + 2, 0) + Math.max(0, badges.length - 1);
   };
+
+  const metadataRightWidth = () => {
+    const parts = [
+      metadataBadgesWidth(),
+      props.metadataRightWidth ?? 0,
+      rightMetadataDisplay().length,
+    ].filter((width) => width > 0);
+    return parts.reduce((sum, width) => sum + width, 0) + Math.max(0, parts.length - 1);
+  };
+
+  const metadataWidth = () =>
+    Math.max(1, rowWidth() - metadataRightWidth() - 1);
 
   const bgColor = () => props.selected ? uiColors.bgSurface0 : uiColors.bgMantle;
 
@@ -103,56 +141,85 @@ export function WorkItemCard(props: WorkItemCardProps) {
           flexDirection: 'column',
           paddingLeft: 1,
           paddingRight: 1,
-          overflow: 'hidden',
         }}
       >
-        {/* Line 1: [marker][prefix][title][spacer][status][suffix] */}
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', overflow: 'hidden' }}>
-          <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>{props.marker} </text>
-          <text fg={props.prefixColor ?? uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-            {props.prefix ?? ''}
-          </text>
-          <RunningText
-            text={props.title}
-            width={titleWidth()}
-            fg={uiColors.textPrimary}
-            attributes={TextAttributes.BOLD}
-            enabled={props.runningTextEnabled}
-            active={props.selected}
-            offset={props.runningTextOffset}
-          />
-          <box style={{ flexGrow: 1, flexShrink: 1 }} />
-          <Show when={props.statusBadgeHighlight} fallback={
-            <text fg={props.statusColor} attributes={TextAttributes.BOLD}>
-              {statusDisplay().text}
-            </text>
-          }>
-            <Badge text={statusDisplay().text} highlight={props.statusBadgeHighlight as any} />
-          </Show>
-          <text fg={props.statusSuffixColor ?? props.statusColor} attributes={TextAttributes.BOLD}>
-            {statusDisplay().suffix}
-          </text>
-        </box>
-
-        {/* ── Line 2 ────────────────────────────────────────────── */}
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', overflow: 'hidden' }}>
-          <Show
-            when={typeof props.metadata === 'string'}
-            fallback={<box style={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>{props.metadata}</box>}
-          >
+        {/* Line 1: [marker][prefix][title] [status badge] */}
+        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row' }}>
+          <box style={{ flexDirection: 'row', overflow: 'hidden', flexShrink: 1, minWidth: 0 }}>
+            <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>{props.marker} </text>
+            <Show when={props.prefixBadge} fallback={
+              <text fg={props.prefixColor ?? uiColors.textPrimary} attributes={TextAttributes.BOLD}>
+                {props.prefix ?? ''}
+              </text>
+            }>
+              {(badge) => <><Badge text={badge().text} highlight={badge().highlight} /><text> </text></>}
+            </Show>
             <RunningText
-              text={props.metadata as string}
-              width={metadataWidth()}
-              fg={uiColors.textMuted}
+              text={props.title}
+              width={titleWidth()}
+              fg={uiColors.textPrimary}
+              attributes={TextAttributes.BOLD}
               enabled={props.runningTextEnabled}
               active={props.selected}
               offset={props.runningTextOffset}
             />
+          </box>
+          <Show when={(props.statusBadges && props.statusBadges.length > 0) || (props.statusBadgeHighlight || statusDisplay().text) || statusDisplay().suffix}>
+            <box style={{ flexDirection: 'row', gap: 1, flexShrink: 0, marginLeft: 'auto' }}>
+              <Show when={props.statusBadges && props.statusBadges.length > 0} fallback={
+                <>
+                  <Show when={props.statusBadgeHighlight} fallback={
+                    <text fg={props.statusColor} attributes={TextAttributes.BOLD}>
+                      {statusDisplay().text}
+                    </text>
+                  }>
+                    <Badge text={statusDisplay().text} highlight={props.statusBadgeHighlight as any} />
+                  </Show>
+                  <Show when={statusDisplay().suffix}>
+                    <text fg={props.statusSuffixColor ?? props.statusColor} attributes={TextAttributes.BOLD}>
+                      {statusDisplay().suffix}
+                    </text>
+                  </Show>
+                </>
+              }>
+                <For each={props.statusBadges ?? []}>
+                  {(badge) => <Badge text={badge.text} highlight={badge.highlight} />}
+                </For>
+              </Show>
+            </box>
           </Show>
-          <box style={{ flexGrow: 1, flexShrink: 1 }} />
-          <text fg={props.rightMetadataColor ?? uiColors.textMuted}>
-            {rightMetadataDisplay()}
-          </text>
+        </box>
+
+        {/* Line 2: metadata [label badges] */}
+        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row' }}>
+          <box style={{ overflow: 'hidden', flexShrink: 1, minWidth: 0 }}>
+            <Show
+              when={typeof props.metadata === 'string'}
+              fallback={<box style={{ overflow: 'hidden' }}>{props.metadata}</box>}
+            >
+              <RunningText
+                text={props.metadata as string}
+                width={metadataWidth()}
+                fg={uiColors.textMuted}
+                enabled={props.runningTextEnabled}
+                active={props.selected}
+                offset={props.runningTextOffset}
+              />
+            </Show>
+          </box>
+          <box style={{ flexDirection: 'row', gap: 1, flexShrink: 0, marginLeft: 'auto' }}>
+            <For each={props.metadataBadges ?? []}>
+              {(badge) => <Badge text={badge.text} highlight={badge.highlight} />}
+            </For>
+            <Show when={props.metadataRight}>
+              {props.metadataRight}
+            </Show>
+            <Show when={typeof props.rightMetadata === 'string' && props.rightMetadata}>
+              <text fg={props.rightMetadataColor ?? uiColors.textMuted}>
+                {rightMetadataDisplay()}
+              </text>
+            </Show>
+          </box>
         </box>
       </box>
     </box>

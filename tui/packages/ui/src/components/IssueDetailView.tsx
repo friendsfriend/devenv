@@ -12,6 +12,7 @@ import { ScrollableContent } from './ScrollableContent';
 import { RunningText } from './RunningText';
 import { DetailSection } from './DetailSection';
 import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
+import { highlightForIndex } from './Highlight';
 
 type RefItem =
 	| { type: "cr"; data: ChangeRequest }
@@ -70,7 +71,10 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 		if ((issue().labels ?? []).length > 0) {
 			rows.push({
 				label: "Labels",
-				value: propertyBadges((issue().labels ?? []).map((label) => ({ label, highlight: "highlight" }))),
+				value: propertyBadges((issue().labels ?? []).map((label, index) => ({
+					label,
+					highlight: highlightForIndex(index),
+				}))),
 			});
 		}
 

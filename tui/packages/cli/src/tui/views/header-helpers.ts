@@ -147,8 +147,6 @@ export function getHeaderInfo(deps: HeaderSubtitleDeps): HeaderInfo {
 		const app = appDetailStore.appDetailApp();
 		return { title: "Repository detail", context: headerText(`${app?.displayName ?? "Unknown"}${app?.branch ? ` · ${app.branch}` : ""}`), detail: `CRs: ${appDetailStore.appDetailChangeRequests().length} · logs: ${appDetailStore.appDetailLogs().length}`, details: appDetails(app) };
 	}
-	if (view === "linkedChangeRequests") return { title: "Linked CRs", context: `${issueStore.linkedChangeRequests().length} items`, detail: headerText(issueStore.selectedIssue()?.title) };
-	if (view === "referencedIssues") return { title: "Referenced issues", context: `${issueStore.referencedIssues().length} items`, detail: headerText(issueStore.selectedIssue()?.title) };
 	if (view === "changeRequestLinkedIssues") return { title: "CR linked issues", context: `${changeRequestStore.changeRequestLinkedIssues().length} items`, detail: headerText(changeRequestStore.selectedChangeRequest()?.title) };
 	if (view === "references") return { title: "References", context: `${issueStore.references().length} items`, detail: headerText(issueStore.selectedIssue()?.title) };
 	if (view === "agentView") return { title: "Pi sessions", context: "sessions", detail: "launch or resume pi" };

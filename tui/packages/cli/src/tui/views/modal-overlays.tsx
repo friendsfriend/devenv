@@ -164,6 +164,40 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				})()}
 			</Show>
 
+			<Show when={issueStore.showIssueListFilterModal()}>
+				<FilterModal
+					parameters={issueStore.issueListFilterParameters()}
+					selectedParameterIndex={issueStore.issueListFilterParameterIndex()}
+					selectedValueIndex={issueStore.issueListFilterValueIndex()}
+					focusedPane={issueStore.issueListFilterFocusedPane()}
+					activeFilters={issueStore.issueListFilters()}
+				/>
+			</Show>
+
+			<Show when={issueStore.showIssueListSortModal()}>
+				<SortModal
+					parameters={issueStore.issueListSortRules()}
+					selectedIndex={issueStore.issueListSortSelectedIndex()}
+				/>
+			</Show>
+
+			<Show when={changeRequestStore.showCrListFilterModal()}>
+				<FilterModal
+					parameters={changeRequestStore.crListFilterParameters()}
+					selectedParameterIndex={changeRequestStore.crListFilterParameterIndex()}
+					selectedValueIndex={changeRequestStore.crListFilterValueIndex()}
+					focusedPane={changeRequestStore.crListFilterFocusedPane()}
+					activeFilters={changeRequestStore.crListFilters()}
+				/>
+			</Show>
+
+			<Show when={changeRequestStore.showCrListSortModal()}>
+				<SortModal
+					parameters={changeRequestStore.crListSortRules()}
+					selectedIndex={changeRequestStore.crListSortSelectedIndex()}
+				/>
+			</Show>
+
 			<Show when={changeRequestStore.showListFilterModal()}>
 				<FilterModal
 					parameters={changeRequestStore.listFilterParameters()}
@@ -178,6 +212,23 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				<SortModal
 					parameters={changeRequestStore.currentListSortRules()}
 					selectedIndex={changeRequestStore.listSortSelectedIndex()}
+				/>
+			</Show>
+
+			<Show when={issueStore.showReferenceFilterModal()}>
+				<FilterModal
+					parameters={issueStore.referenceFilterParameters()}
+					selectedParameterIndex={issueStore.referenceFilterParameterIndex()}
+					selectedValueIndex={issueStore.referenceFilterValueIndex()}
+					focusedPane={issueStore.referenceFilterFocusedPane()}
+					activeFilters={issueStore.referenceFilters()}
+				/>
+			</Show>
+
+			<Show when={issueStore.showReferenceSortModal()}>
+				<SortModal
+					parameters={issueStore.referenceSortRules()}
+					selectedIndex={issueStore.referenceSortSelectedIndex()}
 				/>
 			</Show>
 
@@ -218,12 +269,22 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 			<Show when={issueStore.showLabelPicker()}>
 				<LabelPickerModal
 					labels={issueStore.availableLabels()}
-					selectedLabels={issueStore.selectedIssue()?.labels ?? []}
+					selectedLabels={issueStore.labelPickerSelectedLabels()}
 					selectedIndex={issueStore.labelPickerIndex()}
 					loading={issueStore.issueLoading()}
 					onSelect={(idx) => issueStore.setLabelPickerIndex(idx)}
-					onToggle={() => {}}
-					onConfirm={() => issueStore.setShowLabelPicker(false)}
+					onToggle={(label) => {
+						const selected = issueStore.labelPickerSelectedLabels();
+						issueStore.setLabelPickerSelectedLabels(
+							selected.includes(label)
+								? selected.filter((item) => item !== label)
+								: [...selected, label],
+						);
+					}}
+					onConfirm={() => {
+						const issue = issueStore.selectedIssue();
+						if (issue) props.actions.issueActions.setIssueLabels(issue.iid, issueStore.labelPickerSelectedLabels());
+					}}
 					onCancel={() => issueStore.setShowLabelPicker(false)}
 				/>
 			</Show>
