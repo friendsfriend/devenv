@@ -42,7 +42,11 @@ export async function createShellActionScript(
   return (await response.json()) as ShellActionScriptResponse;
 }
 
-export async function startApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string): Promise<void> {
+export interface StartAppResponse {
+  missingEnvVars?: string[];
+}
+
+export async function startApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string): Promise<StartAppResponse> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -60,6 +64,9 @@ export async function startApp(deps: ClientDeps, appIdent: string, profile: stri
     if (!response.ok) {
       await handleFetchError(response, deps.onError);
     }
+
+    const data = await response.json();
+    return { missingEnvVars: data.missingEnvVars };
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {

@@ -14,6 +14,7 @@
 * When using server-side paging, filtering, sorting, and searching must also happen server-side before pagination; never page first and filter/search/sort client-side afterward
 * For scrollbox content that should wrap (especially markdown/code renderers), set the rendered content width to the usable viewport width, leaving room for modal padding and the scrollbar; do not fix overlap by adding generic scrollbar padding/gaps
 * OpenTUI `<scrollbox>` manages own scrollbar — shows when content overflows vertically. This is expected behavior. Do NOT set `flexDirection` on scrollbox style; it conflicts with internal layout and causes the scrollbar to render outside the panel.
+* OpenTUI `<text>` only accepts strings, TextNodeRenderable, or StyledText as children. Do NOT nest `<text>` inside `<text>` — use template literals or string concatenation instead.
 * When working with OpenTUI components, layouts, keymaps, plugins, or bindings, load the project-local `opentui` skill first (`.pi/skills/opentui/SKILL.md`) and follow its referenced docs.
 * When creating or modifying reusable custom OpenTUI components, update the project-local `opentui` skill references when reusable guidance changes.
 * For TUI performance investigations, generate a disposable large fixture with `bun run perf:fixture -- --apps <count> --scripts <count>` (defaults write to `/tmp/devenv-perf-config` and `/tmp/devenv-perf-home`), then run with `DEVENV_CONFIG_DIR=<config> DEVENV_HOME=<home> OTUI_SHOW_STATS=true bun run dev -p <port>` and use the OpenTUI debug overlay stats.

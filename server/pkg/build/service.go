@@ -51,6 +51,7 @@ type resourceManager interface {
 	DiscoverProfiles(appIdent, localDir string) ([]string, error)
 	DiscoverActionTargets(appIdent, localDir string, action resources.AppAction) ([]resources.ActionTarget, error)
 	EnvFilePath() (string, bool)
+	ComposeMissingEnvVars(appIdent, localDir string, profile string) []string
 	CopyTemplatesDir(destDir string) ([]string, error)
 	CopyFile(src, dst string) error
 }
@@ -81,6 +82,7 @@ type Service interface {
 	SetOnComplete(callback func(appIdent string))
 	ConfigureRunDependencies(apps appRegistry, infra infraStarter)
 	ConfigureStateStore(store runTargetStateStore)
+	ComposeMissingEnvVars(appIdent, localDir, profile string) []string
 }
 
 type service struct {
@@ -143,6 +145,12 @@ type RunTargetInfo struct {
 
 func (s *service) SetOnComplete(callback func(appIdent string)) {
 	s.OnComplete = callback
+}
+
+// ComposeMissingEnvVars returns env variable names referenced in the app's
+// compose file that are not defined in the .env file.
+func (s *service) ComposeMissingEnvVars(appIdent, localDir, profile string) []string {
+	return s.resourceMgr.ComposeMissingEnvVars(appIdent, localDir, profile)
 }
 
 func (s *service) LastRunRuntime(appIdent string) string {
@@ -996,6 +1004,11 @@ func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, logP
 
 	if envFilePath, ok := s.resourceMgr.EnvFilePath(); ok {
 		composeArgs = append(composeArgs, "--env-file", envFilePath)
+	}
+
+	// Check for missing env vars and report before starting.
+	if missing := s.resourceMgr.ComposeMissingEnvVars(a.Ident, a.LocalDirectoryPath, target.Profile); len(missing) > 0 {
+		statusCb(fmt.Sprintf("Missing env vars: %s", strings.Join(missing, ", ")))
 	}
 
 	composeArgs = append(composeArgs, "up", "-d")

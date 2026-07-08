@@ -1,5 +1,8 @@
 import { createSignal } from 'solid-js';
-import type { App, ContainerStats, ChangeRequest } from '@devenv/types';
+import type { ScrollBoxRenderable } from '@opentui/core';
+
+export const APP_DETAIL_PANEL_COUNT = 4;
+import type { ActionTarget, App, ContainerStats, ChangeRequest } from '@devenv/types';
 import type { AppDetailKind } from '@devenv/ui';
 
 export function createAppDetailStore() {
@@ -13,6 +16,15 @@ export function createAppDetailStore() {
   const [appDetailLatestStats, setAppDetailLatestStats] = createSignal<ContainerStats | undefined>(undefined);
   const [appDetailLoading, setAppDetailLoading] = createSignal(false);
   const [appDetailKind, setAppDetailKind] = createSignal<AppDetailKind>('app');
+  const [actionTargets, setActionTargets] = createSignal<ActionTarget[]>([]);
+  const [actionTargetsLoading, setActionTargetsLoading] = createSignal(false);
+  const [dependencyTreeFocused, setDependencyTreeFocused] = createSignal(false);
+  const [dependencyTreeSelectedIndex, setDependencyTreeSelectedIndex] = createSignal(0);
+  const [dependencyTreeNodes, setDependencyTreeNodes] = createSignal<any[]>([]);
+
+  // Panel focus navigation
+  const [appDetailPanelIndex, setAppDetailPanelIndex] = createSignal(0);
+  const appDetailScrollBoxRefs: (ScrollBoxRenderable | undefined)[] = [];
 
   return {
     appDetailApp,
@@ -35,6 +47,24 @@ export function createAppDetailStore() {
     setAppDetailLoading,
     appDetailKind,
     setAppDetailKind,
+    actionTargets,
+    setActionTargets,
+    actionTargetsLoading,
+    setActionTargetsLoading,
+    dependencyTreeFocused,
+    setDependencyTreeFocused,
+    dependencyTreeSelectedIndex,
+    setDependencyTreeSelectedIndex,
+    dependencyTreeNodes,
+    setDependencyTreeNodes,
+
+    // Panel focus navigation
+    appDetailPanelIndex,
+    setAppDetailPanelIndex,
+    appDetailPanelCount: APP_DETAIL_PANEL_COUNT,
+    get appDetailScrollBoxRefs() {
+      return appDetailScrollBoxRefs;
+    },
   };
 }
 

@@ -1,10 +1,20 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus, StatusLogEntry } from '@devenv/types';
+import type { ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus, StatusLogEntry } from '@devenv/types';
+import { buildDependencyTree } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
 import type { AppDetailStore } from '../stores/app-detail-store';
 import type { UiStore } from '../stores/ui-store';
 import { exitApp } from '../exit';
+
+function normalizeNodeStatus(raw: string | undefined): 'running' | 'stopped' | 'failed' | 'unknown' {
+	if (!raw) return 'unknown';
+	const lower = raw.toLowerCase();
+	if (lower.includes('running') || lower.includes('healthy') || lower === 'up') return 'running';
+	if (lower.includes('stopped') || lower.includes('exited') || lower === 'down') return 'stopped';
+	if (lower.includes('failed') || lower.includes('dead') || lower.includes('error')) return 'failed';
+	return 'unknown';
+}
 
 let appDetailAbortController: AbortController | null = null;
 
@@ -172,6 +182,7 @@ export function createAppActions(
             Operation: operation,
             Status: status,
             Message: message,
+            source: 'app',
           };
           appStore.setStatusLogEntries((prev) => [...prev, entry].slice(-50));
         }
@@ -302,6 +313,11 @@ export function createAppActions(
     appDetailStore.setAppDetailStatsHistory([]);
     appDetailStore.setAppDetailMemHistory([]);
     appDetailStore.setAppDetailLatestStats(undefined);
+    appDetailStore.setActionTargets([]);
+    appDetailStore.setActionTargetsLoading(false);
+    appDetailStore.setDependencyTreeFocused(false);
+    appDetailStore.setDependencyTreeSelectedIndex(0);
+    appDetailStore.setAppDetailPanelIndex(0);
     appStore.setViewMode('appDetail');
 
     if (kind !== 'infra') {
@@ -323,6 +339,38 @@ export function createAppActions(
         }
       }
       appDetailStore.setAppDetailCRsLoading(false);
+    }
+
+    // Fetch action targets for dependency tree
+    if (kind !== 'infra' && kind !== 'library') {
+      appDetailStore.setActionTargetsLoading(true);
+      try {
+        let targets = await client.getActionTargets(app.ident, 'run');
+        // Filter to only the active run target's dependencies
+        const runInfo = (app as any).runTargetInfo;
+        if (runInfo) {
+          const activeTarget = targets.find((t) =>
+            (runInfo.targetId && t.id === runInfo.targetId) ||
+            (runInfo.profile && t.profile === runInfo.profile) ||
+            (!runInfo.profile && !t.profile),
+          );
+          targets = activeTarget ? [activeTarget] : targets;
+        }
+        appDetailStore.setActionTargets(targets);
+        // Build initial dependency tree
+        const allApps = appStore.apps();
+        const allInfra = appStore.infraServices();
+        const appStatusMap = new Map(allApps.map((a) => [a.ident, a.status || a.dockerInfo?.Status || 'unknown']));
+        const infraStatusMap = new Map(allInfra.map((s) => [s.ident, s.status || s.dockerInfo?.Status || 'unknown']));
+        appDetailStore.setDependencyTreeNodes(buildDependencyTree(targets, appStatusMap, infraStatusMap));
+        // Keep dependency tree selection ready, but do not steal initial panel focus.
+        if (targets.length > 0) {
+          appDetailStore.setDependencyTreeSelectedIndex(0);
+        }
+      } catch {
+        appDetailStore.setActionTargets([]);
+      }
+      appDetailStore.setActionTargetsLoading(false);
     }
 
     appDetailStore.setAppDetailLoading(false);
@@ -430,6 +478,55 @@ export function createAppActions(
     }
   };
 
+  const expandDependencyNode = async (nodeKey: string) => {
+    const nodes = appDetailStore.dependencyTreeNodes();
+    console.error(`[EXPAND] key=${nodeKey}, nodes=${nodes.length}, keys=[${nodes.map((n: any) => n.key).join(',')}]`);
+    const found = nodes.find((n: any) => n.key === nodeKey);
+    console.error(`[EXPAND] found=${!!found}, kind=${found?.kind}, deduped=${found?.deduped}, expanded=${found?.expanded}, childrenLoaded=${found?.childrenLoaded}`);
+    if (!found || found.kind !== 'app' || found.deduped) return;
+
+    if (found.expanded) {
+      found.expanded = false;
+      found.children = [];
+      found.childrenLoaded = false;
+      appDetailStore.setDependencyTreeNodes([...nodes]);
+      return;
+    }
+
+    if (found.childrenLoaded) return;
+
+    found.loading = true;
+    appDetailStore.setDependencyTreeNodes([...nodes]);
+
+    const allApps = appStore.apps();
+    const allInfra = appStore.infraServices();
+    const appStatusMap = new Map(allApps.map((a) => [a.ident, a.status || a.dockerInfo?.Status || 'unknown']));
+    const infraStatusMap = new Map(allInfra.map((s) => [s.ident, s.status || s.dockerInfo?.Status || 'unknown']));
+
+    try {
+      const childTargets = await client.getActionTargets(found.name, 'run');
+      const requires = childTargets.flatMap((t) => t.requires ?? []);
+      const children: any[] = [];
+      for (const ref of requires) {
+        if (ref.app) {
+          const key = `app:${ref.app}`;
+          children.push({ key, name: ref.app, kind: 'app', runtime: ref.runtime, profile: ref.profile, status: normalizeNodeStatus(appStatusMap.get(ref.app)), expanded: false, childrenLoaded: false, loading: false, children: [], depth: found.depth + 1, deduped: false, cycled: false });
+        } else if (ref.infra) {
+          const key = `infra:${ref.infra}`;
+          children.push({ key, name: ref.infra, kind: 'infra', status: normalizeNodeStatus(infraStatusMap.get(ref.infra)), expanded: false, childrenLoaded: false, loading: false, children: [], depth: found.depth + 1, deduped: false, cycled: false });
+        }
+      }
+      found.expanded = true;
+      found.childrenLoaded = true;
+      found.loading = false;
+      found.children = children;
+    } catch {
+      found.loading = false;
+      found.childrenLoaded = true;
+    }
+    appDetailStore.setDependencyTreeNodes([...nodes]);
+  };
+
   return {
     fetchStatus,
     subscribeToUpdates,
@@ -447,6 +544,7 @@ export function createAppActions(
     requestRemoveApp,
     performRemoveApp,
     createExampleConfig,
+    expandDependencyNode,
   };
 }
 

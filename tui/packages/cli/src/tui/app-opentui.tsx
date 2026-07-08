@@ -136,6 +136,7 @@ function TUIApp(props: TUIAppProps) {
 		providerStore,
 		client,
 		showError,
+		uiStore,
 	);
 	const agentActions = createAgentActions(appStore, agentStore, client);
 	const utilActions = createUtilActions(
@@ -418,11 +419,6 @@ export async function startTUI(serverUrl: string) {
 			useKittyKeyboard: {},
 			...(useConsole ? {
 				consoleOptions: {
-					keyBindings: [
-						// Kitty protocol may send uppercase 'C' for Ctrl+Shift+C
-						{ name: "c", ctrl: true, shift: true, action: "copy-selection" },
-						{ name: "C", ctrl: true, shift: true, action: "copy-selection" },
-					],
 					onCopySelection: (text: string) => {
 						import("@devenv/core")
 							.then(({ copyToClipboard }) => copyToClipboard(text))

@@ -8,6 +8,7 @@ export interface Provider {
 	type: ProviderType | '';
 	username: string;
 	has_token: boolean;
+	missing_vars?: string[];
 	invalid?: boolean;
 	reason?: string;
 	message?: string;
@@ -257,6 +258,7 @@ export interface AppStatus {
 	operationStatus?: OperationStatus; // NEW: Current operation status
 	runTargetInfo?: AppRunTargetInfo | null;
 	status?: "running" | "stopped" | "failed" | string;
+	missingEnvVars?: string[];
 }
 
 // Operation status for showing in-progress operations
@@ -681,6 +683,7 @@ export interface StatusLogEntry {
 	Operation: string; // pull, push, fetch, build, start, stop
 	Status: string; // pending, in progress, active, completed, failed
 	Message: string;
+	source?: "app" | "task" | "infra";
 }
 
 // Agent space types

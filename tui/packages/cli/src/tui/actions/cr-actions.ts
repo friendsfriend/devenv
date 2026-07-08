@@ -201,6 +201,7 @@ export function createCrActions(
 		changeRequestStore.setCrJobsForDetailError("");
 		changeRequestStore.setCrDiscussions([]);
 		changeRequestStore.setCrDiscussionsError("");
+		changeRequestStore.setCrDetailPanelIndex(0);
 		appStore.setViewMode("changeRequestDetail");
 		void loadCRDetailData(cr);
 	};

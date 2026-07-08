@@ -47,6 +47,7 @@ import {
 	deleteKubernetesCluster,
 	exportKubernetesKubeconfig,
 	getKubernetesClusterStatus,
+	StartAppResponse,
 	getKubernetesLogs,
 	recreateKubernetesCluster,
 	refreshKubernetesCluster,
@@ -641,7 +642,7 @@ export class DevEnvClient {
 	deleteProvider(name: string): Promise<void> {
 		return deleteProvider(this.deps, name);
 	}
-	startApp(appIdent: string, profile: string = "", targetId?: string): Promise<void> {
+	startApp(appIdent: string, profile: string = "", targetId?: string): Promise<StartAppResponse> {
 		return startApp(this.deps, appIdent, profile, targetId);
 	}
 	createShellActionScript(

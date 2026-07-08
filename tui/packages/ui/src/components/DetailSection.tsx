@@ -2,6 +2,7 @@
 import { TextAttributes } from '@opentui/core';
 import { type JSX } from 'solid-js';
 import { uiColors } from '../colors';
+import { SearchHeader } from './SearchHeader';
 
 export interface DetailSectionProps {
   title?: string;
@@ -9,6 +10,7 @@ export interface DetailSectionProps {
   children: JSX.Element;
   borderColor?: string;
   titleColor?: string;
+  active?: boolean;
   style?: any;
 }
 
@@ -18,13 +20,18 @@ export function DetailSection(props: DetailSectionProps) {
       backgroundColor={uiColors.bgMantle}
       style={props.style ?? { width: '100%', flexDirection: 'column', overflow: 'hidden' }}
     >
-      <box
-        backgroundColor={uiColors.bgSurface1}
-        style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}
-      >
+      <SearchHeader>
         {props.header ?? <text fg={props.titleColor ?? uiColors.textPrimary} attributes={TextAttributes.BOLD}>{props.title}</text>}
+      </SearchHeader>
+      <box style={{ width: '100%', flexDirection: 'row', flexGrow: 1, minHeight: 0 }}>
+        <box
+          backgroundColor={props.active ? uiColors.primary : uiColors.bgMantle}
+          style={{ width: 1, height: '100%', flexShrink: 0 }}
+        />
+        <box style={{ flexGrow: 1, flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          {props.children}
+        </box>
       </box>
-      {props.children}
     </box>
   );
 }

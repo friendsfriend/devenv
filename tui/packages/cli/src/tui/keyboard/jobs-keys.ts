@@ -1,6 +1,7 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
 import { isDownKey, isUpKey } from './nav-keys';
+import { isReverseTabKey } from './panel-keys';
 /**
  * Handles keyboard events for the Jobs view:
  * - Search mode (type query, clear)
@@ -106,11 +107,17 @@ export async function handleJobsKeys(
     return true;
   }
 
-  // Tab to cycle through stages
+  // Tab/Shift+Tab to cycle through stages
   if (event.name === 'tab' || event.sequence === '\t') {
-    changeRequestStore.setSelectedJobStageIndex((prev) => {
-      return prev >= organizedJobs.length - 1 ? 0 : prev + 1;
-    });
+    if (isReverseTabKey(event)) {
+      changeRequestStore.setSelectedJobStageIndex((prev) => {
+        return prev <= 0 ? organizedJobs.length - 1 : prev - 1;
+      });
+    } else {
+      changeRequestStore.setSelectedJobStageIndex((prev) => {
+        return prev >= organizedJobs.length - 1 ? 0 : prev + 1;
+      });
+    }
     changeRequestStore.setSelectedJobIndex(0);
     return true;
   }

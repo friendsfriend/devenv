@@ -107,6 +107,42 @@ func TestDeleteRemovesOnlyProviderEnvEntries(t *testing.T) {
 	}
 }
 
+func TestLoadReportsMissingEnvVars(t *testing.T) {
+	dir := t.TempDir()
+	providers := filepath.Join(dir, "providers")
+	if err := os.MkdirAll(providers, 0755); err != nil {
+		t.Fatal(err)
+	}
+	// Write a provider with env placeholder
+	providerJSON := `{"name":"work","type":"github","username":"${DEVENV_PROVIDER_WORK_USERNAME}","token":"${DEVENV_PROVIDER_WORK_TOKEN}"}`
+	if err := os.WriteFile(filepath.Join(providers, "work.json"), []byte(providerJSON), 0600); err != nil {
+		t.Fatal(err)
+	}
+	// Write .env with only username, missing token
+	envPath := filepath.Join(dir, ".env")
+	if err := os.WriteFile(envPath, []byte("DEVENV_PROVIDER_WORK_USERNAME=alice\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	store := NewStore(providers, envPath)
+	if err := store.Load(); err != nil {
+		t.Fatal(err)
+	}
+	p, ok := store.Get("work")
+	if !ok {
+		t.Fatal("provider not loaded")
+	}
+	if p.Username != "alice" {
+		t.Fatalf("expected username alice, got %q", p.Username)
+	}
+	if p.Token != "" {
+		t.Fatalf("expected empty token, got %q", p.Token)
+	}
+	if len(p.MissingVars) != 1 || p.MissingVars[0] != "DEVENV_PROVIDER_WORK_TOKEN" {
+		t.Fatalf("expected [DEVENV_PROVIDER_WORK_TOKEN] missing, got %v", p.MissingVars)
+	}
+}
+
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)

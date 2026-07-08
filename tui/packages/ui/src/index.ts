@@ -102,6 +102,8 @@ export { ProfilePickerView } from "./components/ProfilePickerView";
 export type { ProfilePickerProps } from "./components/ProfilePickerView";
 export { ActionTargetPickerView } from "./components/ActionTargetPickerView";
 export type { ActionTargetPickerProps } from "./components/ActionTargetPickerView";
+export { DependencyTreeView, buildDependencyTree, expandNode } from "./components/DependencyTreeView";
+export type { DependencyNode, DependencyTreeViewProps } from "./components/DependencyTreeView";
 export {
 	EditorPickerView,
 	EDITOR_OPTIONS,

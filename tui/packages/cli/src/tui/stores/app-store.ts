@@ -1,4 +1,7 @@
 import { createMemo, createSignal } from 'solid-js';
+import type { ScrollBoxRenderable } from '@opentui/core';
+
+export const KUBERNETES_PANEL_COUNT = 4;
 import type {
 	App,
 	InfraService,
@@ -165,6 +168,10 @@ export function createAppStore() {
 	const [kubernetesClusterError, setKubernetesClusterError] = createSignal<string | null>(null);
 	const [kubernetesCPUHistory, setKubernetesCPUHistory] = createSignal<number[]>([]);
 	const [kubernetesMemoryHistory, setKubernetesMemoryHistory] = createSignal<number[]>([]);
+
+	// Panel focus navigation (Kubernetes tab)
+	const [kubernetesPanelIndex, setKubernetesPanelIndex] = createSignal(0);
+	const kubernetesScrollBoxRefs: (ScrollBoxRenderable | undefined)[] = [];
 	const [loading, setLoading] = createSignal(true);
 	const [error, setError] = createSignal<string | null>(null);
 	const [viewMode, setViewMode] = createSignal<ViewMode>("table");
@@ -419,6 +426,14 @@ export function createAppStore() {
 		setKubernetesCPUHistory,
 		kubernetesMemoryHistory,
 		setKubernetesMemoryHistory,
+
+		// Panel focus navigation (Kubernetes tab)
+		kubernetesPanelIndex,
+		setKubernetesPanelIndex,
+		kubernetesPanelCount: KUBERNETES_PANEL_COUNT,
+		get kubernetesScrollBoxRefs() {
+			return kubernetesScrollBoxRefs;
+		},
 		loading,
 		startupState,
 		setStartupState,

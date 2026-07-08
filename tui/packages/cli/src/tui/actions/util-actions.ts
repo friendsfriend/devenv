@@ -1,10 +1,11 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { ScriptParameter, SshHost, TableRow } from '@devenv/types';
+import type { ScriptParameter, SshHost, StatusLogEntry, TableRow } from '@devenv/types';
 import { EDITOR_OPTIONS, type EditorChoice } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
 import type { AgentStore } from '../stores/agent-store';
 import type { UiStore } from '../stores/ui-store';
+import { formatDuration } from './task-status-utils';
 
 const isTmuxSession = (): boolean => {
   if (!process.env.TMUX) return false;
@@ -346,15 +347,48 @@ export function createUtilActions(
         return false;
       }
       getLogger().write('INFO', `Task ${app.scriptRelativePath || app.displayName} opened in tmux window ${result.windowId || '(unknown)'}`);
+      // Push status log entry for tmux-launched task
+      const argsSummary = taskArgs.length > 0 ? taskArgs.join(' ') : '';
+      const taskName = app.scriptRelativePath || app.displayName;
+      const message = argsSummary ? `${taskName} ${argsSummary}` : taskName;
+      const entry: StatusLogEntry = {
+        Timestamp: new Date().toISOString(),
+        AppIdent: app.ident,
+        AppName: app.displayName,
+        Operation: 'task',
+        Status: 'completed',
+        Message: `${message} [launched]`,
+        source: 'task',
+      };
+      appStore.setStatusLogEntries(prev => [...prev, entry]);
       return true;
     }
 
     getLogger().write('WARN', `Task ${app.scriptRelativePath || app.displayName} running in foreground because TUI is not inside tmux`);
+    const taskStartMs = Date.now();
     renderer.suspend();
     try {
       const result = spawnSync(cmd, cmdArgs, { stdio: 'inherit', shell: false, cwd });
+      const taskDurationMs = Date.now() - taskStartMs;
       if (result.error) getLogger().write('ERROR', `Task execution failed for ${app.scriptRelativePath || app.displayName}: ${result.error.message}`);
       else getLogger().write('INFO', `Task ${app.scriptRelativePath || app.displayName} exited with ${result.status ?? 0}`);
+
+      // Build args summary and push status log entry
+      const argsSummary = taskArgs.length > 0 ? taskArgs.join(' ') : '';
+      const taskName = app.scriptRelativePath || app.displayName;
+      const message = argsSummary ? `${taskName} ${argsSummary}` : taskName;
+      const status = result.error ? 'error' : (result.status === 0 ? 'completed' : 'failed');
+      const entry: StatusLogEntry = {
+        Timestamp: new Date().toISOString(),
+        AppIdent: app.ident,
+        AppName: app.displayName,
+        Operation: 'task',
+        Status: status,
+        Message: `${message} [${formatDuration(taskDurationMs)}]`,
+        source: 'task',
+      };
+      appStore.setStatusLogEntries(prev => [...prev, entry]);
+
       pauseUntilKeypress();
       return !result.error;
     } finally {

@@ -1,6 +1,7 @@
 import { getLogger } from '@devenv/core';
 import type { AppStore } from '../stores';
 import type { AppActions } from './app-actions';
+import { detectOptionalUtilities } from '../startup-utility-detection';
 
 interface InitDeps {
   client: ReturnType<typeof import('@devenv/core').createClient>;
@@ -126,6 +127,9 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
     void appActions.fetchStatus();
     void appActions.subscribeToUpdates(deps.abortSignal);
     void appActions.fetchStatusLog();
+
+    // Detect optional utilities in background (non-blocking)
+    void detectOptionalUtilities(client);
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Unknown error occurred during initialization';
     getLogger().write('ERROR', `Initialization error: ${errorMsg}`);

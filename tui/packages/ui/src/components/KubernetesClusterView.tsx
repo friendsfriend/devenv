@@ -16,6 +16,10 @@ export interface KubernetesClusterViewProps {
   cpuHistory?: number[];
   memoryHistory?: number[];
   height?: number;
+  activePanelIndex?: number;
+  onClusterInfoScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
+  onPodsScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
+  onWorkloadsScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
 }
 
 function stateHighlight(state?: string) {
@@ -49,6 +53,26 @@ function PanelHeader(props: { title: string; children?: JSX.Element }) {
         {props.children}
       </box>
     </SearchHeader>
+  );
+}
+
+function PanelBox(props: { title: string; active: boolean; headerChildren?: JSX.Element; children: JSX.Element; style?: any }) {
+  return (
+    <box
+      backgroundColor={uiColors.bgMantle}
+      style={{ width: '100%', flexGrow: 1, flexBasis: 0, flexDirection: 'column', overflow: 'hidden', ...props.style }}
+    >
+      <PanelHeader title={props.title}>{props.headerChildren}</PanelHeader>
+      <box style={{ width: '100%', flexDirection: 'row', flexGrow: 1, minHeight: 0 }}>
+        <box
+          backgroundColor={props.active ? uiColors.primary : uiColors.bgMantle}
+          style={{ width: 1, height: '100%', flexShrink: 0 }}
+        />
+        <box style={{ flexGrow: 1, flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          {props.children}
+        </box>
+      </box>
+    </box>
   );
 }
 
@@ -105,22 +129,13 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
           }}
         >
           {/* Cluster Info Panel */}
-          <box
-            backgroundColor={uiColors.bgMantle}
-            style={{
-              width: '100%',
-              flexGrow: 1,
-              flexBasis: 0,
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
+          <PanelBox title="Cluster" active={props.activePanelIndex === 0}
+            headerChildren={<Show when={props.loading}><text fg={highlightColor('secondary')}> refreshing...</text></Show>}
           >
-            <PanelHeader title="Cluster">
-              <Show when={props.loading}><text fg={highlightColor('secondary')}> refreshing...</text></Show>
-            </PanelHeader>
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+              onScrollBoxReady={props.onClusterInfoScrollBoxReady}
             >
               <Show when={props.error} fallback={<PropertiesList rows={clusterRows()} labelWidth={10} />}>
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
@@ -128,20 +143,10 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
                 </box>
               </Show>
             </ScrollableContent>
-          </box>
+          </PanelBox>
 
           {/* Resources Panel */}
-          <box
-            backgroundColor={uiColors.bgMantle}
-            style={{
-              width: '100%',
-              flexGrow: 1,
-              flexBasis: 0,
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <PanelHeader title="Resources" />
+          <PanelBox title="Resources" active={props.activePanelIndex === 1}>
             <Show when={stats() !== undefined} fallback={
               <box style={{ paddingLeft: 1, paddingRight: 1, flexGrow: 1 }}>
                 <text fg={highlightColor('secondary')}>No container resources — cluster may be missing or using podman</text>
@@ -167,7 +172,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
                 );
               })()}
             </Show>
-          </box>
+          </PanelBox>
         </box>
 
         {/* Right Column — Nodes + Workloads + Warnings */}
@@ -180,20 +185,11 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
           }}
         >
           {/* Pods Panel */}
-          <box
-            backgroundColor={uiColors.bgMantle}
-            style={{
-              width: '100%',
-              flexGrow: 1,
-              flexBasis: 0,
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <PanelHeader title="Pods" />
+          <PanelBox title="Pods" active={props.activePanelIndex === 2}>
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+              onScrollBoxReady={props.onPodsScrollBoxReady}
             >
               <Show when={(s()?.podList?.length ?? 0) > 0} fallback={
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
@@ -209,23 +205,14 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
                 )}</For>
               </Show>
             </ScrollableContent>
-          </box>
+          </PanelBox>
 
           {/* Workloads Panel */}
-          <box
-            backgroundColor={uiColors.bgMantle}
-            style={{
-              width: '100%',
-              flexGrow: 1,
-              flexBasis: 0,
-              flexDirection: 'column',
-              overflow: 'hidden',
-            }}
-          >
-            <PanelHeader title="Workloads" />
+          <PanelBox title="Workloads" active={props.activePanelIndex === 3}>
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
+              onScrollBoxReady={props.onWorkloadsScrollBoxReady}
             >
               <PropertiesList rows={workloadRows()} labelWidth={12} />
               <Show when={(s()?.releases.length ?? 0) > 0} fallback={
@@ -241,7 +228,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
                 )}</For>
               </Show>
             </ScrollableContent>
-          </box>
+          </PanelBox>
 
 
         </box>

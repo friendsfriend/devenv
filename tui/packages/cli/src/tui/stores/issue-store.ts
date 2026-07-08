@@ -1,4 +1,7 @@
 import { createMemo, createSignal } from 'solid-js';
+import type { ScrollBoxRenderable } from '@opentui/core';
+
+export const ISSUE_DETAIL_PANEL_COUNT = 3;
 import type {
 	Issue,
 	IssueComment,
@@ -56,6 +59,10 @@ export function createIssueStore() {
 	const [issueDetailLoading, setIssueDetailLoading] = createSignal(false);
 	const [issueDetailError, setIssueDetailError] = createSignal("");
 	let issueDetailScrollBoxRef: import("@opentui/core").ScrollBoxRenderable | undefined;
+
+	// Panel focus navigation
+	const [issueDetailPanelIndex, setIssueDetailPanelIndex] = createSignal(0);
+	const issueDetailScrollBoxRefs: (ScrollBoxRenderable | undefined)[] = [];
 
 	// Comments
 	const [issueComments, setIssueComments] = createSignal<IssueComment[]>([]);
@@ -233,6 +240,15 @@ export function createIssueStore() {
 		setIssueDetailLoading,
 		issueDetailError,
 		setIssueDetailError,
+
+		// Panel focus navigation
+		issueDetailPanelIndex,
+		setIssueDetailPanelIndex,
+		issueDetailPanelCount: ISSUE_DETAIL_PANEL_COUNT,
+		get issueDetailScrollBoxRefs() {
+			return issueDetailScrollBoxRefs;
+		},
+
 		get issueDetailScrollBoxRef() {
 			return issueDetailScrollBoxRef;
 		},

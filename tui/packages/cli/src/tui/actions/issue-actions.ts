@@ -132,6 +132,7 @@ export function createIssueActions(
 		issueStore.setReferencedIssuesError("");
 		issueStore.setReferencedIssuesLoading(true);
 		issueStore.setReferences([]);
+		issueStore.setIssueDetailPanelIndex(0);
 		appStore.setViewMode("issueDetail");
 
 		const app = getSelectedApp();

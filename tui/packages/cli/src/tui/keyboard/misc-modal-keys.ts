@@ -637,9 +637,12 @@ export async function handleMiscModalKeys(
       return true;
     }
 
-    // Tab: switch between keybindings and guides
+    // Tab/Shift+Tab: switch between keybindings and guides
     if (event.name === 'tab' || event.name === 'Tab' || event.sequence === '\t') {
-      const nextTab = appStore.helpActiveTab() === 'keybinds' ? 'guides' : 'keybinds';
+      const isShift = !!event.shift;
+      const nextTab = isShift
+        ? (appStore.helpActiveTab() === 'guides' ? 'keybinds' : 'guides')
+        : (appStore.helpActiveTab() === 'keybinds' ? 'guides' : 'keybinds');
       appStore.setHelpSearchActive(false);
       appStore.setHelpSearchQuery('');
       appStore.setHelpActiveTab(nextTab);

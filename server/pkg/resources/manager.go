@@ -23,6 +23,7 @@ type Manager interface {
 	WriteShellActionScript(appIdent string, action AppAction, profile string, command string) (string, error)
 	WritePowerShellActionScript(appIdent string, action AppAction, profile string, command string) (string, error)
 	EnvFilePath() (string, bool)
+	ComposeMissingEnvVars(appIdent, localDir string, profile string) []string
 	CopyTemplatesDir(destDir string) ([]string, error)
 	CopyFile(src, dst string) error
 }
@@ -196,6 +197,30 @@ func (m *manager) EnvFilePath() (string, bool) {
 		return "", false
 	}
 	return p, true
+}
+
+// ComposeMissingEnvVars returns the names of env variables referenced in
+// the app's compose file that are not defined in the .env file.
+func (m *manager) ComposeMissingEnvVars(appIdent, localDir string, profile string) []string {
+	composePath, err := m.ResolveComposeFile(appIdent, localDir, profile)
+	if err != nil {
+		return nil
+	}
+	data, err := os.ReadFile(composePath)
+	if err != nil {
+		return nil
+	}
+
+	var envVars map[string]string
+	if envPath, ok := m.EnvFilePath(); ok {
+		envVars, _ = LoadEnvFile(envPath)
+	}
+	if envVars == nil {
+		envVars = make(map[string]string)
+	}
+
+	_, missing := SubstituteVarsWithWarnings(string(data), envVars)
+	return missing
 }
 
 func (m *manager) CopyTemplatesDir(destDir string) ([]string, error) {
