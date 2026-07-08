@@ -98,6 +98,8 @@ export async function handleGlobalKeys(
   const { appActions, dockerActions, utilActions, logActions, agentActions } = actions;
   const { renderer, launchPi } = ctx;
 
+  if (appStore.isShuttingDown()) return true;
+
   // GLOBAL: Escape closes the opentui console overlay if it is visible
   if ((event.name === 'escape' || event.name === 'Escape') && renderer.console?.visible) {
     renderer.console.hide();

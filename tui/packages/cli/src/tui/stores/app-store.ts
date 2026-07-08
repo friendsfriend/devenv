@@ -64,6 +64,61 @@ export interface StartupState {
 	error: string | null;
 }
 
+export type ShutdownPhase =
+	| "idle"
+	| "preparing"
+	| "canceling-background-work"
+	| "stopping-input"
+	| "stopping-server"
+	| "destroying-renderer"
+	| "complete"
+	| "failed";
+
+export type ShutdownStepPhase = Exclude<ShutdownPhase, "idle" | "failed">;
+export type ShutdownStepStatus = "done" | "current" | "pending" | "failed";
+
+export interface ShutdownState {
+	phase: ShutdownPhase;
+	message: string;
+	error: string | null;
+	failedPhase?: ShutdownStepPhase;
+}
+
+export const SHUTDOWN_PHASE_ORDER: ShutdownStepPhase[] = [
+	"preparing",
+	"canceling-background-work",
+	"stopping-input",
+	"stopping-server",
+	"destroying-renderer",
+	"complete",
+];
+
+export const SHUTDOWN_PHASE_LABELS: Record<ShutdownStepPhase, string> = {
+	preparing: "Preparing shutdown",
+	"canceling-background-work": "Canceling background work",
+	"stopping-input": "Stopping input",
+	"stopping-server": "Stopping server",
+	"destroying-renderer": "Destroying renderer",
+	complete: "Shutdown complete",
+};
+
+export function getShutdownPhaseStatus(state: ShutdownState, phase: ShutdownStepPhase): ShutdownStepStatus {
+	const phaseIndex = SHUTDOWN_PHASE_ORDER.indexOf(phase);
+	if (state.phase === "idle") return "pending";
+	if (state.phase === "failed") {
+		const failedPhase = state.failedPhase;
+		if (!failedPhase) return "pending";
+		const failedIndex = SHUTDOWN_PHASE_ORDER.indexOf(failedPhase);
+		if (phaseIndex < failedIndex) return "done";
+		if (phaseIndex === failedIndex) return "failed";
+		return "pending";
+	}
+	const currentIndex = SHUTDOWN_PHASE_ORDER.indexOf(state.phase);
+	if (phaseIndex < currentIndex) return "done";
+	if (phaseIndex === currentIndex) return "current";
+	return "pending";
+}
+
 function flattenScriptTree(
 	nodes: ScriptNode[],
 	expandedFolders: Set<string>,
@@ -233,6 +288,12 @@ export function createAppStore() {
 	const [startupState, setStartupState] = createSignal<StartupState>({
 		phase: "connecting",
 		message: "Connecting to DevEnv server...",
+		error: null,
+	});
+	const [isShuttingDown, setIsShuttingDown] = createSignal(false);
+	const [shutdownState, setShutdownState] = createSignal<ShutdownState>({
+		phase: "idle",
+		message: "",
 		error: null,
 	});
 	const [scriptsTree, setScriptsTree] = createSignal<ScriptNode[]>([]);
@@ -437,6 +498,10 @@ export function createAppStore() {
 		loading,
 		startupState,
 		setStartupState,
+		isShuttingDown,
+		setIsShuttingDown,
+		shutdownState,
+		setShutdownState,
 		setLoading,
 		error,
 		setError,

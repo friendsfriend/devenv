@@ -232,6 +232,9 @@ for (const item of targets) {
       DEVENV_VERSION: `'${appVersion}'`,
       OTUI_TREE_SITTER_WORKER_PATH: bunfsRoot + workerRelativePath,
       EMBEDDED_SERVER_BINARY_BASE64: `'${serverBinaryBase64}'`,
+      ...(item.os === "linux"
+        ? { "process.env.OPENTUI_LIBC": JSON.stringify(item.abi === "musl" ? "musl" : "glibc") }
+        : {}),
     },
   })
 
