@@ -418,11 +418,6 @@ export async function startTUI(serverUrl: string) {
 			useKittyKeyboard: {},
 			...(useConsole ? {
 				consoleOptions: {
-					keyBindings: [
-						// Kitty protocol may send uppercase 'C' for Ctrl+Shift+C
-						{ name: "c", ctrl: true, shift: true, action: "copy-selection" },
-						{ name: "C", ctrl: true, shift: true, action: "copy-selection" },
-					],
 					onCopySelection: (text: string) => {
 						import("@devenv/core")
 							.then(({ copyToClipboard }) => copyToClipboard(text))

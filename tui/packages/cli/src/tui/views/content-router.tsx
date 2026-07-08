@@ -29,7 +29,7 @@ import { StartupSplash } from "./startup-splash";
 export function ContentRouter(props: ContentRouterProps) {
 	const { appStore, issueStore, changeRequestStore, appDetailStore } =
 		props.stores;
-	const { helpActions, issueActions, pipelineActions, logActions, crActions, dockerActions } =
+	const { helpActions, issueActions, pipelineActions, logActions, crActions, dockerActions, appActions } =
 		props.actions;
 
 	// Fetch once on tab activation — subsequent updates arrive via SSE kubernetes.cluster.refreshed
@@ -191,6 +191,17 @@ export function ContentRouter(props: ContentRouterProps) {
 																										latestStats={appDetailStore.appDetailLatestStats()}
 																										loading={appDetailStore.appDetailLoading()}
 																										changeRequestsLoading={appDetailStore.appDetailChangeRequestsLoading()}
+																										actionTargets={appDetailStore.actionTargets()}
+																										actionTargetsLoading={appDetailStore.actionTargetsLoading()}
+																										dependencyTreeNodes={appDetailStore.dependencyTreeNodes()}
+																										dependencyTreeFocused={appDetailStore.dependencyTreeFocused()}
+																										dependencyTreeSelectedIndex={appDetailStore.dependencyTreeSelectedIndex()}
+																										onDependencyNodeClick={(node, idx) => {
+																											console.error(`[HANDLER] key=${node.key}`);
+																											appDetailStore.setDependencyTreeSelectedIndex(idx);
+																											appDetailStore.setDependencyTreeFocused(true);
+																											appActions.expandDependencyNode(node.key);
+																										}}
 																									/>
 																								</Show>
 																							}

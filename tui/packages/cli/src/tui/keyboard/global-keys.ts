@@ -401,19 +401,10 @@ export async function handleGlobalKeys(
     }
   }
 
-  // GLOBAL: q/Ctrl+C — first press warns, second quit key exits (1s window).
-  if (!isTextEntryActive(stores) && !event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'q') {
-    return handleQuitConfirm('q', uiStore, appActions);
-  }
-
-  if (event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'c') {
-    return handleQuitConfirm('ctrl+c', uiStore, appActions);
-  }
-
-  // GLOBAL: Ctrl+Shift+C, Cmd+C, or Super+C — copy selection to clipboard.
-  if ((event.ctrl && event.shift || event.meta || event.super) && (event.name === 'c' || event.name === 'C')) {
-    _lastQuitKey = null;
-    _lastQuitKeyTime = 0;
+  // GLOBAL: Alt+C — copy selection to clipboard.
+  // Ctrl+Shift+C is intercepted by most terminals, so Alt+C is the reliable shortcut.
+  // Must be checked BEFORE the Ctrl+C quit handler.
+  if (event.meta && (event.name === 'c' || event.name === 'C')) {
     if (ctx.renderer.console?.visible) {
       return copyText(getConsoleText(ctx.renderer), uiStore);
     }
@@ -423,6 +414,33 @@ export async function handleGlobalKeys(
       return true;
     }
     return false;
+  }
+
+  // GLOBAL: q/Ctrl+C — first press warns, second quit key exits (1s window).
+  if (!isTextEntryActive(stores) && !event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'q') {
+    return handleQuitConfirm('q', uiStore, appActions);
+  }
+
+  // GLOBAL: Ctrl+C — copy selection or quit (double-press).
+  if (event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'c') {
+    // Console visible → copy console text (terminal strips shift, can't detect Ctrl+Shift+C)
+    if (ctx.renderer.console?.visible) {
+      const text = getConsoleText(ctx.renderer);
+      if (text) {
+        return copyText(text, uiStore);
+      }
+      return false;
+    }
+    // Normal view → if there's a selection, copy it
+    const selection = ctx.renderer.getSelection();
+    if (selection && selection.getSelectedText()) {
+      _lastQuitKey = null;
+      _lastQuitKeyTime = 0;
+      await utilActions.handleCopySelection();
+      return true;
+    }
+    // No selection — double-press to quit
+    return handleQuitConfirm('ctrl+c', uiStore, appActions);
   }
 
   return false;

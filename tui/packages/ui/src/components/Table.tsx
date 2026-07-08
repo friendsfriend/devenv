@@ -176,7 +176,12 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		if (app.rowKind === "infra") {
 			const parts: Array<string | JSX.Element> = [app.containerBaseName ?? ""];
 			if (app.dockerInfo?.Ports) parts.push(<HighlightedText text={app.dockerInfo.Ports} highlight="highlight" />);
-			return parts.length === 1 ? parts[0] as string : <box style={{ flexDirection: 'row', gap: 1 }}>{parts}</box>;
+			if (parts.length === 1) return parts[0] as string;
+			return (
+				<box style={{ flexDirection: 'row', gap: 1 }}>
+					{parts.map((p) => typeof p === 'string' ? <text>{p}</text> : p)}
+				</box>
+			);
 		}
 
 		const isLinkedWorktree = app.activeWorktree && app.activeWorktree !== app.mainWorktreeBranch;
@@ -188,7 +193,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		return (
 			<box style={{ flexDirection: 'row', gap: 1 }}>
 				<HighlightedText text={parts[0] as string} highlight={hasUnknownProvider ? "negative" : "secondary"} />
-				{parts.slice(1)}
+				{parts.slice(1).map((p) => typeof p === 'string' ? <text>{p}</text> : p)}
 			</box>
 		);
 	};

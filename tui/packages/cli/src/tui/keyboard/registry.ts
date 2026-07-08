@@ -30,8 +30,9 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Ctrl+R"], description: "Toggle running text for overflowing focused fields", footerDescription: "Run text", context: "global", category: "General" },
 	{ keys: ["T"], description: "Open theme picker", footerDescription: "Theme", context: "table", category: "General" },
 	{ keys: ["Esc"], description: "Close OpenTUI console when visible", context: "global", category: "General" },
-	{ keys: ["q", "Ctrl+C"], description: "Quit prompt; press again to quit", context: "global", category: "General" },
-	{ keys: ["Ctrl+Shift+C", "Cmd+C"], description: "Copy selection", context: "global", category: "General" },
+	{ keys: ["q"], description: "Quit prompt; press again to quit", context: "global", category: "General" },
+	{ keys: ["Ctrl+C"], description: "Copy selection or quit (double-press)", footerDescription: "Copy/Quit", context: "global", category: "General" },
+	{ keys: ["Alt+C"], description: "Copy selection", context: "global", category: "General" },
 	{ keys: ["Ctrl+V", "Cmd+V"], description: "Paste provider/app config from clipboard", context: "global", category: "General" },
 
 	// ========== Global modals ==========
@@ -108,7 +109,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	// ========== table — General ==========
 	{ keys: ["A"], description: "Open pi session view", context: "table", category: "General" },
 	{ keys: ["H"], description: "Open SSH host picker", context: "table", category: "General" },
-	{ keys: ["Ctrl+Shift+C"], description: "Copy selection to clipboard", context: "table", category: "General" },
+	{ keys: ["Alt+C"], description: "Copy selection to clipboard", context: "table", category: "General" },
 	{ keys: ["?"], description: "Show help", context: "table", category: "General" },
 	{ keys: ["q"], description: "Quit DevEnv", context: "table", category: "General" },
 
@@ -189,7 +190,10 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["q"], description: "Quit DevEnv", context: "discussionsView", category: "General" },
 
 	// ========== appDetail ==========
-	{ keys: ["Esc"], description: "Return to table", context: "appDetail", category: "Navigation" },
+	{ keys: ["d"], description: "Focus dependency tree", footerDescription: "Deps", context: "appDetail", category: "Navigation" },
+	{ keys: ["j/k", "\u2191/\u2193"], description: "Navigate tree nodes (when tree focused)", context: "appDetail", category: "Navigation" },
+	{ keys: ["Enter"], description: "Expand/collapse tree node (when tree focused)", context: "appDetail", category: "Actions" },
+	{ keys: ["Esc"], description: "Return to table / unfocus tree", context: "appDetail", category: "Navigation" },
 	{ keys: ["q"], description: "Quit DevEnv", context: "appDetail", category: "General" },
 
 	// ========== providers ==========
@@ -379,6 +383,7 @@ const FOOTER_LABELS = new Map<string, string>([
 	["Toggle OpenTUI console", "Console"],
 	["Close OpenTUI console when visible", "Close console"],
 	["Quit prompt; press again to quit", "Quit"],
+	["Copy selection or quit (double-press)", "Copy/Quit"],
 	["Copy selection", "Copy"],
 	["Paste provider/app config from clipboard", "Paste config"],
 	["Copy error details", "Copy error"],

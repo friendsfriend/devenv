@@ -1,6 +1,7 @@
 import { getLogger } from '@devenv/core';
 import { themeNames } from '@devenv/ui';
 import { isDownKey, isUpKey } from './nav-keys';
+import { handleAppDetailKeys } from './app-detail-keys';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -209,6 +210,10 @@ export async function handleTableKeys(
 	// Strategy: If sequence is a single letter, use it; otherwise use name
 
 	if (appStore.viewMode() === "appDetail") {
+		// Delegate to dependency tree handler first
+		if (await handleAppDetailKeys(event, stores.appDetailStore, appActions.expandDependencyNode)) {
+			return true;
+		}
 		if (
 			event.name === "escape" ||
 			event.name === "esc" ||
