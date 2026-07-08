@@ -543,24 +543,6 @@ func ReadLinesBefore(path string, beforeOffset int64, maxLines int) ([]string, i
 	}
 	return parts, pos, pos > 0, nil
 }
-
-func (l *fileLogger) readIndividualAppLog(appIdent string, maxEntries int) (string, error) {
-	logFilePath := filepath.Join(l.homeDir, "logs", appIdent+".log")
-	content, err := os.ReadFile(logFilePath)
-	if err != nil {
-		return "", err
-	}
-	lines := strings.Split(string(content), "\n")
-	maxLines := maxEntries
-	if maxLines <= 0 {
-		maxLines = 500
-	}
-	if len(lines) > maxLines {
-		lines = lines[len(lines)-maxLines:]
-	}
-	return strings.Join(lines, "\n"), nil
-}
-
 func (l *fileLogger) CleanOldLogEntries(maxAge time.Duration) error {
 	logFilePath := l.logFilePath
 
@@ -617,35 +599,6 @@ func (l *fileLogger) CleanOldLogEntries(maxAge time.Duration) error {
 	// Write filtered lines back
 	output := strings.Join(kept, "\n") + "\n"
 	return os.WriteFile(logFilePath, []byte(output), 0644)
-}
-
-// logCommandToIndividualFile maintains backward compatibility with individual app log files
-func (l *fileLogger) logCommandToIndividualFile(appIdent, command string, args []string, output string, err error) {
-	logDir := filepath.Join(l.homeDir, "logs")
-	if err := os.MkdirAll(logDir, 0755); err != nil {
-		return // Silently fail if we can't create log directory
-	}
-
-	logFilePath := filepath.Join(logDir, appIdent+".log")
-	logFile, fileErr := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if fileErr != nil {
-		return // Silently fail if we can't open log file
-	}
-	defer logFile.Close()
-
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	commandLine := fmt.Sprintf("%s %v", command, args)
-
-	logEntry := fmt.Sprintf("[%s] Command: %s\n", timestamp, commandLine)
-	if err != nil {
-		logEntry += fmt.Sprintf("[%s] Error: %s\n", timestamp, err.Error())
-	}
-	if output != "" {
-		logEntry += fmt.Sprintf("[%s] Output:\n%s\n", timestamp, output)
-	}
-	logEntry += fmt.Sprintf("[%s] ---\n\n", timestamp)
-
-	logFile.WriteString(logEntry)
 }
 
 // getAppDisplayName is a placeholder - this should be provided by the app manager

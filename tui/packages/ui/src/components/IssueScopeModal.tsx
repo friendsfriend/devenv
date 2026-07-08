@@ -17,7 +17,7 @@ export const ISSUE_SCOPE_OPTIONS: IssueScopeOption[] = [
 	{ label: "No assignee", value: "no-assignee" },
 ];
 
-export interface IssueScopeModalProps {
+interface IssueScopeModalProps {
 	selectedIndex: number;
 }
 

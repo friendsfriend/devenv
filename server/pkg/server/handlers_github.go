@@ -34,25 +34,6 @@ func (s *Server) resolveGitHubClient(targetApp *app.App) (github.Client, *github
 	client := github.NewClient(token, username)
 	return client, repoInfo, username, nil
 }
-
-// resolveGitHubMRClient returns a GitHub client with the repo info converted to changerequest.RepoInfo.
-func (s *Server) resolveGitHubMRClient(targetApp *app.App) (github.Client, *github.RepoInfo, error) {
-	repoInfo, err := github.ExtractRepoInfo(targetApp.RepositoryPath)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to extract repo info: %w", err)
-	}
-	providerName := targetApp.GetProviderName()
-	username, token := "", ""
-	if s.services.ProviderStore() != nil {
-		username, token = s.services.ProviderStore().CredentialsFor(providerName)
-	}
-	if token == "" {
-		return nil, nil, fmt.Errorf("no token configured for provider %q", providerName)
-	}
-	client := github.NewClient(token, username)
-	return client, repoInfo, nil
-}
-
 func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		respondMethodNotAllowed(w)

@@ -189,7 +189,6 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/actions/run", s.handleRun)
 	mux.HandleFunc("/api/actions/stop", s.handleStopApp)
 	mux.HandleFunc("/api/gitlab/merge-requests", s.handleGitLabChangeRequests)
-	mux.HandleFunc("/api/gitlab/pipeline-jobs", s.handleGitLabPipelineJobs)
 	mux.HandleFunc("/api/gitlab/jobs", s.handleGitLabJobs)
 	mux.HandleFunc("/api/gitlab/test-summary", s.handleGitLabTestSummary)
 	mux.HandleFunc("/api/gitlab/cr-changes", s.handleGitLabChangeRequestChanges)
