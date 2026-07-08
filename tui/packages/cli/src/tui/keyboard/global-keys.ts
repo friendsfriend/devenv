@@ -13,11 +13,26 @@ import type { AppStore } from '../stores/app-store';
  * - Confirm dialog (y/n)
  * - Profile picker navigation
  * - Theme picker navigation
- * - Ctrl+C to exit
+ * - q/Ctrl+C to exit after double-press confirmation
  * - Ctrl+Shift+C to copy selection
  */
-// Track last Ctrl+C press time for double-press exit detection
-let _lastCtrlCTime = 0;
+// Track last quit-key press time for double-press exit detection
+let _lastQuitKey: 'q' | 'ctrl+c' | null = null;
+let _lastQuitKeyTime = 0;
+
+const handleQuitConfirm = (key: 'q' | 'ctrl+c', uiStore: KeyboardStores['uiStore'], appActions: KeyboardActions['appActions']): boolean => {
+  const now = Date.now();
+  if (_lastQuitKey && now - _lastQuitKeyTime < 1000) {
+    _lastQuitKey = null;
+    _lastQuitKeyTime = 0;
+    appActions.exitApp();
+    return true;
+  }
+  _lastQuitKey = key;
+  _lastQuitKeyTime = now;
+  uiStore.setNotification(key === 'ctrl+c' ? 'If you want to quit press Ctrl+C again' : 'If you want to quit press q again', 'info');
+  return true;
+};
 
 const writeOsc52 = (text: string) => {
   const base64 = Buffer.from(text).toString('base64');
@@ -374,38 +389,19 @@ export async function handleGlobalKeys(
     }
   }
 
-  // GLOBAL: Ctrl+C — copy on single press, exit on double-press (500ms window)
-  // Inside tmux, Kitty protocol cannot disambiguate Ctrl+C from Ctrl+Shift+C
-  // (both send \x03), so single Ctrl+C always copies the current selection.
-  // Double Ctrl+C exits the app. With Kitty protocol, plain Ctrl+C arrives as
-  // lowercase 'c' (no shift), while Ctrl+Shift+C arrives as uppercase 'C' with
-  // shift=true — those are handled separately below.
-  //
-  // When no TUI selection exists, let Ctrl+C fall through so the terminal
-  // emulator handles native copy (or SIGINT) instead of showing "Nothing selected".
+  // GLOBAL: q/Ctrl+C — first press warns, second quit key exits (1s window).
+  if (!event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'q') {
+    return handleQuitConfirm('q', uiStore, appActions);
+  }
+
   if (event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'c') {
-    const now = Date.now();
-    if (now - _lastCtrlCTime < 500) {
-      _lastCtrlCTime = 0;
-      appActions.exitApp();
-      return true;
-    }
-    _lastCtrlCTime = now;
-    if (ctx.renderer.console?.visible) {
-      return copyText(getConsoleText(ctx.renderer), uiStore);
-    }
-    const selection = ctx.renderer.getSelection();
-    if (selection && selection.getSelectedText()) {
-      await utilActions.handleCopySelection();
-      return true;
-    }
-    // No TUI selection — let terminal handle copy natively
-    return false;
+    return handleQuitConfirm('ctrl+c', uiStore, appActions);
   }
 
   // GLOBAL: Ctrl+Shift+C, Cmd+C, or Super+C — copy selection to clipboard.
   if ((event.ctrl && event.shift || event.meta || event.super) && (event.name === 'c' || event.name === 'C')) {
-    _lastCtrlCTime = 0;
+    _lastQuitKey = null;
+    _lastQuitKeyTime = 0;
     if (ctx.renderer.console?.visible) {
       return copyText(getConsoleText(ctx.renderer), uiStore);
     }

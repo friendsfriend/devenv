@@ -30,7 +30,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["Ctrl+R"], description: "Toggle running text for overflowing focused fields", footerDescription: "Run text", context: "global", category: "General" },
 	{ keys: ["T"], description: "Open theme picker", footerDescription: "Theme", context: "table", category: "General" },
 	{ keys: ["Esc"], description: "Close OpenTUI console when visible", context: "global", category: "General" },
-	{ keys: ["Ctrl+C"], description: "Copy selection; press twice to quit", context: "global", category: "General" },
+	{ keys: ["q", "Ctrl+C"], description: "Quit prompt; press again to quit", context: "global", category: "General" },
 	{ keys: ["Ctrl+Shift+C", "Cmd+C"], description: "Copy selection", context: "global", category: "General" },
 	{ keys: ["Ctrl+V", "Cmd+V"], description: "Paste provider/app config from clipboard", context: "global", category: "General" },
 
@@ -378,7 +378,7 @@ const FOOTER_LABELS = new Map<string, string>([
 	["Show help", "Help"],
 	["Toggle OpenTUI console", "Console"],
 	["Close OpenTUI console when visible", "Close console"],
-	["Copy selection; press twice to quit", "Copy"],
+	["Quit prompt; press again to quit", "Quit"],
 	["Copy selection", "Copy"],
 	["Paste provider/app config from clipboard", "Paste config"],
 	["Copy error details", "Copy error"],
