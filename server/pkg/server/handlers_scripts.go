@@ -15,7 +15,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/resources"
@@ -293,14 +292,10 @@ func (s *Server) fetchScriptMetadata(scriptPath string) []resources.ScriptParame
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, scriptPath, "--devenv-metadata")
-	if runtime.GOOS != "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	}
+	configureMetadataCommand(cmd)
 	output, execErr := cmd.Output()
 	if execErr != nil {
-		if cmd.Process != nil && runtime.GOOS != "windows" {
-			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		}
+		killMetadataProcess(cmd)
 	}
 
 	params := parseMetadataOutput(output)
