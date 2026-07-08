@@ -27,6 +27,8 @@ go.work.sum
 dist/
 logs/
 devenv
+server/tui/
+tui/server-binaries/
 
 # project folders
 devenv-apps/*
