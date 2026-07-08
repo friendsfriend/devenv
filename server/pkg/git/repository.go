@@ -750,32 +750,6 @@ func (gr *gitRepository) Pull(app App) error {
 	return nil
 }
 
-// checkForLocalChanges returns list of changed files
-func (gr *gitRepository) checkForLocalChanges(app App) ([]string, error) {
-	repo, err := gr.getRepository(app.GetLocalDirectoryPath())
-	if err != nil {
-		return nil, fmt.Errorf("failed to open repository: %w", err)
-	}
-
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	status, err := worktree.Status()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get status: %w", err)
-	}
-
-	var changedFiles []string
-	for file, fileStatus := range status {
-		if fileStatus.Staging != git.Unmodified || fileStatus.Worktree != git.Unmodified {
-			changedFiles = append(changedFiles, file)
-		}
-	}
-	return changedFiles, nil
-}
-
 func (gr *gitRepository) GetLocalBranches(app App) ([]string, error) {
 	repo, err := gr.getRepository(app.GetLocalDirectoryPath())
 	if err != nil {
@@ -898,33 +872,6 @@ func (gr *gitRepository) Checkout(app App, branch string) error {
 	return nil
 }
 
-// updateOrCreateWorktreeRepo handles UpdateOrCreateRepo for worktree-mode apps.
-// The primary worktree lives at $DEVENV_HOME/{ident}/{ident}/ and is created
-// via a standard go-git clone. Linked worktrees are managed by worktrunk.
-// It returns the actual branch checked out as the primary worktree (which may
-// differ from the requested branch when the remote redirects to its default).
-func (gr *gitRepository) updateOrCreateWorktreeRepo(app App) (string, error) {
-	rootDir := appRootDir(app)
-	primaryDir := primaryWorktreeDir(app)
-
-	if err := os.MkdirAll(rootDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create app root directory %s: %w", rootDir, err)
-	}
-
-	gitDirExists, err := gr.existsDir(filepath.Join(primaryDir, ".git"))
-	if err != nil {
-		return "", fmt.Errorf("failed to check primary worktree: %w", err)
-	}
-	if !gitDirExists {
-		mainBranch := app.GetMainWorktreeBranch()
-		if mainBranch == "" {
-			mainBranch = app.GetBranch()
-		}
-		return gr.cloneIntoPrimaryWorktree(app, primaryDir, mainBranch)
-	}
-	return "", gr.pullWorktreeDir(app, primaryDir)
-}
-
 // cloneIntoPrimaryWorktree clones the remote repository into targetDir on branch.
 // It returns the actual branch that was checked out (which may differ from the
 // requested branch when the remote does not have it and the default is used).
@@ -977,53 +924,6 @@ func (gr *gitRepository) resolveHeadBranch(dir string) string {
 		return ""
 	}
 	return head.Name().Short()
-}
-
-// pullWorktreeDir fetches and hard-resets a worktree directory to its remote
-// tracking branch. It is used for both the primary worktree (UpdateOrCreateRepo)
-// and ad-hoc pulls (Pull) in worktree mode.
-func (gr *gitRepository) pullWorktreeDir(app App, worktreeDir string) error {
-	backupDir, backupErr := gr.backupIgnoredFiles(worktreeDir)
-	if backupErr != nil {
-		log.Printf("[WARN] devenv: could not back up ignored files in %s: %v", worktreeDir, backupErr)
-	}
-	defer gr.restoreIgnoredFiles(worktreeDir, backupDir)
-
-	repo, err := gr.getRepository(worktreeDir)
-	if err != nil {
-		return fmt.Errorf("failed to open repository at %s: %w", worktreeDir, err)
-	}
-	fetchOptions := &git.FetchOptions{
-		RemoteName: "origin",
-		RefSpecs:   []config.RefSpec{"+refs/heads/*:refs/remotes/origin/*"},
-		Force:      true,
-	}
-	username, token := gr.credentialsFor(app.GetRepositoryPath())
-	if username != "" && token != "" {
-		fetchOptions.Auth = &gitHttp.BasicAuth{Username: username, Password: token}
-	}
-	if err := repo.Fetch(fetchOptions); err != nil && err != git.NoErrAlreadyUpToDate {
-		return fmt.Errorf("fetch failed in %s: %w", worktreeDir, err)
-	}
-	head, err := repo.Head()
-	if err != nil {
-		return fmt.Errorf("failed to get HEAD in %s: %w", worktreeDir, err)
-	}
-	remoteRef, err := repo.Reference(
-		plumbing.NewRemoteReferenceName("origin", head.Name().Short()), true,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to get remote reference for %s: %w", head.Name().Short(), err)
-	}
-	worktree, err := repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree object: %w", err)
-	}
-	if err := worktree.Reset(&git.ResetOptions{Commit: remoteRef.Hash(), Mode: git.HardReset}); err != nil {
-		return fmt.Errorf("reset failed in %s: %w", worktreeDir, err)
-	}
-	gr.invalidateRepositoryCache(worktreeDir)
-	return nil
 }
 
 // ListWorktrees returns all worktrees for a worktree-mode app.

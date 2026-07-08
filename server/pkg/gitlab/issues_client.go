@@ -96,14 +96,6 @@ func NewIssuesClient(c Client, project *ProjectInfo) issues.Client {
 	}
 }
 
-func (ic *IssuesClient) projectToIssueRepo() *issues.RepoInfo {
-	return &issues.RepoInfo{
-		Host:      ic.project.Host,
-		Namespace: ic.project.Namespace,
-		Project:   ic.project.Project,
-	}
-}
-
 func (ic *IssuesClient) doGet(url string) ([]byte, int, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -412,62 +404,6 @@ func (ic *IssuesClient) doPut(urlStr string, body []byte) ([]byte, int, error) {
 		return nil, 0, fmt.Errorf("failed to read response: %w", err)
 	}
 	return respBody, resp.StatusCode, nil
-}
-
-func (ic *IssuesClient) doDelete(urlStr string, body []byte) ([]byte, int, error) {
-	req, err := http.NewRequest("DELETE", urlStr, bytes.NewReader(body))
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("PRIVATE-TOKEN", ic.c.token)
-	req.Header.Set("User-Agent", "devenv-cli")
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	resp, err := ic.c.httpClient.Do(req)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to execute request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read response: %w", err)
-	}
-	return respBody, resp.StatusCode, nil
-}
-
-// --- Label name→ID cache helper ---
-
-// labelNameToID fetches all project labels and returns a map of label name→ID.
-func (ic *IssuesClient) labelNameToID(proj *ProjectInfo) (map[string]int, error) {
-	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", proj.Namespace, proj.Project))
-	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/labels?per_page=100", ic.c.baseURL, projectPath)
-
-	body, statusCode, err := ic.doGet(apiURL)
-	if err != nil {
-		return nil, err
-	}
-
-	if statusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitLab API error fetching labels (status %d): %s", statusCode, string(body))
-	}
-
-	var glLabels []struct {
-		ID   int    `json:"id"`
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(body, &glLabels); err != nil {
-		return nil, fmt.Errorf("failed to parse labels: %w", err)
-	}
-
-	result := make(map[string]int, len(glLabels))
-	for _, l := range glLabels {
-		result[l.Name] = l.ID
-	}
-	return result, nil
 }
 
 // --- Mutation implementations ---

@@ -8,19 +8,6 @@ import (
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
 
-func HelmStatusCommand(r Runner, release, namespace string) Command {
-	return r.HelmCommandFor("status", release, "--namespace", namespace, "-o", "json")
-}
-
-func ReleaseDiagnosticsCommands(r Runner, release, namespace string) []Command {
-	selector := "app.kubernetes.io/instance=" + release
-	return []Command{
-		r.KubectlCommandFor("get", "pods", "--namespace", namespace, "-l", selector, "-o", "wide"),
-		r.KubectlCommandFor("get", "jobs", "--namespace", namespace, "-l", selector, "-o", "wide"),
-		r.KubectlCommandFor("get", "events", "--namespace", namespace, "--sort-by=.lastTimestamp"),
-	}
-}
-
 func MapHelmStatus(output string, err error) string {
 	if err != nil {
 		return app.InfraStatusStopped

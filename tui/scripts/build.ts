@@ -11,6 +11,25 @@ const dir = path.resolve(__dirname, "..")
 
 process.chdir(dir)
 
+function cleanupBunBuildArtifacts() {
+  for (const entry of fs.readdirSync(dir)) {
+    if (!entry.endsWith(".bun-build")) continue
+    fs.rmSync(path.join(dir, entry), { recursive: true, force: true })
+  }
+}
+
+process.on("exit", cleanupBunBuildArtifacts)
+process.on("SIGINT", () => {
+  cleanupBunBuildArtifacts()
+  process.exit(130)
+})
+process.on("SIGTERM", () => {
+  cleanupBunBuildArtifacts()
+  process.exit(143)
+})
+
+cleanupBunBuildArtifacts()
+
 function patchOpenTUISolidTransform() {
   // Work around Bun 1.3.14 ESM/CJS interop for @opentui/solid's Babel module resolver import.
   // babel-plugin-module-resolver is CommonJS and may not expose a synthetic default during Bun.build.
@@ -230,5 +249,7 @@ for (const item of targets) {
   )
   binaries[name] = appVersion
 }
+
+cleanupBunBuildArtifacts()
 
 export { binaries }

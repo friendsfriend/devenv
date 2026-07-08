@@ -395,16 +395,6 @@ func parseRuntimeStatsTab(name string, out []byte) *NodeResourceStats {
 	mU, mL := parseMemoryPair(memUsage)
 	return &NodeResourceStats{Name: strings.TrimPrefix(name, "devenv-"), ContainerName: name, CPUPercent: parsePercent(cpu), MemoryUsageBytes: mU, MemoryLimitBytes: mL, MemoryPercent: parsePercent(memPerc)}
 }
-
-func pick(m map[string]string, keys ...string) string {
-	for _, k := range keys {
-		if v, ok := m[k]; ok {
-			return v
-		}
-	}
-	return ""
-}
-
 func pickI(m map[string]interface{}, keys ...string) string {
 	for _, k := range keys {
 		if v, ok := m[k]; ok {

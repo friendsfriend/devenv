@@ -302,15 +302,6 @@ func NewIssuesClient(c Client, info *RepoInfo) issues.Client {
 	}
 }
 
-// issueToChangeRequest converts github.RepoInfo to issues.RepoInfo.
-func (ic *IssuesClient) issueToChangeRequest() *issues.RepoInfo {
-	return &issues.RepoInfo{
-		Owner: ic.info.Owner,
-		Repo:  ic.info.Repo,
-		Host:  "github.com",
-	}
-}
-
 // GetIssues implements issues.Client.GetIssues.
 func normalizeGithubIssueSort(sortBy string) string {
 	switch sortBy {
