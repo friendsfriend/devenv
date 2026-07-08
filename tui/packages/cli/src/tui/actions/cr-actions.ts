@@ -12,6 +12,11 @@ const AI_ATTRIBUTION_HEADER = `> 🤖 *This review was generated automatically b
 
 const UNKNOWN_ERROR = "Unknown error";
 
+let crListAbortController: AbortController | null = null;
+let crDetailAbortController: AbortController | null = null;
+
+const isAbortError = (e: unknown) => e instanceof DOMException && e.name === "AbortError";
+
 /** Extract error message safely. */
 function errMsg(e: unknown): string {
 	return e instanceof Error ? e.message : UNKNOWN_ERROR;
@@ -27,6 +32,19 @@ export function createCrActions(
 	const getSelectedApp = () =>
 		appStore.tableFilteredApps()[appStore.selectedIndex()];
 
+	const abortCrListLoad = () => {
+		crListAbortController?.abort();
+		crListAbortController = null;
+	};
+	const abortCrDetailLoad = () => {
+		crDetailAbortController?.abort();
+		crDetailAbortController = null;
+	};
+	const abortViewLoads = () => {
+		abortCrListLoad();
+		abortCrDetailLoad();
+	};
+
 	const loadChangeRequestForCurrentBranch = async () => {
 		if (appStore.operationInProgressForApp())
 			return showError(
@@ -35,6 +53,9 @@ export function createCrActions(
 			);
 		const app = getSelectedApp();
 		if (!app) return;
+		abortCrListLoad();
+		const controller = new AbortController();
+		crListAbortController = controller;
 		changeRequestStore.setCrLoading(true);
 		changeRequestStore.setCrError("");
 		changeRequestStore.setSelectedCRIndex(0);
@@ -51,6 +72,11 @@ export function createCrActions(
 				app.sourceType,
 				1,
 				changeRequestStore.perPage(),
+				undefined,
+				undefined,
+				undefined,
+				undefined,
+				controller.signal,
 			);
 			if (result.items.length > 0) {
 				changeRequestStore.setChangeRequests(result.items);
@@ -67,6 +93,11 @@ export function createCrActions(
 					app.sourceType,
 					1,
 					changeRequestStore.perPage(),
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					controller.signal,
 				);
 				changeRequestStore.setChangeRequests(allResult.items);
 				changeRequestStore.setTotalPages(allResult.totalPages);
@@ -74,7 +105,8 @@ export function createCrActions(
 				changeRequestStore.setCurrentPage(allResult.currentPage);
 				changeRequestStore.setPerPage(allResult.perPage);
 			}
-		} catch {
+		} catch (e) {
+			if (isAbortError(e)) return;
 			try {
 				const allResult = await client.getChangeRequests(
 					app.ident,
@@ -83,6 +115,11 @@ export function createCrActions(
 					app.sourceType,
 					1,
 					changeRequestStore.perPage(),
+					undefined,
+					undefined,
+					undefined,
+					undefined,
+					controller.signal,
 				);
 				changeRequestStore.setChangeRequests(allResult.items);
 				changeRequestStore.setTotalPages(allResult.totalPages);
@@ -93,7 +130,8 @@ export function createCrActions(
 				changeRequestStore.setChangeRequests([]);
 			}
 		} finally {
-			changeRequestStore.setCrLoading(false);
+			if (crListAbortController === controller) crListAbortController = null;
+			if (!controller.signal.aborted) changeRequestStore.setCrLoading(false);
 		}
 	};
 
@@ -105,6 +143,9 @@ export function createCrActions(
 			);
 		const app = getSelectedApp();
 		if (!app) return;
+		abortCrListLoad();
+		const controller = new AbortController();
+		crListAbortController = controller;
 		const p = page ?? changeRequestStore.currentPage();
 		const s = state ?? changeRequestStore.crListFilters().state?.[0] ?? "opened";
 		changeRequestStore.setCrLoading(true);
@@ -122,6 +163,8 @@ export function createCrActions(
 				search,
 				changeRequestStore.activeCrListSort()?.key,
 				changeRequestStore.activeCrListSort()?.direction as "asc" | "desc" | undefined,
+				undefined,
+				controller.signal,
 			);
 			changeRequestStore.setChangeRequests(result.items);
 			changeRequestStore.setTotalPages(result.totalPages);
@@ -129,10 +172,13 @@ export function createCrActions(
 			changeRequestStore.setCurrentPage(result.currentPage);
 			changeRequestStore.setPerPage(result.perPage);
 		} catch (e) {
-			changeRequestStore.setCrError(errMsg(e));
-			changeRequestStore.setChangeRequests([]);
+			if (!isAbortError(e)) {
+				changeRequestStore.setCrError(errMsg(e));
+				changeRequestStore.setChangeRequests([]);
+			}
 		} finally {
-			changeRequestStore.setCrLoading(false);
+			if (crListAbortController === controller) crListAbortController = null;
+			if (!controller.signal.aborted) changeRequestStore.setCrLoading(false);
 		}
 	};
 
@@ -140,6 +186,7 @@ export function createCrActions(
 		cr: NonNullable<ReturnType<typeof changeRequestStore.selectedChangeRequest>>,
 	) => {
 		const app = getSelectedApp();
+		abortCrDetailLoad();
 		const mayLoadPipeline = !!cr.head_pipeline || app?.sourceType === "github";
 		changeRequestStore.setSelectedCR(cr);
 		changeRequestStore.setCrChangesLoading(true);
@@ -163,11 +210,13 @@ export function createCrActions(
 	) => {
 		const app = getSelectedApp();
 		if (!app) return;
+		const controller = new AbortController();
+		crDetailAbortController = controller;
 
 		let detailCr = cr;
 		if (app.sourceType === "github" && !cr.head_pipeline) {
 			try {
-				detailCr = await client.getChangeRequest(app.ident, cr.iid, app.sourceType);
+				detailCr = await client.getChangeRequest(app.ident, cr.iid, app.sourceType, controller.signal);
 				changeRequestStore.setSelectedCR(detailCr);
 			} catch (e) {
 				const msg = errMsg(e);
@@ -184,7 +233,7 @@ export function createCrActions(
 		const changesPromise = (async () => {
 			try {
 				changeRequestStore.setCrChanges(
-					await client.getChangeRequestChanges(app.ident, detailCr.iid, app.sourceType),
+					await client.getChangeRequestChanges(app.ident, detailCr.iid, app.sourceType, controller.signal),
 				);
 			} catch (e) {
 				changeRequestStore.setCrChangesError(errMsg(e));
@@ -200,6 +249,7 @@ export function createCrActions(
 						app.ident,
 						detailCr.head_pipeline.id,
 						app.sourceType,
+						controller.signal,
 					),
 				);
 			} catch (e) {
@@ -216,6 +266,7 @@ export function createCrActions(
 						app.ident,
 						detailCr.head_pipeline.id,
 						app.sourceType,
+						controller.signal,
 					),
 				);
 			} catch (e) {
@@ -227,7 +278,7 @@ export function createCrActions(
 		const linkedIssuesPromise = (async () => {
 			try {
 				changeRequestStore.setCrLinkedIssues(
-					await client.getCRLinkedIssues(app.ident, detailCr.iid, app.sourceType),
+					await client.getCRLinkedIssues(app.ident, detailCr.iid, app.sourceType, controller.signal),
 				);
 			} catch (e) {
 				changeRequestStore.setCrLinkedIssuesError(errMsg(e));
@@ -238,7 +289,7 @@ export function createCrActions(
 		const discussionsPromise = (async () => {
 			try {
 				changeRequestStore.setCrDiscussions(
-					await client.getCRDiscussions(app.ident, detailCr.iid, app.sourceType),
+					await client.getCRDiscussions(app.ident, detailCr.iid, app.sourceType, controller.signal),
 				);
 			} catch (e) {
 				changeRequestStore.setCrDiscussionsError(errMsg(e));
@@ -253,6 +304,7 @@ export function createCrActions(
 			discussionsPromise,
 			linkedIssuesPromise,
 		]);
+		if (crDetailAbortController === controller) crDetailAbortController = null;
 	};
 
 	const submitComment = async () => {
@@ -645,6 +697,7 @@ export function createCrActions(
 		prevPage,
 		showCRDetail,
 		loadCRDetailData,
+		abortViewLoads,
 		submitComment,
 		replyToDiscussion,
 		resolveDiscussion,

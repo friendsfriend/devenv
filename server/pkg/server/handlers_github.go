@@ -13,12 +13,15 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
-	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/github"
 	"github.com/friendsfriend/devenv/pkg/gitlab"
 )
 
 func (s *Server) resolveGitHubClient(targetApp *app.App) (github.Client, *github.RepoInfo, string, error) {
+	return s.resolveGitHubClientWithContext(context.Background(), targetApp)
+}
+
+func (s *Server) resolveGitHubClientWithContext(ctx context.Context, targetApp *app.App) (github.Client, *github.RepoInfo, string, error) {
 	repoInfo, err := github.ExtractRepoInfo(targetApp.RepositoryPath)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to extract repo info: %w", err)
@@ -31,7 +34,7 @@ func (s *Server) resolveGitHubClient(targetApp *app.App) (github.Client, *github
 	if token == "" {
 		return nil, nil, "", fmt.Errorf("no token configured for provider %q", providerName)
 	}
-	client := github.NewClient(token, username)
+	client := github.NewClientWithContext(ctx, token, username)
 	return client, repoInfo, username, nil
 }
 func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request) {
@@ -40,23 +43,15 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	appIdent := r.URL.Query().Get("appIdent")
-	allBranches := r.URL.Query().Get("allBranches")
-	state := r.URL.Query().Get("state")
-	pageStr := r.URL.Query().Get("page")
-	perPageStr := r.URL.Query().Get("perPage")
-	search := r.URL.Query().Get("search")
-	sortBy := r.URL.Query().Get("sort")
-	sortDirection := r.URL.Query().Get("direction")
-	labels := splitCSV(r.URL.Query().Get("labels"))
+	query := parseChangeRequestListQuery(r)
 
-	if appIdent == "" {
+	if query.AppIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
 		return
 	}
 
 	var targetApp *app.App
-	targetApp = s.findAppByIdent(appIdent)
+	targetApp = s.findAppByIdent(query.AppIdent)
 
 	if targetApp == nil {
 		respondNotFound(w, "App not found")
@@ -79,50 +74,17 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		currentBranch == "qa" ||
 		currentBranch == "quality"
 
-	var sourceBranchFilter string
-	if allBranches != "true" && !isDefaultBranch {
-		sourceBranchFilter = currentBranch
+	if !query.AllBranches && !isDefaultBranch {
+		query.Options.SourceBranch = currentBranch
 	}
 
-	// Parse pagination params
-	page := 1
-	if pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	perPage := 50
-	if perPageStr != "" {
-		if pp, err := strconv.Atoi(perPageStr); err == nil && pp > 0 {
-			perPage = pp
-		}
-	}
-
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	// Determine SkipDetails: use SkipDetails for paginated list view (when page params present)
-	// but keep backward compat when no page params (for detail views)
-	skipDetails := pageStr != "" || perPageStr != ""
-
-	if state == "" {
-		state = "opened"
-	}
-
-	result, err := ghClient.GetChangeRequests(repoInfo.ToChangeRequest(), &changerequest.ChangeRequestListOptions{
-		SourceBranch:  sourceBranchFilter,
-		State:         state,
-		Page:          page,
-		PerPage:       perPage,
-		Search:        search,
-		Labels:        labels,
-		SortBy:        sortBy,
-		SortDirection: sortDirection,
-		SkipDetails:   skipDetails,
-	})
+	result, err := ghClient.GetChangeRequests(repoInfo.ToChangeRequest(), &query.Options)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch pull requests: %v", err), http.StatusInternalServerError)
 		return
@@ -136,7 +98,7 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 
 	if len(result.ChangeRequests) == 0 {
 		var errorMsg string
-		if sourceBranchFilter != "" {
+		if query.Options.SourceBranch != "" {
 			errorMsg = fmt.Sprintf("No open pull request found for branch '%s'", currentBranch)
 		} else {
 			errorMsg = "No open pull requests found for this repository"
@@ -179,7 +141,7 @@ func (s *Server) handleGitHubPullRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -227,7 +189,7 @@ func (s *Server) handleGitHubPRChanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -271,7 +233,7 @@ func (s *Server) handleGitHubPRDiscussions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -315,7 +277,7 @@ func (s *Server) handleGitHubPRApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -358,7 +320,7 @@ func (s *Server) handleGitHubPRUnapprove(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -401,7 +363,7 @@ func (s *Server) handleGitHubPRToggleApproval(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -444,7 +406,7 @@ func (s *Server) handleGitHubActionsJobs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -480,7 +442,7 @@ func (s *Server) handleGitHubActionsTestSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondError(w, fmt.Errorf("failed to init client: %w", err), http.StatusInternalServerError)
 		return
@@ -621,13 +583,13 @@ func (s *Server) handleGitHubActionsJobLogs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	logs, err := ghClient.GetJobLogs(repoInfo.ToChangeRequest(), jobID)
+	logs, err := ghClient.GetJobLogsContext(r.Context(), repoInfo.ToChangeRequest(), jobID)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch job logs: %v", err), http.StatusInternalServerError)
 		return

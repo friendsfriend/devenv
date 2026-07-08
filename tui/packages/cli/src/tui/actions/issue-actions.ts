@@ -5,6 +5,10 @@ import type { IssueScope } from '@devenv/types';
 
 const UNKNOWN_ERROR = "Unknown error";
 
+let issueListAbortController: AbortController | null = null;
+let issueDetailAbortController: AbortController | null = null;
+const isAbortError = (e: unknown) => e instanceof DOMException && e.name === "AbortError";
+
 function errMsg(e: unknown): string {
 	return e instanceof Error ? e.message : UNKNOWN_ERROR;
 }
@@ -17,6 +21,19 @@ export function createIssueActions(
 ) {
 	const getSelectedApp = () =>
 		appStore.tableFilteredApps()[appStore.selectedIndex()];
+
+	const abortIssueListLoad = () => {
+		issueListAbortController?.abort();
+		issueListAbortController = null;
+	};
+	const abortIssueDetailLoad = () => {
+		issueDetailAbortController?.abort();
+		issueDetailAbortController = null;
+	};
+	const abortViewLoads = () => {
+		abortIssueListLoad();
+		abortIssueDetailLoad();
+	};
 
 	const getSelectedAppSafe = (): {
 		app: NonNullable<ReturnType<typeof getSelectedApp>>;
@@ -39,6 +56,9 @@ export function createIssueActions(
 		}
 		const app = getSelectedApp();
 		if (!app) return;
+		abortIssueListLoad();
+		const controller = new AbortController();
+		issueListAbortController = controller;
 
 		const filters = issueStore.issueListFilters();
 		const s = filters.state?.[0] ?? "open";
@@ -63,6 +83,7 @@ export function createIssueActions(
 				issueStore.activeIssueListSort()?.key,
 				issueStore.activeIssueListSort()?.direction as "asc" | "desc" | undefined,
 				labels,
+				controller.signal,
 			);
 			issueStore.setIssues(result.items);
 			// Derive totalPages from totalCount/perPage when server doesn't provide it.
@@ -81,16 +102,22 @@ export function createIssueActions(
 			issueStore.setCurrentPage(result.currentPage);
 			issueStore.setPerPage(result.perPage);
 		} catch (e) {
-			issueStore.setIssueError(errMsg(e));
-			issueStore.setIssues([]);
+			if (!isAbortError(e)) {
+				issueStore.setIssueError(errMsg(e));
+				issueStore.setIssues([]);
+			}
 		} finally {
-			issueStore.setIssueLoading(false);
+			if (issueListAbortController === controller) issueListAbortController = null;
+			if (!controller.signal.aborted) issueStore.setIssueLoading(false);
 		}
 	};
 
 	const showIssueDetail = async (
 		issue: NonNullable<ReturnType<typeof issueStore.selectedIssue>>,
 	) => {
+		abortIssueDetailLoad();
+		const controller = new AbortController();
+		issueDetailAbortController = controller;
 		issueStore.setSelectedIssue(issue);
 		issueStore.issueDetailScrollBoxRef = undefined;
 		issueStore.setIssueDetailLoading(true);
@@ -117,9 +144,9 @@ export function createIssueActions(
 		// so one failure doesn't block the others.
 		const [commentsResult, linkedChangeRequestsResult, referencedIssuesResult] =
 			await Promise.allSettled([
-				client.getIssueComments(app.ident, issue.iid, app.sourceType),
-				client.getIssueLinkedCRs(app.ident, issue.iid, app.sourceType),
-				client.getIssueReferencedIssues(app.ident, issue.iid, app.sourceType),
+				client.getIssueComments(app.ident, issue.iid, app.sourceType, controller.signal),
+				client.getIssueLinkedCRs(app.ident, issue.iid, app.sourceType, controller.signal),
+				client.getIssueReferencedIssues(app.ident, issue.iid, app.sourceType, controller.signal),
 			]);
 
 		const comments =
@@ -161,10 +188,13 @@ export function createIssueActions(
 			issueStore.setIssueCommentsError(errMsg(commentsResult.reason));
 		}
 
-		issueStore.setIssueDetailLoading(false);
-		issueStore.setIssueCommentsLoading(false);
-		issueStore.setLinkedCRsLoading(false);
-		issueStore.setReferencedIssuesLoading(false);
+		if (issueDetailAbortController === controller) issueDetailAbortController = null;
+		if (!controller.signal.aborted) {
+			issueStore.setIssueDetailLoading(false);
+			issueStore.setIssueCommentsLoading(false);
+			issueStore.setLinkedCRsLoading(false);
+			issueStore.setReferencedIssuesLoading(false);
+		}
 	};
 
 	const nextPage = async () => {
@@ -468,6 +498,7 @@ export function createIssueActions(
 	return {
 		loadAllIssues,
 		showIssueDetail,
+		abortViewLoads,
 		nextPage,
 		prevPage,
 		backToIssueList,

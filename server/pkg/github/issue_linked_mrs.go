@@ -112,7 +112,7 @@ func (ic *IssuesClient) fetchCrossReferencedPRs(ghInfo *RepoInfo, issueNumber in
 		if !seen[num] {
 			seen[num] = true
 			refs = append(refs, num)
-			log.Printf("[DEBUG] GitHub fetchCrossReferencedPRs: found cross-referenced PR #%d", num)
+			debugLog("GitHub fetchCrossReferencedPRs: found cross-referenced PR #%d", num)
 		}
 	}
 
@@ -182,7 +182,7 @@ func (ic *IssuesClient) GetIssueLinkedChangeRequests(info *issues.RepoInfo, numb
 	issue, err := ic.GetIssue(info, number)
 	if err == nil {
 		bodyRefs := parseClosingReferences(issue.Description)
-		log.Printf("[DEBUG] GitHub GetIssueLinkedChangeRequests(#%d): %d references from body parsing", number, len(bodyRefs))
+		debugLog("GitHub GetIssueLinkedChangeRequests(#%d): %d references from body parsing", number, len(bodyRefs))
 
 		for _, prNum := range bodyRefs {
 			if seen[prNum] {
@@ -200,7 +200,7 @@ func (ic *IssuesClient) GetIssueLinkedChangeRequests(info *issues.RepoInfo, numb
 	// Source 2: Issue timeline cross-referenced events
 	// Catches PRs that reference this issue via PR body keywords or "Development" link
 	timelineRefs := ic.fetchCrossReferencedPRs(ghInfo, number)
-	log.Printf("[DEBUG] GitHub GetIssueLinkedChangeRequests(#%d): %d references from timeline", number, len(timelineRefs))
+	debugLog("GitHub GetIssueLinkedChangeRequests(#%d): %d references from timeline", number, len(timelineRefs))
 
 	for _, prNum := range timelineRefs {
 		if seen[prNum] {

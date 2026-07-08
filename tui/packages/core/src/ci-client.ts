@@ -6,12 +6,14 @@ export async function getPipelineJobs(
   deps: ClientDeps,
   appIdent: string,
   pipelineId: number,
-  sourceType?: string
+  sourceType?: string,
+  signal?: AbortSignal,
 ): Promise<Job[]> {
   const endpoint = sourceType === 'github' ? 'github/actions-jobs' : 'gitlab/jobs';
   const paramName = sourceType === 'github' ? 'runId' : 'pipelineId';
   const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&${paramName}=${pipelineId}`
+    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&${paramName}=${pipelineId}`,
+    { signal }
   );
 
   if (!response.ok) {
@@ -25,12 +27,14 @@ export async function getTestSummary(
   deps: ClientDeps,
   appIdent: string,
   pipelineId: number,
-  sourceType?: string
+  sourceType?: string,
+  signal?: AbortSignal,
 ): Promise<TestSummary> {
   const endpoint = sourceType === 'github' ? 'github/actions-test-summary' : 'gitlab/test-summary';
   const paramName = sourceType === 'github' ? 'runId' : 'pipelineId';
   const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&${paramName}=${pipelineId}`
+    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&${paramName}=${pipelineId}`,
+    { signal }
   );
 
   if (!response.ok) {

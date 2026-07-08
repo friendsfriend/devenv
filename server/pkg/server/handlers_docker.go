@@ -218,7 +218,7 @@ func (s *Server) handleDockerLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DEBUG] Fetching logs for container: %s", containerID)
+	debugLog("Fetching logs for container: %s", containerID)
 
 	logs, err := s.services.DockerClient().GetContainerLogs(containerID)
 	if err != nil {
@@ -227,7 +227,7 @@ func (s *Server) handleDockerLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DEBUG] Successfully fetched %d bytes of logs", len(logs))
+	debugLog("Successfully fetched %d bytes of logs", len(logs))
 
 	// Return logs as plain text
 	w.Header().Set("Content-Type", "text/plain")
@@ -267,7 +267,7 @@ func (s *Server) handleDockerStatsStream(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Printf("[DEBUG] Streaming stats for container: %s", containerID)
+	debugLog("Streaming stats for container: %s", containerID)
 
 	for entry := range statsCh {
 		data, err := json.Marshal(entry)
@@ -279,7 +279,7 @@ func (s *Server) handleDockerStatsStream(w http.ResponseWriter, r *http.Request)
 		flusher.Flush()
 	}
 
-	log.Printf("[DEBUG] Stats stream ended for container: %s", containerID)
+	debugLog("Stats stream ended for container: %s", containerID)
 }
 
 func (s *Server) handleDockerLogsStream(w http.ResponseWriter, r *http.Request) {
@@ -318,7 +318,7 @@ func (s *Server) handleDockerLogsStream(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	log.Printf("[DEBUG] Streaming logs for container: %s", containerID)
+	debugLog("Streaming logs for container: %s", containerID)
 
 	for line := range lineCh {
 		data, err := json.Marshal(map[string]string{"line": line})
@@ -329,5 +329,5 @@ func (s *Server) handleDockerLogsStream(w http.ResponseWriter, r *http.Request) 
 		flusher.Flush()
 	}
 
-	log.Printf("[DEBUG] Log stream ended for container: %s", containerID)
+	debugLog("Log stream ended for container: %s", containerID)
 }

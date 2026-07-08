@@ -21,6 +21,9 @@
     "install:bin": "sh install.sh",
     "dev": "cd tui && bun run dev",
     "type-check": "cd tui && bun run type-check",
-    "test": "cd tui && bun run test"
+    "test": "cd tui && bun run test",
+    "test:server": "cd server && go test ./...",
+    "vet:server": "cd server && go vet ./...",
+    "verify": "bun run type-check && bun run test && bun run test:server && bun run vet:server"
   }
 }

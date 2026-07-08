@@ -12,6 +12,7 @@ import type {
 	RepoSearchResult,
 	ServerEvent,
 	StatusLogEntry,
+	CRVersion,
 } from "@devenv/types";
 import type { ClientDeps, FetchFunction } from "./client-types";
 import { getPiSessions } from "./agent-client";
@@ -300,6 +301,7 @@ export class DevEnvClient {
 		sort?: string,
 		direction?: "asc" | "desc",
 		labels?: string[],
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").ChangeRequestListResult> {
 		return getChangeRequests(
 			this.deps,
@@ -313,6 +315,7 @@ export class DevEnvClient {
 			sort,
 			direction,
 			labels,
+			signal,
 		);
 	}
 	getIssues(
@@ -326,6 +329,7 @@ export class DevEnvClient {
 		sort?: string,
 		direction?: "asc" | "desc",
 		labels?: string[],
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").IssueListResult> {
 		return getIssues(
 			this.deps,
@@ -339,21 +343,24 @@ export class DevEnvClient {
 			sort,
 			direction,
 			labels,
+			signal,
 		);
 	}
 	getIssue(
 		appIdent: string,
 		number: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").Issue> {
-		return getIssue(this.deps, appIdent, number, sourceType);
+		return getIssue(this.deps, appIdent, number, sourceType, signal);
 	}
 	getIssueComments(
 		appIdent: string,
 		number: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").IssueCommentListResult> {
-		return getIssueComments(this.deps, appIdent, number, sourceType);
+		return getIssueComments(this.deps, appIdent, number, sourceType, signal);
 	}
 
 	// ─── Issue Mutations ───────────────────────────────────────────────────
@@ -428,54 +435,61 @@ export class DevEnvClient {
 		appIdent: string,
 		number: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").ChangeRequest[]> {
-		return getIssueLinkedCRs(this.deps, appIdent, number, sourceType);
+		return getIssueLinkedCRs(this.deps, appIdent, number, sourceType, signal);
 	}
 
 	getIssueReferencedIssues(
 		appIdent: string,
 		number: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").Issue[]> {
-		return getIssueReferencedIssues(this.deps, appIdent, number, sourceType);
+		return getIssueReferencedIssues(this.deps, appIdent, number, sourceType, signal);
 	}
 
 	getCRLinkedIssues(
 		appIdent: string,
 		number: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").Issue[]> {
-		return getCRLinkedIssues(this.deps, appIdent, number, sourceType);
+		return getCRLinkedIssues(this.deps, appIdent, number, sourceType, signal);
 	}
 	getPipelineJobs(
 		appIdent: string,
 		pipelineId: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").Job[]> {
-		return getPipelineJobs(this.deps, appIdent, pipelineId, sourceType);
+		return getPipelineJobs(this.deps, appIdent, pipelineId, sourceType, signal);
 	}
 	getTestSummary(
 		appIdent: string,
 		pipelineId: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").TestSummary> {
-		return getTestSummary(this.deps, appIdent, pipelineId, sourceType);
+		return getTestSummary(this.deps, appIdent, pipelineId, sourceType, signal);
 	}
 	getChangeRequest(
 		appIdent: string,
 		crIID: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").ChangeRequest> {
-		return getChangeRequest(this.deps, appIdent, crIID, sourceType);
+		return getChangeRequest(this.deps, appIdent, crIID, sourceType, signal);
 	}
 	getChangeRequestChanges(
 		appIdent: string,
 		crIID: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").ChangeRequestChange[]> {
-		return getChangeRequestChanges(this.deps, appIdent, crIID, sourceType);
+		return getChangeRequestChanges(this.deps, appIdent, crIID, sourceType, signal);
 	}
-	getCRVersions(appIdent: string, crIID: number): Promise<any[]> {
+	getCRVersions(appIdent: string, crIID: number): Promise<CRVersion[]> {
 		return getCRVersions(this.deps, appIdent, crIID);
 	}
 	createCRComment(
@@ -504,8 +518,9 @@ export class DevEnvClient {
 		appIdent: string,
 		crIID: number,
 		sourceType?: string,
+		signal?: AbortSignal,
 	): Promise<import("@devenv/types").Discussion[]> {
-		return getCRDiscussions(this.deps, appIdent, crIID, sourceType);
+		return getCRDiscussions(this.deps, appIdent, crIID, sourceType, signal);
 	}
 	toggleCRApproval(
 		appIdent: string,
@@ -595,8 +610,9 @@ export class DevEnvClient {
 		provider: string,
 		query: string,
 		host?: string,
+		signal?: AbortSignal,
 	): Promise<RepoSearchResult[]> {
-		return searchRepos(this.deps, provider, query, host);
+		return searchRepos(this.deps, provider, query, host, signal);
 	}
 	getRepoBranches(url: string, provider?: string): Promise<string[]> {
 		return getRepoBranches(this.deps, url, provider);

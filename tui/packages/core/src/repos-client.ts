@@ -6,7 +6,8 @@ export async function searchRepos(
   deps: ClientDeps,
   provider: string,
   query: string,
-  host?: string
+  host?: string,
+  signal?: AbortSignal,
 ): Promise<RepoSearchResult[]> {
   const payload: Record<string, string> = { provider, query };
   if (host) payload.host = host;
@@ -15,6 +16,7 @@ export async function searchRepos(
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
+    signal,
   });
 
   if (!response.ok) {

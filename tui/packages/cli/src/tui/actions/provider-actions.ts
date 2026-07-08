@@ -9,6 +9,12 @@ export function createProviderActions(
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
 ) {
+  let repoSearchAbortController: AbortController | null = null;
+  const abortRepositorySearch = () => {
+    repoSearchAbortController?.abort();
+    repoSearchAbortController = null;
+  };
+
   const refreshProviders = async () => {
     providerStore.setProvidersLoading(true);
     providerStore.setProvidersError('');
@@ -42,6 +48,7 @@ export function createProviderActions(
   };
 
   const resetAddRepositoryModal = () => {
+    abortRepositorySearch();
     providerStore.setShowAddRepositoryModal(false);
     providerStore.setAddRepositoryStep('selectProvider');
     providerStore.setAddRepositoryProviders([]);
@@ -92,17 +99,23 @@ export function createProviderActions(
     const idx = providerStore.addRepositorySelectedProviderIndex();
     if (idx < 0 || idx >= providers.length) return;
     const provider = providers[idx];
+    abortRepositorySearch();
+    const controller = new AbortController();
+    repoSearchAbortController = controller;
     providerStore.setAddRepositoryLoading(true);
     providerStore.setAddRepositoryError(null);
     try {
-      const results = await client.searchRepos(provider.name, query);
+      const results = await client.searchRepos(provider.name, query, undefined, controller.signal);
       providerStore.setAddRepositorySearchResults(results);
       providerStore.setAddRepositorySelectedResultIndex(0);
       if (!results.length) providerStore.setAddRepositoryError('No repositories found');
     } catch (e) {
-      providerStore.setAddRepositoryError(e instanceof Error ? e.message : 'Search failed');
+      if (!(e instanceof DOMException && e.name === 'AbortError')) {
+        providerStore.setAddRepositoryError(e instanceof Error ? e.message : 'Search failed');
+      }
     } finally {
-      providerStore.setAddRepositoryLoading(false);
+      if (repoSearchAbortController === controller) repoSearchAbortController = null;
+      if (!controller.signal.aborted) providerStore.setAddRepositoryLoading(false);
     }
   };
 
@@ -230,6 +243,7 @@ export function createProviderActions(
     resetAddRepositoryModal,
     openAddRepositoryModal,
     addRepositoryPerformSearch,
+    abortRepositorySearch,
     addRepositoryFetchBranches,
     addRepositorySubmitCreate,
     openAddProviderModal,

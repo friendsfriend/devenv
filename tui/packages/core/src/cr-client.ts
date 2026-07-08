@@ -1,4 +1,4 @@
-import type { Discussion, ChangeRequestChange, ChangeRequest, ChangeRequestListResult } from '@devenv/types';
+import type { CRCommentPosition, CRCommentRequest, CRMutationResult, CRVersion, Discussion, ChangeRequestChange, ChangeRequest, ChangeRequestListResult } from '@devenv/types';
 import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 
@@ -18,6 +18,7 @@ export async function getChangeRequests(
   sort?: string,
   direction?: 'asc' | 'desc',
   labels?: string[],
+  signal?: AbortSignal,
 ): Promise<ChangeRequestListResult> {
   const params = new URLSearchParams({
     appIdent,
@@ -35,7 +36,7 @@ export async function getChangeRequests(
   params.append('page', String(page));
   params.append('perPage', String(perPage));
   const endpoint = sourceType === 'github' ? 'github/pull-requests' : 'gitlab/merge-requests';
-  const response = await deps.fetchFn(`${deps.baseUrl}/api/${endpoint}?${params}`);
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/${endpoint}?${params}`, { signal });
 
   if (response.status === 404 || response.status === 400) {
     return { items: [], totalCount: -1, totalPages: -1, currentPage: 1, perPage };
@@ -57,13 +58,15 @@ export async function getChangeRequest(
   appIdent: string,
   crIID: number,
   sourceType?: string,
+  signal?: AbortSignal,
 ): Promise<ChangeRequest> {
   if (sourceType !== 'github') {
     throw new Error('Full change request detail fetch is currently only implemented for GitHub');
   }
 
   const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/github/pull-request?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`
+    `${deps.baseUrl}/api/github/pull-request?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`,
+    { signal }
   );
 
   if (!response.ok) {
@@ -80,11 +83,13 @@ export async function getChangeRequestChanges(
   deps: ClientDeps,
   appIdent: string,
   crIID: number,
-  sourceType?: string
+  sourceType?: string,
+  signal?: AbortSignal,
 ): Promise<ChangeRequestChange[]> {
   const endpoint = sourceType === 'github' ? 'github/pr-changes' : 'gitlab/cr-changes';
   const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`
+    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`,
+    { signal }
   );
 
   if (!response.ok) {
@@ -97,7 +102,7 @@ export async function getChangeRequestChanges(
 /**
  * Get CR versions (SHAs) for a specific change request
  */
-export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: number): Promise<any[]> {
+export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: number): Promise<CRVersion[]> {
   const url = `${deps.baseUrl}/api/gitlab/cr-versions?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`;
   const response = await deps.fetchFn(url);
 
@@ -105,7 +110,7 @@ export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: n
     await handleFetchError(response, deps.onError);
   }
 
-  return (await response.json()) as any[];
+  return (await response.json()) as CRVersion[];
 }
 
 /**
@@ -126,21 +131,10 @@ export async function createCRComment(
     newLine?: number;
     oldLine?: number;
     lineCode?: string;
-    lineRange?: {
-      start: {
-        type: string;
-        oldLine?: number;
-        newLine?: number;
-      };
-      end: {
-        type: string;
-        oldLine?: number;
-        newLine?: number;
-      };
-    };
+    lineRange?: CRCommentPosition['lineRange'];
   }
-): Promise<{ status: string; message: string }> {
-  const payload: any = {
+): Promise<CRMutationResult> {
+  const payload: CRCommentRequest = {
     appIdent,
     crIID,
     body,
@@ -177,8 +171,6 @@ export async function createCRComment(
     }
   }
 
-  console.error('[SDK] Payload being sent:', JSON.stringify(payload, null, 2));
-
   const response = await deps.fetchFn(`${deps.baseUrl}/api/gitlab/cr-comment`, {
     method: 'POST',
     headers: {
@@ -191,7 +183,7 @@ export async function createCRComment(
     await handleFetchError(response, deps.onError);
   }
 
-  return (await response.json()) as { status: string; message: string };
+  return (await response.json()) as CRMutationResult;
 }
 
 /**
@@ -201,11 +193,13 @@ export async function getCRDiscussions(
   deps: ClientDeps,
   appIdent: string,
   crIID: number,
-  sourceType?: string
+  sourceType?: string,
+  signal?: AbortSignal,
 ): Promise<Discussion[]> {
   const endpoint = sourceType === 'github' ? 'github/pr-discussions' : 'gitlab/cr-discussions';
   const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`
+    `${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`,
+    { signal }
   );
 
   if (!response.ok) {

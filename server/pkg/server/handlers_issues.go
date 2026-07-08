@@ -1,9 +1,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -16,6 +16,10 @@ import (
 
 // resolveGitHubIssueClient returns a GitHub issues client.
 func (s *Server) resolveGitHubIssueClient(targetApp *app.App) (issues.Client, *github.RepoInfo, error) {
+	return s.resolveGitHubIssueClientWithContext(context.Background(), targetApp)
+}
+
+func (s *Server) resolveGitHubIssueClientWithContext(ctx context.Context, targetApp *app.App) (issues.Client, *github.RepoInfo, error) {
 	repoInfo, err := github.ExtractRepoInfo(targetApp.RepositoryPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to extract repo info: %w", err)
@@ -28,13 +32,17 @@ func (s *Server) resolveGitHubIssueClient(targetApp *app.App) (issues.Client, *g
 	if token == "" {
 		return nil, nil, fmt.Errorf("no token configured for provider %q", providerName)
 	}
-	ghClient := github.NewClient(token, username)
+	ghClient := github.NewClientWithContext(ctx, token, username)
 	issuesClient := github.NewIssuesClient(ghClient, repoInfo)
 	return issuesClient, repoInfo, nil
 }
 
 // resolveGitLabIssueClient returns a GitLab issues client.
 func (s *Server) resolveGitLabIssueClient(targetApp *app.App) (issues.Client, *gitlab.ProjectInfo, error) {
+	return s.resolveGitLabIssueClientWithContext(context.Background(), targetApp)
+}
+
+func (s *Server) resolveGitLabIssueClientWithContext(ctx context.Context, targetApp *app.App) (issues.Client, *gitlab.ProjectInfo, error) {
 	projectInfo, err := gitlab.ExtractProjectInfo(targetApp.RepositoryPath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to extract project info: %w", err)
@@ -48,7 +56,7 @@ func (s *Server) resolveGitLabIssueClient(targetApp *app.App) (issues.Client, *g
 		return nil, nil, fmt.Errorf("no token configured for provider %q", providerName)
 	}
 	baseURL := fmt.Sprintf("https://%s", projectInfo.Host)
-	glClient := gitlab.NewClient(baseURL, token, username)
+	glClient := gitlab.NewClientWithContext(ctx, baseURL, token, username)
 	issuesClient := gitlab.NewIssuesClient(glClient, projectInfo)
 	return issuesClient, projectInfo, nil
 }
@@ -99,30 +107,20 @@ func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := 1
-	if pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	perPage := 50
-	if perPageStr != "" {
-		if pp, err := strconv.Atoi(perPageStr); err == nil && pp > 0 {
-			perPage = pp
-		}
-	}
+	page := parsePage(pageStr)
+	perPage := parsePerPage(perPageStr)
 
 	if state == "" {
 		state = "open"
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] handleGitHubIssues: appIdent=%q scope=%q state=%q search=%q page=%d perPage=%d", appIdent, scope, state, search, page, perPage)
+	debugLog("handleGitHubIssues: appIdent=%q scope=%q state=%q search=%q page=%d perPage=%d", appIdent, scope, state, search, page, perPage)
 
 	result, err := issuesClient.GetIssues(nil, &issues.IssueListOptions{
 		Scope:         scope,
@@ -139,7 +137,7 @@ func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DEBUG] handleGitHubIssues: returned %d items, scope=%q", len(result.Issues), scope)
+	debugLog("handleGitHubIssues: returned %d items, scope=%q", len(result.Issues), scope)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
@@ -172,7 +170,7 @@ func (s *Server) handleGitHubIssueDetail(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -215,7 +213,7 @@ func (s *Server) handleGitHubIssueComments(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -263,24 +261,14 @@ func (s *Server) handleGitLabIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := 1
-	if pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	perPage := 50
-	if perPageStr != "" {
-		if pp, err := strconv.Atoi(perPageStr); err == nil && pp > 0 {
-			perPage = pp
-		}
-	}
+	page := parsePage(pageStr)
+	perPage := parsePerPage(perPageStr)
 
 	if state == "" {
 		state = "opened"
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -332,7 +320,7 @@ func (s *Server) handleGitLabIssueDetail(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -375,7 +363,7 @@ func (s *Server) handleGitLabIssueComments(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -420,7 +408,7 @@ func (s *Server) handleGitHubCloseIssue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -469,7 +457,7 @@ func (s *Server) handleGitHubReopenIssue(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -520,7 +508,7 @@ func (s *Server) handleGitHubSetLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -571,7 +559,7 @@ func (s *Server) handleGitHubSetAssignee(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -614,7 +602,7 @@ func (s *Server) handleGitHubRemoveAssignee(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -649,7 +637,7 @@ func (s *Server) handleGitHubRepoLabels(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -683,7 +671,7 @@ func (s *Server) handleGitHubRepoCollaborators(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -727,7 +715,7 @@ func (s *Server) handleGitLabCloseIssue(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -775,7 +763,7 @@ func (s *Server) handleGitLabReopenIssue(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -826,7 +814,7 @@ func (s *Server) handleGitLabSetLabels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -877,7 +865,7 @@ func (s *Server) handleGitLabSetAssignee(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -920,7 +908,7 @@ func (s *Server) handleGitLabRemoveAssignee(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -955,7 +943,7 @@ func (s *Server) handleGitLabRepoLabels(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -989,7 +977,7 @@ func (s *Server) handleGitLabRepoCollaborators(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1039,7 +1027,7 @@ func (s *Server) handleGitHubAddComment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	client, _, err := s.resolveGitHubIssueClient(targetApp)
+	client, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1084,7 +1072,7 @@ func (s *Server) handleGitHubIssueLinkedCRs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1127,7 +1115,7 @@ func (s *Server) handleGitLabIssueLinkedCRs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1178,7 +1166,7 @@ func (s *Server) handleGitLabAddComment(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	client, _, err := s.resolveGitLabIssueClient(targetApp)
+	client, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1223,7 +1211,7 @@ func (s *Server) handleGitHubCRLinkedIssues(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	issuesClient, repoInfo, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, repoInfo, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1273,7 +1261,7 @@ func (s *Server) handleGitLabCRLinkedIssues(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	issuesClient, projectInfo, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, projectInfo, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1325,7 +1313,7 @@ func (s *Server) handleGitHubIssueReferencedIssues(w http.ResponseWriter, r *htt
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitHubIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitHubIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1374,7 +1362,7 @@ func (s *Server) handleGitLabIssueReferencedIssues(w http.ResponseWriter, r *htt
 		return
 	}
 
-	issuesClient, _, err := s.resolveGitLabIssueClient(targetApp)
+	issuesClient, _, err := s.resolveGitLabIssueClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return

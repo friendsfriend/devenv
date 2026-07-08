@@ -23,6 +23,7 @@ export async function getIssues(
 	sort?: string,
 	direction?: "asc" | "desc",
 	labels?: string[],
+	signal?: AbortSignal,
 ): Promise<IssueListResult> {
 	const params = new URLSearchParams({
 		appIdent,
@@ -42,6 +43,7 @@ export async function getIssues(
 	const endpoint = sourceType === "github" ? "github/issues" : "gitlab/issues";
 	const response = await deps.fetchFn(
 		`${deps.baseUrl}/api/${endpoint}?${params}`,
+		{ signal },
 	);
 
 	if (response.status === 404 || response.status === 400) {
@@ -69,10 +71,12 @@ export async function getIssue(
 	appIdent: string,
 	number: number,
 	sourceType?: string,
+	signal?: AbortSignal,
 ): Promise<Issue> {
 	const endpoint = sourceType === "github" ? "github/issue" : "gitlab/issue";
 	const response = await deps.fetchFn(
 		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+		{ signal },
 	);
 
 	if (!response.ok) {
@@ -90,11 +94,13 @@ export async function getIssueComments(
 	appIdent: string,
 	number: number,
 	sourceType?: string,
+	signal?: AbortSignal,
 ): Promise<IssueCommentListResult> {
 	const endpoint =
 		sourceType === "github" ? "github/issue-comments" : "gitlab/issue-comments";
 	const response = await deps.fetchFn(
 		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+		{ signal },
 	);
 
 	if (!response.ok) {
@@ -263,6 +269,7 @@ export async function getIssueLinkedCRs(
 	appIdent: string,
 	number: number,
 	sourceType?: string,
+	signal?: AbortSignal,
 ): Promise<import("@devenv/types").ChangeRequest[]> {
 	const endpoint =
 		sourceType === "github"
@@ -270,6 +277,7 @@ export async function getIssueLinkedCRs(
 			: "gitlab/issues/linked-crs";
 	const response = await deps.fetchFn(
 		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+		{ signal },
 	);
 
 	if (!response.ok) {
@@ -287,6 +295,7 @@ export async function getIssueReferencedIssues(
 	appIdent: string,
 	number: number,
 	sourceType?: string,
+	signal?: AbortSignal,
 ): Promise<import("@devenv/types").Issue[]> {
 	const endpoint =
 		sourceType === "github"
@@ -294,6 +303,7 @@ export async function getIssueReferencedIssues(
 			: "gitlab/issues/references";
 	const response = await deps.fetchFn(
 		`${deps.baseUrl}/api/${endpoint}?appIdent=${encodeURIComponent(appIdent)}&number=${number}`,
+		{ signal },
 	);
 
 	if (!response.ok) {
@@ -311,6 +321,7 @@ export async function getCRLinkedIssues(
 	appIdent: string,
 	number: number,
 	sourceType?: string,
+	signal?: AbortSignal,
 ): Promise<import("@devenv/types").Issue[]> {
 	const endpoint =
 		sourceType === "github"

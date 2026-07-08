@@ -285,7 +285,7 @@ func (ic *IssuesClient) GetIssueLinkedChangeRequests(info *issues.RepoInfo, numb
 	}
 
 	inlineRefs := parseInlineMRReferences(issue.Description)
-	log.Printf("[DEBUG] GitLab GetIssueLinkedChangeRequests(#%d): %d closed_by MRs, %d inline refs", number, len(closedByMRs), len(inlineRefs))
+	debugLog("GitLab GetIssueLinkedChangeRequests(#%d): %d closed_by MRs, %d inline refs", number, len(closedByMRs), len(inlineRefs))
 
 	if len(inlineRefs) > 0 {
 		for _, refIID := range inlineRefs {

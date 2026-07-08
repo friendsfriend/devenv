@@ -51,7 +51,7 @@ func (ic *IssuesClient) GetIssueReferencedIssues(info *issues.RepoInfo, number i
 	}
 
 	refs := parseReferencedIssueRefs(issue.Description)
-	log.Printf("[DEBUG] GitLab GetIssueReferencedIssues(#%d): found %d references", number, len(refs))
+	debugLog("GitLab GetIssueReferencedIssues(#%d): found %d references", number, len(refs))
 
 	if len(refs) == 0 {
 		return []issues.Issue{}, nil

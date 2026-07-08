@@ -25,7 +25,7 @@ func (ic *IssuesClient) GetIssueReferencedIssues(info *issues.RepoInfo, number i
 	}
 
 	refs := parseClosingReferences(issue.Description)
-	log.Printf("[DEBUG] GitHub GetIssueReferencedIssues(#%d): found %d references", number, len(refs))
+	debugLog("GitHub GetIssueReferencedIssues(#%d): found %d references", number, len(refs))
 
 	if len(refs) == 0 {
 		return []issues.Issue{}, nil
