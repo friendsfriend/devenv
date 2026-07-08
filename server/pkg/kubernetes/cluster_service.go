@@ -174,7 +174,7 @@ func (s ClusterService) Status(ctx context.Context) ClusterStatus {
 			status.Warnings = append(status.Warnings, err.Error())
 			status.State = ClusterStateDegraded
 		} else {
-			status.Pods, status.Namespaces = parsePods(pods)
+			status.Pods, status.Namespaces, status.PodList = parsePods(pods)
 		}
 		if releases, err := exec.Run(ctx, r.HelmCommandFor("list", "--all-namespaces", "-o", "json")); err != nil {
 			status.Warnings = append(status.Warnings, err.Error())
@@ -231,10 +231,11 @@ func parseNodes(out []byte) []ClusterNodeSummary {
 	return res
 }
 
-func parsePods(out []byte) (PodSummary, []NamespaceSummary) {
+func parsePods(out []byte) (PodSummary, []NamespaceSummary, []PodListItem) {
 	var list struct {
 		Items []struct {
 			Metadata struct {
+				Name      string `json:"name"`
 				Namespace string `json:"namespace"`
 			} `json:"metadata"`
 			Status struct {
@@ -245,10 +246,12 @@ func parsePods(out []byte) (PodSummary, []NamespaceSummary) {
 	_ = json.Unmarshal(out, &list)
 	summary := PodSummary{}
 	byNS := map[string]int{}
+	pods := make([]PodListItem, 0, len(list.Items))
 	for _, item := range list.Items {
 		summary.Total++
 		byNS[item.Metadata.Namespace]++
-		switch item.Status.Phase {
+		status := item.Status.Phase
+		switch status {
 		case "Running":
 			summary.Running++
 		case "Pending":
@@ -259,13 +262,17 @@ func parsePods(out []byte) (PodSummary, []NamespaceSummary) {
 			summary.Failed++
 		default:
 			summary.Unknown++
+			if status == "" {
+				status = "Unknown"
+			}
 		}
+		pods = append(pods, PodListItem{Name: item.Metadata.Name, Namespace: item.Metadata.Namespace, Status: status})
 	}
 	ns := make([]NamespaceSummary, 0, len(byNS))
 	for name, count := range byNS {
 		ns = append(ns, NamespaceSummary{Name: name, Pods: count})
 	}
-	return summary, ns
+	return summary, ns, pods
 }
 
 func parseReleases(out []byte) []DevEnvReleaseSummary {

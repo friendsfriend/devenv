@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import type { ActionTarget } from '@devenv/types';
 import { uiColors } from '../colors';
@@ -39,7 +40,6 @@ function truncate(value: string, max: number): string {
 }
 
 function ActionTargetRow(props: { target: ActionTarget; isSelected: boolean }) {
-  const cursor = () => props.isSelected ? '► ' : '  ';
   const details = () => targetDetails(props.target);
   const text = () => details()
     ? `${targetText(props.target)} — ${details()}`
@@ -47,14 +47,14 @@ function ActionTargetRow(props: { target: ActionTarget; isSelected: boolean }) {
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{ width: '100%', height: 1, paddingLeft: 1, paddingRight: 1 }}
     >
       <text
         fg={uiColors.textPrimary}
         attributes={props.isSelected ? TextAttributes.BOLD : undefined}
       >
-        {cursor()}{truncate(text(), 120)}
+        {truncate(text(), 120)}
       </text>
     </box>
   );
@@ -74,7 +74,6 @@ export function ActionTargetPickerView(props: ActionTargetPickerProps) {
       items={props.targets}
       selectedIndex={props.selectedIndex}
       loading={props.loading}
-      reservedHeight={4}
       scrollIndicatorLabel="targets"
       emptyContent={<text fg={uiColors.textSecondary}>No targets available</text>}
       renderItem={(target, isSelected) => (

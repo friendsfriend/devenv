@@ -106,8 +106,7 @@ export function createCrActions(
 		const app = getSelectedApp();
 		if (!app) return;
 		const p = page ?? changeRequestStore.currentPage();
-		const s = state ?? changeRequestStore.crState();
-		changeRequestStore.setCrState(s);
+		const s = state ?? changeRequestStore.crListFilters().state?.[0] ?? "opened";
 		changeRequestStore.setCrLoading(true);
 		changeRequestStore.setCrError("");
 		changeRequestStore.setSelectedCRIndex(0);
@@ -121,6 +120,8 @@ export function createCrActions(
 				p,
 				changeRequestStore.perPage(),
 				search,
+				changeRequestStore.activeCrListSort()?.key,
+				changeRequestStore.activeCrListSort()?.direction as "asc" | "desc" | undefined,
 			);
 			changeRequestStore.setChangeRequests(result.items);
 			changeRequestStore.setTotalPages(result.totalPages);
@@ -138,10 +139,12 @@ export function createCrActions(
 	const showCRDetail = (
 		cr: NonNullable<ReturnType<typeof changeRequestStore.selectedChangeRequest>>,
 	) => {
+		const app = getSelectedApp();
+		const mayLoadPipeline = !!cr.head_pipeline || app?.sourceType === "github";
 		changeRequestStore.setSelectedCR(cr);
 		changeRequestStore.setCrChangesLoading(true);
-		changeRequestStore.setCrTestLoading(!!cr.head_pipeline);
-		changeRequestStore.setCrJobsForDetailLoading(!!cr.head_pipeline);
+		changeRequestStore.setCrTestLoading(mayLoadPipeline);
+		changeRequestStore.setCrJobsForDetailLoading(mayLoadPipeline);
 		changeRequestStore.setCrDiscussionsLoading(true);
 		changeRequestStore.setCrChanges([]);
 		changeRequestStore.setCrChangesError("");
@@ -160,10 +163,28 @@ export function createCrActions(
 	) => {
 		const app = getSelectedApp();
 		if (!app) return;
+
+		let detailCr = cr;
+		if (app.sourceType === "github" && !cr.head_pipeline) {
+			try {
+				detailCr = await client.getChangeRequest(app.ident, cr.iid, app.sourceType);
+				changeRequestStore.setSelectedCR(detailCr);
+			} catch (e) {
+				const msg = errMsg(e);
+				changeRequestStore.setCrJobsForDetailError(`Failed to load pipeline details: ${msg}`);
+				changeRequestStore.setCrTestError(`Failed to load pipeline details: ${msg}`);
+			} finally {
+				if (!detailCr.head_pipeline) {
+					changeRequestStore.setCrJobsForDetailLoading(false);
+					changeRequestStore.setCrTestLoading(false);
+				}
+			}
+		}
+
 		const changesPromise = (async () => {
 			try {
 				changeRequestStore.setCrChanges(
-					await client.getChangeRequestChanges(app.ident, cr.iid, app.sourceType),
+					await client.getChangeRequestChanges(app.ident, detailCr.iid, app.sourceType),
 				);
 			} catch (e) {
 				changeRequestStore.setCrChangesError(errMsg(e));
@@ -172,12 +193,12 @@ export function createCrActions(
 			}
 		})();
 		const jobsPromise = (async () => {
-			if (!cr.head_pipeline) return;
+			if (!detailCr.head_pipeline) return;
 			try {
 				changeRequestStore.setCrJobsForDetail(
 					await client.getPipelineJobs(
 						app.ident,
-						cr.head_pipeline.id,
+						detailCr.head_pipeline.id,
 						app.sourceType,
 					),
 				);
@@ -188,12 +209,12 @@ export function createCrActions(
 			}
 		})();
 		const testSummaryPromise = (async () => {
-			if (!cr.head_pipeline) return;
+			if (!detailCr.head_pipeline) return;
 			try {
 				changeRequestStore.setCrTestSummary(
 					await client.getTestSummary(
 						app.ident,
-						cr.head_pipeline.id,
+						detailCr.head_pipeline.id,
 						app.sourceType,
 					),
 				);
@@ -206,7 +227,7 @@ export function createCrActions(
 		const linkedIssuesPromise = (async () => {
 			try {
 				changeRequestStore.setCrLinkedIssues(
-					await client.getCRLinkedIssues(app.ident, cr.iid, app.sourceType),
+					await client.getCRLinkedIssues(app.ident, detailCr.iid, app.sourceType),
 				);
 			} catch (e) {
 				changeRequestStore.setCrLinkedIssuesError(errMsg(e));
@@ -217,7 +238,7 @@ export function createCrActions(
 		const discussionsPromise = (async () => {
 			try {
 				changeRequestStore.setCrDiscussions(
-					await client.getCRDiscussions(app.ident, cr.iid, app.sourceType),
+					await client.getCRDiscussions(app.ident, detailCr.iid, app.sourceType),
 				);
 			} catch (e) {
 				changeRequestStore.setCrDiscussionsError(errMsg(e));
@@ -363,7 +384,7 @@ export function createCrActions(
 			await client.toggleCRApproval(app.ident, cr.iid, app.sourceType);
 			const fetched = await client.getChangeRequests(
 				app.ident,
-				changeRequestStore.crState(),
+				changeRequestStore.crListFilters().state?.[0] ?? 'opened',
 				"all",
 				app.sourceType,
 				changeRequestStore.currentPage(),
@@ -395,7 +416,7 @@ export function createCrActions(
 			await new Promise((resolve) => setTimeout(resolve, 1000));
 			const fetched = await client.getChangeRequests(
 				app.ident,
-				changeRequestStore.crState(),
+				changeRequestStore.crListFilters().state?.[0] ?? 'opened',
 				"all",
 				app.sourceType,
 				changeRequestStore.currentPage(),

@@ -1,4 +1,5 @@
 import { getLogger } from '@devenv/core';
+import { themeNames } from '@devenv/ui';
 import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
@@ -215,9 +216,6 @@ export async function handleTableKeys(
 		) {
 			appActions.closeAppDetail();
 		}
-		if (event.name === "q" || event.name === "Q") {
-			appActions.exitApp();
-		}
 		return true;
 	}
 
@@ -236,6 +234,11 @@ export async function handleTableKeys(
 		const values = param?.values ?? [];
 		if (key === "escape" || key === "esc" || event.sequence === "\x1b" || key === "return" || key === "enter") {
 			appStore.setShowTableFilterModal(false);
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		if (key === "x") {
+			appStore.setTableFilters({});
 			appStore.setSelectedIndex(0);
 			return true;
 		}
@@ -283,6 +286,11 @@ export async function handleTableKeys(
 		const selected = appStore.tableSortSelectedIndex();
 		if (key === "escape" || key === "esc" || event.sequence === "\x1b" || key === "return" || key === "enter") {
 			appStore.setShowTableSortModal(false);
+			appStore.setSelectedIndex(0);
+			return true;
+		}
+		if (key === "x") {
+			appStore.setTableSortRules((current) => current.map((rule) => ({ ...rule, direction: "none" })));
 			appStore.setSelectedIndex(0);
 			return true;
 		}
@@ -387,10 +395,6 @@ export async function handleTableKeys(
 	}
 
 	switch (key) {
-		case "q":
-		case "Q":
-			appActions.exitApp();
-			break;
 		case "/":
 			appStore.setTableSearchMode(true);
 			appStore.setTableSearchQuery("");
@@ -402,6 +406,15 @@ export async function handleTableKeys(
 		case "O":
 			appStore.setShowTableSortModal(true);
 			break;
+		case "T": {
+			const current = uiStore.activeThemeName();
+			uiStore.setThemePickerOriginalTheme(current);
+			uiStore.setThemePickerFilterActive(false);
+			uiStore.setThemePickerFilterQuery("");
+			uiStore.setThemePickerSelectedIndex(Math.max(0, themeNames.indexOf(current)));
+			uiStore.setShowThemePicker(true);
+			break;
+		}
 		case "return":
 		case "enter":
 			if (appStore.activeTab() === "scripts") {
@@ -492,8 +505,8 @@ export async function handleTableKeys(
 				logActions.loadContainerLogs();
 			break;
 		case "L":
-			// Toggle status log maximize (uppercase L)
-			appStore.setStatusLogMaximized((prev) => !prev);
+			// Open status log modal (uppercase L)
+			appStore.setShowStatusLogModal(true);
 			break;
 		case "o":
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
@@ -510,9 +523,9 @@ export async function handleTableKeys(
 				crActions.loadAllChangeRequests();
 			break;
 		case "i":
-			// Open issue scope picker (lowercase i)
+			// Open issues for current project (lowercase i)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				appStore.setViewMode("issueScopePicker");
+				void issueActions.loadAllIssues();
 			break;
 		case "I":
 			// Load all issues directly (uppercase I / Shift+I)

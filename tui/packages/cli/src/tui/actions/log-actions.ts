@@ -17,6 +17,54 @@ export function createLogActions(
     if (h > 0) logStore.setLogViewportHeight(h);
   };
 
+  const resetLogHistory = () => {
+    logStore.setLogHistoryCursor(null);
+    logStore.setLogHistoryHasMore(false);
+    logStore.setLogHistoryLoading(false);
+    logStore.setLogHistoryError(null);
+  };
+
+  const initializeHistoricalLog = async (type: import('@devenv/core').LogHistoryType, appIdent: string, fallback: () => Promise<string>) => {
+    resetLogHistory();
+    const page = await client.getLogHistory(type, appIdent, undefined, 1000);
+    if (page.lines.length > 0) {
+      logStore.setLogLines(page.lines);
+      logStore.setLogHistoryCursor(page.nextBefore);
+      logStore.setLogHistoryHasMore(page.hasMore);
+      return;
+    }
+    logStore.setLogs(await fallback());
+  };
+
+  const loadOlderLogs = async () => {
+    const params = logStore.logRefreshParams();
+    if ((params.type !== 'action' && params.type !== 'operation') || !params.appIdent) return;
+    if (!logStore.logHistoryHasMore() || logStore.logHistoryLoading()) return;
+    const before = logStore.logHistoryCursor() ?? undefined;
+    const oldScrollTop = logStore.logScrollBoxRef?.scrollTop ?? 0;
+    const oldCount = logStore.logLines().length;
+    logStore.setLogHistoryLoading(true);
+    logStore.setLogHistoryError(null);
+    try {
+      const page = await client.getLogHistory(params.type, params.appIdent, before, 1000);
+      logStore.prependLogLines(page.lines);
+      logStore.setLogHistoryCursor(page.nextBefore);
+      logStore.setLogHistoryHasMore(page.hasMore);
+      const added = logStore.logLines().length - oldCount;
+      if (added > 0) setTimeout(() => logStore.logScrollBoxRef?.scrollTo(oldScrollTop + added), 0);
+    } catch (e) {
+      logStore.setLogHistoryError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      logStore.setLogHistoryLoading(false);
+    }
+  };
+
+  const maybeLoadOlderLogs = () => {
+    const sb = logStore.logScrollBoxRef;
+    if (!sb || sb.scrollTop > 5) return;
+    void loadOlderLogs();
+  };
+
   /**
    * Set logScrollTop to the bottom of the current log content so the viewport
    * starts at the last lines. No sb.scrollTo() here — stickyScroll handles the
@@ -65,6 +113,7 @@ export function createLogActions(
     logStore.setLogSearchMode(false);
     logStore.setLogSearchQuery('');
     logStore.setLogSearchMatchIndex(-1);
+    resetLogHistory();
     clearAiState();
     logStore.setLogRefreshParams({ type: null });
   };
@@ -143,7 +192,7 @@ export function createLogActions(
     logStore.setShowLogModal(true);
     logStore.setLogRefreshParams({ type: null });
     try {
-      logStore.setLogs(await client.getOperationLogs(app.ident, 100));
+      await initializeHistoricalLog('operation', app.ident, () => client.getOperationLogs(app.ident, 100));
       scrollToLogBottom();
       logStore.setLogTitle(`Operation Logs: ${app.displayName} (auto-refresh: 10s)`);
       logStore.setLogRefreshParams({ type: 'operation', appIdent: app.ident });
@@ -159,7 +208,7 @@ export function createLogActions(
     logStore.setShowLogModal(true);
     logStore.setLogRefreshParams({ type: null });
     try {
-      logStore.setLogs(await client.getActionLog(appIdent));
+      await initializeHistoricalLog('action', appIdent, () => client.getActionLog(appIdent));
       scrollToLogBottom();
       logStore.setLogRefreshParams({ type: 'action', appIdent });
     } catch (e) {
@@ -183,7 +232,7 @@ export function createLogActions(
     logStore.setShowLogModal(true);
     logStore.setLogRefreshParams({ type: null });
     try {
-      logStore.setLogs(await client.getOperationLogs(appIdent, 500));
+      await initializeHistoricalLog('operation', appIdent, () => client.getOperationLogs(appIdent, 500));
       scrollToLogBottom();
       logStore.setLogRefreshParams({ type: 'operation', appIdent });
     } catch (e) {
@@ -296,6 +345,8 @@ export function createLogActions(
     dismissAiOverlay,
     clearAiState,
     closeLogModal,
+    loadOlderLogs,
+    maybeLoadOlderLogs,
     syncLogScroll,
     scrollToLogBottom,
     setLogStreamAbortController,

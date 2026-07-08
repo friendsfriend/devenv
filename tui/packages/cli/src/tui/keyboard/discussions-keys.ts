@@ -5,7 +5,6 @@ import { computeInitialSplitView } from './diff-modal-utils';
 import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Discussions view:
- * - q to quit (works even in reply mode)
  * - Reply mode: ESC to cancel, Ctrl+Enter to submit, text input
  * - ESC to go back to CR detail
  * - Shift+D to open diff for selected discussion's file
@@ -21,18 +20,12 @@ export async function handleDiscussionsKeys(
   ctx: KeyboardContext,
 ): Promise<boolean> {
   const { appStore, changeRequestStore } = stores;
-  const { appActions, crActions } = actions;
+  const { crActions } = actions;
   const { showError } = ctx;
 
   if (appStore.viewMode() !== 'discussionsView') return false;
 
   const discussions = changeRequestStore.crDiscussions();
-
-  // q to quit (handle before reply mode check so it works in both modes)
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
-  }
 
   // CHECK REPLY MODE FIRST (takes precedence over navigation)
   if (changeRequestStore.replyMode()) {

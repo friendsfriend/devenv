@@ -22,6 +22,7 @@ type ClusterStatus struct {
 	Nodes             []ClusterNodeSummary   `json:"nodes"`
 	Namespaces        []NamespaceSummary     `json:"namespaces"`
 	Pods              PodSummary             `json:"pods"`
+	PodList           []PodListItem          `json:"podList"`
 	Releases          []DevEnvReleaseSummary `json:"releases"`
 	Stats             *ClusterResourceStats  `json:"stats,omitempty"`
 	Warnings          []string               `json:"warnings,omitempty"`
@@ -47,6 +48,12 @@ type PodSummary struct {
 	Succeeded int `json:"succeeded"`
 	Failed    int `json:"failed"`
 	Unknown   int `json:"unknown"`
+}
+
+type PodListItem struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Status    string `json:"status"`
 }
 
 type DevEnvReleaseSummary struct {

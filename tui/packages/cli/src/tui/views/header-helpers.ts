@@ -118,7 +118,7 @@ export function getHeaderInfo(deps: HeaderSubtitleDeps): HeaderInfo {
 		return { title: `Pipeline #${changeRequestStore.currentPipelineId() || "N/A"}`, context: `${changeRequestStore.jobs().length} jobs · ${running} running · ${failed} failed`, detail: headerText(selectedApp?.displayName), severity: failed ? "error" : running ? "warning" : "normal" };
 	}
 	if (view === "issues") {
-		return { title: "Issues", context: `${issueStore.issueScope()} · page ${issueStore.currentPage()}/${issueStore.totalPages() || 1}`, detail: issueStore.issueSearchQuery() ? `Search: "${issueStore.issueSearchQuery()}"` : headerText(`${selectedApp?.displayName ?? "All apps"}${branch}`), right: `${issueStore.totalCount()} total` };
+		return { title: "Issues", context: `${issueStore.issueListFilters().scope?.[0] ?? 'all'} · page ${issueStore.currentPage()}/${issueStore.totalPages() || 1}`, detail: issueStore.issueSearchQuery() ? `Search: "${issueStore.issueSearchQuery()}"` : headerText(`${selectedApp?.displayName ?? "All apps"}${branch}`), right: `${issueStore.totalCount()} total` };
 	}
 	if (view === "issueDetail") {
 		const issue: any = issueStore.selectedIssue();
@@ -147,13 +147,10 @@ export function getHeaderInfo(deps: HeaderSubtitleDeps): HeaderInfo {
 		const app = appDetailStore.appDetailApp();
 		return { title: "Repository detail", context: headerText(`${app?.displayName ?? "Unknown"}${app?.branch ? ` · ${app.branch}` : ""}`), detail: `CRs: ${appDetailStore.appDetailChangeRequests().length} · logs: ${appDetailStore.appDetailLogs().length}`, details: appDetails(app) };
 	}
-	if (view === "linkedChangeRequests") return { title: "Linked CRs", context: `${issueStore.linkedChangeRequests().length} items`, detail: headerText(issueStore.selectedIssue()?.title) };
-	if (view === "referencedIssues") return { title: "Referenced issues", context: `${issueStore.referencedIssues().length} items`, detail: headerText(issueStore.selectedIssue()?.title) };
 	if (view === "changeRequestLinkedIssues") return { title: "CR linked issues", context: `${changeRequestStore.changeRequestLinkedIssues().length} items`, detail: headerText(changeRequestStore.selectedChangeRequest()?.title) };
 	if (view === "references") return { title: "References", context: `${issueStore.references().length} items`, detail: headerText(issueStore.selectedIssue()?.title) };
 	if (view === "agentView") return { title: "Pi sessions", context: "sessions", detail: "launch or resume pi" };
 	if (view === "sshPicker") return { title: "SSH hosts", context: "connect", detail: "select host" };
-	if (view === "issueScopePicker") return { title: "Issue scope", context: "select scope" };
 	return { title: getTabName(appStore.activeTab()), detail: headerText(`${selectedApp?.displayName ?? "No selection"}${branch}`), right: live };
 }
 
@@ -180,7 +177,7 @@ function getHeaderSubtitle(deps: HeaderSubtitleDeps): string {
 	}
 	if (appStore.viewMode() === "issues") {
 		const app = appStore.filteredApps()[appStore.selectedIndex()];
-		return `Issues: ${app?.displayName || "Unknown"} (${issueStore.issueScope()})`;
+		return `Issues: ${app?.displayName || "Unknown"} (${issueStore.issueListFilters().scope?.[0] ?? 'all'})`;
 	}
 	if (appStore.viewMode() === "issueDetail") {
 		const issue = issueStore.selectedIssue();

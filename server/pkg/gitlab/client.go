@@ -184,17 +184,18 @@ type MergeRequestApprovals struct {
 
 // ChangeRequest represents a GitLab change request from the API
 type ChangeRequest struct {
-	ID           int       `json:"id"`
-	IID          int       `json:"iid"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	SourceBranch string    `json:"source_branch"`
-	TargetBranch string    `json:"target_branch"`
-	State        string    `json:"state"`
-	WebURL       string    `json:"web_url"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Author       struct {
+	ID            int       `json:"id"`
+	IID           int       `json:"iid"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	SourceBranch  string    `json:"source_branch"`
+	TargetBranch  string    `json:"target_branch"`
+	DefaultBranch string    `json:"default_branch,omitempty"`
+	State         string    `json:"state"`
+	WebURL        string    `json:"web_url"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Author        struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
 	} `json:"author"`
@@ -724,6 +725,7 @@ func convertMRToChangeRequest(m ChangeRequest) changerequest.ChangeRequest {
 		Description:                 m.Description,
 		SourceBranch:                m.SourceBranch,
 		TargetBranch:                m.TargetBranch,
+		DefaultBranch:               m.DefaultBranch,
 		State:                       m.State,
 		WebURL:                      m.WebURL,
 		CreatedAt:                   m.CreatedAt,

@@ -49,6 +49,31 @@ export async function getChangeRequests(
 }
 
 /**
+ * Get full change request details. Used for GitHub paginated lists where
+ * pipeline/approval details are intentionally skipped in list responses.
+ */
+export async function getChangeRequest(
+  deps: ClientDeps,
+  appIdent: string,
+  crIID: number,
+  sourceType?: string,
+): Promise<ChangeRequest> {
+  if (sourceType !== 'github') {
+    throw new Error('Full change request detail fetch is currently only implemented for GitHub');
+  }
+
+  const response = await deps.fetchFn(
+    `${deps.baseUrl}/api/github/pull-request?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`
+  );
+
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+  }
+
+  return (await response.json()) as ChangeRequest;
+}
+
+/**
  * Get changed files for a specific change request
  */
 export async function getChangeRequestChanges(

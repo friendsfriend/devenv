@@ -1,8 +1,11 @@
+/** @jsxImportSource @opentui/solid */
 import { Show } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
+import { PropertiesList, propertyBadges } from './PropertiesList';
+import { MatchedText } from './MatchedText';
 
 export type AddRepositoryStep = 'selectProvider' | 'selectDestination' | 'findRepo' | 'repositoryName' | 'selectBranch' | 'confirm';
 export type FindRepoMode = 'selectMode' | 'search' | 'url';
@@ -38,6 +41,7 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
   const hasBranchFilter = () => props.branchFilterQuery.length > 0;
   const destinationLabel = () => props.destinationType === 'APP' ? 'Applications' : 'Libraries';
   const itemLabel = () => props.destinationType === 'APP' ? 'Application' : 'Library';
+  const selectedBranch = () => filteredBranches()[props.selectedBranchIndex] ?? '';
 
   const title = () => {
     if (props.step === 'selectProvider') return 'Add Repository';
@@ -128,7 +132,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
               }}
             >
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                {isSelected() ? '▸ ' : '  '}
               </text>
               <text
                 fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
@@ -142,12 +145,11 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
       </Show>
 
       <Show when={props.step === 'selectDestination'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Provider: '}</text>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            {selectedProvider()?.name ?? ''}
-          </text>
-        </box>
+        <PropertiesList
+          labelWidth={10}
+          rows={[{ label: 'Provider', value: propertyBadges([{ label: selectedProvider()?.name ?? '', highlight: 'highlight' }]) }]}
+        />
+        <box style={{ width: '100%', height: 1, flexShrink: 0 }} />
 
         <box style={{ width: '100%', height: 1, flexShrink: 0, marginBottom: 1 }}>
           <text fg={uiColors.textMuted}>Select destination:</text>
@@ -158,7 +160,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
           return (
             <box style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0 }}>
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                {isSelected() ? '▸ ' : '  '}
               </text>
               <text
                 fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
@@ -172,12 +173,11 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
       </Show>
 
       <Show when={props.step === 'findRepo'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Provider: '}</text>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            {selectedProvider()?.name ?? ''}
-          </text>
-        </box>
+        <PropertiesList
+          labelWidth={10}
+          rows={[{ label: 'Provider', value: propertyBadges([{ label: selectedProvider()?.name ?? '', highlight: 'highlight' }]) }]}
+        />
+        <box style={{ width: '100%', height: 1, flexShrink: 0 }} />
 
         <Show when={props.findRepoMode === 'selectMode'}>
           <box style={{ width: '100%', height: 1, flexShrink: 0, marginBottom: 1 }}>
@@ -189,7 +189,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
             return (
               <box style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0 }}>
                 <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                  {isSelected() ? '▸ ' : '  '}
                 </text>
                 <text
                   fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
@@ -227,14 +226,13 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
             return (
               <box style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0 }}>
                 <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                  {isSelected() ? '▸ ' : '  '}
                 </text>
-                <text
+                <MatchedText
+                  text={result.fullPath}
+                  query={props.searchQuery}
                   fg={isSelected() ? uiColors.primary : uiColors.textSecondary}
                   attributes={isSelected() ? TextAttributes.BOLD : undefined}
-                >
-                  {result.fullPath}
-                </text>
+                />
               </box>
             );
           })}
@@ -263,16 +261,14 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
       </Show>
 
       <Show when={props.step === 'repositoryName'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row' }}>
-          <text fg={uiColors.textMuted}>{'Provider: '}</text>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            {selectedProvider()?.name ?? ''}
-          </text>
-        </box>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Repo:     '}</text>
-          <text fg={uiColors.textSecondary}>{repoUrl()}</text>
-        </box>
+        <PropertiesList
+          labelWidth={10}
+          rows={[
+            { label: 'Provider', value: propertyBadges([{ label: selectedProvider()?.name ?? '', highlight: 'highlight' }]) },
+            { label: 'Repo', value: repoUrl(), valueHighlight: 'secondary' },
+          ]}
+        />
+        <box style={{ width: '100%', height: 1, flexShrink: 0 }} />
 
         <box
           style={{
@@ -295,22 +291,15 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
       </Show>
 
       <Show when={props.step === 'selectBranch'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row' }}>
-          <text fg={uiColors.textMuted}>{'Provider: '}</text>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            {selectedProvider()?.name ?? ''}
-          </text>
-        </box>
-
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row' }}>
-          <text fg={uiColors.textMuted}>{'Repo:     '}</text>
-          <text fg={uiColors.textSecondary}>{repoUrl()}</text>
-        </box>
-
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Name:     '}</text>
-          <text fg={uiColors.textSecondary}>{props.repositoryName}</text>
-        </box>
+        <PropertiesList
+          labelWidth={10}
+          rows={[
+            { label: 'Provider', value: propertyBadges([{ label: selectedProvider()?.name ?? '', highlight: 'highlight' }]) },
+            { label: 'Repo', value: repoUrl(), valueHighlight: 'secondary' },
+            { label: 'Name', value: props.repositoryName },
+          ]}
+        />
+        <box style={{ width: '100%', height: 1, flexShrink: 0 }} />
 
         <box
           style={{
@@ -343,44 +332,29 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
               }}
             >
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                {isSelected() ? '▸ ' : '  '}
               </text>
-              <text
+              <MatchedText
+                text={branch}
+                query={props.branchFilterQuery}
                 fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
                 attributes={isSelected() ? TextAttributes.BOLD : undefined}
-              >
-                {branch}
-              </text>
+              />
             </box>
           );
         })}
       </Show>
 
       <Show when={props.step === 'confirm'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Provider:   '}</text>
-          <text fg={uiColors.textPrimary}>{selectedProvider()?.name ?? ''}</text>
-        </box>
-
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Destination:'}</text>
-          <text fg={uiColors.textPrimary}>{destinationLabel()}</text>
-        </box>
-
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Repository: '}</text>
-          <text fg={uiColors.textPrimary}>{repoUrl()}</text>
-        </box>
-
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{`${itemLabel()} Name: `}</text>
-          <text fg={uiColors.textPrimary}>{props.repositoryName}</text>
-        </box>
-
-        <box style={{ width: '100%', height: 1, flexShrink: 0, flexDirection: 'row', marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Branch:     '}</text>
-          <text fg={uiColors.textPrimary}>{filteredBranches()[props.selectedBranchIndex] ?? ''}</text>
-        </box>
+        <PropertiesList
+          labelWidth={12}
+          rows={[
+            { label: 'Provider', value: propertyBadges([{ label: selectedProvider()?.name ?? '', highlight: 'highlight' }]) },
+            { label: 'Destination', value: propertyBadges([{ label: destinationLabel(), highlight: 'highlight' }]) },
+            { label: 'Repository', value: repoUrl(), valueHighlight: 'secondary' },
+            { label: `${itemLabel()} Name`, value: props.repositoryName },
+            { label: 'Branch', value: selectedBranch() },
+          ]}
+        />
 
         <box style={{ width: '100%', height: 1, flexShrink: 0 }}>
           <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>Press Enter to create repository entry</text>

@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { GenericModal } from "./GenericModal";
@@ -18,9 +19,9 @@ export interface SortModalProps {
 
 export function SortModal(props: SortModalProps) {
 	const directionLabel = (direction: SortDirection) => {
-		if (direction === "asc") return "↑ asc";
-		if (direction === "desc") return "↓ desc";
-		return "none";
+		if (direction === "asc") return "↑";
+		if (direction === "desc") return "↓";
+		return "—";
 	};
 
 	const directionColor = (direction: SortDirection) => {
@@ -31,7 +32,7 @@ export function SortModal(props: SortModalProps) {
 	return (
 		<GenericModal
 			title="Order / Sort"
-			helpText="j/k select • Space mode • K/J priority • Enter apply • Esc close"
+			helpText="j/k select • Space mode • K/J priority • x clear all • Enter apply • Esc close"
 			widthPercent={0.6}
 			heightPercent={0.55}
 		>

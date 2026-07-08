@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { GenericModal } from "./GenericModal";
@@ -33,7 +34,7 @@ export function FilterModal(props: FilterModalProps) {
 	return (
 		<GenericModal
 			title="Filter"
-			helpText="h/l focus • j/k move • Space toggle • Enter apply • Esc close"
+			helpText="h/l focus • j/k move • Space toggle • x clear all • Enter apply • Esc close"
 			widthPercent={0.7}
 			heightPercent={0.65}
 		>

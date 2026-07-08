@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from "../colors";
 import { ListViewModal } from "./ListViewModal";
@@ -21,11 +22,10 @@ export interface IssueScopeModalProps {
 }
 
 function ScopeRow(props: { label: string; isSelected: boolean }) {
-	const cursor = () => (props.isSelected ? "► " : "  ");
-
+	
 	return (
 		<box
-			backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+			backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
 			style={{
 				width: "100%",
 				height: 1,
@@ -37,7 +37,6 @@ function ScopeRow(props: { label: string; isSelected: boolean }) {
 				fg={uiColors.textPrimary}
 				attributes={props.isSelected ? TextAttributes.BOLD : undefined}
 			>
-				{cursor()}
 				{props.label}
 			</text>
 		</box>
@@ -57,7 +56,6 @@ export function IssueScopeModal(props: IssueScopeModalProps) {
 			heightPercent={0.4}
 			items={ISSUE_SCOPE_OPTIONS.map((option) => option.label)}
 			selectedIndex={props.selectedIndex}
-			reservedHeight={3}
 			scrollIndicatorLabel="scopes"
 			renderItem={(item, isSelected) => (
 				<ScopeRow label={item} isSelected={isSelected()} />

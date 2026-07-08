@@ -94,6 +94,7 @@ import {
 	analyzeLogsWithAIStream,
 	analyzeCRWithAIStream,
 	getActionLog,
+	getLogHistory,
 	getOperationLogs,
 	getStatusLog,
 	addStatusLog,
@@ -101,6 +102,7 @@ import {
 import {
 	approveChangeRequest,
 	createCRComment,
+	getChangeRequest,
 	getChangeRequests,
 	getChangeRequestChanges,
 	getCRDiscussions,
@@ -272,6 +274,9 @@ export class DevEnvClient {
 	}
 	getActionLog(appIdent: string): Promise<string> {
 		return getActionLog(this.deps, appIdent);
+	}
+	getLogHistory(type: import("./logs-client").LogHistoryType, appIdent: string, before?: number, limit: number = 1000) {
+		return getLogHistory(this.deps, type, appIdent, before, limit);
 	}
 	getStatusLog(limit: number = 50): Promise<StatusLogEntry[]> {
 		return getStatusLog(this.deps, limit);
@@ -455,6 +460,13 @@ export class DevEnvClient {
 		sourceType?: string,
 	): Promise<import("@devenv/types").TestSummary> {
 		return getTestSummary(this.deps, appIdent, pipelineId, sourceType);
+	}
+	getChangeRequest(
+		appIdent: string,
+		crIID: number,
+		sourceType?: string,
+	): Promise<import("@devenv/types").ChangeRequest> {
+		return getChangeRequest(this.deps, appIdent, crIID, sourceType);
 	}
 	getChangeRequestChanges(
 		appIdent: string,
@@ -737,6 +749,7 @@ export function createClient(
 }
 
 export type { FetchFunction };
+export type { LogHistoryType } from "./logs-client";
 export * from "@devenv/types";
 export * from "./logger";
 export * from "./custom-fetch";

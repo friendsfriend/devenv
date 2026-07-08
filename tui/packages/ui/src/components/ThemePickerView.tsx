@@ -1,9 +1,11 @@
+/** @jsxImportSource @opentui/solid */
 import { For, createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { GenericModal } from "./GenericModal";
 import { formatHelpText } from "./HelpText";
 import { themeColorForTheme, themeNames } from "../theme";
 import { uiColors } from "../colors";
+import { highlightColor } from './Highlight';
 
 export interface ThemePickerViewProps {
   selectedIndex: number;
@@ -14,7 +16,7 @@ export interface ThemePickerViewProps {
 }
 
 const label = (name: string) => name.split("-").map((part) => part ? part[0]!.toUpperCase() + part.slice(1) : part).join(" ");
-const nameColumn = (name: string, selected: boolean, active: boolean) => `${selected ? "› " : "  "}${active ? "✓ " : "  "}${label(name)}`.padEnd(32).slice(0, 32);
+const nameColumn = (name: string, selected: boolean, active: boolean) => `${active ? "✓ " : ""}${label(name)}`.padEnd(32).slice(0, 32);
 
 export function ThemePickerView(props: ThemePickerViewProps) {
   const dimensions = useTerminalDimensions();
@@ -46,13 +48,11 @@ export function ThemePickerView(props: ThemePickerViewProps) {
         { key: "Enter", action: "Apply" },
         { key: "Esc", action: "Close" },
       ])}
+      searchMode={props.filterActive}
+      searchQuery={props.filterQuery}
+      searchResultCount={items().length}
     >
       <box style={{ flexDirection: "column", width: "100%", height: "100%" }}>
-        <box style={{ width: "100%", height: 1, flexDirection: "row" }}>
-          <text fg={props.filterActive ? uiColors.primary : uiColors.textMuted}>
-            {props.filterActive ? "/" : "Filter: "}{props.filterQuery ?? ""}
-          </text>
-        </box>
         <For each={visible()}>
           {(item) => {
             const selected = () => item.index === props.selectedIndex;
@@ -81,7 +81,7 @@ export function ThemePickerView(props: ThemePickerViewProps) {
           }}
         </For>
         <box style={{ width: "100%", height: 1, flexDirection: "row" }}>
-          <text fg={uiColors.textMuted}>{showing()}</text>
+          <text fg={highlightColor('secondary')}>{showing()}</text>
         </box>
       </box>
     </GenericModal>

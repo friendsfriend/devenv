@@ -1,13 +1,15 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
-import { uiColors } from '../colors';
 import type { ChangeRequest } from '@devenv/types';
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
-import { formatShortDate, getIssueStateColor, getPipelineStatusColor } from '../statusUtils';
+import { formatShortDate, getIssueStateColor } from '../statusUtils';
 import { WorkItemCard } from './WorkItemCard';
+import { HighlightedText, highlightColor } from './Highlight';
 import { ContentPanel } from './ContentStack';
+import { FilterStatusBar } from './FilterStatusBar';
 
 interface ChangeRequestViewProps {
   changeRequests: ChangeRequest[];
@@ -22,6 +24,9 @@ interface ChangeRequestViewProps {
   currentPage?: number;
   totalPages?: number;
   state?: string;
+  sourceType?: string;
+  filterSummary?: string;
+  sortSummary?: string;
   runningTextEnabled?: boolean;
   runningTextOffset?: number;
 }
@@ -38,29 +43,39 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
   // Lines of fixed chrome outside the list area:
   //   Layout header (2) + Layout footer (3)  = LAYOUT_CHROME_LINES (5)
   //   Top/bottom spacers + summary header    = 3
-  const RESERVED_LINES = LAYOUT_CHROME_LINES + 3;
+  const hasFilterStatus = () => !!props.filterSummary || !!props.sortSummary;
+  const reservedLines = () => LAYOUT_CHROME_LINES + 3 + (hasFilterStatus() ? 1 : 0);
 
   const getMergeStatusText = (cr: ChangeRequest) => {
-    if (cr.has_conflicts) return { text: '✗', fg: uiColors.error };
-    if (cr.merge_status === 'can_be_merged') return { text: '✓', fg: uiColors.success };
-    if (cr.draft || cr.work_in_progress) return { text: '○', fg: uiColors.warning };
-    return { text: '○', fg: uiColors.textMuted };
+    if (cr.has_conflicts) return { text: '✗', fg: highlightColor('negative') };
+    if (cr.merge_status === 'can_be_merged') return { text: '✓', fg: highlightColor('positive') };
+    if (cr.draft || cr.work_in_progress) return { text: '○', fg: highlightColor('warning') };
+    return { text: '○', fg: highlightColor('secondary') };
   };
 
-  const stateColor = createMemo(() => {
-    const s = props.state ?? 'opened';
-    if (s === 'opened') return uiColors.success;
-    if (s === 'closed') return uiColors.error;
-    return uiColors.warning; // "all"
-  });
+  const stateHighlight = (state: string) => {
+    if (state === 'opened' || state === 'open') return 'positive' as const;
+    if (state === 'closed') return 'negative' as const;
+    if (state === 'merged') return 'highlight' as const;
+    return 'warning' as const;
+  };
+
+  const pipelineHighlight = (status?: string) => {
+    const s = (status ?? '').toLowerCase();
+    if (s === 'success' || s === 'passed') return 'positive' as const;
+    if (s === 'failed' || s === 'error' || s === 'canceled') return 'negative' as const;
+    if (s === 'running' || s === 'pending' || s === 'created') return 'warning' as const;
+    return 'secondary' as const;
+  };
 
   const summary = createMemo(() => {
     const cp = props.currentPage ?? 1;
     const tp = props.totalPages;
     const loaded = props.changeRequests.length;
-    return tp && tp > 0
+    const base = tp && tp > 0
       ? `[Pg ${cp}/${tp}] [${loaded} loaded]`
       : `[Pg ${cp}] [${loaded} loaded]`;
+    return base;
   });
 
   const scrollSelection = (direction: 'up' | 'down' | 'left' | 'right', delta: number) => {
@@ -75,37 +90,40 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
   return (
     <ContentPanel>
       <Show when={props.loading}>
-        <CenteredState message="Loading change requests..." color={uiColors.primary} />
+        <CenteredState message="Loading change requests..." color={highlightColor('highlight')} />
       </Show>
 
       <Show when={!props.loading && props.error}>
-        <CenteredState message={props.error!} color={uiColors.error} />
+        <CenteredState message={props.error!} color={highlightColor('negative')} />
       </Show>
 
       <Show when={!props.loading && !props.error}>
         <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery}>
           <box style={{ width: '100%', flexDirection: 'row' }}>
-            <text fg={uiColors.textPrimary}>Change requests</text>
+            <HighlightedText text="Change requests" highlight="primary" />
             <box style={{ width: 'auto', flexDirection: 'row', gap: 1 }}>
-              <text fg={stateColor()} attributes={TextAttributes.BOLD}>{`[${props.state ?? 'opened'}]`}</text>
+              <HighlightedText text={`[${props.state ?? 'opened'}]`} highlight={stateHighlight(props.state ?? 'opened')} attributes={TextAttributes.BOLD} />
             </box>
             <box style={{ width: 'auto', marginLeft: 'auto' }}>
-              <text fg={uiColors.textMuted}>{summary()}</text>
+              <HighlightedText text={summary()} highlight="secondary" />
             </box>
           </box>
         </SearchHeader>
+
+        <FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
 
         <Show when={props.changeRequests.length === 0}
           fallback={
             <ScrollableList<ChangeRequest>
               items={props.changeRequests}
               selectedIndex={props.selectedIndex}
-              reservedLines={RESERVED_LINES}
+              reservedLines={reservedLines()}
               estimatedItemHeight={2}
               showScrollIndicator={false}
               onScroll={scrollSelection}
               renderItem={(cr, isSelected, index) => {
                 const mergeStatus = getMergeStatusText(cr);
+                const showPipeline = props.sourceType !== 'github';
                 const pipeline = cr.head_pipeline?.status || '-';
                 return (
                   <WorkItemCard
@@ -113,11 +131,13 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
                     prefix={`${mergeStatus.text} `}
                     prefixColor={mergeStatus.fg}
                     title={cr.title}
+                    titleQuery={props.searchQuery}
                     statusText={cr.state}
                     statusColor={getIssueStateColor(cr.state)}
-                    statusSuffixText={` • pipeline ${pipeline}`}
-                    statusSuffixColor={getPipelineStatusColor(cr.head_pipeline?.status)}
+                    statusBadgeHighlight={stateHighlight(cr.state)}
                     metadata={`@${cr.author.name} • updated ${formatShortDate(cr.updated_at)}`}
+                    metadataRight={showPipeline ? <HighlightedText text={`pipeline ${pipeline}`} highlight={pipelineHighlight(cr.head_pipeline?.status)} /> : undefined}
+                    metadataRightWidth={showPipeline ? `pipeline ${pipeline}`.length : 0}
                     selected={isSelected()}
                     index={index}
                     onMouseUp={props.onSelectCR ? () => props.onSelectCR!(cr) : undefined}
@@ -129,7 +149,7 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
             />
           }
         >
-          <CenteredState message="No change requests found" />
+          <CenteredState message="No change requests found" color={highlightColor('secondary')} />
         </Show>
       </Show>
     </ContentPanel>

@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/resources"
@@ -183,9 +184,24 @@ func (s *Server) handleListScripts(w http.ResponseWriter, r *http.Request) {
 		respondInternalError(w, err)
 		return
 	}
+
+	// Extract metadata concurrently with a bounded worker pool (10 workers).
+	// This avoids O(N) sequential fork+exec overhead for large script collections.
+	const maxWorkers = 10
+	sem := make(chan struct{}, maxWorkers)
+	var wg sync.WaitGroup
+
 	for i := range scripts {
-		scripts[i].Parameters = s.fetchScriptMetadata(scripts[i].AbsolutePath)
+		wg.Add(1)
+		go func(idx int, path string) {
+			sem <- struct{}{}        // acquire
+			defer func() { <-sem }() // release
+			defer wg.Done()
+			scripts[idx].Parameters = s.fetchScriptMetadata(path)
+		}(i, scripts[i].AbsolutePath)
 	}
+
+	wg.Wait()
 
 	respondJSON(w, map[string]interface{}{
 		"scripts": buildScriptTree(scripts),
@@ -261,12 +277,49 @@ func (s *Server) handleScriptMetadata(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) fetchScriptMetadata(scriptPath string) []resources.ScriptParameter {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// Check cache first using file mtime
+	cacheKey := sha256Hex(scriptPath)
+	fi, err := os.Stat(scriptPath)
+	if err == nil {
+		metadataCacheMu.RLock()
+		cached, ok := metadataCache[cacheKey]
+		metadataCacheMu.RUnlock()
+		if ok && !cached.FileMtime.Before(fi.ModTime()) {
+			return cached.Parameters
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, scriptPath, "--devenv-metadata")
-	output, err := cmd.Output()
-	if err != nil {
+	if runtime.GOOS != "windows" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	}
+	output, execErr := cmd.Output()
+	if execErr != nil {
+		if cmd.Process != nil && runtime.GOOS != "windows" {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+	}
+
+	params := parseMetadataOutput(output)
+
+	// Update cache
+	if err == nil {
+		metadataCacheMu.Lock()
+		metadataCache[cacheKey] = &scriptMetadataEntry{
+			Parameters: params,
+			FileMtime:  fi.ModTime(),
+		}
+		metadataCacheMu.Unlock()
+	}
+
+	return params
+}
+
+func parseMetadataOutput(output []byte) []resources.ScriptParameter {
+	if len(output) == 0 {
 		return []resources.ScriptParameter{}
 	}
 
@@ -285,7 +338,6 @@ func (s *Server) fetchScriptMetadata(scriptPath string) []resources.ScriptParame
 		return wrapped.Parameters
 	}
 
-	// Try single object (legacy)
 	var single resources.ScriptParameter
 	if err := json.Unmarshal(output, &single); err == nil {
 		return []resources.ScriptParameter{single}

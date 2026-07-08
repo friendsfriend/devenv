@@ -1,9 +1,9 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
-import { isDownKey, isUpKey } from './nav-keys';
+import { isDownKey, isUpKey, isLeftKey, isRightKey } from './nav-keys';
 /**
  * Handles keyboard events for the Test Results view:
- * - q to quit, ? for help (early guard from parent handler)
+ * - ? for help (early guard from parent handler)
  * - Search mode (type query, clear)
  * - / to search, ESC to close detail modal / clear search / go back
  * - Enter to open test detail modal
@@ -17,15 +17,11 @@ export async function handleTestResultsKeys(
   _ctx: KeyboardContext,
 ): Promise<boolean> {
   const { appStore, changeRequestStore } = stores;
-  const { appActions, helpActions } = actions;
+  const { helpActions } = actions;
 
   if (appStore.viewMode() !== 'testResults') return false;
 
-  // q to quit, ? for help — these are global shortcuts for this view
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
-  }
+  // ? for help — global shortcut for this view
   if (event.name === '?' || event.sequence === '?') {
     helpActions.showHelp();
     return true;
@@ -85,6 +81,86 @@ export async function handleTestResultsKeys(
       )
     : allTests;
   const totalTests = filteredTests.length;
+
+  if (changeRequestStore.showListFilterModal() && changeRequestStore.listControlTarget() === 'tests') {
+    const params = changeRequestStore.listFilterParameters();
+    const param = params[changeRequestStore.listFilterParameterIndex()];
+    const values = param?.values ?? [];
+    if (event.name === 'escape' || event.name === 'esc' || event.sequence === '\x1b' || event.name === 'return' || event.name === 'enter') {
+      changeRequestStore.setShowListFilterModal(false);
+      changeRequestStore.setSelectedTestIndex(0);
+      return true;
+    }
+    if (event.name === 'x') { changeRequestStore.setCurrentListFilters({}); changeRequestStore.setSelectedTestIndex(0); return true; }
+    if (isLeftKey(event)) { changeRequestStore.setListFilterFocusedPane('parameter'); return true; }
+    if (isRightKey(event)) { changeRequestStore.setListFilterFocusedPane('value'); return true; }
+    if (isDownKey(event)) {
+      if (changeRequestStore.listFilterFocusedPane() === 'parameter') {
+        changeRequestStore.setListFilterParameterIndex(i => Math.min(params.length - 1, i + 1));
+        changeRequestStore.setListFilterValueIndex(0);
+      } else changeRequestStore.setListFilterValueIndex(i => Math.min(values.length - 1, i + 1));
+      return true;
+    }
+    if (isUpKey(event)) {
+      if (changeRequestStore.listFilterFocusedPane() === 'parameter') {
+        changeRequestStore.setListFilterParameterIndex(i => Math.max(0, i - 1));
+        changeRequestStore.setListFilterValueIndex(0);
+      } else changeRequestStore.setListFilterValueIndex(i => Math.max(0, i - 1));
+      return true;
+    }
+    if (event.sequence === ' ' && param && values[changeRequestStore.listFilterValueIndex()]) {
+      const value = values[changeRequestStore.listFilterValueIndex()].value;
+      changeRequestStore.setCurrentListFilters(filters => {
+        const current = filters[param.key] ?? [];
+        return { ...filters, [param.key]: current.includes(value) ? current.filter(v => v !== value) : [...current, value] };
+      });
+      changeRequestStore.setSelectedTestIndex(0);
+      return true;
+    }
+    return true;
+  }
+
+  if (changeRequestStore.showListSortModal() && changeRequestStore.listControlTarget() === 'tests') {
+    const rules = changeRequestStore.currentListSortRules();
+    const selected = changeRequestStore.listSortSelectedIndex();
+    const cycle = (d: 'asc' | 'desc' | 'none') => d === 'none' ? 'asc' : d === 'asc' ? 'desc' : 'none';
+    if (event.name === 'escape' || event.name === 'esc' || event.sequence === '\x1b' || event.name === 'return' || event.name === 'enter') {
+      changeRequestStore.setShowListSortModal(false);
+      changeRequestStore.setSelectedTestIndex(0);
+      return true;
+    }
+    if (event.name === 'x') { changeRequestStore.setCurrentListSortRules(rules.map(rule => ({ ...rule, direction: 'none' }))); changeRequestStore.setSelectedTestIndex(0); return true; }
+    if (isDownKey(event)) { changeRequestStore.setListSortSelectedIndex(i => Math.min(rules.length - 1, i + 1)); return true; }
+    if (isUpKey(event)) { changeRequestStore.setListSortSelectedIndex(i => Math.max(0, i - 1)); return true; }
+    if (event.sequence === ' ') {
+      changeRequestStore.setCurrentListSortRules(current => current.map((rule, index) => index === selected ? { ...rule, direction: cycle(rule.direction) } : rule));
+      changeRequestStore.setSelectedTestIndex(0);
+      return true;
+    }
+    if (event.sequence === 'K' && selected > 0) {
+      changeRequestStore.setCurrentListSortRules(current => { const next = [...current]; [next[selected - 1], next[selected]] = [next[selected], next[selected - 1]]; return next; });
+      changeRequestStore.setListSortSelectedIndex(selected - 1);
+      return true;
+    }
+    if (event.sequence === 'J' && selected < rules.length - 1) {
+      changeRequestStore.setCurrentListSortRules(current => { const next = [...current]; [next[selected], next[selected + 1]] = [next[selected + 1], next[selected]]; return next; });
+      changeRequestStore.setListSortSelectedIndex(selected + 1);
+      return true;
+    }
+    return true;
+  }
+
+  // F to open filter modal, O to open sort modal
+  if (event.name === 'F' || (event.name === 'f' && event.shift)) {
+    changeRequestStore.setListControlTarget('tests');
+    changeRequestStore.setShowListFilterModal(true);
+    return true;
+  }
+  if (event.name === 'O' || (event.name === 'o' && event.shift)) {
+    changeRequestStore.setListControlTarget('tests');
+    changeRequestStore.setShowListSortModal(true);
+    return true;
+  }
 
   // '/' to enter search mode
   if (event.name === '/' || event.sequence === '/') {

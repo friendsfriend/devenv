@@ -1,9 +1,11 @@
+/** @jsxImportSource @opentui/solid */
 import { Show } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 import type { ProviderType } from '@devenv/types';
+import { PropertiesList, propertyBadges } from './PropertiesList';
 
 export type ConnectProviderStep = 'selectProvider' | 'name' | 'username' | 'token';
 
@@ -96,7 +98,6 @@ export function ConnectProviderModal(props: ConnectProviderModalProps) {
                 }}
               >
                 <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                  {isSelected() ? '▸ ' : '  '}
                 </text>
                 <text
                   fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
@@ -112,12 +113,10 @@ export function ConnectProviderModal(props: ConnectProviderModalProps) {
 
       {/* Step 2: Provider name */}
       <Show when={props.step === 'name'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Provider: '}</text>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            {providerLabel()}
-          </text>
-        </box>
+        <PropertiesList
+          labelWidth={10}
+          rows={[{ label: 'Provider', value: propertyBadges([{ label: providerLabel(), highlight: 'highlight' }]) }]}
+        />
 
         <box
           style={{
@@ -141,14 +140,13 @@ export function ConnectProviderModal(props: ConnectProviderModalProps) {
 
       {/* Step 3: Username input */}
       <Show when={props.step === 'username'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Provider: '}</text>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            {providerLabel()}
-          </text>
-          <text fg={uiColors.textMuted}>{'  Name: '}</text>
-          <text fg={uiColors.textSecondary}>{props.nameText}</text>
-        </box>
+        <PropertiesList
+          labelWidth={10}
+          rows={[
+            { label: 'Provider', value: propertyBadges([{ label: providerLabel(), highlight: 'highlight' }]) },
+            { label: 'Name', value: props.nameText, valueHighlight: 'secondary' },
+          ]}
+        />
 
         <box
           style={{
@@ -172,27 +170,14 @@ export function ConnectProviderModal(props: ConnectProviderModalProps) {
 
       {/* Step 4: Token input (masked) */}
       <Show when={props.step === 'token'}>
-        <box style={{ width: '100%', height: 1, flexShrink: 0, marginBottom: 1 }}>
-          <text fg={uiColors.textMuted}>{'Provider: '}</text>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-            {providerLabel()}
-          </text>
-          <text fg={uiColors.textMuted}>{'  Name: '}</text>
-          <text fg={uiColors.textSecondary}>{props.nameText}</text>
-        </box>
-
-        <box
-          style={{
-            width: '100%',
-            height: 1,
-            flexDirection: 'row',
-            flexShrink: 0,
-            marginBottom: 1,
-          }}
-        >
-          <text fg={uiColors.textMuted}>{'Username: '}</text>
-          <text fg={uiColors.textSecondary}>{props.usernameText}</text>
-        </box>
+        <PropertiesList
+          labelWidth={10}
+          rows={[
+            { label: 'Provider', value: propertyBadges([{ label: providerLabel(), highlight: 'highlight' }]) },
+            { label: 'Name', value: props.nameText, valueHighlight: 'secondary' },
+            { label: 'Username', value: props.usernameText, valueHighlight: 'secondary' },
+          ]}
+        />
 
         <box
           style={{

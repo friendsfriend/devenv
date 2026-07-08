@@ -7,7 +7,6 @@ import {
 	StatusLogView,
 	IssueView,
 	IssueDetailView,
-	LinkedCRsView,
 	ReferencesView,
 	ChangeRequestView,
 	ChangeRequestDetailView,
@@ -16,7 +15,6 @@ import {
 	TimelineView,
 	TestResultsDetailView,
 	JobsDetailView,
-	ProvidersView,
 	HelpView,
 	AppDetailView,
 	uiColors,
@@ -29,7 +27,7 @@ import type { ContentRouterProps } from "./types";
 import { StartupSplash } from "./startup-splash";
 
 export function ContentRouter(props: ContentRouterProps) {
-	const { appStore, issueStore, changeRequestStore, providerStore, appDetailStore } =
+	const { appStore, issueStore, changeRequestStore, appDetailStore } =
 		props.stores;
 	const { helpActions, issueActions, pipelineActions, logActions, crActions, dockerActions } =
 		props.actions;
@@ -40,9 +38,9 @@ export function ContentRouter(props: ContentRouterProps) {
 		void dockerActions.refreshKubernetesCluster();
 	});
 
-	// Table shares content area with StatusLogView (6 lines below it).
+	// Table shares content area with StatusLogView (4 lines below it).
 	// Include three 1-line gutters: header-tabs, table-log, log-footer.
-	const STATUS_LOG_HEIGHT = 6;
+	const STATUS_LOG_HEIGHT = 4;
 	const TABLE_VIEW_GUTTERS = 3;
 	const TAB_BAR_LINES = 3;
 	const availableTableLines = Math.max(
@@ -58,11 +56,27 @@ export function ContentRouter(props: ContentRouterProps) {
 					)
 				: props.columns;
 
+	const selectedAppSourceType = () => {
+		const row = appStore.filteredApps()[appStore.selectedIndex()];
+		return row?.rowKind === "app" ? row.sourceType : undefined;
+	};
+	const listFilterSummary = (filters: Record<string, string[]>) =>
+		Object.entries(filters).filter(([, values]) => values.length > 0).map(([key, values]) => `${key}: ${values.join(",")}`).join(" • ");
+	const listSortSummary = (rules: Array<{ label: string; direction: string }>) => {
+		const active = rules.find((rule) => rule.direction !== "none");
+		if (!active) return "";
+		const dir = active.direction === "asc" ? "↑" : "↓";
+		return `${active.label} ${dir}`;
+	};
+	const tableFilterSummary = () => listFilterSummary(appStore.tableFilters());
+	const tableSortSummary = () => listSortSummary(appStore.tableSortRules());
+
 	return (
 		<>
 			{appStore.viewMode() === "references" ? (
 				<ReferencesView
-					references={issueStore.references()}
+					references={issueStore.referencesFiltered()}
+					allReferencesCount={issueStore.references().length}
 					selectedIndex={issueStore.selectedReferenceIndex()}
 					loading={
 						issueStore.linkedChangeRequestsLoading() ||
@@ -72,8 +86,10 @@ export function ContentRouter(props: ContentRouterProps) {
 						issueStore.linkedChangeRequestsError() || issueStore.referencedIssuesError()
 					}
 					onClose={() => issueActions.backToIssueDetailFromReferences()}
-				runningTextEnabled={props.runningTextEnabled}
-				runningTextOffset={props.runningTextOffset}
+					activeFilters={issueStore.referenceFilters()}
+					sortRules={issueStore.referenceSortRules()}
+					runningTextEnabled={props.runningTextEnabled}
+					runningTextOffset={props.runningTextOffset}
 				/>
 			) : appStore.viewMode() === "changeRequestLinkedIssues" ? (
 				<IssueView
@@ -94,35 +110,7 @@ export function ContentRouter(props: ContentRouterProps) {
 						appStore.setViewMode("changeRequestDetail");
 					}}
 				/>
-			) : appStore.viewMode() === "referencedIssues" ? (
-				<IssueView
-					issues={issueStore.referencedIssues()}
-					selectedIndex={issueStore.selectedReferencedIssueIndex()}
-					onSelectedIndexChange={issueStore.setSelectedReferencedIssueIndex}
-					runningTextEnabled={props.runningTextEnabled}
-					runningTextOffset={props.runningTextOffset}
-					loading={issueStore.referencedIssuesLoading()}
-					error={issueStore.referencedIssuesError()}
-					currentPage={1}
-					totalPages={1}
-					totalCount={issueStore.referencedIssues().length}
-					scope={"all"}
-					onSelectIssue={(issue) => void issueActions.showIssueDetail(issue)}
-					onClose={() => issueActions.backToIssueDetailFromReferences()}
-				/>
-			) : appStore.viewMode() === "linkedChangeRequests" ? (
-				<LinkedCRsView
-					changeRequests={issueStore.linkedChangeRequests()}
-					selectedIndex={issueStore.selectedLinkedCRIndex()}
-					loading={issueStore.linkedChangeRequestsLoading()}
-					error={issueStore.linkedChangeRequestsError()}
-					onClose={() => {}}
-					runningTextEnabled={props.runningTextEnabled}
-					runningTextOffset={props.runningTextOffset}
-				/>
-			) : appStore.loading() ? (
-				<StartupSplash appStore={appStore} />
-			) : appStore.error() ? (
+			) : appStore.error() && !appStore.loading() ? (
 				<box
 					style={{
 						width: "100%",
@@ -182,38 +170,12 @@ export function ContentRouter(props: ContentRouterProps) {
 																										appDetailStore.appDetailApp()
 																									}
 																									fallback={
-																										<Show
-																											when={
-																												appStore.viewMode() ===
-																												"providers"
-																											}
-																											fallback={
-																												<box
-																													style={{
-																														width: "100%",
-																														height: "100%",
-																													}}
-																												/>
-																											}
-																										>
-																											<ProvidersView
-																												providers={providerStore.providers()}
-																												loading={providerStore.providersLoading()}
-																												error={providerStore.providersError()}
-																												selectedProviderIndex={providerStore.selectedProviderIndex()}
-																												onClose={() => {
-																													appStore.setViewMode(
-																														"table",
-																													);
-																													providerStore.setProviders(
-																														[],
-																													);
-																													providerStore.setProvidersError(
-																														"",
-																													);
-																												}}
-																											/>
-																										</Show>
+																										<box
+																			style={{
+																				width: "100%",
+																				height: "100%",
+																			}}
+																		/>
 																									}
 																								>
 																									<AppDetailView
@@ -276,6 +238,9 @@ export function ContentRouter(props: ContentRouterProps) {
 																						}
 																						searchMode={changeRequestStore.testSearchMode()}
 																						searchQuery={changeRequestStore.testSearchQuery()}
+																						testResultsUnsupported={selectedAppSourceType() === 'github'}
+																						filterSummary={listFilterSummary(changeRequestStore.currentListFilters())}
+																						sortSummary={listSortSummary(changeRequestStore.currentListSortRules())}
 																					/>
 																				</Show>
 																			}
@@ -316,6 +281,8 @@ export function ContentRouter(props: ContentRouterProps) {
 																		}}
 																		searchMode={changeRequestStore.changedFilesSearchMode()}
 																		searchQuery={changeRequestStore.changedFilesSearchQuery()}
+																		filterSummary={listFilterSummary(changeRequestStore.currentListFilters())}
+																		sortSummary={listSortSummary(changeRequestStore.currentListSortRules())}
 																	/>
 																</Show>
 															}
@@ -329,6 +296,7 @@ export function ContentRouter(props: ContentRouterProps) {
 																}
 																testLoading={changeRequestStore.crTestLoading()}
 																testError={changeRequestStore.crTestError()}
+																testResultsUnsupported={selectedAppSourceType() === 'github'}
 																changes={changeRequestStore.crChanges()}
 																changesLoading={changeRequestStore.crChangesLoading()}
 																changesError={changeRequestStore.crChangesError()}
@@ -363,7 +331,10 @@ export function ContentRouter(props: ContentRouterProps) {
 														searchQuery={changeRequestStore.crSearchQuery()}
 														currentPage={changeRequestStore.currentPage()}
 														totalPages={changeRequestStore.totalPages()}
-														state={changeRequestStore.crState()}
+														state={changeRequestStore.crListFilters().state?.[0] ?? 'opened'}
+														sourceType={selectedAppSourceType()}
+														filterSummary={listFilterSummary(changeRequestStore.crListFilters())}
+														sortSummary={listSortSummary(changeRequestStore.crListSortRules())}
 													runningTextEnabled={props.runningTextEnabled}
 													runningTextOffset={props.runningTextOffset}
 													/>
@@ -416,8 +387,10 @@ export function ContentRouter(props: ContentRouterProps) {
 										currentPage={issueStore.currentPage()}
 										totalPages={issueStore.totalPages()}
 										totalCount={issueStore.totalCount()}
-										scope={issueStore.issueScope()}
-										state={issueStore.issueState()}
+										scope={(issueStore.issueListFilters().scope?.[0] ?? 'all') as any}
+										state={issueStore.issueListFilters().state?.[0] ?? 'open'}
+										filterSummary={listFilterSummary(issueStore.issueListFilters())}
+										sortSummary={listSortSummary(issueStore.issueListSortRules())}
 										searchMode={issueStore.issueSearchMode()}
 										searchQuery={issueStore.issueSearchQuery()}
 										runningTextEnabled={props.runningTextEnabled}
@@ -486,20 +459,7 @@ export function ContentRouter(props: ContentRouterProps) {
 						</Show>
 					}
 				>
-					<Show
-						when={!appStore.statusLogMaximized()}
-						fallback={
-							<StatusLogView
-								entries={appStore.statusLogEntries()}
-								height={30}
-								width={props.dimensions.width}
-								isMaximized={true}
-								runningTextEnabled={props.runningTextEnabled}
-								runningTextOffset={props.runningTextOffset}
-							/>
-						}
-					>
-						<ContentStack
+					<ContentStack
 							items={[
 								<box
 									style={{
@@ -548,27 +508,68 @@ export function ContentRouter(props: ContentRouterProps) {
 									</Show>
 									<Show
 										when={appStore.activeTab() === "kubernetes"}
-										fallback={(() => {
-											const TableComponent = appStore.activeTab() === "scripts"
-												? TaskTable
-												: appStore.activeTab() === "infrastructure"
-													? InfrastructureTable
-													: RepositoryTable;
-											return <TableComponent
-												apps={appStore.tableFilteredApps()}
-												columns={tableColumns()}
-												selectedIndex={appStore.selectedIndex()}
-												onSelect={appStore.setSelectedIndex}
-												showBorder={true}
-												availableLines={availableTableLines}
-												searchMode={appStore.tableSearchMode()}
-												searchQuery={appStore.tableSearchQuery()}
-												spinnerFrames={props.spinnerFrames}
-												spinnerFrame={appStore.spinnerFrame}
-												runningTextEnabled={props.runningTextEnabled}
-												runningTextOffset={props.runningTextOffset}
-											/>;
-										})()}
+										fallback={
+											<Show
+												when={appStore.activeTab() === "scripts"}
+												fallback={
+													<Show
+														when={appStore.activeTab() === "infrastructure"}
+														fallback={
+															<RepositoryTable
+																apps={appStore.tableFilteredApps()}
+																columns={tableColumns()}
+																selectedIndex={appStore.selectedIndex()}
+																onSelect={appStore.setSelectedIndex}
+																showBorder={true}
+																availableLines={availableTableLines}
+																searchMode={appStore.tableSearchMode()}
+																searchQuery={appStore.tableSearchQuery()}
+																spinnerFrames={props.spinnerFrames}
+																spinnerFrame={appStore.spinnerFrame}
+																filterSummary={tableFilterSummary()}
+																sortSummary={tableSortSummary()}
+																runningTextEnabled={props.runningTextEnabled}
+																runningTextOffset={props.runningTextOffset}
+															/>
+														}
+													>
+														<InfrastructureTable
+															apps={appStore.tableFilteredApps()}
+															columns={tableColumns()}
+															selectedIndex={appStore.selectedIndex()}
+															onSelect={appStore.setSelectedIndex}
+															showBorder={true}
+															availableLines={availableTableLines}
+															searchMode={appStore.tableSearchMode()}
+															searchQuery={appStore.tableSearchQuery()}
+															spinnerFrames={props.spinnerFrames}
+															spinnerFrame={appStore.spinnerFrame}
+															filterSummary={tableFilterSummary()}
+															sortSummary={tableSortSummary()}
+															runningTextEnabled={props.runningTextEnabled}
+															runningTextOffset={props.runningTextOffset}
+														/>
+													</Show>
+												}
+											>
+												<TaskTable
+													apps={appStore.tableFilteredApps()}
+													columns={tableColumns()}
+													selectedIndex={appStore.selectedIndex()}
+													onSelect={appStore.setSelectedIndex}
+													showBorder={true}
+													availableLines={availableTableLines}
+													searchMode={appStore.tableSearchMode()}
+													searchQuery={appStore.tableSearchQuery()}
+													spinnerFrames={props.spinnerFrames}
+													spinnerFrame={appStore.spinnerFrame}
+													filterSummary={tableFilterSummary()}
+													sortSummary={tableSortSummary()}
+													runningTextEnabled={props.runningTextEnabled}
+													runningTextOffset={props.runningTextOffset}
+												/>
+											</Show>
+										}
 									>
 										<KubernetesClusterView
 											status={appStore.kubernetesClusterStatus()}
@@ -583,18 +584,16 @@ export function ContentRouter(props: ContentRouterProps) {
 								<box style={{ flexShrink: 0 }}>
 									<StatusLogView
 										entries={appStore.statusLogEntries()}
-										height={6}
-										width={props.dimensions.width}
-										isMaximized={false}
-									runningTextEnabled={props.runningTextEnabled}
-									runningTextOffset={props.runningTextOffset}
+										height={STATUS_LOG_HEIGHT}
 									/>
 								</box>,
 							]}
 						/>
-					</Show>
 				</Show>
 			)}
+			<Show when={appStore.loading()}>
+				<StartupSplash appStore={appStore} spinnerFrames={props.spinnerFrames} spinnerFrame={appStore.spinnerFrame} />
+			</Show>
 		</>
 	);
 }

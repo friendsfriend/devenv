@@ -14,6 +14,7 @@ import (
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
 	"github.com/friendsfriend/devenv/pkg/resources"
+	"github.com/friendsfriend/devenv/pkg/state"
 	"github.com/friendsfriend/devenv/pkg/status"
 )
 
@@ -27,6 +28,12 @@ type appRegistry interface {
 	GetApps() []app.App
 	GetInfraServices() []app.InfraService
 	GetAppByIdent(ident string) (app.App, bool)
+}
+
+type runTargetStateStore interface {
+	GetAppRunTargetInfo(ident string) (state.AppRunTargetInfo, bool, error)
+	SetAppRunTargetInfo(ident string, info state.AppRunTargetInfo) error
+	ClearAppRunTargetInfo(ident string) error
 }
 
 type infraStarter interface {
@@ -63,6 +70,9 @@ type Service interface {
 	RecoverShellTmuxRuns(apps []app.App)
 	ActiveOperationLogPath(appIdent string) (string, bool)
 	LastRunRuntime(appIdent string) string
+	RunTargetInfo(appIdent string) (*RunTargetInfo, bool)
+	SetRunTargetInfo(appIdent string, target resources.ActionTarget)
+	ClearRunTargetInfo(appIdent string)
 	KubernetesRunStatus(appIdent string) string
 	KubernetesRunLogs(appIdent, localDir string) (string, error)
 	DiscoverKubernetesRunStatus(appIdent, localDir string) string
@@ -70,6 +80,7 @@ type Service interface {
 	SetLastRunRuntime(appIdent string, runtime resources.ActionRuntime)
 	SetOnComplete(callback func(appIdent string))
 	ConfigureRunDependencies(apps appRegistry, infra infraStarter)
+	ConfigureStateStore(store runTargetStateStore)
 }
 
 type service struct {
@@ -77,6 +88,7 @@ type service struct {
 	executor       commandRunner
 	statusMgr      status.Manager
 	OnComplete     func(appIdent string)
+	homeDir        string
 	tmuxMu         sync.Mutex
 	tmuxRuns       map[string]ShellTmuxRunState
 	portForwardMu  sync.Mutex
@@ -85,19 +97,23 @@ type service struct {
 	activeLogMap   map[string]string
 	lastRunMu      sync.RWMutex
 	lastRunRuntime map[string]resources.ActionRuntime
+	runTargetInfo  map[string]RunTargetInfo
 	lastKubernetes map[string]*resources.KubernetesTargetMetadata
+	stateStore     runTargetStateStore
 	appRegistry    appRegistry
 	infraStarter   infraStarter
 }
 
-func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr status.Manager) Service {
+func NewService(resourceMgr resourceManager, exec commandRunner, statusMgr status.Manager, homeDir string) Service {
 	return &service{
 		resourceMgr:    resourceMgr,
 		executor:       exec,
 		statusMgr:      statusMgr,
+		homeDir:        homeDir,
 		tmuxRuns:       make(map[string]ShellTmuxRunState),
 		activeLogMap:   make(map[string]string),
 		lastRunRuntime: make(map[string]resources.ActionRuntime),
+		runTargetInfo:  make(map[string]RunTargetInfo),
 		lastKubernetes: make(map[string]*resources.KubernetesTargetMetadata),
 		portForwards:   make(map[string][]*osExec.Cmd),
 	}
@@ -111,6 +127,18 @@ type ShellTmuxRunState struct {
 	WindowID  string
 	PID       int
 	StartedAt time.Time
+}
+
+// RunTargetInfo tracks app run target metadata exposed through status APIs.
+type RunTargetInfo struct {
+	Runtime    string    `json:"runtime"`
+	LaunchMode string    `json:"launchMode,omitempty"`
+	Label      string    `json:"label,omitempty"`
+	Profile    string    `json:"profile,omitempty"`
+	TargetID   string    `json:"targetId,omitempty"`
+	SourcePath string    `json:"sourcePath,omitempty"`
+	StartedAt  time.Time `json:"startedAt"`
+	Display    string    `json:"display"`
 }
 
 func (s *service) SetOnComplete(callback func(appIdent string)) {
@@ -130,6 +158,111 @@ func (s *service) SetLastRunRuntime(appIdent string, runtime resources.ActionRun
 		s.lastRunRuntime = make(map[string]resources.ActionRuntime)
 	}
 	s.lastRunRuntime[appIdent] = runtime
+}
+
+func (s *service) RunTargetInfo(appIdent string) (*RunTargetInfo, bool) {
+	s.lastRunMu.RLock()
+	info, ok := s.runTargetInfo[appIdent]
+	s.lastRunMu.RUnlock()
+	if ok {
+		return &info, true
+	}
+	if s.stateStore == nil {
+		return nil, false
+	}
+	stored, ok, err := s.stateStore.GetAppRunTargetInfo(appIdent)
+	if err != nil || !ok {
+		return nil, false
+	}
+	info = runTargetInfoFromState(stored)
+	s.lastRunMu.Lock()
+	if s.runTargetInfo == nil {
+		s.runTargetInfo = make(map[string]RunTargetInfo)
+	}
+	s.runTargetInfo[appIdent] = info
+	s.lastRunMu.Unlock()
+	return &info, true
+}
+
+func (s *service) SetRunTargetInfo(appIdent string, target resources.ActionTarget) {
+	info := RunTargetInfo{
+		Runtime:    string(target.Runtime),
+		LaunchMode: string(target.LaunchMode),
+		Label:      target.Label,
+		Profile:    target.Profile,
+		TargetID:   target.ID,
+		SourcePath: target.SourcePath,
+		StartedAt:  time.Now().UTC(),
+		Display:    FormatRunTargetDisplay(target),
+	}
+	s.lastRunMu.Lock()
+	if s.runTargetInfo == nil {
+		s.runTargetInfo = make(map[string]RunTargetInfo)
+	}
+	s.runTargetInfo[appIdent] = info
+	s.lastRunMu.Unlock()
+	if s.stateStore != nil {
+		_ = s.stateStore.SetAppRunTargetInfo(appIdent, runTargetInfoToState(info))
+	}
+}
+
+func (s *service) ClearRunTargetInfo(appIdent string) {
+	s.lastRunMu.Lock()
+	delete(s.runTargetInfo, appIdent)
+	s.lastRunMu.Unlock()
+	if s.stateStore != nil {
+		_ = s.stateStore.ClearAppRunTargetInfo(appIdent)
+	}
+}
+
+func runTargetInfoToState(info RunTargetInfo) state.AppRunTargetInfo {
+	return state.AppRunTargetInfo{
+		Runtime:    info.Runtime,
+		LaunchMode: info.LaunchMode,
+		Label:      info.Label,
+		Profile:    info.Profile,
+		TargetID:   info.TargetID,
+		SourcePath: info.SourcePath,
+		StartedAt:  info.StartedAt.UTC().Format(time.RFC3339),
+		Display:    info.Display,
+	}
+}
+
+func runTargetInfoFromState(info state.AppRunTargetInfo) RunTargetInfo {
+	startedAt, _ := time.Parse(time.RFC3339, info.StartedAt)
+	return RunTargetInfo{
+		Runtime:    info.Runtime,
+		LaunchMode: info.LaunchMode,
+		Label:      info.Label,
+		Profile:    info.Profile,
+		TargetID:   info.TargetID,
+		SourcePath: info.SourcePath,
+		StartedAt:  startedAt,
+		Display:    info.Display,
+	}
+}
+
+func FormatRunTargetDisplay(target resources.ActionTarget) string {
+	badge := string(target.Runtime)
+	if target.Runtime == resources.ActionRuntimeShell && target.LaunchMode == resources.LaunchModeTmux {
+		badge = "tmux"
+	}
+	label := strings.TrimSpace(target.Label)
+	if label == "" {
+		label = strings.TrimSpace(target.Profile)
+	}
+	if label == "" {
+		label = string(target.Runtime)
+	}
+	display := fmt.Sprintf("[%s] %s", badge, label)
+	profile := strings.TrimSpace(target.Profile)
+	if profile == "" && target.Runtime == resources.ActionRuntimeDocker && strings.EqualFold(label, "default") {
+		profile = "default"
+	}
+	if profile != "" {
+		display += " (" + profile + ")"
+	}
+	return display
 }
 
 func (s *service) setLastKubernetesTarget(appIdent string, target *resources.KubernetesTargetMetadata) {
@@ -208,6 +341,10 @@ func (s *service) kubernetesTargetStatus(target *resources.KubernetesTargetMetad
 func (s *service) ConfigureRunDependencies(apps appRegistry, infra infraStarter) {
 	s.appRegistry = apps
 	s.infraStarter = infra
+}
+
+func (s *service) ConfigureStateStore(store runTargetStateStore) {
+	s.stateStore = store
 }
 
 func (s *service) BuildAppWithStatus(a *app.App) {
@@ -382,6 +519,12 @@ func (s *service) selectActionTarget(a *app.App, action resources.AppAction, tar
 			if target.Runtime == resources.ActionRuntimeDocker && target.Profile == profile {
 				return target, true, nil
 			}
+			if target.Runtime == resources.ActionRuntimeDocker && profile == "default" && target.Profile == "" && strings.EqualFold(target.Label, "default") {
+				return target, true, nil
+			}
+		}
+		if profile != "" {
+			return resources.ActionTarget{ID: fmt.Sprintf("app/%s/%s/%s/%s", a.Ident, resources.AppActionRun, resources.ActionRuntimeDocker, profile), Action: resources.AppActionRun, Runtime: resources.ActionRuntimeDocker, Label: profile, Profile: profile}, true, nil
 		}
 		return resources.ActionTarget{}, false, nil
 	}
@@ -489,6 +632,7 @@ func (s *service) StopShellTmuxRun(appIdent string) error {
 	if err, _ := s.executor.RunCommandSilent("tmux", []string{"kill-window", "-t", state.WindowID}, []string{}, ""); err != nil {
 		return err
 	}
+	s.ClearRunTargetInfo(appIdent)
 	return nil
 }
 
@@ -503,6 +647,7 @@ func (s *service) IsShellTmuxRunActive(appIdent string) bool {
 		s.tmuxMu.Lock()
 		delete(s.tmuxRuns, appIdent)
 		s.tmuxMu.Unlock()
+		s.ClearRunTargetInfo(appIdent)
 		return false
 	} else if _, panePID := parseTmuxWindowAndPID(output); panePID > 0 {
 		state.PID = panePID
@@ -514,6 +659,7 @@ func (s *service) IsShellTmuxRunActive(appIdent string) bool {
 		s.tmuxMu.Lock()
 		delete(s.tmuxRuns, appIdent)
 		s.tmuxMu.Unlock()
+		s.ClearRunTargetInfo(appIdent)
 		return false
 	}
 	return true
@@ -587,7 +733,7 @@ func (s *service) runShellLogged(a *app.App, target resources.ActionTarget, oper
 		return
 	}
 	if operation == "run" {
-		s.SetLastRunRuntime(a.Ident, resources.ActionRuntimeShell)
+		s.SetLastRunRuntime(a.Ident, target.Runtime)
 	}
 	statusCb(operation + " successful")
 	if s.OnComplete != nil {
@@ -644,6 +790,12 @@ func (s *service) startOperationLog(appIdent, operation string) (string, error) 
 	}
 	s.activeLogMap[appIdent] = path
 	s.activeLogMu.Unlock()
+
+	// Clear the persistent individual app log so the operation view shows
+	// only the current operation's output.
+	persistentPath := filepath.Join(s.homeDir, "logs", appIdent+".log")
+	os.Remove(persistentPath)
+
 	return path, nil
 }
 
@@ -822,6 +974,7 @@ func (s *service) runAppInternal(a *app.App, profile string, targetID string, st
 			return
 		}
 	}
+	s.SetRunTargetInfo(a.Ident, target)
 	s.startRunTarget(a, target, logPath, statusCb)
 }
 

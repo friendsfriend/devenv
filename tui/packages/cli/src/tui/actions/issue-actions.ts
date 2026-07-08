@@ -28,10 +28,8 @@ export function createIssueActions(
 	};
 
 	const loadAllIssues = async (
-		scope: IssueScope = issueStore.issueScope(),
 		page?: number,
 		search?: string,
-		state?: string,
 	) => {
 		if (appStore.operationInProgressForApp()) {
 			return showError(
@@ -42,14 +40,15 @@ export function createIssueActions(
 		const app = getSelectedApp();
 		if (!app) return;
 
+		const filters = issueStore.issueListFilters();
+		const s = filters.state?.[0] ?? "open";
+		const scope = (filters.scope?.[0] ?? "all") as IssueScope;
+		const labels = filters.labels ?? [];
 		const p = page ?? issueStore.currentPage();
-		const s = state ?? issueStore.issueState();
-		issueStore.setIssueState(s);
 		issueStore.setIssueLoading(true);
 		issueStore.setIssueError("");
 		issueStore.setSelectedIssueIndex(0);
 		issueStore.setIssues([]);
-		issueStore.setIssueScope(scope);
 		appStore.setViewMode("issues");
 
 		try {
@@ -61,6 +60,9 @@ export function createIssueActions(
 				issueStore.perPage(),
 				search,
 				s,
+				issueStore.activeIssueListSort()?.key,
+				issueStore.activeIssueListSort()?.direction as "asc" | "desc" | undefined,
+				labels,
 			);
 			issueStore.setIssues(result.items);
 			// Derive totalPages from totalCount/perPage when server doesn't provide it.
@@ -172,7 +174,6 @@ export function createIssueActions(
 		const total = issueStore.totalPages();
 		if (total > 0 && current >= total) return;
 		await loadAllIssues(
-			issueStore.issueScope(),
 			current + 1,
 			issueStore.issueSearchTerm(),
 		);
@@ -184,7 +185,6 @@ export function createIssueActions(
 		const current = issueStore.currentPage();
 		if (current <= 1) return;
 		await loadAllIssues(
-			issueStore.issueScope(),
 			current - 1,
 			issueStore.issueSearchTerm(),
 		);
@@ -198,8 +198,9 @@ export function createIssueActions(
 		appStore.setViewMode("issues");
 	};
 
-	const selectScope = (scope: IssueScope) => {
-		void loadAllIssues(scope);
+	const selectScope = (scope: string) => {
+		issueStore.setIssueListFilters({ ...issueStore.issueListFilters(), scope: [scope] });
+		void loadAllIssues();
 	};
 
 	// ─── Mutation Actions ───────────────────────────────────────────────────
@@ -220,7 +221,7 @@ export function createIssueActions(
 			);
 			issueStore.setIssueSubmitting(false);
 			issueStore.setSelectedIssue(issue);
-			void loadAllIssues(issueStore.issueScope());
+			void loadAllIssues();
 		} catch (e) {
 			issueStore.setIssueSubmitError(errMsg(e));
 			issueStore.setIssueSubmitting(false);
@@ -242,7 +243,7 @@ export function createIssueActions(
 			);
 			issueStore.setIssueSubmitting(false);
 			issueStore.setSelectedIssue(issue);
-			void loadAllIssues(issueStore.issueScope());
+			void loadAllIssues();
 		} catch (e) {
 			issueStore.setIssueSubmitError(errMsg(e));
 			issueStore.setIssueSubmitting(false);
@@ -266,7 +267,7 @@ export function createIssueActions(
 			issueStore.setIssueSubmitting(false);
 			issueStore.setShowLabelPicker(false);
 			issueStore.setSelectedIssue(issue);
-			void loadAllIssues(issueStore.issueScope());
+			issueStore.setIssues(issueStore.issues().map((item) => item.iid === issue.iid ? issue : item));
 		} catch (e) {
 			issueStore.setIssueSubmitError(errMsg(e));
 			issueStore.setIssueSubmitting(false);
@@ -290,7 +291,7 @@ export function createIssueActions(
 			issueStore.setIssueSubmitting(false);
 			issueStore.setShowAssigneePicker(false);
 			issueStore.setSelectedIssue(issue);
-			void loadAllIssues(issueStore.issueScope());
+			void loadAllIssues();
 		} catch (e) {
 			issueStore.setIssueSubmitError(errMsg(e));
 			issueStore.setIssueSubmitting(false);
@@ -313,7 +314,7 @@ export function createIssueActions(
 			issueStore.setIssueSubmitting(false);
 			issueStore.setShowAssigneePicker(false);
 			issueStore.setSelectedIssue(issue);
-			void loadAllIssues(issueStore.issueScope());
+			void loadAllIssues();
 		} catch (e) {
 			issueStore.setIssueSubmitError(errMsg(e));
 			issueStore.setIssueSubmitting(false);
@@ -399,6 +400,7 @@ export function createIssueActions(
 	const openLabelPicker = () => {
 		issueStore.setIssueSubmitError("");
 		issueStore.setLabelPickerIndex(0);
+		issueStore.setLabelPickerSelectedLabels(issueStore.selectedIssue()?.labels ?? []);
 		void fetchRepoLabels();
 		issueStore.setShowLabelPicker(true);
 	};
@@ -435,7 +437,9 @@ export function createIssueActions(
 	};
 
 	const showLinkedCRsSubView = () => {
-		appStore.setViewMode("linkedChangeRequests");
+		issueStore.setReferenceFilters({ type: ["cr"], state: [] });
+		issueStore.setSelectedReferenceIndex(0);
+		appStore.setViewMode("references");
 	};
 
 	const backToIssueDetailFromLinkedCRs = () => {
@@ -444,10 +448,14 @@ export function createIssueActions(
 	};
 
 	const showReferencedIssuesSubView = () => {
-		appStore.setViewMode("referencedIssues");
+		issueStore.setReferenceFilters({ type: ["issue"], state: [] });
+		issueStore.setSelectedReferenceIndex(0);
+		appStore.setViewMode("references");
 	};
 
 	const showReferencesSubView = () => {
+		issueStore.setReferenceFilters({ type: [], state: [] });
+		issueStore.setSelectedReferenceIndex(0);
 		appStore.setViewMode("references");
 	};
 

@@ -1,11 +1,12 @@
 import {
 	render,
-	useKeyboard,
 	usePaste,
 	useRenderer,
 	useTerminalDimensions,
 } from '@opentui/solid';
 import { createCliRenderer } from '@opentui/core';
+import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui';
+import { KeymapProvider, useKeymap } from '@opentui/keymap/solid';
 import { setExitRenderer, getExitSignal } from "./exit";
 import { onMount, createEffect, on, onCleanup } from 'solid-js';
 import "opentui-spinner/solid";
@@ -64,7 +65,6 @@ import {
 	handleWorktreeManagerKeys,
 	handleIssueListKeys,
 	handleIssueDetailKeys,
-	handleLinkedCRsKeys,
 	handleReferencesKeys,
 	handleTableKeys,
 	handlePaste,
@@ -185,15 +185,35 @@ function TUIApp(props: TUIAppProps) {
 		minAlpha: 0.3,
 	});
 
+	const hasActiveSpinner = () =>
+		appStore.loading() ||
+		appStore.startupState().phase !== "complete" ||
+		appStore.exampleConfigLoading() ||
+		!!appStore.operationInProgressForApp() ||
+		appStore.hasActiveOperation() ||
+		changeRequestStore.crLoading() ||
+		changeRequestStore.crChangesLoading() ||
+		changeRequestStore.crTestLoading() ||
+		changeRequestStore.crJobsForDetailLoading() ||
+		changeRequestStore.crDiscussionsLoading() ||
+		changeRequestStore.jobsLoading() ||
+		changeRequestStore.crAiLoading() ||
+		logStore.logAiLoading() ||
+		logStore.logAiStreaming();
+
 	const spinnerInterval = setInterval(() => {
-		appStore.setSpinnerFrame((prev) => (prev + 1) % spinnerFrames.length);
-	}, 40);
-	const runningTextInterval = setInterval(() => {
-		if (uiStore.runningTextEnabled()) uiStore.setRunningTextOffset((prev) => prev + 1);
-	}, 160);
-	onCleanup(() => {
-		clearInterval(spinnerInterval);
-		clearInterval(runningTextInterval);
+		if (hasActiveSpinner()) {
+			appStore.setSpinnerFrame((prev) => (prev + 1) % spinnerFrames.length);
+		}
+	}, 80);
+	onCleanup(() => clearInterval(spinnerInterval));
+
+	createEffect(() => {
+		if (!uiStore.runningTextEnabled()) return;
+		const runningTextInterval = setInterval(() => {
+			uiStore.setRunningTextOffset((prev) => prev + 1);
+		}, 160);
+		onCleanup(() => clearInterval(runningTextInterval));
 	});
 
 	/* selectedLine removed — no cursor line / visual mode */
@@ -248,28 +268,34 @@ function TUIApp(props: TUIAppProps) {
 		showError,
 	};
 
-	useKeyboard(async (event) => {
-		if (await handleGlobalKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleAddRepositoryModalKeys(event, kbStores, kbActions)) return;
-		if (await handleConnectProviderModalKeys(event, kbStores, kbActions))
-			return;
-		if (await handleDiffModalKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleLogModalKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleJobsKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleCrListKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleCrDetailKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleIssueTimelineKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleLinkedCRsKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleReferencesKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleChangedFilesKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleTestResultsKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleDiscussionsKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleMiscModalKeys(event, kbStores, kbActions, kbCtx)) return;
-		if (await handleWorktreeManagerKeys(event, kbStores, kbActions, kbCtx))
-			return;
-		if (await handleTableKeys(event, kbStores, kbActions, kbCtx)) return;
+	const keymap = useKeymap();
+	onMount(() => {
+		const dispose = keymap.intercept("key", (input) => {
+			void (async () => {
+				const event = input.event;
+				const handled =
+					(await handleGlobalKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleAddRepositoryModalKeys(event, kbStores, kbActions)) ||
+					(await handleConnectProviderModalKeys(event, kbStores, kbActions)) ||
+					(await handleDiffModalKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleLogModalKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleJobsKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleCrListKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleCrDetailKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleIssueTimelineKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleReferencesKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleChangedFilesKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleTestResultsKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleDiscussionsKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleMiscModalKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleWorktreeManagerKeys(event, kbStores, kbActions, kbCtx)) ||
+					(await handleTableKeys(event, kbStores, kbActions, kbCtx));
+				if (handled) input.consume();
+			})();
+		});
+		onCleanup(dispose);
 	});
 
 	usePaste((event) => handlePaste(event, providerStore));
@@ -383,21 +409,27 @@ export async function startTUI(serverUrl: string) {
 		const terminalThemeColors = await queryTerminalThemeColors();
 		loadSystemTheme(terminalThemeColors);
 
+		const useConsole = process.env.DEVENV_TUI_CONSOLE === "1";
 		const renderer = await createCliRenderer({
+			targetFps: 60,
+			gatherStats: true,
 			exitOnCtrlC: false,
+			consoleMode: useConsole ? "console-overlay" : "disabled",
 			useKittyKeyboard: {},
-			consoleOptions: {
-				keyBindings: [
-					// Kitty protocol may send uppercase 'C' for Ctrl+Shift+C
-					{ name: "c", ctrl: true, shift: true, action: "copy-selection" },
-					{ name: "C", ctrl: true, shift: true, action: "copy-selection" },
-				],
-				onCopySelection: (text: string) => {
-					import("@devenv/core")
-						.then(({ copyToClipboard }) => copyToClipboard(text))
-						.catch(() => {});
+			...(useConsole ? {
+				consoleOptions: {
+					keyBindings: [
+						// Kitty protocol may send uppercase 'C' for Ctrl+Shift+C
+						{ name: "c", ctrl: true, shift: true, action: "copy-selection" },
+						{ name: "C", ctrl: true, shift: true, action: "copy-selection" },
+					],
+					onCopySelection: (text: string) => {
+						import("@devenv/core")
+							.then(({ copyToClipboard }) => copyToClipboard(text))
+							.catch(() => {});
+					},
 				},
-			},
+			} : {}),
 		});
 
 		setExitRenderer(renderer);
@@ -420,8 +452,17 @@ export async function startTUI(serverUrl: string) {
 			renderer.once("destroy", resolve);
 		});
 
+		const keymap = createDefaultOpenTuiKeymap(renderer);
+
 		try {
-			await render(() => <TUIApp serverUrl={serverUrl} />, renderer);
+			await render(
+				() => (
+					<KeymapProvider keymap={keymap}>
+						<TUIApp serverUrl={serverUrl} />
+					</KeymapProvider>
+				),
+				renderer,
+			);
 			await rendererDestroyed;
 		} finally {
 			unregisterFatalCleanup();

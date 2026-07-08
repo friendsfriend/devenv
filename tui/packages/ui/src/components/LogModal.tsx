@@ -1,19 +1,29 @@
+/** @jsxImportSource @opentui/solid */
 import { createMemo, For, Show } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import type { TextChunk } from '@opentui/core';
 import { useRenderer } from '@opentui/solid';
-import { colors, uiColors } from '../colors';
+import { uiColors } from '../colors';
+import { highlightColor } from './Highlight';
 import { ansiToStyledText, stripAnsi } from '../ansiToStyledText';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 import { LogAiOverlay } from './LogAiOverlay';
 import { ScrollableContent } from './ScrollableContent';
+import { SearchHeader } from './SearchHeader';
 
 export interface LogModalProps {
   /** Modal title / header label (e.g. "Container Logs: my-app (auto-refresh: 10s)") */
   title: string;
   /** Raw log text — newline-separated */
   logs: string;
+  /** Optional pre-split log lines. Avoids splitting large logs every render. */
+  logLines?: readonly string[];
+  /** When set, renders custom children instead of line-by-line log text. Parent owns search/filter. */
+  children?: any;
+  historyLoading?: boolean;
+  historyHasMore?: boolean;
+  historyError?: string | null;
   /**
    * Called once on mount with the ScrollBoxRenderable so the parent can call
    * scrollBy / scrollTo directly (same imperative pattern as DiffViewModal).
@@ -124,7 +134,7 @@ export function LogModal(props: LogModalProps) {
     height: renderer.height,
   });
 
-  const lines = createMemo(() => props.logs.split('\n'));
+  const lines = createMemo(() => props.logLines ? [...props.logLines] : props.logs.split('\n'));
   const lineCount = () => lines().length;
 
   // All lines are passed to <For>; OpenTUI viewportCulling handles off-screen clipping.
@@ -139,36 +149,16 @@ export function LogModal(props: LogModalProps) {
   const matchCount = () => props.searchMatchLines.size;
 
   const customHeader = () => (
-    <box flexShrink={0} flexDirection="row" justifyContent="space-between" alignItems="center">
-      <box flexDirection="row" gap={1} alignItems="center">
-        <text fg={uiColors.textPrimary}>
+    <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={matchCount()}>
+      <box flexDirection="row" justifyContent="space-between" alignItems="center" style={{ width: '100%' }}>
+        <text fg={highlightColor('primary')}>
           <b>{props.title}</b>
         </text>
-        {/* While typing: show live input; after confirm: show query + match count */}
-        <Show
-          when={props.searchMode}
-          fallback={
-            <Show when={props.searchQuery.length > 0}>
-              <text fg={colors.peach}>
-                {' '}/{props.searchQuery}
-                {matchCount() > 0
-                  ? ` (${(props.searchMatchIndex >= 0 ? props.searchMatchIndex + 1 : 1)}/${matchCount()})`
-                  : ' (no matches)'}
-              </text>
-            </Show>
-          }
-        >
-          <box flexDirection="row" alignItems="center">
-            <text fg={colors.peach}> /</text>
-            <text fg={uiColors.textPrimary}>{props.searchQuery}</text>
-            <text fg={uiColors.primary}>█</text>
-          </box>
-        </Show>
+        <text fg={highlightColor('secondary')}>
+          {props.historyLoading ? 'loading older… • ' : ''}{String(lineCount())} lines{props.historyHasMore ? ' • older logs available' : ''}
+        </text>
       </box>
-      <text fg={uiColors.textMuted}>
-        {String(lineCount())} lines
-      </text>
-    </box>
+    </SearchHeader>
   );
 
   // ── keybind help text (standard modal style: plain string via formatHelpText) ──
@@ -211,7 +201,23 @@ export function LogModal(props: LogModalProps) {
         stickyStart="bottom"
       >
         <box paddingLeft={1} paddingRight={1}>
-          <For each={lines()}>
+          <Show when={props.historyError}>
+            <box flexDirection="row" style={{ flexShrink: 0, height: 1, minWidth: '100%' }}>
+              <text fg={uiColors.warning}>Failed to load older logs: {props.historyError}</text>
+            </box>
+          </Show>
+          <Show when={props.historyLoading}>
+            <box flexDirection="row" style={{ flexShrink: 0, height: 1, minWidth: '100%' }}>
+              <text fg={highlightColor('secondary')}>Loading older logs…</text>
+            </box>
+          </Show>
+          <Show when={!props.historyLoading && !props.historyHasMore && lineCount() > 0}>
+            <box flexDirection="row" style={{ flexShrink: 0, height: 1, minWidth: '100%' }}>
+              <text fg={highlightColor('secondary')}>Start of log</text>
+            </box>
+          </Show>
+          <Show when={!props.children} fallback={props.children}>
+            <For each={lines()}>
             {(line, localIndex) => {
               const index = localIndex;
               const isMatchLine = () => props.searchMatchLines.has(index());
@@ -232,23 +238,23 @@ export function LogModal(props: LogModalProps) {
                     when={hasSearch()}
                     fallback={
                       styledLine
-                        ? <text fg={uiColors.textPrimary}>
+                        ? <text fg={highlightColor('primary')}>
                             <For each={styledLine.chunks}>
                               {(chunk) => <span style={chunkStyle(chunk)}>{chunk.text}</span>}
                             </For>
                           </text>
-                        : <text fg={uiColors.textPrimary}>{line}</text>
+                        : <text fg={highlightColor('primary')}>{line}</text>
                     }
                   >
                     <For each={splitMatches(stripAnsi(line), query())}>
                       {(seg) => (
                         <Show
                           when={seg.isMatch}
-                          fallback={<text fg={uiColors.textPrimary}>{seg.text}</text>}
+                          fallback={<text fg={highlightColor('primary')}>{seg.text}</text>}
                         >
                           <text
-                            fg={colors.base}
-                            bg={isCurrentMatch() ? colors.peach : colors.yellow}
+                            fg={uiColors.bgBase}
+                            bg={isCurrentMatch() ? uiColors.primary : uiColors.warning}
                           >
                             {seg.text}
                           </text>
@@ -260,6 +266,7 @@ export function LogModal(props: LogModalProps) {
               );
             }}
           </For>
+          </Show>
         </box>
       </ScrollableContent>
     </GenericModal>

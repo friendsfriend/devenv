@@ -263,6 +263,8 @@ type ChangeRequest struct {
 	SourceBranch string `json:"source_branch"`
 	// TargetBranch is the branch the changes will be merged into.
 	TargetBranch string `json:"target_branch"`
+	// DefaultBranch is the repository default branch used to judge whether target branch is unusual.
+	DefaultBranch string `json:"default_branch,omitempty"`
 	// State is the current state: "opened", "merged", "closed", etc.
 	State string `json:"state"`
 	// WebURL is the URL to view this change request in a browser.

@@ -4,7 +4,7 @@ import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Jobs view:
  * - Search mode (type query, clear)
- * - q to quit, / to search, ESC to go back
+ * - / to search, ESC to go back
  * - v to view job logs, r to retry, c to cancel
  * - Tab for stage selection
  * - j/k for navigation
@@ -16,7 +16,7 @@ export async function handleJobsKeys(
   _ctx: KeyboardContext,
 ): Promise<boolean> {
   const { appStore, changeRequestStore } = stores;
-  const { appActions, logActions, pipelineActions } = actions;
+  const { logActions, pipelineActions } = actions;
 
   if (appStore.viewMode() !== 'jobs') return false;
 
@@ -48,12 +48,6 @@ export async function handleJobsKeys(
       return true;
     }
     return true; // swallow all other keys
-  }
-
-  // q to quit
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
   }
 
   // '/' to enter search mode

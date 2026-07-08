@@ -1,8 +1,10 @@
+/** @jsxImportSource @opentui/solid */
 import { Show, createMemo } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export interface BranchInfo {
   name: string;
@@ -36,12 +38,11 @@ function BranchRow(props: {
   };
 
   const isBold = () => props.isCurrent || !props.branchInfo.isRemote || props.isSelected;
-  const cursor = () => props.isSelected ? '► ' : '  ';
   const suffix = () => props.isCurrent ? ' (current)' : '';
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 1,
@@ -53,7 +54,7 @@ function BranchRow(props: {
         fg={branchColor()}
         attributes={isBold() ? TextAttributes.BOLD : undefined}
       >
-        {cursor()}{props.branchInfo.name}{suffix()}
+        {props.branchInfo.name}{suffix()}
       </text>
     </box>
   );
@@ -122,7 +123,7 @@ export function BranchSelectorView(props: BranchSelectorProps) {
           <text style={{ fg: uiColors.textSecondary }}>
             Current:{' '}
           </text>
-          <text fg={uiColors.success} attributes={TextAttributes.BOLD}>
+          <text fg={highlightColor('positive')} attributes={TextAttributes.BOLD}>
             {props.currentBranch}
           </text>
         </box>
@@ -134,15 +135,15 @@ export function BranchSelectorView(props: BranchSelectorProps) {
             <Show
               when={filterQuery()}
               fallback={
-                <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>No branches found</text>
+                <text fg={highlightColor('highlight')} attributes={TextAttributes.BOLD}>No branches found</text>
               }
             >
-              <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>No branches matching "{filterQuery()}"</text>
+              <text fg={highlightColor('highlight')} attributes={TextAttributes.BOLD}>No branches matching "{filterQuery()}"</text>
             </Show>
           }
         >
-          <text fg={uiColors.textSecondary}>No existing branch matches "{filterQuery()}".</text>
-          <text fg={uiColors.success} attributes={TextAttributes.BOLD}>Press Enter to create a new worktree on branch "{filterQuery()}".</text>
+          <text fg={highlightColor('secondary')}>No existing branch matches "{filterQuery()}".</text>
+          <text fg={highlightColor('positive')} attributes={TextAttributes.BOLD}>Press Enter to create a new worktree on branch "{filterQuery()}".</text>
         </Show>
       }
       renderItem={(branchInfo, isSelected) => {

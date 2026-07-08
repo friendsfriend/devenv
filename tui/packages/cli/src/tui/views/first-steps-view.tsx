@@ -1,110 +1,101 @@
-import { TextAttributes, RGBA } from '@opentui/core';
-import { useTerminalDimensions } from '@opentui/solid';
-import { uiColors } from '@devenv/ui';
+import { Show } from 'solid-js';
+import { TextAttributes } from '@opentui/core';
+import { uiColors, Badge, GenericModal, formatHelpText } from '@devenv/ui';
 import type { AppStore, ProviderStore } from "../stores";
 
 export function FirstStepsView(props: {
 	appStore: AppStore;
 	providerStore: ProviderStore;
 }) {
-	const dimensions = useTerminalDimensions();
-	const dialogWidth = () => Math.min(86, Math.max(40, dimensions().width - 4));
 	const hasProvider = () => props.providerStore.providers().some((p) => !p.invalid);
-	const invalidProviderCount = () => props.providerStore.providers().filter((p) => p.invalid).length;
-	const hasWorkspaceResource = () => props.appStore.apps().length > 0 || props.appStore.infraServices().length > 0 || props.appStore.scriptVisibleRows().length > 0;
+	const hasResources = () => props.appStore.apps().length > 0 || props.appStore.infraServices().length > 0 || props.appStore.scriptVisibleRows().length > 0;
 	const selected = (idx: number) => props.appStore.firstStepsSelectedIndex() === idx;
-	const cursor = (idx: number) => selected(idx) ? "► " : "  ";
-	const rowColor = (idx: number, done: boolean, fallback: string = uiColors.textPrimary) => done ? uiColors.success : selected(idx) ? uiColors.textPrimary : fallback;
+	const rowBg = (idx: number) => selected(idx) ? uiColors.bgSurface2 : undefined;
+
 	return (
-		<box
-			position="absolute"
-			top={0}
-			left={0}
-			width="100%"
-			height="100%"
-			justifyContent="center"
-			alignItems="center"
-			backgroundColor={RGBA.fromInts(0, 0, 0, 120)}
+		<GenericModal
+			title="Welcome to DevEnv"
+			helpText={formatHelpText([
+				{ key: 'j/k', action: 'Navigate' },
+				{ key: 'Enter', action: 'Select' },
+				{ key: 'Esc', action: 'Close' },
+			])}
+			widthPercent={0.65}
+			heightPercent={0.6}
 		>
-			<box
-				border
-				borderStyle="rounded"
-				borderColor={uiColors.primary}
-				backgroundColor={uiColors.bgMantle}
-				style={{
-					width: dialogWidth(),
-					flexDirection: "column",
-					paddingLeft: 4,
-					paddingRight: 4,
-					paddingTop: 2,
-					paddingBottom: 2,
-					gap: 1,
-				}}
-			>
-				<text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-					Welcome to DevEnv
+			<text fg={uiColors.textPrimary}>Thank you for using DevEnv.</text>
+			<text fg={uiColors.textSecondary}>Complete these steps to get started.</text>
+
+			<box style={{ width: '100%', height: 1, flexShrink: 0 }} />
+
+			{/* Step 1: Connect Provider */}
+			<box backgroundColor={rowBg(0)} style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1, paddingRight: 1 }}>
+				<Show when={hasProvider()} fallback={<text fg={uiColors.textMuted}>1.</text>}>
+					<Badge text="✓" highlight="positive" />
+				</Show>
+				<box style={{ width: 2, flexShrink: 0 }} />
+				<text fg={selected(0) ? uiColors.textPrimary : hasProvider() ? uiColors.success : uiColors.textPrimary} attributes={TextAttributes.BOLD}>
+					Connect a git provider
 				</text>
-				<text fg={uiColors.textPrimary}>Thank you for using DevEnv.</text>
-				<text fg={uiColors.textSecondary}>Connect a provider, then add a repository, load examples, or set up config sync.</text>
-
-				<box style={{ width: "100%", height: 1, flexDirection: "row" }}>
-					<box style={{ width: 5, height: 1, justifyContent: "flex-end" }}>
-						<text fg={hasProvider() ? uiColors.success : uiColors.textPrimary} attributes={hasProvider() ? TextAttributes.BOLD : undefined}>{hasProvider() ? "✓ 1." : "1."}</text>
-					</box>
-					<box backgroundColor={selected(0) ? uiColors.bgSurface2 : undefined} style={{ flexGrow: 1, height: 1, paddingLeft: 1, paddingRight: 1 }}>
-						<text fg={rowColor(0, hasProvider())} attributes={selected(0) || hasProvider() ? TextAttributes.BOLD : undefined}>
-							{cursor(0)}Connect Provider
-						</text>
-					</box>
-				</box>
-				<box style={{ width: "100%", height: 1, flexDirection: "row" }}>
-					<box style={{ width: 5, height: 1, justifyContent: "flex-end" }}>
-						<text fg={hasWorkspaceResource() ? uiColors.success : uiColors.textPrimary} attributes={hasWorkspaceResource() ? TextAttributes.BOLD : undefined}>{hasWorkspaceResource() ? "✓ 2." : "2."}</text>
-					</box>
-					<box backgroundColor={selected(1) ? uiColors.bgSurface2 : undefined} style={{ width: "24%", height: 1, paddingLeft: 1, paddingRight: 1 }}>
-						<text fg={rowColor(1, hasWorkspaceResource(), hasProvider() ? uiColors.textPrimary : uiColors.textSecondary)} attributes={selected(1) || hasWorkspaceResource() ? TextAttributes.BOLD : undefined}>
-							{cursor(1)}Add repository
-						</text>
-					</box>
-					<box style={{ width: "8%", height: 1, justifyContent: "center" }}>
-						<text fg={uiColors.textMuted}>-or-</text>
-					</box>
-					<box backgroundColor={selected(2) ? uiColors.bgSurface2 : undefined} style={{ width: "24%", height: 1, paddingLeft: 1, paddingRight: 1 }}>
-						<text fg={rowColor(2, hasWorkspaceResource())} attributes={selected(2) || hasWorkspaceResource() ? TextAttributes.BOLD : undefined}>
-							{cursor(2)}Load examples
-						</text>
-					</box>
-					<box style={{ width: "8%", height: 1, justifyContent: "center" }}>
-						<text fg={uiColors.textMuted}>-or-</text>
-					</box>
-					<box backgroundColor={selected(3) ? uiColors.bgSurface2 : undefined} style={{ flexGrow: 1, height: 1, paddingLeft: 1, paddingRight: 1 }}>
-						<text fg={selected(3) ? uiColors.textPrimary : uiColors.textSecondary} attributes={selected(3) ? TextAttributes.BOLD : undefined}>
-							{cursor(3)}Config repo guide
-						</text>
-					</box>
-				</box>
-				<box style={{ width: "100%", height: 1, flexDirection: "row" }}>
-					<box style={{ width: 5, height: 1, justifyContent: "flex-end" }}>
-						<text fg={uiColors.textPrimary}>?</text>
-					</box>
-					<box backgroundColor={selected(4) ? uiColors.bgSurface2 : undefined} style={{ flexGrow: 1, height: 1, paddingLeft: 1, paddingRight: 1 }}>
-						<text fg={uiColors.textPrimary} attributes={selected(4) ? TextAttributes.BOLD : undefined}>{cursor(4)}Help</text>
-					</box>
-				</box>
-
-				{props.appStore.exampleConfigMessage() ? (
-					<text fg={props.appStore.exampleConfigLoading() ? uiColors.warning : uiColors.textSecondary}>
-						{props.appStore.exampleConfigMessage()}
-					</text>
-				) : null}
-				{props.providerStore.providersError() ? (
-					<text fg={uiColors.error}>{props.providerStore.providersError()}</text>
-				) : null}
-				{invalidProviderCount() > 0 ? (
-					<text fg={uiColors.warning}>{invalidProviderCount()} provider(s) blocked: clear-text credentials found. Press c to open Providers, then edit or delete.</text>
-				) : null}
-				<text fg={uiColors.textMuted}>j/k rows    h/l or ←/→ options    enter selects    esc closes</text>
+				<Show when={hasProvider()}>
+					<text fg={uiColors.textMuted}>  done</text>
+				</Show>
 			</box>
-		</box>
+
+			{/* Step 2: Add repository or alternatives */}
+			<box backgroundColor={rowBg(1)} style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1, paddingRight: 1 }}>
+				<Show when={hasResources()} fallback={<text fg={!hasProvider() ? uiColors.textSecondary : uiColors.textMuted}>2.</text>}>
+					<Badge text="✓" highlight="positive" />
+				</Show>
+				<box style={{ width: 2, flexShrink: 0 }} />
+				<text fg={!hasProvider() ? uiColors.textSecondary : selected(1) ? uiColors.textPrimary : uiColors.textPrimary} attributes={selected(1) ? TextAttributes.BOLD : undefined}>
+					Add repository
+				</text>
+			</box>
+
+			{/* Step 2a: Load examples */}
+			<box backgroundColor={rowBg(2)} style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 4, paddingRight: 1 }}>
+				<text fg={uiColors.textMuted}>— or —</text>
+				<box style={{ width: 1, flexShrink: 0 }} />
+				<text fg={!hasProvider() ? uiColors.textTertiary : selected(2) ? uiColors.textPrimary : uiColors.textSecondary} attributes={selected(2) ? TextAttributes.BOLD : undefined}>
+					Load examples
+				</text>
+			</box>
+
+			{/* Step 2b: Config repo guide */}
+			<box backgroundColor={rowBg(3)} style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 4, paddingRight: 1 }}>
+				<text fg={uiColors.textMuted}>— or —</text>
+				<box style={{ width: 1, flexShrink: 0 }} />
+				<text fg={!hasProvider() ? uiColors.textTertiary : selected(3) ? uiColors.textPrimary : uiColors.textSecondary} attributes={selected(3) ? TextAttributes.BOLD : undefined}>
+					View config repo guide
+				</text>
+			</box>
+
+			<box style={{ width: '100%', height: 1, flexShrink: 0 }} />
+
+			{/* Step 3: Help */}
+			<box backgroundColor={rowBg(4)} style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1, paddingRight: 1 }}>
+				<text fg={uiColors.textMuted}>?</text>
+				<box style={{ width: 2, flexShrink: 0 }} />
+				<text fg={selected(4) ? uiColors.textPrimary : uiColors.textSecondary} attributes={selected(4) ? TextAttributes.BOLD : undefined}>
+					Help
+				</text>
+			</box>
+
+			<box style={{ width: '100%', height: 1, flexShrink: 0 }} />
+
+			{/* Status messages */}
+			<Show when={props.appStore.exampleConfigMessage()}>
+				<text fg={props.appStore.exampleConfigLoading() ? uiColors.warning : uiColors.textSecondary}>
+					{props.appStore.exampleConfigMessage()}
+				</text>
+			</Show>
+			<Show when={props.providerStore.providersError()}>
+				<text fg={uiColors.error}>{props.providerStore.providersError()}</text>
+			</Show>
+			<Show when={!props.providerStore.providersError() && props.providerStore.providers().some((p) => p.invalid)}>
+				<text fg={uiColors.warning}>Provider(s) blocked: clear-text credentials in provider JSON. Press c to open Providers and edit.</text>
+			</Show>
+		</GenericModal>
 	);
 }

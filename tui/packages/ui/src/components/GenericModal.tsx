@@ -1,9 +1,22 @@
-import { For, JSX, createMemo } from 'solid-js';
+/** @jsxImportSource @opentui/solid */
+import { For, JSX, Show, createMemo } from 'solid-js';
 import { RGBA } from '@opentui/core';
+import { SearchHeader } from './SearchHeader';
+import { FilterStatusBar } from './FilterStatusBar';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { TextAttributes } from '@opentui/core';
 import { invokeGlobalSelectionMouseUpHandler } from '../selectionCopy';
+
+function hexToRgba(hex: string, alpha: number): RGBA {
+  const normalized = hex.replace('#', '');
+  if (normalized.length !== 6) return RGBA.fromHex(hex);
+
+  const r = parseInt(normalized.slice(0, 2), 16) / 255;
+  const g = parseInt(normalized.slice(2, 4), 16) / 255;
+  const b = parseInt(normalized.slice(4, 6), 16) / 255;
+  return RGBA.fromValues(r, g, b, alpha);
+}
 
 function wrapHelpText(text: string, maxWidth: number): string[] {
   if (!text) return [''];
@@ -46,10 +59,19 @@ export interface GenericModalProps {
   widthPercent?: number;
   /** Height as percentage of screen (0-1), default 0.7 (70%) */
   heightPercent?: number;
+  /** Exact height in terminal lines. Overrides heightPercent when provided. */
+  heightLines?: number;
   /** Optional custom header content (replaces default title) */
   customHeader?: JSX.Element;
   /** Optional custom footer content (replaces default help text) */
   customFooter?: JSX.Element;
+  /** Optional search mode/query for SearchHeader */
+  searchMode?: boolean;
+  searchQuery?: string;
+  searchResultCount?: number;
+  /** Optional filter/sort summary for FilterStatusBar */
+  filterSummary?: string;
+  sortSummary?: string;
   /** Click handler for backdrop */
   onBackdropClick?: () => void;
 }
@@ -72,7 +94,7 @@ export function GenericModal(props: GenericModalProps) {
   const dimensions = useTerminalDimensions();
 
   const dialogWidth = () => Math.floor(dimensions().width * (props.widthPercent ?? 0.5));
-  const dialogHeight = () => Math.floor(dimensions().height * (props.heightPercent ?? 0.7));
+  const dialogHeight = () => Math.min(dimensions().height, props.heightLines ?? Math.floor(dimensions().height * (props.heightPercent ?? 0.7)));
   const helpLines = createMemo(() => wrapHelpText(props.helpText, Math.max(1, dialogWidth() - 4)));
 
   return (
@@ -85,12 +107,12 @@ export function GenericModal(props: GenericModalProps) {
       flexDirection="column"
       justifyContent="center"
       alignItems="center"
-      backgroundColor={RGBA.fromInts(0, 0, 0, 150)}
+      backgroundColor={RGBA.fromValues(0, 0, 0, 0.35)}
       onMouseUp={() => props.onBackdropClick?.()}
     >
       {/* Dialog box */}
       <box
-        backgroundColor={uiColors.bgMantle}
+        backgroundColor={hexToRgba(uiColors.bgMantle, 0.92)}
         width={dialogWidth()}
         height={dialogHeight()}
         flexDirection="column"
@@ -107,20 +129,23 @@ export function GenericModal(props: GenericModalProps) {
         {props.customHeader ? (
           props.customHeader
         ) : (
-          <box
-            style={{
-              width: '100%',
-              height: 1,
-              justifyContent: 'flex-start',
-              flexDirection: 'row',
-              flexShrink: 0,
-            }}
-          >
-            <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-              {props.title}
-            </text>
-          </box>
+          <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.searchResultCount}>
+            <box
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                flexDirection: 'row',
+              }}
+            >
+              <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
+                {props.title}
+              </text>
+            </box>
+          </SearchHeader>
         )}
+
+        {/* FILTER STATUS */}
+        <FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
 
         {/* MIDDLE CONTENT */}
         <box

@@ -28,7 +28,7 @@ export function createGitActions(
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
     const app = getSelectedApp();
     if (!app) return;
-    appendStatusLog(app, 'pull', 'in_progress', `Pulling ${app.branch}...`);
+    appendStatusLog(app, 'pull', 'in progress', `Pulling ${app.branch}...`);
     uiStore.setLoadingModalMessage(`Pulling ${app.displayName} (${app.branch})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -47,7 +47,7 @@ export function createGitActions(
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
     const app = getSelectedApp();
     if (!app) return;
-    appendStatusLog(app, 'push', 'in_progress', `Pushing ${app.branch}...`);
+    appendStatusLog(app, 'push', 'in progress', `Pushing ${app.branch}...`);
     uiStore.setLoadingModalMessage(`Pushing ${app.displayName} (${app.branch})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -66,7 +66,7 @@ export function createGitActions(
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
     const app = getSelectedApp();
     if (!app) return;
-    appendStatusLog(app, 'fetch', 'in_progress', `Fetching ${app.displayName}...`);
+    appendStatusLog(app, 'fetch', 'in progress', `Fetching ${app.displayName}...`);
     uiStore.setLoadingModalMessage(`Fetching ${app.displayName}...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -159,7 +159,7 @@ export function createGitActions(
     if (!app || !selected) return;
     const branchName = selected.name.startsWith('origin/') ? selected.name.substring(7) : selected.name;
     closeBranchSelector();
-    appendStatusLog(app, 'checkout', 'in_progress', `Checking out ${branchName}...`);
+    appendStatusLog(app, 'checkout', 'in progress', `Checking out ${branchName}...`);
     uiStore.setLoadingModalMessage(`Checking out ${branchName}...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -182,7 +182,7 @@ export function createGitActions(
     uiStore.setShowCreateBranchModal(false);
     uiStore.setCreateBranchName('');
     closeBranchSelector();
-    appendStatusLog(app, 'create-branch', 'in_progress', `Creating branch ${branchName}...`);
+    appendStatusLog(app, 'create-branch', 'in progress', `Creating branch ${branchName}...`);
     uiStore.setLoadingModalMessage(`Creating branch ${branchName}...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -219,7 +219,7 @@ export function createGitActions(
     }
 
     closeBranchSelector();
-    appendStatusLog(app, 'create-worktree', 'in_progress', `Creating worktree ${branchName}...`);
+    appendStatusLog(app, 'create-worktree', 'in progress', `Creating worktree ${branchName}...`);
     uiStore.setLoadingModalMessage(`Creating worktree ${branchName} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -248,7 +248,7 @@ export function createGitActions(
       return showError('Cannot Remove Worktree', 'Cannot remove the active or primary worktree.');
     }
     closeBranchSelector();
-    appendStatusLog(app, 'remove-worktree', 'in_progress', `Removing worktree ${branchName}...`);
+    appendStatusLog(app, 'remove-worktree', 'in progress', `Removing worktree ${branchName}...`);
     uiStore.setLoadingModalMessage(`Removing worktree ${branchName} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -277,7 +277,7 @@ export function createGitActions(
       return showError('Cannot Remove Worktree', 'Cannot remove the active or primary worktree.');
     }
 
-    appendStatusLog(app, 'remove-worktree', 'in_progress', `Removing worktree ${selected.branch}...`);
+    appendStatusLog(app, 'remove-worktree', 'in progress', `Removing worktree ${selected.branch}...`);
     uiStore.setLoadingModalMessage(`Removing worktree ${selected.branch} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -310,7 +310,7 @@ export function createGitActions(
     const app = appStore.apps().find((a) => a.ident === appId);
     if (!app) return;
 
-    appendStatusLog(app, 'switch-worktree', 'in_progress', `Switching worktree ${selected.branch}...`);
+    appendStatusLog(app, 'switch-worktree', 'in progress', `Switching worktree ${selected.branch}...`);
     uiStore.setLoadingModalMessage(`Switching worktree ${selected.branch} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {

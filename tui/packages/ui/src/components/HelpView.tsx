@@ -1,14 +1,19 @@
+/** @jsxImportSource @opentui/solid */
 import { createMemo, For, Show, type JSX } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
+import { HighlightedText } from './Highlight';
+import { formatHelpText } from './HelpText';
 import { GenericModal } from './GenericModal';
 import { ModalTabs } from './ModalTabs';
+import { SearchHeader } from './SearchHeader';
 import { focusSoon } from '../utils/focusSoon';
 import { ScrollableContent } from './ScrollableContent';
 import { ScrollableList } from './ScrollableList';
 import { RunningText } from './RunningText';
 import { WorkItemCard } from './WorkItemCard';
+import { MatchedText } from './MatchedText';
 
 export interface HelpSection {
   title: string;
@@ -92,14 +97,20 @@ export function HelpView(props: HelpViewProps): JSX.Element {
       title="Help"
       widthPercent={0.72}
       heightPercent={0.78}
-      helpText=""
-      customFooter={<box style={{ height: 0 }} />}
+      helpText={formatHelpText([
+        { key: 'j/k', action: 'Navigate' },
+        { key: 'Tab', action: 'Switch tab' },
+        { key: '/', action: 'Search' },
+        { key: 'Esc', action: 'Close' },
+      ])}
       customHeader={
         <box style={{ width: '100%', flexDirection: 'column', flexShrink: 0 }}>
-          <box style={{ width: '100%', flexDirection: 'row' }}>
-            <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>Help</text>
-            <text fg={uiColors.textMuted}>{` — ${props.viewTitle}`}</text>
-          </box>
+          <SearchHeader searchMode={props.searchActive} searchQuery={props.searchQuery} resultCount={hasMatches() ? filteredSections().length : 0}>
+            <box style={{ width: '100%', flexDirection: 'row' }}>
+              <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>Help</text>
+              <text fg={uiColors.textMuted}>{` — ${props.viewTitle}`}</text>
+            </box>
+          </SearchHeader>
           <ModalTabs
             activeId={activeTab()}
             onChange={(id) => props.onTabChange?.(id as HelpTab)}
@@ -148,16 +159,24 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                 <For each={filteredSections()}>
                   {(section) => (
                     <box style={{ flexDirection: 'column', marginBottom: 1 }}>
-                      <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
+                      <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
                         {section.title}
                       </text>
                       <For each={section.items}>
                         {(item) => (
-                          <box style={{ flexDirection: 'row', paddingLeft: 1 }}>
-                            <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-                              {item.key.padEnd(18).slice(0, 18)}
-                            </text>
-                            <RunningText text={item.description} width={descriptionWidth()} fg={uiColors.textPrimary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+                          <box style={{ flexDirection: 'row', paddingLeft: 1, gap: 2 }}>
+                            <HighlightedText
+                              text={item.key.length > 18 ? item.key.slice(0, 17) + '…' : item.key.padEnd(18)}
+                              highlight="highlight"
+                              attributes={TextAttributes.BOLD}
+                            />
+                            <Show when={(props.searchQuery ?? '').length > 0} fallback={
+                              <RunningText text={item.description} width={descriptionWidth()} fg={uiColors.textPrimary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+                            }>
+                              <box style={{ width: descriptionWidth(), overflow: 'hidden' }}>
+                                <MatchedText text={item.description} query={props.searchQuery} fg={uiColors.textPrimary} />
+                              </box>
+                            </Show>
                           </box>
                         )}
                       </For>
@@ -178,10 +197,11 @@ export function HelpView(props: HelpViewProps): JSX.Element {
             scrollIndicatorLabel="guides"
             renderItem={(guide, isSelected, absoluteIndex) => (
               <WorkItemCard
-                marker={`${absoluteIndex + 1}.`}
+                marker=""
                 title={guide.title}
+                titleQuery={props.searchQuery}
                 statusText={guide.category}
-                statusColor={uiColors.primary}
+                statusBadgeHighlight="highlight"
                 metadata={guide.description}
                 selected={isSelected()}
                 index={absoluteIndex}

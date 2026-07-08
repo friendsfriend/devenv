@@ -22,15 +22,16 @@ import {
 	TaskArgsModal,
 	TaskAddModal,
 	CrAiReviewOverlay,
-	IssueScopeModal,
 	CloseReasonModal,
 	CommentModal,
 	LabelPickerModal,
 	AssigneePickerModal,
 	FilterModal,
 	SortModal,
+	StatusLogModal,
 	HelpView,
 	ThemePickerView,
+	ProvidersView,
 	themeNames,
 	uiColors,
 } from '@devenv/ui';
@@ -52,6 +53,20 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 
 	return (
 		<>
+			<Show when={appStore.viewMode() === "providers"}>
+				<ProvidersView
+					providers={providerStore.providers()}
+					loading={providerStore.providersLoading()}
+					error={providerStore.providersError()}
+					selectedProviderIndex={providerStore.selectedProviderIndex()}
+					onClose={() => {
+						appStore.setViewMode("table");
+						providerStore.setProviders([]);
+						providerStore.setProvidersError("");
+					}}
+				/>
+			</Show>
+
 			<Show when={appStore.showFirstSteps() && appStore.viewMode() === "table" && !providerStore.showConnectProviderModal() && !providerStore.showAddRepositoryModal() && !uiStore.showMarkdownModal()}>
 				<FirstStepsView appStore={appStore} providerStore={providerStore} />
 			</Show>
@@ -149,6 +164,40 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				})()}
 			</Show>
 
+			<Show when={issueStore.showIssueListFilterModal()}>
+				<FilterModal
+					parameters={issueStore.issueListFilterParameters()}
+					selectedParameterIndex={issueStore.issueListFilterParameterIndex()}
+					selectedValueIndex={issueStore.issueListFilterValueIndex()}
+					focusedPane={issueStore.issueListFilterFocusedPane()}
+					activeFilters={issueStore.issueListFilters()}
+				/>
+			</Show>
+
+			<Show when={issueStore.showIssueListSortModal()}>
+				<SortModal
+					parameters={issueStore.issueListSortRules()}
+					selectedIndex={issueStore.issueListSortSelectedIndex()}
+				/>
+			</Show>
+
+			<Show when={changeRequestStore.showCrListFilterModal()}>
+				<FilterModal
+					parameters={changeRequestStore.crListFilterParameters()}
+					selectedParameterIndex={changeRequestStore.crListFilterParameterIndex()}
+					selectedValueIndex={changeRequestStore.crListFilterValueIndex()}
+					focusedPane={changeRequestStore.crListFilterFocusedPane()}
+					activeFilters={changeRequestStore.crListFilters()}
+				/>
+			</Show>
+
+			<Show when={changeRequestStore.showCrListSortModal()}>
+				<SortModal
+					parameters={changeRequestStore.crListSortRules()}
+					selectedIndex={changeRequestStore.crListSortSelectedIndex()}
+				/>
+			</Show>
+
 			<Show when={changeRequestStore.showListFilterModal()}>
 				<FilterModal
 					parameters={changeRequestStore.listFilterParameters()}
@@ -166,11 +215,24 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={appStore.viewMode() === "issueScopePicker"}>
-				<IssueScopeModal selectedIndex={issueStore.issueScopePickerIndex()} />
+			<Show when={issueStore.showReferenceFilterModal()}>
+				<FilterModal
+					parameters={issueStore.referenceFilterParameters()}
+					selectedParameterIndex={issueStore.referenceFilterParameterIndex()}
+					selectedValueIndex={issueStore.referenceFilterValueIndex()}
+					focusedPane={issueStore.referenceFilterFocusedPane()}
+					activeFilters={issueStore.referenceFilters()}
+				/>
 			</Show>
 
-			<Show when={issueStore.showCommentModal()}>
+			<Show when={issueStore.showReferenceSortModal()}>
+				<SortModal
+					parameters={issueStore.referenceSortRules()}
+					selectedIndex={issueStore.referenceSortSelectedIndex()}
+				/>
+			</Show>
+
+<Show when={issueStore.showCommentModal()}>
 				<CommentModal
 					text={issueStore.commentText()}
 					submitting={issueStore.issueSubmitting()}
@@ -203,12 +265,22 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 			<Show when={issueStore.showLabelPicker()}>
 				<LabelPickerModal
 					labels={issueStore.availableLabels()}
-					selectedLabels={issueStore.selectedIssue()?.labels ?? []}
+					selectedLabels={issueStore.labelPickerSelectedLabels()}
 					selectedIndex={issueStore.labelPickerIndex()}
 					loading={issueStore.issueLoading()}
 					onSelect={(idx) => issueStore.setLabelPickerIndex(idx)}
-					onToggle={() => {}}
-					onConfirm={() => issueStore.setShowLabelPicker(false)}
+					onToggle={(label) => {
+						const selected = issueStore.labelPickerSelectedLabels();
+						issueStore.setLabelPickerSelectedLabels(
+							selected.includes(label)
+								? selected.filter((item) => item !== label)
+								: [...selected, label],
+						);
+					}}
+					onConfirm={() => {
+						const issue = issueStore.selectedIssue();
+						if (issue) props.actions.issueActions.setIssueLabels(issue.iid, issueStore.labelPickerSelectedLabels());
+					}}
 					onCancel={() => issueStore.setShowLabelPicker(false)}
 				/>
 			</Show>
@@ -534,6 +606,10 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				<LogModal
 					title={logStore.logTitle()}
 					logs={logStore.logs()}
+					logLines={logStore.logLines()}
+					historyLoading={logStore.logHistoryLoading()}
+					historyHasMore={logStore.logHistoryHasMore()}
+					historyError={logStore.logHistoryError()}
 					onScrollBoxReady={(sb) => {
 						logStore.logScrollBoxRef = sb;
 						// Read the actual scrollTop and viewport height after the first
@@ -559,6 +635,17 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					onAiScrollBoxReady={(sb) => {
 						logStore.logAiScrollBoxRef = sb;
 					}}
+				/>
+			</Show>
+
+			<Show when={appStore.showStatusLogModal()}>
+				<StatusLogModal
+					entries={appStore.statusLogEntries()}
+					searchMode={appStore.statusLogSearchMode()}
+					searchQuery={appStore.statusLogSearchQuery()}
+					selectedIndex={appStore.statusLogSelectedIndex()}
+					onScrollBoxReady={(sb) => { appStore.statusLogModalScrollBoxRef = sb; }}
+					onClose={() => appStore.setShowStatusLogModal(false)}
 				/>
 			</Show>
 

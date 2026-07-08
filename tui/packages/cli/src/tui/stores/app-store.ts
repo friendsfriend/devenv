@@ -27,8 +27,6 @@ export type ViewMode =
 	| "issueDetail"
 	| "issueTimeline"
 	| "issueScopePicker"
-	| "linkedChangeRequests"
-	| "referencedIssues"
 	| "changeRequestLinkedIssues"
 	| "references";
 
@@ -52,6 +50,8 @@ export type StartupPhase =
 	| "server-ready"
 	| "loading-applications"
 	| "loading-infrastructure"
+	| "loading-scripts"
+	| "loading-providers"
 	| "complete"
 	| "failed";
 
@@ -114,6 +114,24 @@ function appGitRank(app: TableRow): number {
 	return status.includes("+") || status.includes("~") || status.includes("-") || status.includes("*") ? 0 : 1;
 }
 
+function tableSearchText(app: TableRow): string {
+	return [
+		app.ident,
+		app.displayName,
+		app.localDirectoryPath,
+		app.repositoryPath,
+		app.branch,
+		app.containerBaseName,
+		app.status,
+		app.dockerInfo?.Status,
+		app.rowKind === "app" ? app.provider : "",
+		app.rowKind === "app" ? app.sourceType : "",
+		app.rowKind === "script" ? app.scriptRelativePath : "",
+		app.rowKind === "script" ? app.interpreter : "",
+		app.rowKind === "infra" ? app.type : "",
+	].filter(Boolean).join("\n").toLowerCase();
+}
+
 function compareByRule(a: TableRow, b: TableRow, rule: TableSortRule): number {
 	let result = 0;
 	if (rule.key === "status") result = appStatusRank(a) - appStatusRank(b);
@@ -174,8 +192,8 @@ export function createAppStore() {
 	const [showTableSortModal, setShowTableSortModal] = createSignal(false);
 	const [tableSortSelectedIndex, setTableSortSelectedIndex] = createSignal(0);
 	const appSortRules = (): TableSortRule[] => [
-		{ key: "status", label: "Status", direction: "asc" },
-		{ key: "git", label: "Git", direction: "asc" },
+		{ key: "status", label: "Status", direction: "none" },
+		{ key: "git", label: "Git", direction: "none" },
 		{ key: "name", label: "Name", direction: "none" },
 	];
 	const scriptSortRules = (): TableSortRule[] => [
@@ -194,9 +212,16 @@ export function createAppStore() {
 	const [statusLogEntries, setStatusLogEntries] = createSignal<
 		StatusLogEntry[]
 	>([]);
-	const [statusLogMaximized, setStatusLogMaximized] = createSignal(false);
+	const [statusLogSearchMode, setStatusLogSearchMode] = createSignal(false);
+	const [statusLogSearchQuery, setStatusLogSearchQuery] = createSignal("");
+	const [showStatusLogModal, setShowStatusLogModal] = createSignal(false);
+	const [statusLogSelectedIndex, setStatusLogSelectedIndex] = createSignal(-1);
+	let statusLogModalScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
 	const [operationInProgressForApp, setOperationInProgressForApp] =
 		createSignal<string | null>(null);
+	const hasActiveOperation = createMemo(() =>
+		apps().some((app) => app.operationStatus?.status === "active"),
+	);
 	const [spinnerFrame, setSpinnerFrame] = createSignal(0);
 	const [startupState, setStartupState] = createSignal<StartupState>({
 		phase: "connecting",
@@ -338,14 +363,9 @@ export function createAppStore() {
 	const filteredApps = createMemo(() => sortApps(applyTableFilters(filteredAppsUnsorted()), tableSortRules()));
 
 	const tableFilteredApps = createMemo(() => {
-		const q = tableSearchQuery().toLowerCase();
-		const items = q
-			? filteredApps().filter((app) =>
-				Object.values(app).some(
-					(v) => v != null && String(v).toLowerCase().includes(q),
-				),
-			)
-			: filteredApps();
+		const q = tableSearchQuery().trim().toLowerCase();
+		const filtered = applyTableFilters(filteredAppsUnsorted());
+		const items = q ? filtered.filter((app) => tableSearchText(app).includes(q)) : filtered;
 		return sortApps(items, tableSortRules());
 	});
 
@@ -450,10 +470,23 @@ export function createAppStore() {
 		setTableSortRules,
 		statusLogEntries,
 		setStatusLogEntries,
-		statusLogMaximized,
-		setStatusLogMaximized,
+		statusLogSearchMode,
+		setStatusLogSearchMode,
+		statusLogSearchQuery,
+		setStatusLogSearchQuery,
+		showStatusLogModal,
+		setShowStatusLogModal,
+		statusLogSelectedIndex,
+		setStatusLogSelectedIndex,
+		get statusLogModalScrollBoxRef() {
+			return statusLogModalScrollBoxRef;
+		},
+		set statusLogModalScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) {
+			statusLogModalScrollBoxRef = value;
+		},
 		operationInProgressForApp,
 		setOperationInProgressForApp,
+		hasActiveOperation,
 		spinnerFrame,
 		setSpinnerFrame,
 		scriptsTree,

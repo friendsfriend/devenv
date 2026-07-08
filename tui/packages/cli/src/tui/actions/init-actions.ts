@@ -100,7 +100,19 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
     const fetchedInfraServices = await client.getInfraServices();
     getLogger().write('DEBUG', `Fetched ${fetchedInfraServices.length} infrastructure services`);
     appStore.setInfraServices(fetchedInfraServices);
+    appStore.setStartupState({
+      phase: 'loading-scripts',
+      message: 'Loading scripts...',
+      error: null,
+    });
+    getLogger().write('DEBUG', 'Fetching scripts...');
     await appActions.loadScripts();
+    appStore.setStartupState({
+      phase: 'loading-providers',
+      message: 'Loading providers...',
+      error: null,
+    });
+    getLogger().write('DEBUG', 'Fetching providers...');
     await refreshProviders?.();
 
     getLogger().write('INFO', 'Initial data fetch complete');
@@ -120,6 +132,11 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
     if (e instanceof Error && e.stack) {
       getLogger().write('ERROR', `Stack: ${e.stack}`);
     }
+    appStore.setStartupState({
+      phase: 'failed',
+      message: errorMsg,
+      error: errorMsg,
+    });
     showError('Initialization Failed', errorMsg);
     appStore.setLoading(false);
   }

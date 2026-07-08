@@ -17,7 +17,7 @@ export async function handleLogModalKeys(
   ctx: KeyboardContext,
 ): Promise<boolean> {
   const { logStore } = stores;
-  const { appActions, logActions, utilActions } = actions;
+  const { logActions, utilActions } = actions;
 
   if (!logStore.showLogModal()) return false;
 
@@ -52,6 +52,18 @@ export async function handleLogModalKeys(
   }
 
   // ── Search mode: capture typed characters into the query ──────────────
+  const logContentOffset = () => {
+    let offset = 0;
+    if (logStore.logHistoryError()) offset += 1;
+    if (logStore.logHistoryLoading()) offset += 1;
+    if (!logStore.logHistoryLoading() && !logStore.logHistoryHasMore() && logStore.logLines().length > 0) offset += 1;
+    return offset;
+  };
+
+  const scrollToLogLine = (line: number) => {
+    logStore.logScrollBoxRef?.scrollTo(line + logContentOffset());
+  };
+
   if (logStore.logSearchMode()) {
     if (
       event.name === 'escape' ||
@@ -70,7 +82,7 @@ export async function handleLogModalKeys(
       const matches = logStore.logSearchMatchLinesList();
       if (matches.length > 0 && logStore.logSearchMatchIndex() < 0) {
         logStore.setLogSearchMatchIndex(0);
-        logStore.logScrollBoxRef?.scrollTo(matches[0]);
+        scrollToLogLine(matches[0]);
         logActions.syncLogScroll();
       }
       return true;
@@ -87,12 +99,6 @@ export async function handleLogModalKeys(
       return true;
     }
     return true; // swallow all other keys while typing
-  }
-
-  // q to quit
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
   }
 
   const writeLogsToTempFile = async (): Promise<string | null> => {
@@ -204,6 +210,7 @@ export async function handleLogModalKeys(
   if (isUpKey(event)) {
     if (sb) sb.scrollBy(-1);
     logActions.syncLogScroll();
+    logActions.maybeLoadOlderLogs();
     return true;
   }
 
@@ -218,6 +225,7 @@ export async function handleLogModalKeys(
   if (event.name === 'u') {
     if (sb) sb.scrollBy(-Math.floor((sb.viewport.height || 10) / 2));
     logActions.syncLogScroll();
+    logActions.maybeLoadOlderLogs();
     return true;
   }
 
@@ -225,6 +233,7 @@ export async function handleLogModalKeys(
   if (event.name === 'g' && !event.shift) {
     if (sb) sb.scrollTo(0);
     logActions.syncLogScroll();
+    logActions.maybeLoadOlderLogs();
     return true;
   }
 
@@ -251,7 +260,7 @@ export async function handleLogModalKeys(
     const next = (logStore.logSearchMatchIndex() + 1) % matches.length;
     logStore.setLogSearchMatchIndex(next);
     const line = matches[next];
-    if (sb) sb.scrollTo(line);
+    scrollToLogLine(line);
     logActions.syncLogScroll();
     return true;
   }
@@ -262,7 +271,7 @@ export async function handleLogModalKeys(
     const prev = (logStore.logSearchMatchIndex() - 1 + matches.length) % matches.length;
     logStore.setLogSearchMatchIndex(prev);
     const line = matches[prev];
-    if (sb) sb.scrollTo(line);
+    scrollToLogLine(line);
     logActions.syncLogScroll();
     return true;
   }

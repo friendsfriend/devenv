@@ -1,11 +1,14 @@
+/** @jsxImportSource @opentui/solid */
 import { For, Show, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
+import { HighlightedText } from './Highlight';
 import type { TableRow } from '@devenv/types';
 import { uiColors } from "../colors";
 import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { SearchHeader } from "./SearchHeader";
 import { WorkItemCard } from "./WorkItemCard";
+import { FilterStatusBar } from './FilterStatusBar';
 import { formatStatus, getGitStatusStyle, getStatusStyle } from "../statusUtils";
 
 export interface TableColumn {
@@ -50,6 +53,8 @@ export interface TableProps<T = string> {
 	availableLines?: number;
 	spinnerFrames?: string[];
 	spinnerFrame?: () => number;
+	filterSummary?: string;
+	sortSummary?: string;
 	runningTextEnabled?: boolean;
 	runningTextOffset?: number;
 }
@@ -65,6 +70,10 @@ export interface TableProps<T = string> {
  * - Keyboard navigation support
  * - / search: filters rows (no highlighting)
  */
+export function appRunTargetRightMetadata(app: TableRow): string | undefined {
+	return app.rowKind === "app" ? app.runTargetInfo?.display : undefined;
+}
+
 function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: string; runningLabel?: string }) {
 	const providerIcon = (app: TableRow) => {
 		if (app.rowKind !== "app") return "";
@@ -123,8 +132,26 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		if (app.rowKind === "script") {
 			return app.interpreter ? ` • ${app.interpreter}` : "";
 		}
-		const details = [gitStatusText(app), app.rowKind === "app" && app.branch ? `branch ${app.branch}` : undefined, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
+		const details = [
+			gitStatusText(app),
+			app.rowKind === "app" && app.branch ? `branch ${app.branch}` : undefined,
+		].filter(Boolean).join(" • ");
 		return details ? ` • ${details}` : "";
+	};
+
+	const appStatusHighlight = (app: TableRow) => {
+		if (app.operationStatus?.status) {
+			switch (app.operationStatus.status) {
+				case "active": return undefined;
+				case "completed": return "positive" as const;
+				case "failed": return "negative" as const;
+				case "pending": return undefined;
+			}
+		}
+		const status = (app.status || app.dockerInfo?.Status || "not found").toLowerCase();
+		if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "positive" as const;
+		if (status.includes("failed") || status.includes("error")) return "negative" as const;
+		return undefined;
 	};
 
 	const appStatusColor = (app: TableRow) => {
@@ -147,16 +174,23 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 			return `${app.scriptRelativePath}${app.nodeType === "script" && params ? ` • ${params} params` : ""}`;
 		}
 		if (app.rowKind === "infra") {
-			return [app.containerBaseName, app.dockerInfo?.Ports].filter(Boolean).join(" • ");
+			const parts: Array<string | JSX.Element> = [app.containerBaseName ?? ""];
+			if (app.dockerInfo?.Ports) parts.push(<HighlightedText text={app.dockerInfo.Ports} highlight="highlight" />);
+			return parts.length === 1 ? parts[0] as string : <box style={{ flexDirection: 'row', gap: 1 }}>{parts}</box>;
 		}
 
 		const isLinkedWorktree = app.activeWorktree && app.activeWorktree !== app.mainWorktreeBranch;
-		return [
-			`${providerIcon(app)} ${app.provider || app.sourceType || "repo"}`,
-			isLinkedWorktree ? `worktree ${app.activeWorktree}` : undefined,
-			app.dockerInfo?.Ports,
-			app.repositoryPath,
-		].filter(Boolean).join(" • ");
+		const hasUnknownProvider = app.rowKind === "app" && providerIcon(app) === "?" && !app.provider;
+		const parts: Array<string | JSX.Element> = [`${providerIcon(app)} ${app.provider || app.sourceType || "repo"}`];
+		if (isLinkedWorktree) parts.push(`worktree ${app.activeWorktree}`);
+		if (app.dockerInfo?.Ports) parts.push(<HighlightedText text={app.dockerInfo.Ports} highlight="highlight" />);
+		if (parts.length === 1) return hasUnknownProvider ? <HighlightedText text={parts[0] as string} highlight="negative" /> : parts[0] as string;
+		return (
+			<box style={{ flexDirection: 'row', gap: 1 }}>
+				<HighlightedText text={parts[0] as string} highlight={hasUnknownProvider ? "negative" : "secondary"} />
+				{parts.slice(1)}
+			</box>
+		);
 	};
 
 	/**
@@ -177,6 +211,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		if (props.showBorder !== false) lines -= 2;
 		if (props.tabs && props.tabs.length > 0) lines -= 3;
 		lines -= 1; // list header
+		if (props.filterSummary || props.sortSummary) lines -= 1;
 		return Math.max(1, lines);
 	};
 
@@ -185,6 +220,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		let lines = LAYOUT_CHROME_LINES + 1;
 		if (props.showBorder !== false) lines += 2;
 		if (props.tabs && props.tabs.length > 0) lines += 3;
+		if (props.filterSummary || props.sortSummary) lines += 1;
 		return lines;
 	};
 
@@ -249,6 +285,8 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 				</box>
 			</SearchHeader>
 
+			<FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
+
 			{/* Table Body — virtual scroll keeps selected row always visible */}
 			<Show
 				when={props.apps.length > 0}
@@ -277,14 +315,17 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 							<WorkItemCard
 								marker={appMarker(app)}
 								prefix={`[${appKind(app)}] `}
-								prefixColor={isLib ? uiColors.textSecondary : uiColors.primary}
+								prefixColor={uiColors.primary}
 								title={app.displayName}
+								titleQuery={props.searchQuery}
 								statusText={isLib ? '' : appStatus(app)}
-								statusColor={isLib ? uiColors.textMuted : appStatusColor(app)}
-								statusAttributes={isLib ? undefined : TextAttributes.BOLD}
+								statusColor={appStatusColor(app)}
+								statusBadgeHighlight={isLib ? undefined : appStatusHighlight(app)}
 								statusSuffixText={appStatusSuffix(app)}
-								statusSuffixColor={getGitStatusStyle(gitStatus(app)).color}
+								statusSuffixColor={gitStatus(app) === '✓' ? uiColors.textMuted : (gitStatus(app) === 'x' || gitStatus(app) === '...' || gitStatus(app) === 'error') ? uiColors.error : getGitStatusStyle(gitStatus(app)).color}
 								metadata={appMetadata(app)}
+								rightMetadata={appRunTargetRightMetadata(app)}
+								rightMetadataColor={uiColors.highlight}
 								selected={isSelected()}
 								index={index}
 								runningTextEnabled={props.runningTextEnabled}

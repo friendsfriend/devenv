@@ -12,11 +12,52 @@ import { applyTheme, saveThemeName } from '../theme-settings';
  * - Confirm dialog (y/n)
  * - Profile picker navigation
  * - Theme picker navigation
- * - Ctrl+C to exit
+ * - q/Ctrl+C to exit after double-press confirmation
  * - Ctrl+Shift+C to copy selection
  */
-// Track last Ctrl+C press time for double-press exit detection
-let _lastCtrlCTime = 0;
+// Track last quit-key press time for double-press exit detection
+let _lastQuitKey: 'q' | 'ctrl+c' | null = null;
+let _lastQuitKeyTime = 0;
+
+const isTextEntryActive = (stores: KeyboardStores): boolean => {
+  const { appStore, uiStore, logStore, changeRequestStore, issueStore, agentStore, providerStore } = stores;
+  return Boolean(
+    appStore.tableSearchMode() ||
+    appStore.statusLogSearchMode() ||
+    uiStore.branchFilterActive() ||
+    uiStore.showCreateBranchModal() ||
+    uiStore.themePickerFilterActive() ||
+    uiStore.taskArgsEditing() ||
+    uiStore.showTaskAddModal() ||
+    logStore.logSearchMode() ||
+    logStore.logAiPromptMode() ||
+    changeRequestStore.jobsSearchMode() ||
+    changeRequestStore.crSearchMode() ||
+    changeRequestStore.changedFilesSearchMode() ||
+    changeRequestStore.testSearchMode() ||
+    changeRequestStore.replyMode() ||
+    changeRequestStore.showCommentModal() ||
+    issueStore.issueSearchMode() ||
+    agentStore.sshFilterActive() ||
+    agentStore.agentFilterActive() ||
+    providerStore.showConnectProviderModal() ||
+    providerStore.showAddRepositoryModal()
+  );
+};
+
+const handleQuitConfirm = (key: 'q' | 'ctrl+c', uiStore: KeyboardStores['uiStore'], appActions: KeyboardActions['appActions']): boolean => {
+  const now = Date.now();
+  if (_lastQuitKey && now - _lastQuitKeyTime < 1000) {
+    _lastQuitKey = null;
+    _lastQuitKeyTime = 0;
+    appActions.exitApp();
+    return true;
+  }
+  _lastQuitKey = key;
+  _lastQuitKeyTime = now;
+  uiStore.setNotification(key === 'ctrl+c' ? 'If you want to quit press Ctrl+C again' : 'If you want to quit press q again', 'info');
+  return true;
+};
 
 const writeOsc52 = (text: string) => {
   const base64 = Buffer.from(text).toString('base64');
@@ -58,7 +99,7 @@ export async function handleGlobalKeys(
   const { renderer, launchPi } = ctx;
 
   // GLOBAL: Escape closes the opentui console overlay if it is visible
-  if ((event.name === 'escape' || event.name === 'Escape') && renderer.console.visible) {
+  if ((event.name === 'escape' || event.name === 'Escape') && renderer.console?.visible) {
     renderer.console.hide();
     return true;
   }
@@ -67,8 +108,11 @@ export async function handleGlobalKeys(
   // Legacy terminals encode Ctrl+/ as Ctrl+_ (\x1f); Kitty can report '/'.
   if (event.ctrl && !event.shift && !event.meta && !event.super
     && (event.name === '/' || event.name === '_' || event.sequence === '\x1f' || event.raw === '\x1f')) {
-    renderer.console.toggle();
-    return true;
+    if (renderer.console) {
+      renderer.console.toggle();
+      return true;
+    }
+    return false;
   }
 
   // GLOBAL: Ctrl+R toggles running text for focused/overflowing UI fields.
@@ -77,19 +121,6 @@ export async function handleGlobalKeys(
     uiStore.setRunningTextEnabled(next);
     uiStore.setRunningTextOffset(0);
     uiStore.setNotification(next ? 'Running text on' : 'Running text off', 'info');
-    return true;
-  }
-
-  const diffTextInputActive = changeRequestStore.showDiffModal() && (changeRequestStore.showCommentModal() || !!changeRequestStore.replyMode());
-
-  // GLOBAL: Shift+T opens theme picker. Do not intercept text input in diff comments/replies.
-  if (!diffTextInputActive && !uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
-    const current = uiStore.activeThemeName();
-    uiStore.setThemePickerOriginalTheme(current);
-    uiStore.setThemePickerFilterActive(false);
-    uiStore.setThemePickerFilterQuery('');
-    uiStore.setThemePickerSelectedIndex(Math.max(0, themeNames.indexOf(current)));
-    uiStore.setShowThemePicker(true);
     return true;
   }
 
@@ -328,19 +359,11 @@ export async function handleGlobalKeys(
       return true;
     }
     if (isDownKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i === 0 ? 1 : 4);
+      appStore.setFirstStepsSelectedIndex((i) => Math.min(i + 1, 4));
       return true;
     }
     if (isUpKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i === 4 ? 1 : 0);
-      return true;
-    }
-    if (isLeftKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i >= 2 && i <= 3 ? i - 1 : i);
-      return true;
-    }
-    if (isRightKey(event)) {
-      appStore.setFirstStepsSelectedIndex((i) => i >= 1 && i <= 2 ? i + 1 : i);
+      appStore.setFirstStepsSelectedIndex((i) => Math.max(i - 1, 0));
       return true;
     }
     if (event.name === 'return' || event.name === 'Return' || event.name === 'enter' || event.name === 'Enter') {
@@ -378,39 +401,20 @@ export async function handleGlobalKeys(
     }
   }
 
-  // GLOBAL: Ctrl+C — copy on single press, exit on double-press (500ms window)
-  // Inside tmux, Kitty protocol cannot disambiguate Ctrl+C from Ctrl+Shift+C
-  // (both send \x03), so single Ctrl+C always copies the current selection.
-  // Double Ctrl+C exits the app. With Kitty protocol, plain Ctrl+C arrives as
-  // lowercase 'c' (no shift), while Ctrl+Shift+C arrives as uppercase 'C' with
-  // shift=true — those are handled separately below.
-  //
-  // When no TUI selection exists, let Ctrl+C fall through so the terminal
-  // emulator handles native copy (or SIGINT) instead of showing "Nothing selected".
+  // GLOBAL: q/Ctrl+C — first press warns, second quit key exits (1s window).
+  if (!isTextEntryActive(stores) && !event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'q') {
+    return handleQuitConfirm('q', uiStore, appActions);
+  }
+
   if (event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'c') {
-    const now = Date.now();
-    if (now - _lastCtrlCTime < 500) {
-      _lastCtrlCTime = 0;
-      appActions.exitApp();
-      return true;
-    }
-    _lastCtrlCTime = now;
-    if (ctx.renderer.console.visible) {
-      return copyText(getConsoleText(ctx.renderer), uiStore);
-    }
-    const selection = ctx.renderer.getSelection();
-    if (selection && selection.getSelectedText()) {
-      await utilActions.handleCopySelection();
-      return true;
-    }
-    // No TUI selection — let terminal handle copy natively
-    return false;
+    return handleQuitConfirm('ctrl+c', uiStore, appActions);
   }
 
   // GLOBAL: Ctrl+Shift+C, Cmd+C, or Super+C — copy selection to clipboard.
   if ((event.ctrl && event.shift || event.meta || event.super) && (event.name === 'c' || event.name === 'C')) {
-    _lastCtrlCTime = 0;
-    if (ctx.renderer.console.visible) {
+    _lastQuitKey = null;
+    _lastQuitKeyTime = 0;
+    if (ctx.renderer.console?.visible) {
       return copyText(getConsoleText(ctx.renderer), uiStore);
     }
     const selection = ctx.renderer.getSelection();

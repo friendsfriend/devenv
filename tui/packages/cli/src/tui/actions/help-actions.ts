@@ -34,8 +34,6 @@ const CONTEXT_TITLES: Record<string, string> = {
 	issueDetail: "Issue Detail",
 	issueTimeline: "Issue Timeline",
 	issueScopePicker: "Issue Scope Picker",
-	linkedChangeRequests: "Linked Change Requests",
-	referencedIssues: "Referenced Issues",
 	changeRequestLinkedIssues: "CR Linked Issues",
 	references: "References",
 	agentView: "Pi Sessions",

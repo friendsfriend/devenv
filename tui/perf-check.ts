@@ -1,0 +1,5 @@
+import { createRoot } from 'solid-js';
+import { createAppStore } from './packages/cli/src/tui/stores/app-store';
+const now=()=>performance.now();
+const measure=(name:string,fn:(i:number)=>void,rounds=20)=>{const s:number[]=[];for(let i=0;i<rounds;i++){const t=now();fn(i);s.push(now()-t)}s.sort((a,b)=>a-b);const avg=s.reduce((a,b)=>a+b,0)/s.length;console.log(`${name}: avg=${avg.toFixed(2)} p95=${(s[Math.floor(s.length*.95)]??s.at(-1)!).toFixed(2)} max=${s.at(-1)!.toFixed(2)} ms`)};
+createRoot(dispose=>{const store=createAppStore();store.setApps(Array.from({length:50000},(_,i)=>({ident:`perf-app-${i}`,displayName:`Performance App ${i}`,repositoryPath:`https://example.com/perf-app-${i}.git`,localDirectoryPath:`/tmp/perf-app-${i}`,branch:i%2?'main':'feature',containerBaseName:`perf-${i}`,appType:i%4===0?'LIB':'APP',sourceType:'git',provider:'gitlab',status:'not found',gitStatus:'x'} as any)));measure('table search 50k',i=>{store.setTableSearchQuery(`perf-app-${i}`);store.tableFilteredApps().length},20);dispose();});

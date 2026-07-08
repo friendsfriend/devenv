@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { Show, For, createMemo, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
@@ -416,6 +417,7 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
               flexShrink: 0,
               minHeight: 0,
               flexDirection: 'row',
+              overflow: 'hidden',
             }}
           >
             {/* List rows — overflow: hidden prevents rounding leaks */}
@@ -448,6 +450,8 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
                   width: 1,
                   flexShrink: 0,
                   flexDirection: 'column',
+                  minHeight: 0,
+                  overflow: 'hidden',
                 }}
               >
                 {/* Track above thumb */}
@@ -462,9 +466,9 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
                   style={{ width: 1, height: thumbHeight(), flexShrink: 0 }}
                   backgroundColor={uiColors.scrollbarThumb}
                 />
-                {/* Track below thumb */}
+                {/* Track below thumb - flexGrow with minHeight:0 so it collapses to 0 at end-of-scroll */}
                 <box
-                  style={{ width: 1, flexGrow: 1 }}
+                  style={{ width: 1, flexGrow: 1, minHeight: 0 }}
                   backgroundColor={uiColors.scrollbarTrack}
                 />
               </box>
@@ -478,7 +482,6 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
                 width: '100%',
                 height: 1,
                 justifyContent: 'center',
-                marginTop: 1,
                 flexShrink: 0,
               }}
             >

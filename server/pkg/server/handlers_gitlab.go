@@ -140,6 +140,12 @@ func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	for i := range result.ChangeRequests {
+		if result.ChangeRequests[i].DefaultBranch == "" {
+			result.ChangeRequests[i].DefaultBranch = targetApp.MainWorktreeBranch
+		}
+	}
+
 	// If no MRs found, return appropriate error
 	if len(result.ChangeRequests) == 0 {
 		var errorMsg string

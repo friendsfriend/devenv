@@ -6,7 +6,7 @@ import { isDownKey, isUpKey } from './nav-keys';
 /**
  * Handles keyboard events for the Changed Files view:
  * - Search mode (type query, clear)
- * - q to quit, / to search, ESC to go back
+ * - / to search, ESC to go back
  * - Shift+D to switch to discussions view
  * - Enter to open diff modal
  * - j/k/g/G for navigation
@@ -18,8 +18,6 @@ export async function handleChangedFilesKeys(
   ctx: KeyboardContext,
 ): Promise<boolean> {
   const { appStore, changeRequestStore } = stores;
-  const { appActions } = actions;
-
   if (appStore.viewMode() !== 'changedFiles') return false;
 
   if (changeRequestStore.showListFilterModal() && changeRequestStore.listControlTarget() === 'changedFiles') {
@@ -31,6 +29,7 @@ export async function handleChangedFilesKeys(
       changeRequestStore.setSelectedChangedFileIndex(0);
       return true;
     }
+    if (event.name === 'x') { changeRequestStore.setCurrentListFilters({}); changeRequestStore.setSelectedChangedFileIndex(0); return true; }
     if (isDownKey(event)) {
       if (changeRequestStore.listFilterFocusedPane() === 'parameter') {
         changeRequestStore.setListFilterParameterIndex(i => Math.min(params.length - 1, i + 1));
@@ -67,6 +66,7 @@ export async function handleChangedFilesKeys(
       changeRequestStore.setSelectedChangedFileIndex(0);
       return true;
     }
+    if (event.name === 'x') { changeRequestStore.setCurrentListSortRules(rules.map(rule => ({ ...rule, direction: 'none' }))); changeRequestStore.setSelectedChangedFileIndex(0); return true; }
     if (isDownKey(event)) { changeRequestStore.setListSortSelectedIndex(i => Math.min(rules.length - 1, i + 1)); return true; }
     if (isUpKey(event)) { changeRequestStore.setListSortSelectedIndex(i => Math.max(0, i - 1)); return true; }
     if (event.sequence === ' ') {
@@ -116,12 +116,6 @@ export async function handleChangedFilesKeys(
       return true;
     }
     return true; // swallow all other keys
-  }
-
-  // q to quit
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
   }
 
   if (event.sequence === 'F') {

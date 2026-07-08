@@ -1,7 +1,9 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export interface ProfilePickerProps {
   profiles: string[];
@@ -17,11 +19,10 @@ function ProfileRow(props: {
   label: string;
   isSelected: boolean;
 }) {
-  const cursor = () => props.isSelected ? '► ' : '  ';
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 1,
@@ -30,10 +31,10 @@ function ProfileRow(props: {
       }}
     >
       <text
-        fg={uiColors.textPrimary}
+        fg={highlightColor('primary')}
         attributes={props.isSelected ? TextAttributes.BOLD : undefined}
       >
-        {cursor()}{props.label}
+        {props.label}
       </text>
     </box>
   );
@@ -62,10 +63,9 @@ export function ProfilePickerView(props: ProfilePickerProps) {
       items={allOptions()}
       selectedIndex={props.selectedIndex}
       loading={props.loading}
-      reservedHeight={4}
       scrollIndicatorLabel="profiles"
       emptyContent={
-        <text fg={uiColors.textSecondary}>No profiles available</text>
+        <text fg={highlightColor('secondary')}>No profiles available</text>
       }
       renderItem={(item, isSelected) => (
         <ProfileRow label={item} isSelected={isSelected()} />

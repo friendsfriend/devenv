@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -146,6 +147,12 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	for i := range result.ChangeRequests {
+		if result.ChangeRequests[i].DefaultBranch == "" {
+			result.ChangeRequests[i].DefaultBranch = targetApp.MainWorktreeBranch
+		}
+	}
+
 	if len(result.ChangeRequests) == 0 {
 		var errorMsg string
 		if sourceBranchFilter != "" {
@@ -159,6 +166,56 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+func (s *Server) handleGitHubPullRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	appIdent := r.URL.Query().Get("appIdent")
+	prNumberStr := r.URL.Query().Get("crIID")
+
+	if appIdent == "" || prNumberStr == "" {
+		respondBadRequest(w, "appIdent and crIID parameters required")
+		return
+	}
+
+	prNumber, err := strconv.Atoi(prNumberStr)
+	if err != nil || prNumber <= 0 {
+		respondBadRequest(w, "Invalid crIID")
+		return
+	}
+
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found")
+		return
+	}
+	if targetApp.RepositoryPath == "" {
+		respondBadRequest(w, "App has no repository path")
+		return
+	}
+
+	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	if err != nil {
+		respondBadRequest(w, err.Error())
+		return
+	}
+
+	pr, err := ghClient.GetPullRequest(repoInfo, prNumber)
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to fetch pull request: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	if pr.DefaultBranch == "" {
+		pr.DefaultBranch = targetApp.MainWorktreeBranch
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(pr)
 }
 
 func (s *Server) handleGitHubPRChanges(w http.ResponseWriter, r *http.Request) {
@@ -436,17 +493,123 @@ func (s *Server) handleGitHubActionsTestSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	empty := gitlab.TestSummary{
-		Total:      0,
-		Success:    0,
-		Failed:     0,
-		Skipped:    0,
+	targetApp := s.findAppByIdent(appIdent)
+	if targetApp == nil {
+		respondNotFound(w, "App not found: "+appIdent)
+		return
+	}
+
+	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	if err != nil {
+		respondError(w, fmt.Errorf("failed to init client: %w", err), http.StatusInternalServerError)
+		return
+	}
+
+	respondEmpty := func() {
+		empty := gitlab.TestSummary{
+			Total:      0,
+			Success:    0,
+			Failed:     0,
+			Skipped:    0,
+			Error:      0,
+			TestSuites: []gitlab.TestSuite{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(empty)
+	}
+
+	runID, err := strconv.Atoi(runIDStr)
+	if err != nil {
+		respondEmpty()
+		return
+	}
+
+	run, err := ghClient.GetWorkflowRunByID(repoInfo, int64(runID))
+	if err != nil || run == nil || run.HeadSHA == "" {
+		respondEmpty()
+		return
+	}
+
+	checkRuns, err := ghClient.GetCheckRunsForRef(repoInfo, run.HeadSHA)
+	if err != nil {
+		respondEmpty()
+		return
+	}
+
+	var total, passed, failed, skipped int
+	testSuiteMap := make(map[string]*gitlab.TestSuite)
+
+	for _, cr := range checkRuns {
+		if cr.Status != "completed" {
+			continue
+		}
+		summary := cr.Output.Summary
+		if summary == "" {
+			continue
+		}
+
+		summaryLower := strings.ToLower(summary)
+		t := extractTestCount(summaryLower, `(\d+)\s*passed`)
+		p := extractTestCount(summaryLower, `(\d+)\s*failed`)
+		s := extractTestCount(summaryLower, `(\d+)\s*skipped`)
+
+		if t == 0 {
+			t = extractTestCount(summaryLower, `passed[:\s]+(\d+)`)
+		}
+		if p == 0 {
+			p = extractTestCount(summaryLower, `failed[:\s]+(\d+)`)
+		}
+		if s == 0 {
+			s = extractTestCount(summaryLower, `skipped[:\s]+(\d+)`)
+		}
+
+		if t == 0 && p == 0 && s == 0 {
+			totalFromSummary := extractTestCount(summaryLower, `(\d+)\s*tests?`)
+			if totalFromSummary > 0 {
+				t = totalFromSummary
+			}
+		}
+
+		total += t + p + s
+		passed += t
+		failed += p
+		skipped += s
+
+		if t > 0 || p > 0 || s > 0 {
+			name := cr.Name
+			if _, ok := testSuiteMap[name]; !ok {
+				testSuiteMap[name] = &gitlab.TestSuite{
+					Name:      name,
+					TestCases: []gitlab.TestCase{},
+				}
+			}
+		}
+	}
+
+	summary := gitlab.TestSummary{
+		Total:      total,
+		Success:    passed,
+		Failed:     failed,
+		Skipped:    skipped,
 		Error:      0,
-		TestSuites: []gitlab.TestSuite{},
+		TestSuites: make([]gitlab.TestSuite, 0, len(testSuiteMap)),
+	}
+	for _, ts := range testSuiteMap {
+		summary.TestSuites = append(summary.TestSuites, *ts)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(empty)
+	json.NewEncoder(w).Encode(summary)
+}
+
+func extractTestCount(text string, pattern string) int {
+	re := regexp.MustCompile(pattern)
+	matches := re.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		count, _ := strconv.Atoi(matches[1])
+		return count
+	}
+	return 0
 }
 
 func (s *Server) handleGitHubActionsJobLogs(w http.ResponseWriter, r *http.Request) {

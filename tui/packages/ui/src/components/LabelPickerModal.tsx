@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { For, Show } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from "../colors";
@@ -20,12 +21,11 @@ function LabelRow(props: {
 	isSelected: boolean;
 	isToggled: boolean;
 }) {
-	const cursor = () => (props.isSelected ? "► " : "  ");
-	const checkbox = () => (props.isToggled ? "☑ " : "☐ ");
+		const checkbox = () => (props.isToggled ? "☑ " : "☐ ");
 
 	return (
 		<box
-			backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+			backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
 			style={{
 				width: "100%",
 				height: 1,
@@ -37,7 +37,6 @@ function LabelRow(props: {
 				fg={uiColors.textPrimary}
 				attributes={props.isSelected ? TextAttributes.BOLD : undefined}
 			>
-				{cursor()}
 				{checkbox()}
 				{props.label}
 			</text>
@@ -56,14 +55,14 @@ export function LabelPickerModal(props: LabelPickerModalProps) {
 					title="Select Labels"
 					helpText={formatHelpText([
 						{ key: "j/k", action: "Navigate" },
-						{ key: "Enter", action: "Toggle" },
-						{ key: "Esc", action: "Confirm" },
+						{ key: "Space", action: "Toggle" },
+						{ key: "Enter", action: "Confirm" },
+						{ key: "Esc", action: "Cancel" },
 					])}
 					widthPercent={0.35}
 					heightPercent={0.5}
 					items={props.labels}
 					selectedIndex={props.selectedIndex}
-					reservedHeight={3}
 					scrollIndicatorLabel="labels"
 					renderItem={(item, isSelected) => (
 						<LabelRow

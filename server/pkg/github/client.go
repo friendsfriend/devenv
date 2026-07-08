@@ -22,6 +22,9 @@ import (
 // It provides merge/pull request operations for GitHub repositories.
 type Client interface {
 	changerequest.Client
+	GetPullRequest(info *RepoInfo, prNumber int) (*ChangeRequest, error)
+	GetWorkflowRunByID(info *RepoInfo, runID int64) (*ghWorkflowRun, error)
+	GetCheckRunsForRef(info *RepoInfo, ref string) ([]ghCheckRun, error)
 }
 
 type client struct {
@@ -122,8 +125,11 @@ func ExtractRepoInfo(gitURL string) (*RepoInfo, error) {
 // --- GitHub API raw types (used internally for unmarshalling) ---
 
 type ghPRBranch struct {
-	Ref string `json:"ref"` // branch name
-	SHA string `json:"sha"`
+	Ref  string `json:"ref"` // branch name
+	SHA  string `json:"sha"`
+	Repo *struct {
+		DefaultBranch string `json:"default_branch"`
+	} `json:"repo,omitempty"`
 }
 
 type ghUser struct {
@@ -229,22 +235,23 @@ type ghTimelineEvent struct {
 // Field names and JSON tags are identical to the GitLab client's ChangeRequest struct
 // so the TUI can consume both sources transparently.
 type ChangeRequest struct {
-	ID           int       `json:"id"`
-	IID          int       `json:"iid"`
-	Title        string    `json:"title"`
-	Description  string    `json:"description"`
-	SourceBranch string    `json:"source_branch"`
-	TargetBranch string    `json:"target_branch"`
-	State        string    `json:"state"` // opened, merged, closed
-	WebURL       string    `json:"web_url"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
-	Author       struct {
+	ID            int       `json:"id"`
+	IID           int       `json:"iid"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	SourceBranch  string    `json:"source_branch"`
+	TargetBranch  string    `json:"target_branch"`
+	DefaultBranch string    `json:"default_branch,omitempty"`
+	State         string    `json:"state"` // opened, merged, closed
+	WebURL        string    `json:"web_url"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Author        struct {
 		Name     string `json:"name"`
 		Username string `json:"username"`
 	} `json:"author"`
-	// GitHub has no server-side pipeline — head_pipeline will always be nil.
-	// We keep the field for JSON compatibility with the TUI.
+	// GitHub has no GitLab-style pipeline, but we expose the latest matching
+	// Actions workflow run as head_pipeline for TUI compatibility.
 	HeadPipeline *struct {
 		ID     int    `json:"id"`
 		Status string `json:"status"`
@@ -381,6 +388,13 @@ func mergeableToChangeRequestStatus(pr ghPR) (mergeStatus, detailedMergeStatus s
 	return "cannot_be_merged", pr.MergeableState, false
 }
 
+func defaultBranchFromPR(pr ghPR) string {
+	if pr.Base.Repo != nil {
+		return pr.Base.Repo.DefaultBranch
+	}
+	return ""
+}
+
 func convertPR(pr ghPR, approvals *MergeRequestApprovals, latestRun *ghWorkflowRun) ChangeRequest {
 	mergeStatus, detailedMergeStatus, hasConflicts := mergeableToChangeRequestStatus(pr)
 	state := prStateToChangeRequestState(pr)
@@ -392,6 +406,7 @@ func convertPR(pr ghPR, approvals *MergeRequestApprovals, latestRun *ghWorkflowR
 		Description:                 pr.Body,
 		SourceBranch:                pr.Head.Ref,
 		TargetBranch:                pr.Base.Ref,
+		DefaultBranch:               defaultBranchFromPR(pr),
 		State:                       state,
 		WebURL:                      pr.HTMLURL,
 		CreatedAt:                   pr.CreatedAt,
@@ -435,6 +450,7 @@ func convertPRToChangeRequest(pr ghPR, approvals *MergeRequestApprovals, latestR
 		Description:                 pr.Body,
 		SourceBranch:                pr.Head.Ref,
 		TargetBranch:                pr.Base.Ref,
+		DefaultBranch:               defaultBranchFromPR(pr),
 		State:                       state,
 		WebURL:                      pr.HTMLURL,
 		CreatedAt:                   pr.CreatedAt,
@@ -1490,13 +1506,21 @@ type ghActionJob struct {
 	RunID       int       `json:"run_id"`
 }
 
+type ghCheckRun struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Output struct {
+		Summary string `json:"summary"`
+	} `json:"output"`
+}
+
 // mapRunStatusToGitLab maps a GitHub Actions workflow run's status/conclusion to
 // a GitLab-compatible pipeline status string.
 func mapRunStatusToGitLab(run ghWorkflowRun) string {
 	switch run.Status {
 	case "queued", "waiting", "pending":
 		return "pending"
-	case "in_progress":
+	case "in progress":
 		return "running"
 	case "completed":
 		switch run.Conclusion {
@@ -1517,9 +1541,9 @@ func mapRunStatusToGitLab(run ghWorkflowRun) string {
 // convertActionJob converts a ghActionJob into the GitLab Job shape that the TUI expects.
 // workflowName is used as the "stage" field.
 func convertActionJob(job ghActionJob, workflowName string) gitlab.Job {
-	stage := workflowName
+	stage := strings.TrimSpace(workflowName)
 	if stage == "" {
-		stage = "build"
+		stage = "Default"
 	}
 
 	run := ghWorkflowRun{Status: job.Status, Conclusion: job.Conclusion}
@@ -1940,6 +1964,70 @@ func generateLineCode(filePath string, newLine *int, oldLine *int) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
+
+func (c *client) GetWorkflowRunByID(info *RepoInfo, runID int64) (*ghWorkflowRun, error) {
+	if info == nil {
+		return nil, fmt.Errorf("repo info is nil")
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/actions/runs/%d",
+		info.Owner, info.Repo, runID)
+
+	resp, err := c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch workflow run: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var run ghWorkflowRun
+	if err := json.Unmarshal(body, &run); err != nil {
+		return nil, fmt.Errorf("failed to parse workflow run: %w", err)
+	}
+
+	return &run, nil
+}
+
+func (c *client) GetCheckRunsForRef(info *RepoInfo, ref string) ([]ghCheckRun, error) {
+	if info == nil {
+		return nil, fmt.Errorf("repo info is nil")
+	}
+
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/commits/%s/check-runs",
+		info.Owner, info.Repo, ref)
+
+	resp, err := c.doRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch check runs: %w", err)
+	}
+
+	body, err := readBody(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitHub API error (status %d): %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		TotalCount int          `json:"total_count"`
+		CheckRuns  []ghCheckRun `json:"check_runs"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("failed to parse check runs: %w", err)
+	}
+
+	return result.CheckRuns, nil
+}
+
 // ValidateConnection implements changerequest.Client.ValidateConnection.
 func (c *client) ValidateConnection(info *changerequest.RepoInfo) error {
 	apiURL := "https://api.github.com/user"
@@ -2116,7 +2204,7 @@ func convertActionJobToChangeRequest(job ghActionJob) changerequest.Job {
 	return changerequest.Job{
 		ID:         job.ID,
 		Name:       job.Name,
-		Stage:      "build",
+		Stage:      "Default",
 		Status:     mapJobStatusToGitLab(job),
 		WebURL:     job.HTMLURL,
 		StartedAt:  &startedAt,
@@ -2129,7 +2217,7 @@ func mapJobStatusToGitLab(job ghActionJob) string {
 	switch job.Status {
 	case "queued", "waiting", "pending":
 		return "pending"
-	case "in_progress":
+	case "in progress":
 		return "running"
 	case "completed":
 		switch job.Conclusion {

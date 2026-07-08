@@ -1,6 +1,6 @@
 {
   "name": "devenv-cli",
-  "version": "0.9.0",
+  "version": "0.12.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/friendsfriend/devenv.git"
@@ -16,6 +16,8 @@
   "scripts": {
     "build": "bun run build.ts",
     "build:single": "bun run build.ts --single",
+    "set-version": "bun run scripts/set-version.ts",
+    "perf:fixture": "bun run scripts/create-perf-config.ts",
     "install:bin": "sh install.sh",
     "dev": "cd tui && bun run dev",
     "type-check": "cd tui && bun run type-check",

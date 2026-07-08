@@ -1,9 +1,12 @@
+/** @jsxImportSource @opentui/solid */
 import { Show, createMemo } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import type { SshHost } from '@devenv/types';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
+import { MatchedText } from './MatchedText';
 
 export interface SshHostPickerViewProps {
   hosts: SshHost[];
@@ -16,8 +19,7 @@ export interface SshHostPickerViewProps {
 
 // ─── Host row ─────────────────────────────────────────────────────────────────
 
-function HostRow(props: { host: SshHost; isSelected: boolean }) {
-  const cursor = () => (props.isSelected ? '►' : ' ');
+function HostRow(props: { host: SshHost; isSelected: boolean; query?: string }) {
   const target = () => {
     const h = props.host;
     const user = h.user ? `${h.user}@` : '';
@@ -28,7 +30,7 @@ function HostRow(props: { host: SshHost; isSelected: boolean }) {
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface1 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 1,
@@ -37,17 +39,15 @@ function HostRow(props: { host: SshHost; isSelected: boolean }) {
         paddingLeft: 1,
       }}
     >
-      <text fg={props.isSelected ? uiColors.primary : uiColors.textSecondary}>
-        {cursor()}{' '}
-      </text>
-      <text
-        fg={props.isSelected ? uiColors.textPrimary : uiColors.textSecondary}
-        attributes={props.isSelected ? TextAttributes.BOLD : undefined}
-        style={{ flexShrink: 0 }}
-      >
-        {props.host.alias}
-      </text>
-      <text fg={uiColors.textMuted}>{'  '}{target()}</text>
+      <box style={{ flexShrink: 0 }}>
+        <MatchedText
+          text={props.host.alias}
+          query={props.query}
+          fg={props.isSelected ? uiColors.textPrimary : uiColors.textSecondary}
+          attributes={props.isSelected ? TextAttributes.BOLD : undefined}
+        />
+      </box>
+      <MatchedText text={target()} query={props.query} fg={highlightColor('secondary')} />
     </box>
   );
 }
@@ -88,7 +88,6 @@ export function SshHostPickerView(props: SshHostPickerViewProps) {
       heightPercent={HEIGHT_PERCENT}
       items={filteredHosts()}
       selectedIndex={clampedIndex()}
-      reservedHeight={4}
       filterPlaceholder="filter hosts..."
       scrollIndicatorLabel="hosts"
       filterQuery={props.filterQuery}
@@ -98,14 +97,14 @@ export function SshHostPickerView(props: SshHostPickerViewProps) {
         <Show
           when={props.hosts.length === 0}
           fallback={
-            <text fg={uiColors.textMuted}>No hosts match filter</text>
+            <text fg={highlightColor('secondary')}>No hosts match filter</text>
           }
         >
-          <text fg={uiColors.textMuted}>No hosts found in ~/.ssh/config</text>
+          <text fg={highlightColor('secondary')}>No hosts found in ~/.ssh/config</text>
         </Show>
       }
       renderItem={(host, isSelected) => (
-        <HostRow host={host} isSelected={isSelected()} />
+        <HostRow host={host} isSelected={isSelected()} query={searchQuery()} />
       )}
     />
   );

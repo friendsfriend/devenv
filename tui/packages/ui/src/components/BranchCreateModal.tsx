@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { onMount } from 'solid-js';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';

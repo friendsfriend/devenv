@@ -39,13 +39,22 @@ export async function handleIssueDetailKeys(
 			issueStore.setLabelPickerIndex(Math.max(idx - 1, 0));
 			return true;
 		}
-		if (event.name === "enter" || event.name === "return") {
+		if (event.name === "space" || event.sequence === " ") {
 			const idx = issueStore.labelPickerIndex();
 			const labels = issueStore.availableLabels();
 			const selectedLabel = labels[idx];
 			if (selectedLabel) {
-				issueActions.setIssueLabels(issue.iid, [selectedLabel]);
+				const selected = issueStore.labelPickerSelectedLabels();
+				issueStore.setLabelPickerSelectedLabels(
+					selected.includes(selectedLabel)
+						? selected.filter((label) => label !== selectedLabel)
+						: [...selected, selectedLabel],
+				);
 			}
+			return true;
+		}
+		if (event.name === "enter" || event.name === "return") {
+			issueActions.setIssueLabels(issue.iid, issueStore.labelPickerSelectedLabels());
 			return true;
 		}
 		if (event.name === "escape" || event.name === "q") {

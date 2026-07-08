@@ -21,14 +21,16 @@ import (
 )
 
 type Server struct {
-	port          int
-	services      services.Container
-	apps          []app.App
-	infraServices []app.InfraService
-	listeners     map[chan Event]bool
-	listenerMu    sync.RWMutex
-	opStatus      map[string]*OperationStatus
-	opStatusMu    sync.RWMutex
+	port           int
+	services       services.Container
+	apps           []app.App
+	infraServices  []app.InfraService
+	listeners      map[chan Event]bool
+	listenerMu     sync.RWMutex
+	opStatus       map[string]*OperationStatus
+	opStatusMu     sync.RWMutex
+	statusEventMu  sync.Mutex
+	statusEventSig map[string]string
 
 	// CR review sessions: token → session (created per review, cleaned up on stream close)
 	crSessions   map[string]*crReviewSession
@@ -69,6 +71,7 @@ type AppStatusResponse struct {
 	ActiveWorktree  string           `json:"activeWorktree,omitempty"`
 	OperationStatus *OperationStatus `json:"operationStatus,omitempty"`
 	Status          string           `json:"status,omitempty"`
+	RunTargetInfo   interface{}      `json:"runTargetInfo,omitempty"`
 }
 
 type InfraServiceResponse struct {
@@ -88,10 +91,11 @@ type InfraServiceResponse struct {
 
 func NewServer(port int) *Server {
 	s := &Server{
-		port:       port,
-		listeners:  make(map[chan Event]bool),
-		opStatus:   make(map[string]*OperationStatus),
-		crSessions: make(map[string]*crReviewSession),
+		port:           port,
+		listeners:      make(map[chan Event]bool),
+		opStatus:       make(map[string]*OperationStatus),
+		statusEventSig: make(map[string]string),
+		crSessions:     make(map[string]*crReviewSession),
 	}
 	return s
 }
@@ -145,6 +149,7 @@ func (s *Server) Start() error {
 	go s.startScriptHealthPoller()
 	go s.startKubernetesStatusWatchers()
 	go s.startKubernetesClusterPoller()
+	go s.startStatusLogCleanup()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/apps", s.handleGetApps)
@@ -170,6 +175,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/docker/stats/stream", s.handleDockerStatsStream)
 	mux.HandleFunc("/api/logs/operation/", s.handleOperationLogs)
 	mux.HandleFunc("/api/logs/action/", s.handleActionLog)
+	mux.HandleFunc("/api/logs/history/", s.handleLogHistory)
 	mux.HandleFunc("/api/logs/status", s.handleStatusLog)
 	mux.HandleFunc("/api/git/pull", s.handleGitPull)
 	mux.HandleFunc("/api/git/push", s.handleGitPush)
@@ -200,6 +206,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/gitlab/job-retry", s.handleGitLabJobRetry)
 	mux.HandleFunc("/api/gitlab/job-cancel", s.handleGitLabJobCancel)
 	mux.HandleFunc("/api/github/pull-requests", s.handleGitHubPullRequests)
+	mux.HandleFunc("/api/github/pull-request", s.handleGitHubPullRequest)
 	mux.HandleFunc("/api/github/pr-changes", s.handleGitHubPRChanges)
 	mux.HandleFunc("/api/github/pr-discussions", s.handleGitHubPRDiscussions)
 	mux.HandleFunc("/api/github/pr-approve", s.handleGitHubPRApprove)
@@ -381,19 +388,55 @@ func (s *Server) findIdentByContainerName(containerName string) string {
 	return ""
 }
 
+func (s *Server) startStatusLogCleanup() {
+	// Clean old entries daily (runs 1h after startup, then every 24h)
+	const cleanupInterval = 24 * time.Hour
+	const maxAge = 3 * 24 * time.Hour
+
+	timer := time.NewTimer(1 * time.Hour)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			if logger := s.services.Logger(); logger != nil {
+				_ = logger.CleanOldLogEntries(maxAge)
+			}
+			timer.Reset(cleanupInterval)
+		}
+	}
+}
+
 func (s *Server) startScriptHealthPoller() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+
+	// Track last-known run-active flag / script status to avoid redundant broadcasts.
+	previousApp := make(map[string]bool)
+	previousInfra := make(map[string]string)
+
 	for range ticker.C {
 		for i := range s.apps {
-			_ = s.services.BuildService().IsShellTmuxRunActive(s.apps[i].Ident)
+			// Always run for side effects (tmux session cleanup/update)
+			active := s.services.BuildService().IsShellTmuxRunActive(s.apps[i].Ident)
+			// Only broadcast when tmux run state actually changed
+			prev, ok := previousApp[s.apps[i].Ident]
+			if ok && prev == active {
+				continue
+			}
+			previousApp[s.apps[i].Ident] = active
 			s.broadcastAppStatus(s.apps[i].Ident)
 		}
 		for i := range s.infraServices {
 			if s.infraServices[i].Type != app.InfraServiceTypeScript {
 				continue
 			}
-			_, _ = s.services.OperationsService().ScriptInfrastructureStatus(s.infraServices[i].Ident)
+			status, _ := s.services.OperationsService().ScriptInfrastructureStatus(s.infraServices[i].Ident)
+			prev, ok := previousInfra[s.infraServices[i].Ident]
+			if ok && prev == status {
+				continue
+			}
+			previousInfra[s.infraServices[i].Ident] = status
 			s.broadcastAppStatus(s.infraServices[i].Ident)
 		}
 	}
@@ -443,20 +486,12 @@ func (s *Server) startGitPoller() {
 			opStatus := s.opStatus[app.Ident]
 			s.opStatusMu.RUnlock()
 
-			s.BroadcastEvent(Event{
-				Type: "status.updated",
-				Properties: map[string]interface{}{
-					"ident":           app.Ident,
-					"dockerInfo":      dockerInfo,
-					"gitStatus":       gitStatus,
-					"branch":          branch,
-					"operationStatus": opStatus,
-					"status":          s.appRuntimeStatus(app.Ident, dockerInfo),
-				},
-				Timestamp: time.Now(),
-			})
+			appRunStatus := s.appRuntimeStatus(app.Ident, dockerInfo)
+			s.broadcastStatusUpdated(app.Ident, s.appStatusEventProperties(app.Ident, dockerInfo, gitStatus, branch, opStatus, appRunStatus))
 
-			log.Printf("[Git poller] Change detected for %s — branch: %s, gitStatus: %s", app.Ident, branch, gitStatus)
+			if os.Getenv("DEVENV_DEBUG_POLLER") == "1" {
+				log.Printf("[Git poller] Change detected for %s — branch: %s, gitStatus: %s", app.Ident, branch, gitStatus)
+			}
 		}
 	}
 }
@@ -496,18 +531,8 @@ func (s *Server) startReconciliationPoller() {
 				opStatus := s.opStatus[app.Ident]
 				s.opStatusMu.RUnlock()
 
-				s.BroadcastEvent(Event{
-					Type: "status.updated",
-					Properties: map[string]interface{}{
-						"ident":           app.Ident,
-						"dockerInfo":      dockerInfo,
-						"gitStatus":       gitStatus,
-						"branch":          branch,
-						"operationStatus": opStatus,
-						"status":          s.appRuntimeStatus(app.Ident, dockerInfo),
-					},
-					Timestamp: time.Now(),
-				})
+				appRunStatus := s.appRuntimeStatus(app.Ident, dockerInfo)
+				s.broadcastStatusUpdated(app.Ident, s.appStatusEventProperties(app.Ident, dockerInfo, gitStatus, branch, opStatus, appRunStatus))
 			}
 		}
 
@@ -528,15 +553,11 @@ func (s *Server) startReconciliationPoller() {
 					opStatus := s.opStatus[svc.Ident]
 					s.opStatusMu.RUnlock()
 
-					s.BroadcastEvent(Event{
-						Type: "status.updated",
-						Properties: map[string]interface{}{
-							"ident":           svc.Ident,
-							"dockerInfo":      dockerInfo,
-							"operationStatus": opStatus,
-							"status":          dockerRuntimeStatus(dockerInfo),
-						},
-						Timestamp: time.Now(),
+					s.broadcastStatusUpdated(svc.Ident, map[string]interface{}{
+						"ident":           svc.Ident,
+						"dockerInfo":      dockerInfo,
+						"operationStatus": opStatus,
+						"status":          dockerRuntimeStatus(dockerInfo),
 					})
 				}
 			}
@@ -607,6 +628,25 @@ func (s *Server) BroadcastEvent(event Event) {
 	}
 }
 
+func (s *Server) broadcastStatusUpdated(ident string, props map[string]interface{}) {
+	data, err := json.Marshal(props)
+	if err == nil {
+		sig := string(data)
+		s.statusEventMu.Lock()
+		if s.statusEventSig == nil {
+			s.statusEventSig = make(map[string]string)
+		}
+		if s.statusEventSig[ident] == sig {
+			s.statusEventMu.Unlock()
+			return
+		}
+		s.statusEventSig[ident] = sig
+		s.statusEventMu.Unlock()
+	}
+
+	s.BroadcastEvent(Event{Type: "status.updated", Properties: props, Timestamp: time.Now()})
+}
+
 func (s *Server) broadcastAppStatus(appIdent string) {
 	dockerClient := s.services.DockerClient()
 
@@ -623,19 +663,7 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 		s.opStatusMu.RUnlock()
 
 		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
-		s.BroadcastEvent(Event{
-			Type: "status.updated",
-			Properties: map[string]interface{}{
-				"ident":           appIdent,
-				"dockerInfo":      dockerInfo,
-				"gitStatus":       gitStatus,
-				"branch":          currentBranch,
-				"operationStatus": opStatus,
-				"status":          appRunStatus,
-			},
-			Timestamp: time.Now(),
-		})
-		log.Printf("[DEBUG] Broadcasted status update for app %s - Docker: %s, Branch: %s", appIdent, dockerInfo.Status, currentBranch)
+		s.broadcastStatusUpdated(appIdent, s.appStatusEventProperties(appIdent, dockerInfo, gitStatus, currentBranch, opStatus, appRunStatus))
 		return
 	}
 
@@ -661,7 +689,7 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 			props["dockerInfo"] = dockerInfo
 			props["status"] = dockerRuntimeStatus(dockerInfo)
 		}
-		s.BroadcastEvent(Event{Type: "status.updated", Properties: props, Timestamp: time.Now()})
+		s.broadcastStatusUpdated(appIdent, props)
 		return
 	}
 
@@ -695,23 +723,11 @@ func (s *Server) broadcastAppStatusWithBranch(appIdent, knownBranch string) {
 		s.opStatusMu.RUnlock()
 
 		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
-		props := map[string]interface{}{
-			"ident":           appIdent,
-			"dockerInfo":      dockerInfo,
-			"gitStatus":       gitStatus,
-			"branch":          branch,
-			"operationStatus": opStatus,
-			"status":          appRunStatus,
-		}
+		props := s.appStatusEventProperties(appIdent, dockerInfo, gitStatus, branch, opStatus, appRunStatus)
 		if targetApp.ActiveWorktree != "" {
 			props["activeWorktree"] = targetApp.ActiveWorktree
 		}
-		s.BroadcastEvent(Event{
-			Type:       "status.updated",
-			Properties: props,
-			Timestamp:  time.Now(),
-		})
-		log.Printf("[DEBUG] Broadcasted status update for app %s - Docker: %s, Branch: %s", appIdent, dockerInfo.Status, branch)
+		s.broadcastStatusUpdated(appIdent, props)
 		return
 	}
 
@@ -738,6 +754,23 @@ func (s *Server) broadcastAppStatusWithRetry(appIdent string, prevDockerStatus s
 			}
 		}
 	}()
+}
+
+func (s *Server) appStatusEventProperties(appIdent string, dockerInfo docker.Info, gitStatus, branch string, opStatus *OperationStatus, appRunStatus string) map[string]interface{} {
+	props := map[string]interface{}{
+		"ident":           appIdent,
+		"dockerInfo":      dockerInfo,
+		"gitStatus":       gitStatus,
+		"branch":          branch,
+		"operationStatus": opStatus,
+		"status":          appRunStatus,
+	}
+	if s.services != nil && s.services.BuildService() != nil {
+		if info, ok := s.services.BuildService().RunTargetInfo(appIdent); ok {
+			props["runTargetInfo"] = info
+		}
+	}
+	return props
 }
 
 func (s *Server) appRuntimeStatus(appIdent string, dockerInfo docker.Info) string {
@@ -838,9 +871,26 @@ func (i *infraServiceAdapter) GetContainerBaseName() string { return i.service.G
 
 func (s *Server) setOperationStatus(appIdent, operation, status, message string) {
 	s.opStatusMu.Lock()
-	defer s.opStatusMu.Unlock()
 
 	s.opStatus[appIdent] = &OperationStatus{Operation: operation, Status: status, Message: message}
+
+	s.opStatusMu.Unlock()
+
+	// Log to status log
+	if logger := s.services.Logger(); logger != nil {
+		appName := appIdent
+		if app := s.findAppByIdent(appIdent); app != nil {
+			appName = app.DisplayName
+		}
+		logOpType := logging.OperationType(operation)
+		logStatusType := logging.StatusCompleted
+		if status == "active" {
+			logStatusType = logging.StatusInProgress
+		} else if status == "failed" {
+			logStatusType = logging.StatusFailed
+		}
+		_ = logger.LogStatus(appIdent, appName, logOpType, logStatusType, message)
+	}
 
 	s.BroadcastEvent(Event{
 		Type: "operation.status.changed",
@@ -939,7 +989,6 @@ func (s *Server) updateOrCreateRepoWithStatus(targetApp *app.App, callback func(
 		actualBranch, err := s.services.GitRepository().UpdateOrCreateRepo(gitApp)
 		if err != nil {
 			statusCallback("Failed: " + err.Error())
-			s.services.Logger().LogStatus(targetApp.Ident, targetApp.DisplayName, logging.OpCheckout, logging.StatusFailed, err.Error())
 		} else {
 			// Record the actual branch that was checked out as the primary
 			// worktree branch. This may differ from the requested branch when
@@ -950,7 +999,6 @@ func (s *Server) updateOrCreateRepoWithStatus(targetApp *app.App, callback func(
 				}
 			}
 			statusCallback("Checkout completed")
-			s.services.Logger().LogStatus(targetApp.Ident, targetApp.DisplayName, logging.OpCheckout, logging.StatusCompleted, "Repository updated successfully")
 		}
 		if callback != nil {
 			callback()

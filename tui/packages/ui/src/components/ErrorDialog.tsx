@@ -1,7 +1,9 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
+import { SearchHeader } from './SearchHeader';
 
 export interface ErrorDialogProps {
   title: string;
@@ -25,22 +27,13 @@ export function ErrorDialog(props: ErrorDialogProps) {
       heightPercent={0.3}
       onBackdropClick={props.onClose}
       customHeader={
-        <box
-          style={{
-            width: '100%',
-            height: 1,
-            justifyContent: 'flex-start',
-            flexDirection: 'row',
-            flexShrink: 0,
-          }}
-        >
-          <text
-            fg={uiColors.error}
-            attributes={TextAttributes.BOLD}
-          >
-            ✗ {props.title}
-          </text>
-        </box>
+        <SearchHeader>
+          <box style={{ width: '100%', flexDirection: 'row' }}>
+            <text fg={uiColors.error} attributes={TextAttributes.BOLD}>
+              ✗ {props.title}
+            </text>
+          </box>
+        </SearchHeader>
       }
     >
       {/* Error message */}

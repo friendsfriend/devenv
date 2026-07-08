@@ -1,7 +1,9 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
+import { SearchHeader } from './SearchHeader';
 
 export interface ConfirmDialogProps {
   title: string;
@@ -24,22 +26,13 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
       widthPercent={0.4}
       heightPercent={0.25}
       customHeader={
-        <box
-          style={{
-            width: '100%',
-            height: 1,
-            justifyContent: 'flex-start',
-            flexDirection: 'row',
-            flexShrink: 0,
-          }}
-        >
-          <text
-            fg={uiColors.warning}
-            attributes={TextAttributes.BOLD}
-          >
-            ⚠ {props.title}
-          </text>
-        </box>
+        <SearchHeader>
+          <box style={{ width: '100%', flexDirection: 'row' }}>
+            <text fg={uiColors.warning} attributes={TextAttributes.BOLD}>
+              ⚠ {props.title}
+            </text>
+          </box>
+        </SearchHeader>
       }
     >
       <box

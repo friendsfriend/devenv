@@ -27,8 +27,6 @@ export function createChangeRequestStore() {
 	const [totalCount, setTotalCount] = createSignal(0);
 	const [perPage, setPerPage] = createSignal(50);
 
-	// State filter: "opened", "merged", "closed", "all"
-	const [crState, setCrState] = createSignal<string>("opened");
 	// Active server-side search term (set when user presses Enter in search mode)
 	const [searchTerm, setSearchTerm] = createSignal("");
 	const [selectedChangeRequest, setSelectedCR] = createSignal<ChangeRequest | null>(null);
@@ -90,6 +88,18 @@ export function createChangeRequestStore() {
 		createSignal(false);
 	const [crSearchMode, setCrSearchMode] = createSignal(false);
 	const [crSearchQuery, setCrSearchQuery] = createSignal("");
+	const [crListFilters, setCrListFilters] = createSignal<Record<string, string[]>>({ state: ["opened"] });
+	const [crListFilterParameterIndex, setCrListFilterParameterIndex] = createSignal(0);
+	const [crListFilterValueIndex, setCrListFilterValueIndex] = createSignal(0);
+	const [crListFilterFocusedPane, setCrListFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
+	const [showCrListFilterModal, setShowCrListFilterModal] = createSignal(false);
+	const [showCrListSortModal, setShowCrListSortModal] = createSignal(false);
+	const [crListSortSelectedIndex, setCrListSortSelectedIndex] = createSignal(0);
+	const [crListSortRules, setCrListSortRules] = createSignal<SortRule[]>([
+		{ key: "updated", label: "Updated", direction: "desc" },
+		{ key: "created", label: "Created", direction: "none" },
+		{ key: "title", label: "Title", direction: "none" },
+	]);
 	const [changedFilesSearchMode, setChangedFilesSearchMode] =
 		createSignal(false);
 	const [changedFilesSearchQuery, setChangedFilesSearchQuery] =
@@ -128,6 +138,16 @@ export function createChangeRequestStore() {
 	let crAiLastScrollTop = 0;
 
 	const currentListFilters = createMemo(() => listFilters()[listControlTarget() ?? "changedFiles"]);
+	const crListFilterParameters = createMemo(() => {
+		const stateValues = [
+			{ value: "opened", label: "opened" },
+			{ value: "merged", label: "merged" },
+			{ value: "closed", label: "closed" },
+			{ value: "all", label: "all" },
+		];
+		return [{ key: "state", label: "State", values: stateValues }];
+	});
+	const activeCrListSort = createMemo(() => crListSortRules().find((rule) => rule.direction !== "none"));
 	const currentListSortRules = createMemo(() => listSortRules()[listControlTarget() ?? "changedFiles"]);
 	const setCurrentListFilters = (value: Record<string, string[]> | ((filters: Record<string, string[]>) => Record<string, string[]>)) => {
 		const target = listControlTarget();
@@ -166,7 +186,17 @@ export function createChangeRequestStore() {
 	const listFilterParameters = createMemo(() => {
 		const target = listControlTarget();
 		if (!target) return [];
-		const source = target === "changedFiles" ? changedFilesFiltered() : target === "jobs" ? jobs() : (crTestSummary()?.test_suites ?? []).flatMap((s) => s.test_cases.map((t) => ({ ...t, suiteName: s.name })));
+		const source = target === "changedFiles"
+			? applyFilters(
+				(changedFilesSearchQuery().toLowerCase()
+					? crChanges().filter((c) => [c.new_path, c.old_path].some((v) => v && v.toLowerCase().includes(changedFilesSearchQuery().toLowerCase())))
+					: crChanges()),
+				"changedFiles",
+				changedFileValue,
+			)
+			: target === "jobs"
+				? jobs()
+				: (crTestSummary()?.test_suites ?? []).flatMap((s) => s.test_cases.map((t) => ({ ...t, suiteName: s.name })));
 		const rules = listSortRules()[target];
 		return rules.map((rule) => {
 			const counts = new Map<string, number>();
@@ -178,7 +208,7 @@ export function createChangeRequestStore() {
 		});
 	});
 
-	const selectedTestForDetail = createMemo(() => {
+	const sortedTestsForDetail = createMemo(() => {
 		const testSuites = crTestSummary()?.test_suites || [];
 		const allTests: Array<TestCase & { suiteName: string }> = [];
 		for (const suite of testSuites) {
@@ -195,8 +225,10 @@ export function createChangeRequestStore() {
 			if (classCompare !== 0) return classCompare;
 			return a.name.localeCompare(b.name);
 		});
-		return allTests[selectedTestIndex()] ?? null;
+		return allTests;
 	});
+
+	const selectedTestForDetail = createMemo(() => sortedTestsForDetail()[selectedTestIndex()] ?? null);
 
 	return {
 		changeRequests,
@@ -216,8 +248,7 @@ export function createChangeRequestStore() {
 		setPerPage,
 		searchTerm,
 		setSearchTerm,
-		crState,
-		setCrState,
+
 		selectedChangeRequest,
 		setSelectedCR,
 		selectedChangeRequestIndex,
@@ -306,6 +337,24 @@ export function createChangeRequestStore() {
 		setCrSearchMode,
 		crSearchQuery,
 		setCrSearchQuery,
+		crListFilters,
+		setCrListFilters,
+		crListFilterParameters,
+		crListFilterParameterIndex,
+		setCrListFilterParameterIndex,
+		crListFilterValueIndex,
+		setCrListFilterValueIndex,
+		crListFilterFocusedPane,
+		setCrListFilterFocusedPane,
+		showCrListFilterModal,
+		setShowCrListFilterModal,
+		showCrListSortModal,
+		setShowCrListSortModal,
+		crListSortRules,
+		setCrListSortRules,
+		crListSortSelectedIndex,
+		setCrListSortSelectedIndex,
+		activeCrListSort,
 		changedFilesSearchMode,
 		setChangedFilesSearchMode,
 		changedFilesSearchQuery,

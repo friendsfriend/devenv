@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import type { WorktreeInfo } from '@devenv/types';
 import { uiColors } from '../colors';
@@ -14,7 +15,6 @@ function WorktreeRow(props: {
   worktree: WorktreeInfo;
   isSelected: boolean;
 }) {
-  const cursor = () => (props.isSelected ? '► ' : '  ');
 
   const label = () => {
     const parts: string[] = [props.worktree.branch];
@@ -33,7 +33,7 @@ function WorktreeRow(props: {
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 2,
@@ -43,7 +43,7 @@ function WorktreeRow(props: {
       }}
     >
       <text fg={color()} attributes={isBold() ? TextAttributes.BOLD : undefined}>
-        {cursor()}{label()}
+        {label()}
       </text>
       <text fg={uiColors.textMuted} style={{ paddingLeft: 4 }}>
         {props.worktree.path.split('/').filter(Boolean).pop() ?? props.worktree.path}
@@ -72,7 +72,6 @@ export function WorktreeManagerModal(props: WorktreeManagerModalProps) {
       items={props.worktrees}
       selectedIndex={props.selectedIndex}
       estimatedItemHeight={2}
-      reservedHeight={4}
       scrollIndicatorLabel="worktrees"
       emptyContent={
         <text fg={uiColors.textSecondary}>No worktrees found for this repository.</text>

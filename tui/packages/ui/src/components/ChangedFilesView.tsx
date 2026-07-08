@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
 import { uiColors } from '../colors';
@@ -6,6 +7,10 @@ import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
+import { FilterStatusBar } from './FilterStatusBar';
+import { HighlightedText, highlightColor } from './Highlight';
+import { Badge } from './Badge';
+import { MatchedText } from './MatchedText';
 
 interface ChangedFilesViewProps {
   changes: ChangeRequestChange[];
@@ -15,6 +20,8 @@ interface ChangedFilesViewProps {
   error?: string;
   searchMode?: boolean;
   searchQuery?: string;
+  filterSummary?: string;
+  sortSummary?: string;
 }
 
 /**
@@ -29,15 +36,10 @@ interface ChangedFilesViewProps {
 export function ChangedFilesView(props: ChangedFilesViewProps) {
   // Get change type and color
   const getChangeType = (change: ChangeRequestChange) => {
-    if (change.new_file) {
-      return { type: 'Added', color: uiColors.success, icon: '+' };
-    } else if (change.deleted_file) {
-      return { type: 'Deleted', color: uiColors.error, icon: '-' };
-    } else if (change.renamed_file) {
-      return { type: 'Renamed', color: uiColors.primary, icon: '→' };
-    } else {
-      return { type: 'Modified', color: uiColors.warning, icon: '~' };
-    }
+    if (change.new_file) return { type: '+', highlight: 'positive' as const };
+    if (change.deleted_file) return { type: '-', highlight: 'negative' as const };
+    if (change.renamed_file) return { type: '→', highlight: 'highlight2' as const };
+    return { type: '~', highlight: 'warning' as const };
   };
 
   // Get file path (show new_path for renamed/new, old_path for deleted)
@@ -67,16 +69,16 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   //   Own header rows (title + stats)        = 2
   //   Table header row                       = 1
   //                                   Total  = 11
-  const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 2 + 1;
+  const reservedLines = () => LAYOUT_CHROME_LINES + 2 + 2 + 1 + 1;
 
   return (
     <ContentPanel>
       <Show when={props.loading}>
-        <CenteredState message="Loading changed files..." color={uiColors.primary} bold />
+        <CenteredState message="Loading changed files..." color={highlightColor('highlight')} bold />
       </Show>
 
       <Show when={props.error}>
-        <CenteredState message={props.error!} color={uiColors.error} bold />
+        <CenteredState message={props.error!} color={highlightColor('negative')} bold />
       </Show>
 
       {/* Content */}
@@ -91,44 +93,41 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
             paddingRight: 1,
           }}
         >
-          <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-            Changed Files ({totalStats().totalFiles} files)
-          </text>
-          <text fg={uiColors.textSecondary}>
-            <span style={{ fg: uiColors.success }}>+{totalStats().totalAdded}</span>
+          <HighlightedText text={`Changed Files (${totalStats().totalFiles} files)`} highlight="primary" attributes={TextAttributes.BOLD} />
+          <text fg={highlightColor('secondary')}>
+            <span style={{ fg: highlightColor('positive') }}>+{totalStats().totalAdded}</span>
             {' '}
-            <span style={{ fg: uiColors.error }}>-{totalStats().totalDeleted}</span>
+            <span style={{ fg: highlightColor('negative') }}>-{totalStats().totalDeleted}</span>
           </text>
         </box>
 
         {/* Table Header */}
         <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.changes.length}>
               <>
-                <box style={{ width: '5%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}></text>
-                </box>
-                <box style={{ width: '12%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Type</text>
+                <box style={{ width: 5 }}>
+                  <HighlightedText text="Type" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
                 <box style={{ width: '58%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>File Path</text>
+                  <HighlightedText text="File Path" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
                 <box style={{ width: '25%' }}>
-                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>Changes (+/-)</text>
+                  <HighlightedText text="Changes (+/-)" highlight="primary" attributes={TextAttributes.BOLD} />
                 </box>
               </>
         </SearchHeader>
 
+        <FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
+
         {/* Empty State */}
         <Show when={props.changes.length === 0}>
-          <CenteredState message="No changed files" />
+          <CenteredState message="No changed files" color={highlightColor('secondary')} />
         </Show>
 
         {/* Table Rows — rendered via ScrollableList for correct virtual windowing */}
         <ScrollableList<ChangeRequestChange>
           items={props.changes}
           selectedIndex={props.selectedIndex}
-          reservedLines={RESERVED_LINES}
+          reservedLines={reservedLines()}
           estimatedItemHeight={1}
           showScrollIndicator={false}
           renderItem={(change, isSelected) => {
@@ -136,46 +135,40 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
             const filePath = getFilePath(change);
             return (
               <box
-                backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+                backgroundColor={isSelected() ? uiColors.bgSurface0 : undefined}
                 style={{
                   width: '100%',
                   height: 1,
                   flexDirection: 'row',
-                  paddingLeft: 1,
-                  paddingRight: 1,
                 }}
               >
-                {/* Icon */}
-                <box style={{ width: '5%' }}>
-                  <text fg={changeType.color} attributes={TextAttributes.BOLD}>
-                    {changeType.icon}
-                  </text>
-                </box>
-                {/* Type */}
-                <box style={{ width: '12%' }}>
-                  <text
-                    fg={isSelected() ? uiColors.textPrimary : changeType.color}
-                    attributes={isSelected() ? TextAttributes.BOLD : undefined}
-                  >
-                    {changeType.type}
-                  </text>
-                </box>
-                {/* File Path */}
-                <box style={{ width: '58%' }}>
-                  <text
-                    fg={isSelected() ? uiColors.textPrimary : uiColors.textSecondary}
-                    attributes={isSelected() ? TextAttributes.BOLD : undefined}
-                  >
-                    {filePath}
-                  </text>
-                </box>
-                {/* Stats */}
-                <box style={{ width: '25%' }}>
-                  <text fg={isSelected() ? uiColors.textPrimary : uiColors.textMuted}>
-                    <span style={{ fg: uiColors.success }}>+{change.lines_added || 0}</span>
-                    {' '}
-                    <span style={{ fg: uiColors.error }}>-{change.lines_deleted || 0}</span>
-                  </text>
+                {/* Accent marker strip */}
+                <box
+                  backgroundColor={isSelected() ? uiColors.highlight : undefined}
+                  style={{ width: 2, flexShrink: 0 }}
+                />
+                <box style={{ flexGrow: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                  {/* Type */}
+                  <box style={{ width: 5 }}>
+                    <Badge text={changeType.type} highlight={changeType.highlight} />
+                  </box>
+                  {/* File Path */}
+                  <box style={{ width: '58%' }}>
+                    <MatchedText
+                      text={filePath}
+                      query={props.searchQuery}
+                      fg={highlightColor(isSelected() ? 'primary' : 'secondary')}
+                      attributes={isSelected() ? TextAttributes.BOLD : undefined}
+                    />
+                  </box>
+                  {/* Stats */}
+                  <box style={{ width: '25%' }}>
+                    <text fg={highlightColor(isSelected() ? 'primary' : 'secondary')}>
+                      <span style={{ fg: highlightColor('positive') }}>+{change.lines_added || 0}</span>
+                      {' '}
+                      <span style={{ fg: highlightColor('negative') }}>-{change.lines_deleted || 0}</span>
+                    </text>
+                  </box>
                 </box>
               </box>
             );

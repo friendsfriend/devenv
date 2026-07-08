@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { Show, For, createMemo } from 'solid-js';
@@ -7,6 +8,8 @@ import { getMarkdownSyntaxStyle } from "../markdownSyntax";
 import { gitlabHtmlToMarkdown, containsHtml } from "../utils/gitlabHtml";
 import { ScrollableContent } from './ScrollableContent';
 import { RunningText } from './RunningText';
+import { DetailSection } from './DetailSection';
+import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
 import type {
 	Issue,
 	ChangeRequest,
@@ -23,6 +26,7 @@ interface ChangeRequestDetailViewProps {
 	testSummary?: TestSummary;
 	testLoading?: boolean;
 	testError?: string;
+	testResultsUnsupported?: boolean;
 	changes?: ChangeRequestChange[];
 	changesLoading?: boolean;
 	changesError?: string;
@@ -95,16 +99,17 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 		const stageMinJobId = new Map<string, number>();
 
 		for (const job of props.jobs) {
-			if (!grouped.has(job.stage)) {
-				grouped.set(job.stage, []);
-				stageMinJobId.set(job.stage, job.id);
+			const stage = (job.stage ?? "").trim() || "Default";
+			if (!grouped.has(stage)) {
+				grouped.set(stage, []);
+				stageMinJobId.set(stage, job.id);
 			}
-			grouped.get(job.stage)!.push(job);
+			grouped.get(stage)!.push(job);
 
 			// Track the minimum job ID for this stage
-			const currentMin = stageMinJobId.get(job.stage)!;
+			const currentMin = stageMinJobId.get(stage)!;
 			if (job.id < currentMin) {
-				stageMinJobId.set(job.stage, job.id);
+				stageMinJobId.set(stage, job.id);
 			}
 		}
 
@@ -136,11 +141,131 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 
 		return { total, resolved, open };
 	});
+	const discussionsPanelHeight = () => (!props.discussionsLoading && !props.discussionsError && discussionCounts().total > 0 ? 4 : 2);
+	const testResultsPanelHeight = () => {
+		if (props.testLoading || props.testError || !props.testSummary) return 2;
+		return props.testSummary.error > 0 ? 6 : 5;
+	};
 
 	const dimensions = useTerminalDimensions();
 	const cr = () => props.changeRequest;
 	const lineWidth = () => Math.max(1, Math.floor(dimensions().width * 0.6) - 4);
 	const linkedIssueTitleWidth = () => Math.max(1, lineWidth() - 8);
+	const statusHighlight = (status: string) => {
+		switch (status.toLowerCase()) {
+			case "success":
+			case "can_be_merged":
+			case "opened":
+				return "positive" as const;
+			case "failed":
+			case "cannot_be_merged":
+				return "negative" as const;
+			case "pending":
+			case "created":
+			case "manual":
+				return "warning" as const;
+			case "running":
+			case "checking":
+			case "merged":
+				return "highlight" as const;
+			case "closed":
+			case "skipped":
+			case "canceled":
+				return "secondary" as const;
+			default:
+				return "primary" as const;
+		}
+	};
+	const isDefaultTargetBranch = () => !!cr().default_branch && cr().target_branch === cr().default_branch;
+	const mergeHighlight = () => {
+		if (cr().merge_status === "can_be_merged") return "positive" as const;
+		if (cr().merge_status === "cannot_be_merged" || cr().merge_status === "cannot_be_merged_recheck") return "negative" as const;
+		return "warning" as const;
+	};
+	const mergeLabel = () => {
+		if (cr().merge_status === "can_be_merged") return "Can be merged";
+		if (cr().merge_status === "cannot_be_merged" || cr().merge_status === "cannot_be_merged_recheck") return "Cannot be merged";
+		return cr().merge_status || "unknown";
+	};
+	const statusRows = (): PropertyRow[] => {
+		const rows: PropertyRow[] = [
+			{ label: "Merge", value: propertyBadges([{ label: mergeLabel(), highlight: mergeHighlight() }]) },
+		];
+
+		if (cr().detailed_merge_status && cr().detailed_merge_status !== cr().merge_status) {
+			rows.push({ label: "Details", value: cr().detailed_merge_status, valueHighlight: "secondary" });
+		}
+		if (cr().draft || cr().work_in_progress) rows.push({ label: "Draft", value: "Yes", valueHighlight: "warning" });
+		if (cr().has_conflicts) rows.push({ label: "Conflicts", value: "Yes", valueHighlight: "negative" });
+		if (!cr().blocking_discussions_resolved) rows.push({ label: "Discussions", value: "Unresolved", valueHighlight: "warning" });
+		if (cr().approvals) {
+			const approvals = cr().approvals!;
+			const approved = approvals.approvals_left === 0;
+			const approvedCount = approvals.approvals_required - approvals.approvals_left;
+			rows.push({
+				label: "Approvals",
+				value: approved ? `Approved ${approvedCount}/${approvals.approvals_required}` : `${approvedCount}/${approvals.approvals_required} need ${approvals.approvals_left}`,
+				valueHighlight: approved ? "positive" : "warning",
+			});
+			if (approvals.approved_by?.length > 0) {
+				rows.push({
+					label: "Approved By",
+					value: approvals.approved_by.map((approval) => approval.user.name).join(", "),
+					valueHighlight: "secondary",
+				});
+			}
+		}
+		if (cr().rebase_in_progress) rows.push({ label: "Rebase", value: "In progress", valueHighlight: "warning" });
+
+		return rows;
+	};
+	const metadataRows = (): PropertyRow[] => {
+		const rows: PropertyRow[] = [
+			{ label: "State", value: propertyBadges([{ label: cr().state, highlight: statusHighlight(cr().state) }]) },
+		];
+
+		const pipelineStatus = cr().head_pipeline?.status;
+		if (pipelineStatus) {
+			rows.push({ label: "Pipeline", value: propertyBadges([{ label: pipelineStatus, highlight: statusHighlight(pipelineStatus) }]) });
+		}
+
+		rows.push({ label: "Source", value: cr().source_branch });
+		if (!isDefaultTargetBranch()) {
+			rows.push({ label: "Target", value: propertyBadges([{ label: cr().target_branch, highlight: "warning" }]) });
+		}
+
+		if (cr().updated_at) rows.push({ label: "Updated", value: formatDate(cr().updated_at) });
+		if (cr().created_at) rows.push({ label: "Created", value: formatDate(cr().created_at) });
+		if (cr().author?.name) rows.push({ label: "Author", value: `${cr().author.name} (@${cr().author.username})`, valueHighlight: "secondary" });
+
+		if (cr().description && cr().description.trim() !== "") {
+			rows.push({
+				label: "Description",
+				layout: "block",
+				value: (
+					<code
+						filetype="markdown"
+						content={containsHtml(cr().description!)
+							? gitlabHtmlToMarkdown(cr().description!)
+							: cr().description!}
+						syntaxStyle={getMarkdownSyntaxStyle()}
+						drawUnstyledText={true}
+						fg={uiColors.textSecondary}
+					/>
+				),
+			});
+		}
+
+		if (cr().web_url) {
+			rows.push({
+				label: "URL",
+				value: <RunningText text={cr().web_url} width={lineWidth()} fg={uiColors.textMuted} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />,
+				labelHighlight: "secondary",
+			});
+		}
+
+		return rows;
+	};
 
 	return (
 		<ContentFrame>
@@ -162,8 +287,8 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					}}
 				>
 				{/* METADATA PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					header={<RunningText text={cr().title} width={lineWidth()} fg={uiColors.textPrimary} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />}
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -172,10 +297,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 						overflow: "hidden",
 					}}
 				>
-					{/* Title - Fixed header outside scrollbox */}
-					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-						<RunningText text={cr().title} width={lineWidth()} fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
-					</box>
 
 					{/* Scrollable content */}
 					<ScrollableContent
@@ -185,423 +306,32 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							minHeight: 0,
 						}}
 					>
-						{/* Author */}
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Author:{" "}
-							</text>
-							<text fg={uiColors.textPrimary}>
-								{cr().author.name} (@{cr().author.username})
-							</text>
-						</box>
+						<PropertiesList rows={metadataRows()} labelWidth={12} />
 
-						{/* Source Branch */}
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Source:{" "}
-							</text>
-							<text fg={uiColors.textSecondary}>{cr().source_branch}</text>
-						</box>
-
-						{/* Target Branch */}
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Target:{" "}
-							</text>
-							<text fg={uiColors.textSecondary}>{cr().target_branch}</text>
-						</box>
-
-						{/* State */}
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								State:{" "}
-							</text>
-							<text
-								fg={getStatusColor(cr().state)}
-								attributes={TextAttributes.BOLD}
-							>
-								{cr().state}
-							</text>
-						</box>
-
-						{/* Pipeline Status */}
-						<Show when={cr().head_pipeline?.status}>
-							{(status) => (
-								<box
-									style={{
-										flexDirection: "row",
-										paddingLeft: 1,
-										paddingRight: 1,
-									}}
-								>
-									<text
-										fg={uiColors.textMuted}
-										attributes={TextAttributes.BOLD}
-									>
-										Pipeline:{" "}
-									</text>
-									<text
-										fg={getStatusColor(status())}
-										attributes={TextAttributes.BOLD}
-									>
-										{status()}
-									</text>
-								</box>
-							)}
-						</Show>
-
-						{/* Created */}
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Created:{" "}
-							</text>
-							<text fg={uiColors.textSecondary}>
-								{formatDate(cr().created_at)}
-							</text>
-						</box>
-
-						{/* Updated */}
-						<box
-							style={{ flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Updated:{" "}
-							</text>
-							<text fg={uiColors.textSecondary}>
-								{formatDate(cr().updated_at)}
-							</text>
-						</box>
-
-						{/* Description */}
-						<Show when={cr().description && cr().description.trim() !== ""}>
-							<box style={{ marginTop: 1, paddingLeft: 1, paddingRight: 1 }}>
-								<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-									Description:
-								</text>
-							</box>
-							<box style={{ paddingLeft: 3, paddingRight: 1 }}>
-								<code
-									filetype="markdown"
-									content={containsHtml(cr().description!)
-										? gitlabHtmlToMarkdown(cr().description!)
-										: cr().description!}
-									syntaxStyle={getMarkdownSyntaxStyle()}
-								drawUnstyledText={true}
-								fg={uiColors.textSecondary}
-						/>
-							</box>
-						</Show>
-
-						{/* URL */}
-						<box
-							style={{
-								marginTop: 1,
-								flexDirection: "row",
-								paddingLeft: 1,
-								paddingRight: 1,
-							}}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								URL:{" "}
-							</text>
-							<RunningText text={cr().web_url} width={lineWidth()} fg={uiColors.primary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
-						</box>
-
-						{/* Linked Issues */}
-						<box style={{ marginTop: 1, paddingLeft: 1, paddingRight: 1 }}>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Linked Issues
-								{props.linkedIssues && props.linkedIssues.length > 0
-									? ` (${props.linkedIssues.length})`
-									: ""}
-							</text>
-						</box>
-
-						<Show when={props.linkedIssuesLoading}>
-							<box style={{ paddingLeft: 2, paddingRight: 1 }}>
-								<text fg={uiColors.warning}>Loading...</text>
-							</box>
-						</Show>
-
-						<Show
-							when={
-								!props.linkedIssuesLoading &&
-								props.linkedIssuesError &&
-								props.linkedIssuesError.length > 0
-							}
-						>
-							<box style={{ paddingLeft: 2, paddingRight: 1 }}>
-								<text fg={uiColors.error}>
-									Error: {props.linkedIssuesError}
-								</text>
-							</box>
-						</Show>
-
-						<Show
-							when={
-								!props.linkedIssuesLoading &&
-								!props.linkedIssuesError &&
-								(!props.linkedIssues || props.linkedIssues.length === 0)
-							}
-						>
-							<box style={{ paddingLeft: 2, paddingRight: 1 }}>
-								<text fg={uiColors.textMuted}>No linked issues</text>
-							</box>
-						</Show>
-
-						<For each={props.linkedIssues}>
-							{(iss) => (
-								<box
-									style={{
-										flexDirection: "row",
-										paddingLeft: 2,
-										paddingRight: 1,
-									}}
-								>
-									<text fg={uiColors.primary}>#{iss.iid}</text>
-									<text fg={uiColors.textSecondary}>
-										{iss.state === "opened" || iss.state === "open"
-											? " ○ "
-											: " ◌ "}
-									</text>
-									<RunningText text={iss.title} width={linkedIssueTitleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
-								</box>
-							)}
-						</For>
 					</ScrollableContent>
-				</box>
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* STATUS PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Status"
 					style={{
 						width: "100%",
-						flexGrow: 1,
-						flexBasis: 0,
+						height: statusRows().length + 1,
+						flexShrink: 0,
 						flexDirection: "column",
 						overflow: "hidden",
 					}}
 				>
-					<ScrollableContent
-												style={{
-							width: "100%",
-							flexGrow: 1,
-							minHeight: 0,
-						}}
-					>
-						{/* Title */}
-						<box style={{ height: 1, paddingLeft: 1, paddingRight: 1 }}>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Status
-							</text>
-						</box>
-
-						{/* Merge Status */}
-						<box
-							style={{
-								height: 1,
-								flexDirection: "row",
-								paddingLeft: 1,
-								paddingRight: 1,
-							}}
-						>
-							<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-								Merge:{" "}
-							</text>
-							<Show
-								when={cr().merge_status === "can_be_merged"}
-								fallback={
-									<Show
-										when={
-											cr().merge_status === "cannot_be_merged" ||
-											cr().merge_status === "cannot_be_merged_recheck"
-										}
-										fallback={
-											<text fg={uiColors.warning}>○ {cr().merge_status}</text>
-										}
-									>
-										<text fg={uiColors.error}>✗ Cannot be merged</text>
-									</Show>
-								}
-							>
-								<text fg={uiColors.success}>✓ Can be merged</text>
-							</Show>
-						</box>
-
-						{/* Detailed Merge Status */}
-						<Show
-							when={
-								cr().detailed_merge_status &&
-								cr().detailed_merge_status !== cr().merge_status
-							}
-						>
-							<box
-								style={{
-									height: 1,
-									flexDirection: "row",
-									paddingLeft: 1,
-									paddingRight: 1,
-								}}
-							>
-								<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-									Details:{" "}
-								</text>
-								<text fg={uiColors.textSecondary}>
-									{cr().detailed_merge_status}
-								</text>
-							</box>
-						</Show>
-
-						{/* Draft Status */}
-						<Show when={cr().draft || cr().work_in_progress}>
-							<box
-								style={{
-									height: 1,
-									flexDirection: "row",
-									paddingLeft: 1,
-									paddingRight: 1,
-								}}
-							>
-								<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-									Draft:{" "}
-								</text>
-								<text fg={uiColors.warning}>Yes</text>
-							</box>
-						</Show>
-
-						{/* Conflicts */}
-						<Show when={cr().has_conflicts}>
-							<box
-								style={{
-									height: 1,
-									flexDirection: "row",
-									paddingLeft: 1,
-									paddingRight: 1,
-								}}
-							>
-								<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-									Conflicts:{" "}
-								</text>
-								<text fg={uiColors.error}>Yes</text>
-							</box>
-						</Show>
-
-						{/* Blocking Discussions */}
-						<Show when={!cr().blocking_discussions_resolved}>
-							<box
-								style={{
-									height: 1,
-									flexDirection: "row",
-									paddingLeft: 1,
-									paddingRight: 1,
-								}}
-							>
-								<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-									Discussions:{" "}
-								</text>
-								<text fg={uiColors.warning}>Unresolved</text>
-							</box>
-						</Show>
-
-						{/* Approvals */}
-						<Show when={cr().approvals}>
-							<box
-								style={{
-									height: 1,
-									flexDirection: "row",
-									paddingLeft: 1,
-									paddingRight: 1,
-								}}
-							>
-								<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-									Approvals:{" "}
-								</text>
-								<Show
-									when={cr().approvals!.approvals_left === 0}
-									fallback={
-										<text fg={uiColors.warning}>
-											{cr().approvals!.approvals_required -
-												cr().approvals!.approvals_left}
-											/{cr().approvals!.approvals_required} (need{" "}
-											{cr().approvals!.approvals_left} more)
-										</text>
-									}
-								>
-									<text fg={uiColors.success}>
-										✓ Approved (
-										{cr().approvals!.approvals_required -
-											cr().approvals!.approvals_left}
-										/{cr().approvals!.approvals_required})
-									</text>
-								</Show>
-							</box>
-
-							{/* Approved By */}
-							<Show
-								when={cr().approvals && cr().approvals!.approved_by?.length > 0}
-							>
-								<box style={{ height: 1, paddingLeft: 1, paddingRight: 1 }}>
-									<text
-										fg={uiColors.textMuted}
-										attributes={TextAttributes.BOLD}
-									>
-										Approved by:
-									</text>
-								</box>
-								<For each={cr().approvals!.approved_by}>
-									{(approval) => (
-										<box style={{ height: 1, paddingLeft: 3, paddingRight: 1 }}>
-											<text fg={uiColors.success}>
-												✓ {approval.user.name} (@{approval.user.username})
-											</text>
-										</box>
-									)}
-								</For>
-							</Show>
-						</Show>
-
-						{/* Rebase Status */}
-						<Show when={cr().rebase_in_progress}>
-							<box
-								style={{
-									height: 1,
-									flexDirection: "row",
-									paddingLeft: 1,
-									paddingRight: 1,
-								}}
-							>
-								<text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>
-									Rebase:{" "}
-								</text>
-								<text fg={uiColors.warning}>In progress...</text>
-							</box>
-						</Show>
-					</ScrollableContent>
-				</box>
+					<PropertiesList rows={statusRows()} labelWidth={12} />
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* CHANGED FILES PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Changed Files"
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -613,20 +343,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Changed Files
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.changesLoading}>
 							<box
@@ -709,7 +425,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</For>
 						</ScrollableContent>
 					</Show>
-				</box>
+				</DetailSection>
 			</box>
 
 			{/* RIGHT COLUMN: Pipeline Jobs + Test Results */}
@@ -723,8 +439,8 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 				}}
 			>
 				{/* PIPELINE JOBS PANEL */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Pipeline Jobs"
 					style={{
 						width: "100%",
 						flexGrow: 1,
@@ -735,20 +451,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Pipeline Jobs
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.jobsLoading}>
 							<box
@@ -838,16 +540,59 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</For>
 						</ScrollableContent>
 					</Show>
-				</box>
+				</DetailSection>
+
+				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
+
+				{/* LINKED ISSUES PANEL - max 2 rows */}
+				<DetailSection
+					title={`Linked Issues${props.linkedIssues && props.linkedIssues.length > 0 ? ` (${props.linkedIssues.length})` : ""}`}
+					style={{
+						width: "100%",
+						height: 3,
+						flexShrink: 0,
+						flexDirection: "column",
+					}}
+				>
+					<Show when={props.linkedIssuesLoading}>
+						<box style={{ height: 1, paddingLeft: 1, paddingRight: 1 }}>
+							<text fg={uiColors.warning}>Loading...</text>
+						</box>
+					</Show>
+
+					<Show when={!props.linkedIssuesLoading && props.linkedIssuesError && props.linkedIssuesError.length > 0}>
+						<box style={{ height: 1, paddingLeft: 1, paddingRight: 1 }}>
+							<text fg={uiColors.error}>Error: {props.linkedIssuesError}</text>
+						</box>
+					</Show>
+
+					<Show when={!props.linkedIssuesLoading && !props.linkedIssuesError && (!props.linkedIssues || props.linkedIssues.length === 0)}>
+						<box style={{ height: 1, paddingLeft: 1, paddingRight: 1 }}>
+							<text fg={uiColors.textMuted}>No linked issues</text>
+						</box>
+					</Show>
+
+					<Show when={!props.linkedIssuesLoading && !props.linkedIssuesError && (props.linkedIssues?.length ?? 0) > 0}>
+						<For each={(props.linkedIssues ?? []).slice(0, 2)}>
+							{(iss) => (
+								<box style={{ height: 1, flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}>
+									<text fg={uiColors.primary}>#{iss.iid}</text>
+									<text fg={uiColors.textSecondary}>{iss.state === "opened" || iss.state === "open" ? " ○ " : " ◌ "}</text>
+									<RunningText text={iss.title} width={linkedIssueTitleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+								</box>
+							)}
+						</For>
+					</Show>
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* DISCUSSIONS PANEL - Fixed height summary */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Discussions"
 					style={{
 						width: "100%",
-						height: 6,
+						height: discussionsPanelHeight(),
 						flexShrink: 0,
 						flexDirection: "column",
 					}}
@@ -855,20 +600,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Discussions
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.discussionsLoading}>
 							<box
@@ -962,16 +693,16 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</box>
 						</Show>
 					</box>
-				</box>
+				</DetailSection>
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
 				{/* TEST RESULTS PANEL - Fixed height summary */}
-				<box
-					backgroundColor={uiColors.bgMantle}
+				<DetailSection
+					title="Test Results"
 					style={{
 						width: "100%",
-						height: 8,
+						height: testResultsPanelHeight(),
 						flexShrink: 0,
 						flexDirection: "column",
 					}}
@@ -979,20 +710,6 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<box
 						style={{ width: "100%", flexShrink: 0, flexDirection: "column" }}
 					>
-						{/* Title */}
-						<box
-							style={{ width: "100%", height: 1 }}
-							paddingLeft={1}
-							paddingRight={1}
-						>
-							<text
-								fg={uiColors.borderHighlight}
-								attributes={TextAttributes.BOLD}
-							>
-								Test Results
-							</text>
-						</box>
-
 						{/* Loading State */}
 						<Show when={props.testLoading}>
 							<box
@@ -1026,7 +743,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 								paddingLeft={1}
 								paddingRight={1}
 							>
-								<text fg={uiColors.textMuted}>No test results available</text>
+								<text fg={uiColors.textSecondary}>{props.testResultsUnsupported ? 'Test results are only available for GitLab CI' : 'No test results available'}</text>
 							</box>
 						</Show>
 
@@ -1105,7 +822,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 							</box>
 						</Show>
 					</box>
-				</box>
+				</DetailSection>
 			</box>
 		</box>
 	</ContentFrame>

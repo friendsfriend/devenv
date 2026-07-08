@@ -19,7 +19,7 @@ export async function handleCrDetailKeys(
 	_ctx: KeyboardContext,
 ): Promise<boolean> {
 	const { appStore, changeRequestStore } = stores;
-	const { appActions, crActions, pipelineActions, helpActions } = actions;
+	const { crActions, pipelineActions, helpActions } = actions;
 
 	if (appStore.viewMode() !== "changeRequestDetail") return false;
 
@@ -96,10 +96,6 @@ export async function handleCrDetailKeys(
 
 	// --- Normal CR detail keys ---
 
-	if (event.name === "q" || event.name === "Q") {
-		appActions.exitApp();
-		return true;
-	}
 	if (event.name === "?" || event.sequence === "?") {
 		helpActions.showHelp();
 		return true;

@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { Show } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from "../colors";
@@ -19,12 +20,11 @@ function AssigneeRow(props: {
 	isSelected: boolean;
 	isCurrentAssignee: boolean;
 }) {
-	const cursor = () => (props.isSelected ? "► " : "  ");
-	const badge = () => (props.isCurrentAssignee ? "✓ " : "  ");
+		const badge = () => (props.isCurrentAssignee ? "✓ " : "  ");
 
 	return (
 		<box
-			backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+			backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
 			style={{
 				width: "100%",
 				height: 1,
@@ -36,7 +36,6 @@ function AssigneeRow(props: {
 				fg={uiColors.textPrimary}
 				attributes={props.isSelected ? TextAttributes.BOLD : undefined}
 			>
-				{cursor()}
 				{badge()}
 				{props.name}
 				{props.isCurrentAssignee ? " (current)" : ""}
@@ -64,7 +63,6 @@ export function AssigneePickerModal(props: AssigneePickerModalProps) {
 					heightPercent={0.5}
 					items={props.collaborators}
 					selectedIndex={props.selectedIndex}
-					reservedHeight={3}
 					scrollIndicatorLabel="collaborators"
 					renderItem={(item, isSelected) => (
 						<AssigneeRow

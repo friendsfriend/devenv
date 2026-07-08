@@ -1,7 +1,9 @@
+/** @jsxImportSource @opentui/solid */
 import { createSignal, onMount, createEffect, For, type JSX } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
+import { highlightColor } from './Highlight';
 
 export interface LogViewProps {
   /** Log content to display */

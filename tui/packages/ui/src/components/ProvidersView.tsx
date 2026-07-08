@@ -1,9 +1,11 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, For } from 'solid-js';
 import { uiColors } from '../colors';
 import type { Provider } from '@devenv/types';
-import { ContentPanel } from './ContentStack';
 import { CenteredState } from './CenteredState';
+import { GenericModal } from './GenericModal';
+import { formatHelpText } from './HelpText';
 
 interface ProvidersViewProps {
   providers: Provider[];
@@ -25,7 +27,19 @@ export function ProvidersView(props: ProvidersViewProps) {
   };
 
   return (
-    <ContentPanel>
+    <GenericModal
+      title="Providers"
+      helpText={formatHelpText([
+        { key: 'j/k', action: 'Navigate' },
+        { key: 'a', action: 'Add' },
+        { key: 'e', action: 'Edit' },
+        { key: 'd', action: 'Delete' },
+        { key: 'Esc', action: 'Close' },
+      ])}
+      widthPercent={0.65}
+      heightPercent={0.55}
+      onBackdropClick={props.onClose}
+    >
       <Show when={props.loading}>
         <CenteredState message="Loading providers..." color={uiColors.primary} />
       </Show>
@@ -35,22 +49,7 @@ export function ProvidersView(props: ProvidersViewProps) {
       </Show>
 
       <Show when={!props.loading && !props.error}>
-        <box
-          style={{
-            width: '100%',
-            height: '100%',
-            flexDirection: 'column',
-            paddingLeft: 2,
-            paddingRight: 2,
-          }}
-        >
-          <box style={{ width: '100%' }}>
-            <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-              Providers
-            </text>
-            <text fg={uiColors.textMuted}>{'  (a: add, e: edit, d: delete)'}</text>
-          </box>
-
+        <box style={{ width: '100%', height: '100%', flexDirection: 'column' }}>
           <Show when={props.providers.length === 0}>
             <box style={{ width: '100%', height: 1, flexShrink: 0 }}>
               <text fg={uiColors.textMuted}>No providers configured. Press 'a' to add one.</text>
@@ -67,38 +66,35 @@ export function ProvidersView(props: ProvidersViewProps) {
           <For each={props.providers}>
             {(provider: Provider, idx) => {
               const isSelected = () => (props.selectedProviderIndex ?? -1) === idx();
-              const typeLabel = provider.type === 'github' ? 'GitHub' : 'GitLab';
+              const typeIcon = provider.type === 'github' ? '' : '';
 
               return (
-                <box style={{ width: '100%', flexDirection: 'row', height: 1, flexShrink: 0 }}>
+                <box
+                  style={{ width: '100%', flexDirection: 'row', height: 1, flexShrink: 0 }}
+                  backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+                >
                   <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                    {isSelected() ? '▸ ' : '  '}
-                  </text>
-                  <box style={{ width: 20 }}>
-                    <text
-                      fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
-                      attributes={isSelected() ? TextAttributes.BOLD : undefined}
-                    >
-                      {provider.name}
                     </text>
-                  </box>
-                  <box style={{ width: 10 }}>
-                    <text fg={provider.invalid ? uiColors.warning : uiColors.textSecondary}>{provider.invalid ? 'Invalid' : typeLabel}</text>
-                  </box>
-                  <box style={{ width: 20 }}>
-                    <text fg={uiColors.textSecondary}>
-                      {provider.invalid ? '(blocked)' : provider.username || '(no user)'}
-                    </text>
-                  </box>
-                  <text fg={getSecretColor(provider)}>
-                    {renderSecret(provider)}
+                  <text
+                    fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
+                    attributes={isSelected() ? TextAttributes.BOLD : undefined}
+                  >
+                    {provider.name}
                   </text>
+                  <text fg={uiColors.textMuted}>  {typeIcon}</text>
+                  <text fg={provider.invalid ? uiColors.warning : uiColors.textMuted}>  {provider.invalid ? 'Invalid' : (provider.username || '(no user)')}</text>
+                  <Show when={provider.invalid}>
+                    <text fg={uiColors.textMuted}> (blocked)</text>
+                  </Show>
+                  <box style={{ marginLeft: 'auto' }}>
+                    <text fg={getSecretColor(provider)} attributes={TextAttributes.BOLD}>{renderSecret(provider)}</text>
+                  </box>
                 </box>
               );
             }}
           </For>
         </box>
       </Show>
-</ContentPanel>
+    </GenericModal>
   );
 }

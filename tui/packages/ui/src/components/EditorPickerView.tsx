@@ -1,7 +1,9 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
 
 export type EditorChoice = 'nvim' | 'vscode' | 'intellij';
 
@@ -26,11 +28,10 @@ function EditorRow(props: {
   option: EditorOption;
   isSelected: boolean;
 }) {
-  const cursor = () => props.isSelected ? '► ' : '  ';
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 1,
@@ -43,9 +44,9 @@ function EditorRow(props: {
         fg={props.isSelected ? uiColors.primary : uiColors.textPrimary}
         attributes={props.isSelected ? TextAttributes.BOLD : undefined}
       >
-        {cursor()}{props.option.label}
+        {props.option.label}
       </text>
-      <text fg={uiColors.textSecondary}>
+      <text fg={highlightColor('secondary')}>
         {'  '}{props.option.description}
       </text>
     </box>
@@ -65,7 +66,6 @@ export function EditorPickerView(props: EditorPickerViewProps) {
       heightPercent={0.3}
       items={props.options}
       selectedIndex={props.selectedIndex}
-      reservedHeight={4}
       scrollIndicatorLabel="editors"
       renderItem={(option, isSelected) => (
         <EditorRow option={option} isSelected={isSelected()} />

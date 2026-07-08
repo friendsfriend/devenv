@@ -35,6 +35,10 @@ type Logger interface {
 	ReadRecentLogEntries(maxEntries int) ([]LogEntry, error)
 	// ReadAppLogs reads log entries for a specific app.
 	ReadAppLogs(appIdent string, maxEntries int) (string, error)
+	// ReadAppLogHistory reads older raw command log lines for a specific app before a byte offset.
+	ReadAppLogHistory(appIdent string, beforeOffset int64, maxLines int) (lines []string, nextBeforeOffset int64, hasMore bool, err error)
+	// CleanOldLogEntries removes entries in the unified status log older than maxAge.
+	CleanOldLogEntries(maxAge time.Duration) error
 	// RunCommandWithLogging executes a command and logs the result.
 	RunCommandWithLogging(appIdent, command string, args []string, envVars []string, workingDir string) (error, string)
 	// RunCommandWithLoggingToFile executes a command and streams stdout/stderr to logPath.
@@ -62,7 +66,7 @@ const (
 
 	// Status types
 	StatusPending    StatusType = "pending"
-	StatusInProgress StatusType = "in_progress"
+	StatusInProgress StatusType = "in progress"
 	StatusCompleted  StatusType = "completed"
 	StatusFailed     StatusType = "failed"
 	StatusCancelled  StatusType = "cancelled"
@@ -473,6 +477,73 @@ func (l *fileLogger) readRawIndividualAppLog(appIdent string) (string, error) {
 	return string(content), nil
 }
 
+func (l *fileLogger) ReadAppLogHistory(appIdent string, beforeOffset int64, maxLines int) ([]string, int64, bool, error) {
+	logFilePath := filepath.Join(l.homeDir, "logs", appIdent+".log")
+	return ReadLinesBefore(logFilePath, beforeOffset, maxLines)
+}
+
+func ReadLinesBefore(path string, beforeOffset int64, maxLines int) ([]string, int64, bool, error) {
+	if maxLines <= 0 {
+		maxLines = 1000
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, 0, false, nil
+		}
+		return nil, 0, false, err
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return nil, 0, false, err
+	}
+	if beforeOffset <= 0 || beforeOffset > info.Size() {
+		beforeOffset = info.Size()
+	}
+	if beforeOffset == 0 {
+		return []string{}, 0, false, nil
+	}
+
+	const chunkSize int64 = 32 * 1024
+	pos := beforeOffset
+	buf := make([]byte, 0, chunkSize*2)
+	lineCount := 0
+
+	for pos > 0 && lineCount <= maxLines {
+		readSize := chunkSize
+		if pos < readSize {
+			readSize = pos
+		}
+		pos -= readSize
+		chunk := make([]byte, readSize)
+		if _, err := file.ReadAt(chunk, pos); err != nil && err != io.EOF {
+			return nil, 0, false, err
+		}
+		buf = append(chunk, buf...)
+		lineCount = bytes.Count(buf, []byte{'\n'})
+	}
+
+	if len(buf) > 0 && buf[len(buf)-1] == '\n' {
+		buf = buf[:len(buf)-1]
+	}
+	parts := strings.Split(string(buf), "\n")
+	if len(parts) > maxLines {
+		drop := len(parts) - maxLines
+		parts = parts[drop:]
+		consumed := 0
+		for i := 0; i < drop; i++ {
+			consumed += len(strings.Split(string(buf), "\n")[i]) + 1
+		}
+		pos += int64(consumed)
+	}
+	if len(parts) == 1 && parts[0] == "" {
+		parts = []string{}
+	}
+	return parts, pos, pos > 0, nil
+}
+
 func (l *fileLogger) readIndividualAppLog(appIdent string, maxEntries int) (string, error) {
 	logFilePath := filepath.Join(l.homeDir, "logs", appIdent+".log")
 	content, err := os.ReadFile(logFilePath)
@@ -488,6 +559,64 @@ func (l *fileLogger) readIndividualAppLog(appIdent string, maxEntries int) (stri
 		lines = lines[len(lines)-maxLines:]
 	}
 	return strings.Join(lines, "\n"), nil
+}
+
+func (l *fileLogger) CleanOldLogEntries(maxAge time.Duration) error {
+	logFilePath := l.logFilePath
+
+	info, err := os.Stat(logFilePath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// If the file is newer than maxAge, skip entirely
+	if time.Since(info.ModTime()) < maxAge {
+		return nil
+	}
+
+	content, err := os.ReadFile(logFilePath)
+	if err != nil {
+		return err
+	}
+
+	lines := strings.Split(string(content), "\n")
+	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
+		return nil
+	}
+
+	cutoff := time.Now().Add(-maxAge)
+	var kept []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 2)
+		if len(parts) < 2 {
+			kept = append(kept, line)
+			continue
+		}
+		ts, err := time.Parse("2006-01-02 15:04:05", parts[0])
+		if err != nil {
+			// Can't parse timestamp — keep the line to be safe
+			kept = append(kept, line)
+			continue
+		}
+		if ts.After(cutoff) || ts.Equal(cutoff) {
+			kept = append(kept, line)
+		}
+	}
+
+	if len(kept) == len(lines) {
+		return nil // nothing to remove
+	}
+
+	// Write filtered lines back
+	output := strings.Join(kept, "\n") + "\n"
+	return os.WriteFile(logFilePath, []byte(output), 0644)
 }
 
 // logCommandToIndividualFile maintains backward compatibility with individual app log files

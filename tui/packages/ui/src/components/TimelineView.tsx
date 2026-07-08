@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { For, Show, createMemo } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
@@ -7,6 +8,10 @@ import { gitlabHtmlToMarkdown, containsHtml } from '../utils/gitlabHtml';
 import { calculateVisibleItems } from '../utils/virtualScroll';
 import { LAYOUT_CHROME_LINES } from './ScrollableList';
 import { ContentPanel } from './ContentStack';
+import { Badge } from './Badge';
+import { SearchHeader } from './SearchHeader';
+import { FilterStatusBar } from './FilterStatusBar';
+import { highlightColor, HighlightedText, type Highlight } from './Highlight';
 import type { Discussion, ChangeRequestChange, IssueComment, NotePosition } from '@devenv/types';
 
 // ── Normalized timeline item shared by CR discussions and issue comments ──
@@ -147,34 +152,46 @@ export function TimelineView(props: TimelineViewProps) {
     return item.notes.length > 0 && item.notes[0].system;
   };
 
+  const itemMeta = createMemo(() => {
+    const meta = new Map<TimelineItem, { isSystem: boolean; latest: number; resolved: boolean; outdated: boolean }>();
+    for (const item of props.items) {
+      const system = isSystemItem(item);
+      let latest = 0;
+      for (const note of item.notes) {
+        const noteTime = new Date(note.created_at).getTime();
+        if (noteTime > latest) latest = noteTime;
+      }
+      const resolvableNotes = item.notes.filter(n => n.resolvable);
+      const resolved = resolvableNotes.length > 0 && resolvableNotes.every(n => n.resolved);
+      const outdated = !!props.currentHeadSHA && !!item.position && item.position.head_sha !== props.currentHeadSHA;
+      meta.set(item, { isSystem: system, latest, resolved, outdated });
+    }
+    return meta;
+  });
+
+  const metaFor = (item: TimelineItem) => itemMeta().get(item) ?? { isSystem: isSystemItem(item), latest: 0, resolved: false, outdated: false };
+
   // Sort by newest first (based on most recent note)
   const sortedItems = createMemo(() => {
+    const meta = itemMeta();
     const filtered = props.showOnlyComments
-      ? props.items.filter(d => !isSystemItem(d))
+      ? props.items.filter(d => !meta.get(d)?.isSystem)
       : props.items;
-    return [...filtered].sort((a, b) => {
-      const aLatest = a.notes.reduce((latest, note) => {
-        const noteTime = new Date(note.created_at).getTime();
-        return noteTime > latest ? noteTime : latest;
-      }, 0);
-      const bLatest = b.notes.reduce((latest, note) => {
-        const noteTime = new Date(note.created_at).getTime();
-        return noteTime > latest ? noteTime : latest;
-      }, 0);
-      return bLatest - aLatest;
-    });
+    return [...filtered].sort((a, b) => (meta.get(b)?.latest ?? 0) - (meta.get(a)?.latest ?? 0));
   });
 
   const selectedItem = createMemo(() => {
     return sortedItems()[props.selectedIndex];
   });
 
+  const sortedItemHeights = createMemo(() => sortedItems().map(d => metaFor(d).isSystem ? 2 : 4));
+
   // Virtual scrolling
   const visibleItems = createMemo(() => {
     const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 2;
     const visibleHeight = dimensions().height - RESERVED_LINES;
     const items = sortedItems();
-    const itemHeights = items.map(d => isSystemItem(d) ? 2 : 4);
+    const itemHeights = sortedItemHeights();
     const result = calculateVisibleItems(items, {
       totalItems: items.length,
       selectedIndex: props.selectedIndex,
@@ -200,6 +217,23 @@ export function TimelineView(props: TimelineViewProps) {
     return date.toLocaleDateString();
   };
 
+  const getSystemNoteHighlight = (icon: string): Highlight => {
+    switch (icon) {
+      case '✓': return 'positive';
+      case '✗': return 'negative';
+      case '→': return 'highlight';
+      case '←': return 'secondary';
+      case '': return 'highlight1';
+      case '✕': return 'negative';
+      case '○': return 'warning';
+      case '@': return 'highlight2';
+      case '◆': return 'highlight3';
+      case '●': return 'highlight2';
+      case '↑': return 'positive';
+      default: return 'secondary';
+    }
+  };
+
   const getSystemNoteIcon = (body: string): string => {
     const plain = containsHtml(body) ? gitlabHtmlToMarkdown(body) : body;
     const lowerBody = plain.toLowerCase();
@@ -207,7 +241,7 @@ export function TimelineView(props: TimelineViewProps) {
     if (lowerBody.includes('unapproved')) return '✗';
     if (lowerBody.includes('assigned')) return '→';
     if (lowerBody.includes('unassigned')) return '←';
-    if (lowerBody.includes('merged')) return '⚡';
+    if (lowerBody.includes('merged')) return '';
     if (lowerBody.includes('closed')) return '✕';
     if (lowerBody.includes('reopened')) return '○';
     if (lowerBody.includes('mentioned')) return '@';
@@ -248,11 +282,7 @@ export function TimelineView(props: TimelineViewProps) {
     return pos.new_line ? `Line ${pos.new_line}` : pos.old_line ? `Line ${pos.old_line}` : '';
   };
 
-  const getItemResolved = (item: TimelineItem): boolean => {
-    const resolvableNotes = item.notes.filter(n => n.resolvable);
-    if (resolvableNotes.length === 0) return false;
-    return resolvableNotes.every(n => n.resolved);
-  };
+  const getItemResolved = (item: TimelineItem): boolean => metaFor(item).resolved;
 
   // ── Diff snippet (CR only) ────────────────────────────────────────────
 
@@ -320,13 +350,18 @@ export function TimelineView(props: TimelineViewProps) {
   // ── Stats ─────────────────────────────────────────────────────────────
 
   const stats = createMemo(() => {
+    let systemNotes = 0;
+    let resolved = 0;
+    let outdated = 0;
+    for (const item of props.items) {
+      const meta = metaFor(item);
+      if (meta.isSystem) systemNotes++;
+      else if (meta.resolved) resolved++;
+      if (meta.outdated) outdated++;
+    }
     const total = props.items.length;
-    const systemNotes = props.items.filter(d => isSystemItem(d)).length;
     const userComments = total - systemNotes;
-    const userItems = props.items.filter(d => !isSystemItem(d));
-    const resolved = userItems.filter(d => getItemResolved(d)).length;
-    const open = userItems.length - resolved;
-    const outdated = props.items.filter(d => isItemOutdated(d)).length;
+    const open = userComments - resolved;
     return { total, systemNotes, userComments, resolved, open, outdated };
   });
 
@@ -341,36 +376,40 @@ export function TimelineView(props: TimelineViewProps) {
     <ContentPanel>
       <Show when={props.loading}>
         <box style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
-          <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>Loading...</text>
+          <text fg={highlightColor('highlight')} attributes={TextAttributes.BOLD}>Loading...</text>
         </box>
       </Show>
 
       <Show when={props.error && props.error.length > 0}>
         <box style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}>
-          <text fg={uiColors.error} attributes={TextAttributes.BOLD}>{props.error}</text>
+          <text fg={highlightColor('negative')} attributes={TextAttributes.BOLD}>{props.error}</text>
         </box>
       </Show>
 
       <Show when={!props.loading && !props.error}>
         {/* Header */}
-        <box style={{ width: '100%', height: 2, flexDirection: 'column', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-          <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-            {props.title || (props.isIssueTimeline ? 'Timeline' : 'Discussions (' + stats().userComments + ' comments, ' + stats().systemNotes + ' events)')}
-            {props.showOnlyComments && <span style={{ fg: uiColors.primary }}> [comments only]</span>}
-          </text>
-          <Show when={!props.isIssueTimeline}>
-            <text fg={uiColors.textSecondary}>
-              <span style={{ fg: stats().resolved === stats().userComments ? uiColors.success : uiColors.warning }}>
-                {stats().resolved + '/' + stats().userComments + ' Resolved'}
-              </span>
-              {stats().outdated > 0 && <><span> • </span><span style={{ fg: uiColors.warning }}>{stats().outdated + ' Outdated'}</span></>}
-            </text>
-          </Show>
-        </box>
+        <SearchHeader>
+          <box style={{ width: '100%', flexDirection: 'row' }}>
+            <HighlightedText text={props.title || (props.isIssueTimeline ? 'Timeline' : 'Discussions')} highlight="primary" attributes={TextAttributes.BOLD} />
+            <Show when={props.showOnlyComments}>
+              <HighlightedText text=" [comments only]" highlight="highlight" />
+            </Show>
+            <box style={{ width: 'auto', marginLeft: 'auto' }}>
+              <HighlightedText text={`${stats().userComments} comments, ${stats().systemNotes} events`} highlight="secondary" />
+            </box>
+          </box>
+        </SearchHeader>
+
+        <Show when={!props.isIssueTimeline}>
+          <FilterStatusBar
+            filterSummary={`${stats().resolved}/${stats().userComments} Resolved`}
+            sortSummary={stats().outdated > 0 ? `${stats().outdated} Outdated` : undefined}
+          />
+        </Show>
 
         <Show when={sortedItems().length === 0}>
           <box style={{ width: '100%', flexGrow: 1, justifyContent: 'center', alignItems: 'center' }}>
-            <text fg={uiColors.textMuted}>
+            <text fg={highlightColor('secondary')}>
               {props.isIssueTimeline ? 'No timeline entries' : 'No discussions found'}
             </text>
           </box>
@@ -392,21 +431,29 @@ export function TimelineView(props: TimelineViewProps) {
                   const replyCount = item.notes.length - 1;
                   const isLast = () => absoluteIndex === sortedItems().length - 1;
 
-                  // Determine dot color
-                  const dotColor = () => {
-                    if (isSystem) return uiColors.textMuted;
-                    if (props.isIssueTimeline) return uiColors.primary;
-                    return resolved ? uiColors.success : uiColors.warning;
-                  };
-                  const dotChar = () => isSystem ? '○' : props.isIssueTimeline ? '●' : '●';
+                  const systemIcon = () => getSystemNoteIcon(firstNote.body);
+                  const systemHighlight = () => getSystemNoteHighlight(systemIcon());
 
                   return (
-                    <box backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+                    <box
+                      backgroundColor={isSelected() ? uiColors.bgSurface0 : undefined}
                       style={{ width: '100%', flexDirection: 'row', flexShrink: 0 }}>
+                      {/* Accent marker — same width whether selected or not to keep layout stable */}
+                      <Show when={isSelected()}>
+                        <box backgroundColor={uiColors.highlight} style={{ width: 2, flexShrink: 0 }} />
+                      </Show>
+                      <Show when={!isSelected()}>
+                        <box style={{ width: 2, flexShrink: 0 }} />
+                      </Show>
                       {/* Timeline gutter */}
-                      <box style={{ width: 3, flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                        <box style={{ width: 3, height: 1, justifyContent: 'center', alignItems: 'center' }}>
-                          <text fg={dotColor()} attributes={TextAttributes.BOLD}>{dotChar()}</text>
+                      <box style={{ width: 6, flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                        <box style={{ width: 6, height: 1, justifyContent: 'center', alignItems: 'center' }}>
+                          <Show when={isSystem}>
+                            <Badge text={systemIcon()} highlight={systemHighlight()} />
+                          </Show>
+                          <Show when={!isSystem}>
+                            <text fg={resolved ? highlightColor('positive') : highlightColor('warning')} attributes={TextAttributes.BOLD}>●</text>
+                          </Show>
                         </box>
                         <Show when={!isLast()}>
                           <box style={{ width: 1, flexGrow: 1, flexDirection: 'column' }}>
@@ -422,11 +469,10 @@ export function TimelineView(props: TimelineViewProps) {
                         {/* System note — compact single line */}
                         <Show when={isSystem}>
                           <box style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 1 }}>
-                            <text fg={uiColors.textMuted}>{getSystemNoteIcon(firstNote.body)}</text>
-                            <text fg={uiColors.textSecondary} attributes={TextAttributes.BOLD}>{firstNote.author?.name || 'System'}</text>
-                            <text fg={isSelected() ? uiColors.textSecondary : uiColors.textMuted}>{systemNoteActionLine(firstNote.body)}</text>
+                            <text fg={highlightColor('secondary')} attributes={TextAttributes.BOLD}>{firstNote.author?.name || 'System'}</text>
+                            <text fg={highlightColor('secondary')}>{systemNoteActionLine(firstNote.body)}</text>
                             <box style={{ marginLeft: 'auto' }}>
-                              <text fg={uiColors.textMuted} attributes={TextAttributes.DIM}>{formatTimestamp(firstNote.created_at)}</text>
+                              <text fg={highlightColor('secondary')} attributes={TextAttributes.DIM}>{formatTimestamp(firstNote.created_at)}</text>
                             </box>
                           </box>
                         </Show>
@@ -436,29 +482,27 @@ export function TimelineView(props: TimelineViewProps) {
                           <box style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between' }}>
                             <box flexDirection="row" gap={1}>
                               <Show when={!props.isIssueTimeline}>
-                                <text fg={resolved ? uiColors.success : uiColors.warning} attributes={TextAttributes.BOLD}>
-                                  {resolved ? '✓ Resolved' : '● Open'}
-                                </text>
+                                <Badge text={resolved ? 'Resolved' : 'Open'} highlight={resolved ? 'positive' : 'warning'} />
                               </Show>
                               <Show when={!props.isIssueTimeline}>
-                                <text fg={uiColors.textMuted} attributes={TextAttributes.DIM}>
+                                <text fg={highlightColor('secondary')} attributes={TextAttributes.DIM}>
                                   {filePath}{lineNumber && ` • ${lineNumber}`}
                                 </text>
                               </Show>
                             </box>
                             <box flexDirection="row" gap={0.5}>
-                              {!props.isIssueTimeline && outdated && <text fg={uiColors.warning}>⚠</text>}
-                              <text fg={uiColors.textMuted}>{formatTimestamp(firstNote.created_at)}</text>
+                              {!props.isIssueTimeline && outdated && <Badge text={'Outdated'} highlight={'negative'} />}
+                              <text fg={highlightColor('secondary')}>{formatTimestamp(firstNote.created_at)}</text>
                             </box>
                           </box>
                           <box style={{ width: '100%' }}>
-                            <text fg={isSelected() ? uiColors.textPrimary : uiColors.textSecondary} attributes={TextAttributes.BOLD}>
+                            <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>
                               {firstNote.author?.name || 'Unknown'}
                             </text>
                           </box>
                           <Show when={!props.isIssueTimeline && replyCount > 0}>
                             <box style={{ width: '100%' }}>
-                              <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
+                              <text fg={highlightColor('highlight')} attributes={TextAttributes.BOLD}>
                                 {`${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}`}
                               </text>
                             </box>
@@ -496,14 +540,14 @@ export function TimelineView(props: TimelineViewProps) {
                                   case 'added': return uiColors.diffAdded;
                                   case 'removed': return uiColors.diffRemoved;
                                   case 'context': return uiColors.diffContext;
-                                  default: return uiColors.textPrimary;
+                                  default: return highlightColor('primary');
                                 }
                               };
                               const signColor = () => {
                                 switch (line.type) {
                                   case 'added': return uiColors.diffAdded;
                                   case 'removed': return uiColors.diffRemoved;
-                                  default: return uiColors.textMuted;
+                                  default: return highlightColor('secondary');
                                 }
                               };
                               const lineNum = () => {
@@ -517,7 +561,7 @@ export function TimelineView(props: TimelineViewProps) {
                               };
                               return (
                                 <box flexDirection="row" backgroundColor={bgColor()} paddingLeft={1} paddingRight={1}>
-                                  <text fg={uiColors.textMuted} flexShrink={0} width={10}>{lineNum()}</text>
+                                  <text fg={highlightColor('secondary')} flexShrink={0} width={10}>{lineNum()}</text>
                                   <text fg={signColor()} flexShrink={0} width={2}>{sign()}</text>
                                   <text fg={fgColor()} flexGrow={1}>{line.content}</text>
                                 </box>
@@ -537,7 +581,7 @@ export function TimelineView(props: TimelineViewProps) {
                             <box style={{ width: '100%', flexDirection: 'row', flexShrink: 0 }}>
                               <box style={{ width: 4, flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
                                 <box style={{ width: 3, height: 1, justifyContent: 'center', alignItems: 'center' }}>
-                                  <text fg={note.system ? uiColors.textMuted : uiColors.primary}>
+                                  <text fg={note.system ? highlightColor('secondary') : highlightColor('highlight')}>
                                     {note.system ? '○' : '●'}
                                   </text>
                                 </box>
@@ -556,15 +600,15 @@ export function TimelineView(props: TimelineViewProps) {
                               </box>
                               <box style={{ flexGrow: 1, flexDirection: 'column', paddingLeft: 1, paddingBottom: 1.5 }}>
                                 <box flexDirection="row" gap={1}>
-                                  <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>{note.author?.name || 'Unknown'}</text>
-                                  <text fg={uiColors.textMuted}>{formatTimestamp(note.created_at)}</text>
+                                  <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>{note.author?.name || 'Unknown'}</text>
+                                  <text fg={highlightColor('secondary')}>{formatTimestamp(note.created_at)}</text>
                                 </box>
                                 <Show when={note.body}>
                                   <code filetype="markdown" content={note.system ? systemNoteToMarkdown(note.body) : note.body}
-                                    syntaxStyle={getMarkdownSyntaxStyle()} drawUnstyledText={true} fg={uiColors.textSecondary} />
+                                    syntaxStyle={getMarkdownSyntaxStyle()} drawUnstyledText={true} fg={highlightColor('secondary')} />
                                 </Show>
                                 <Show when={!note.body}>
-                                  <text fg={uiColors.textMuted}>(no content)</text>
+                                  <text fg={highlightColor('secondary')}>(no content)</text>
                                 </Show>
                               </box>
                             </box>
@@ -578,18 +622,18 @@ export function TimelineView(props: TimelineViewProps) {
                           <Show when={replyMode() === selectedItem()!.id}>
                             <box style={{ width: '100%', flexDirection: 'row', alignItems: 'center', gap: 1 }}>
                               <box style={{ width: 4, flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
-                                <text fg={uiColors.primary}>●</text>
+                                <text fg={highlightColor('highlight')}>●</text>
                               </box>
                               <box style={{ flexGrow: 1, flexDirection: 'row', alignItems: 'center', paddingLeft: 1 }}
                                 backgroundColor={uiColors.bgBase} border={true} borderStyle="single"
                                 borderColor={uiColors.borderHighlight} paddingLeft={1} paddingRight={1}>
-                                <text fg={uiColors.textPrimary}>{replyText() || 'Reply here...'}█</text>
+                                <text fg={highlightColor('primary')}>{replyText() || 'Reply here...'}█</text>
                               </box>
                             </box>
                           </Show>
                           <Show when={replyMode() !== selectedItem()!.id}>
                             <box style={{ width: '100%', flexDirection: 'row', gap: 1, paddingLeft: 4 }}>
-                              <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>[r] Reply to thread</text>
+                              <text fg={highlightColor('highlight')} attributes={TextAttributes.BOLD}>[r] Reply to thread</text>
                             </box>
                           </Show>
                         </box>

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -143,7 +144,7 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 		opStatus := s.getOperationStatus(a.Ident)
 
 		appRunStatus := s.appRuntimeStatus(a.Ident, dockerInfo)
-		statuses = append(statuses, AppStatusResponse{
+		resp := AppStatusResponse{
 			Ident:           a.Ident,
 			DockerInfo:      &dockerInfo,
 			GitStatus:       gitStatus,
@@ -151,7 +152,13 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 			ActiveWorktree:  a.ActiveWorktree,
 			OperationStatus: opStatus,
 			Status:          appRunStatus,
-		})
+		}
+		if s.services != nil && s.services.BuildService() != nil {
+			if info, ok := s.services.BuildService().RunTargetInfo(a.Ident); ok {
+				resp.RunTargetInfo = info
+			}
+		}
+		statuses = append(statuses, resp)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -302,6 +309,65 @@ func (s *Server) handleActionLog(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write(content)
+}
+
+func (s *Server) handleLogHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		respondMethodNotAllowed(w)
+		return
+	}
+
+	rawPath := strings.TrimPrefix(r.URL.Path, "/api/logs/history/")
+	parts := strings.SplitN(rawPath, "/", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		respondBadRequest(w, "Log type and app ident required")
+		return
+	}
+	logType, appIdent := parts[0], parts[1]
+
+	limit := 1000
+	if raw := r.URL.Query().Get("limit"); raw != "" {
+		if _, err := fmt.Sscanf(raw, "%d", &limit); err != nil || limit < 1 {
+			respondBadRequest(w, "Invalid limit parameter")
+			return
+		}
+	}
+	before := int64(0)
+	if raw := r.URL.Query().Get("before"); raw != "" {
+		if _, err := fmt.Sscanf(raw, "%d", &before); err != nil || before < 0 {
+			respondBadRequest(w, "Invalid before parameter")
+			return
+		}
+	}
+
+	var (
+		lines      []string
+		nextBefore int64
+		hasMore    bool
+		err        error
+	)
+
+	switch logType {
+	case "action", "operation", "script":
+		// action, operation, and script infra logs are all file-backed in {homeDir}/logs/{appIdent}.log
+		lines, nextBefore, hasMore, err = s.services.Logger().ReadAppLogHistory(appIdent, before, limit)
+	case "status":
+		statusLogPath := filepath.Join(s.services.HomeDir(), "logs", "status.log")
+		lines, nextBefore, hasMore, err = logging.ReadLinesBefore(statusLogPath, before, limit)
+	default:
+		respondBadRequest(w, "Unsupported log history type")
+		return
+	}
+
+	if err != nil {
+		respondErrorMessage(w, fmt.Sprintf("Failed to read log history: %v", err), http.StatusInternalServerError)
+		return
+	}
+	respondJSON(w, map[string]interface{}{
+		"lines":      lines,
+		"nextBefore": nextBefore,
+		"hasMore":    hasMore,
+	}, http.StatusOK)
 }
 
 func (s *Server) handleStatusLog(w http.ResponseWriter, r *http.Request) {

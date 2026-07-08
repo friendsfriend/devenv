@@ -1,10 +1,13 @@
-import { TextAttributes } from '@opentui/core';
-import { For, Show, createMemo } from 'solid-js';
-import { useTerminalDimensions } from '@opentui/solid';
+/** @jsxImportSource @opentui/solid */
+import { For, Show, type JSX } from 'solid-js';
 import type { KubernetesClusterStatus } from '@devenv/types';
 
 import { ScrollableContent } from './ScrollableContent';
 import { uiColors } from '../colors';
+import { highlightColor, HighlightedText } from './Highlight';
+import { ResourceTimelineCharts } from './ResourceTimelineCharts';
+import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
+import { SearchHeader } from './SearchHeader';
 
 export interface KubernetesClusterViewProps {
   status?: KubernetesClusterStatus | null;
@@ -15,10 +18,10 @@ export interface KubernetesClusterViewProps {
   height?: number;
 }
 
-function stateColor(state?: string): string {
-  if (state === 'running') return uiColors.success;
-  if (state === 'degraded' || state === 'unreachable') return uiColors.warning;
-  return uiColors.textMuted;
+function stateHighlight(state?: string) {
+  if (state === 'running') return 'positive' as const;
+  if (state === 'degraded' || state === 'unreachable') return 'warning' as const;
+  return 'secondary' as const;
 }
 
 export function kubernetesClusterSummaryLines(status?: KubernetesClusterStatus | null): string[] {
@@ -33,41 +36,53 @@ export function kubernetesClusterSummaryLines(status?: KubernetesClusterStatus |
   return lines;
 }
 
-function toHalfBlockSparkline(values: number[], width: number): { topRow: string; bottomRow: string } {
-  const topChars = [' ', '▂', '▄', '▆', '█'];
-  const botChars = [' ', '▂', '▄', '▆', '█'];
-  if (values.length === 0) return { topRow: ' '.repeat(width), bottomRow: ' '.repeat(width) };
-  const display = values.length > width ? values.slice(-width) : values;
-  const pad = width - display.length;
-  let top = '';
-  let bot = '';
-  for (const value of display) {
-    const clamped = Math.max(0, Math.min(100, value));
-    const height = Math.round((clamped / 100) * 8);
-    const botLevel = height === 0 ? 1 : Math.min(height, 4);
-    const topLevel = Math.max(0, height - 4);
-    bot += botChars[botLevel];
-    top += topChars[topLevel];
-  }
-  return { topRow: ' '.repeat(pad) + top, bottomRow: ' '.repeat(pad) + bot };
-}
-
 function formatMB(bytes: number): string {
   const mb = Math.round(bytes / (1024 * 1024));
   return `${mb}MB`;
+}
+
+function PanelHeader(props: { title: string; children?: JSX.Element }) {
+  return (
+    <SearchHeader>
+      <box style={{ width: '100%', flexDirection: 'row' }}>
+        <HighlightedText text={props.title} highlight="primary" />
+        {props.children}
+      </box>
+    </SearchHeader>
+  );
 }
 
 export function KubernetesClusterView(props: KubernetesClusterViewProps) {
   const s = () => props.status;
   const state = () => s()?.state ?? 'missing';
   const stats = () => s()?.stats;
-  const dimensions = useTerminalDimensions();
-  const labelWidth = 5;
-  const sparklineWidth = createMemo(() => {
-    const termWidth = dimensions().width;
-    const panelWidth = Math.floor(termWidth * 0.5);
-    return Math.max(5, panelWidth - 4 - labelWidth);
-  });
+  const clusterRows = (): PropertyRow[] => [
+    { label: 'State', value: propertyBadges([{ label: state(), highlight: stateHighlight(state()) }]) },
+    { label: 'Name', value: s()?.clusterName ?? 'devenv' },
+    { label: 'Context', value: s()?.contextName ?? 'kind-devenv' },
+    { label: 'Provider', value: s()?.provider || 'unknown', valueHighlight: 'secondary' },
+    { label: 'Exists', value: s()?.exists ? 'yes' : 'no', valueHighlight: s()?.exists ? 'positive' : 'negative' },
+    { label: 'Reachable', value: s()?.reachable ? 'yes' : 'no', valueHighlight: s()?.reachable ? 'positive' : 'negative' },
+    { label: 'Version', value: s()?.kubernetesVersion || 'n/a' },
+  ];
+  const podsText = () => `${s()?.pods.total ?? 0} total, ${s()?.pods.running ?? 0} running, ${s()?.pods.failed ?? 0} failed`;
+  const podStatusHighlight = (status: string) => {
+    if (status === 'Running' || status === 'Succeeded') return 'positive' as const;
+    if (status === 'Failed') return 'negative' as const;
+    if (status === 'Pending') return 'warning' as const;
+    return 'secondary' as const;
+  };
+  const workloadRows = (): PropertyRow[] => [
+    {
+      label: 'Pods',
+      value: (s()?.pods.failed ?? 0) > 0 ? propertyBadges([{ label: podsText(), highlight: 'negative' }]) : podsText(),
+    },
+    {
+      label: 'Namespaces',
+      value: (s()?.namespaces ?? []).map((ns) => `${ns.name}(${ns.pods})`).join(', ') || 'none',
+      valueHighlight: (s()?.namespaces ?? []).length > 0 ? 'secondary' : 'secondary',
+    },
+  ];
 
   return (
     <>
@@ -100,48 +115,16 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={stateColor(state())} attributes={TextAttributes.BOLD}>Cluster</text>
-              <Show when={props.loading}><text fg={uiColors.textMuted}> refreshing...</text></Show>
-            </box>
+            <PanelHeader title="Cluster">
+              <Show when={props.loading}><text fg={highlightColor('secondary')}> refreshing...</text></Show>
+            </PanelHeader>
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
-              <Show when={props.error} fallback={
-                <>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>State: </text>
-                    <text fg={stateColor(state())}>{state()}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Name: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.clusterName ?? 'devenv'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Context: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.contextName ?? 'kind-devenv'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Provider: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.provider || 'unknown'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Exists: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.exists ? 'yes' : 'no'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Reachable: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.reachable ? 'yes' : 'no'}</text>
-                  </box>
-                  <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Version: </text>
-                    <text fg={uiColors.textSecondary}>{s()?.kubernetesVersion || 'n/a'}</text>
-                  </box>
-                </>
-              }>
+              <Show when={props.error} fallback={<PropertiesList rows={clusterRows()} labelWidth={10} />}>
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.error}>Error: {props.error}</text>
+                  <text fg={highlightColor('negative')}>Error: {props.error}</text>
                 </box>
               </Show>
             </ScrollableContent>
@@ -158,64 +141,32 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                Resources
-              </text>
-            </box>
-            <ScrollableContent
-              axes={['x', 'y']}
-              style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
-            >
-              <Show when={stats() !== undefined} fallback={
-                <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No container resources — cluster may be missing or using podman</text>
-                </box>
-              }>
-                {(() => {
-                  const st = stats()!;
-                  const cpuSpark = () => toHalfBlockSparkline(props.cpuHistory ?? [], sparklineWidth());
-                  const memSpark = () => toHalfBlockSparkline(props.memoryHistory ?? [], sparklineWidth());
-                  return (
-                    <>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>CPU  </text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.primary}>{cpuSpark().topRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textSecondary}>{st.cpuPercent.toFixed(1)}%</text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.primary}>{cpuSpark().bottomRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ height: 1 }} />
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>MEM  </text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.success}>{memSpark().topRow}</text>
-                        </box>
-                      </box>
-                      <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1, height: 1 }}>
-                        <box style={{ width: labelWidth, flexShrink: 0 }}>
-                          <text fg={uiColors.textSecondary}>{formatMB(st.memoryUsageBytes)}/{formatMB(st.memoryLimitBytes)}</text>
-                        </box>
-                        <box style={{ flexGrow: 1, flexShrink: 0, marginLeft: 1 }}>
-                          <text fg={uiColors.success}>{memSpark().bottomRow}</text>
-                        </box>
-                      </box>
-                    </>
-                  );
-                })()}
-              </Show>
-            </ScrollableContent>
+            <PanelHeader title="Resources" />
+            <Show when={stats() !== undefined} fallback={
+              <box style={{ paddingLeft: 1, paddingRight: 1, flexGrow: 1 }}>
+                <text fg={highlightColor('secondary')}>No container resources — cluster may be missing or using podman</text>
+              </box>
+            }>
+              {(() => {
+                const st = stats()!;
+                return (
+                  <ResourceTimelineCharts
+                    cpu={{
+                      title: 'CPU',
+                      value: `${st.cpuPercent.toFixed(1)}%`,
+                      values: props.cpuHistory ?? [],
+                      color: uiColors.primary,
+                    }}
+                    memory={{
+                      title: 'MEM',
+                      value: `${formatMB(st.memoryUsageBytes)}/${formatMB(st.memoryLimitBytes)}`,
+                      values: props.memoryHistory ?? [],
+                      color: uiColors.success,
+                    }}
+                  />
+                );
+              })()}
+            </Show>
           </box>
         </box>
 
@@ -228,7 +179,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
             flexDirection: 'column',
           }}
         >
-          {/* Nodes Panel */}
+          {/* Pods Panel */}
           <box
             backgroundColor={uiColors.bgMantle}
             style={{
@@ -239,27 +190,21 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                Nodes
-              </text>
-            </box>
+            <PanelHeader title="Pods" />
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
-              <Show when={(s()?.nodes.length ?? 0) > 0} fallback={
+              <Show when={(s()?.podList?.length ?? 0) > 0} fallback={
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No node data</text>
+                  <text fg={highlightColor('secondary')}>No pod data</text>
                 </box>
               }>
-                <For each={s()?.nodes ?? []}>{(node) => (
-                  <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={node.ready ? uiColors.success : uiColors.error}>{node.ready ? '✓' : '×'}</text>
-                    <text fg={uiColors.textSecondary}>  {node.name}</text>
-                    <Show when={node.kubeletVersion}>
-                      <text fg={uiColors.textMuted}>  {node.kubeletVersion}</text>
-                    </Show>
+                <For each={s()?.podList ?? []}>{(pod) => (
+                  <box style={{ height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                    <box style={{ width: '45%', flexShrink: 0 }}><text fg={highlightColor('primary')}>{pod.name}</text></box>
+                    <box style={{ width: '20%', flexShrink: 0 }}><text fg={podStatusHighlight(pod.status) === 'positive' ? highlightColor('positive') : podStatusHighlight(pod.status) === 'negative' ? highlightColor('negative') : podStatusHighlight(pod.status) === 'warning' ? highlightColor('warning') : highlightColor('secondary')}>{pod.status}</text></box>
+                    <text fg={highlightColor('secondary')}>{pod.namespace}</text>
                   </box>
                 )}</For>
               </Show>
@@ -277,32 +222,21 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                Workloads
-              </text>
-            </box>
+            <PanelHeader title="Workloads" />
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
             >
-              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Pods: </text>
-                <text fg={uiColors.textSecondary}>{s()?.pods.total ?? 0} total, {s()?.pods.running ?? 0} running, {s()?.pods.failed ?? 0} failed</text>
-              </box>
-              <box style={{ flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
-                <text fg={uiColors.textMuted} attributes={TextAttributes.BOLD}>Namespaces: </text>
-                <text fg={uiColors.textSecondary}>{(s()?.namespaces ?? []).map((ns) => `${ns.name}(${ns.pods})`).join(', ') || 'none'}</text>
-              </box>
+              <PropertiesList rows={workloadRows()} labelWidth={12} />
               <Show when={(s()?.releases.length ?? 0) > 0} fallback={
                 <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                  <text fg={uiColors.textMuted}>No DevEnv Helm releases</text>
+                  <text fg={highlightColor('secondary')}>No DevEnv Helm releases</text>
                 </box>
               }>
                 <For each={s()?.releases ?? []}>{(release) => (
                   <box style={{ paddingLeft: 1, paddingRight: 1 }}>
-                    <text fg={uiColors.textSecondary}>{release.namespace}/{release.name}</text>
-                    <text fg={uiColors.textMuted}>  {release.status} {release.chart || ''}</text>
+                    <text fg={highlightColor('secondary')}>{release.namespace}/{release.name}</text>
+                    <text fg={highlightColor('secondary')}>  {release.status} {release.chart || ''}</text>
                   </box>
                 )}</For>
               </Show>

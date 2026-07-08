@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
 import { Show, createMemo } from 'solid-js';
 import { uiColors } from '../colors';
@@ -6,6 +7,10 @@ import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
 import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
 import { ContentPanel } from './ContentStack';
+import { FilterStatusBar } from './FilterStatusBar';
+import { HighlightedText, highlightColor } from './Highlight';
+import { Badge } from './Badge';
+import { MatchedText } from './MatchedText';
 
 interface TestResultsDetailViewProps {
   testSuites?: TestSuite[];
@@ -15,6 +20,9 @@ interface TestResultsDetailViewProps {
   onClose: () => void;
   searchMode?: boolean;
   searchQuery?: string;
+  filterSummary?: string;
+  sortSummary?: string;
+  testResultsUnsupported?: boolean;
 }
 
 /**
@@ -74,23 +82,8 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
   //   Inner rounded border top + bottom        = 2
   //   Inner table header row                   = 1
   //                                     Total  = 13
-  const RESERVED_LINES = LAYOUT_CHROME_LINES + 2 + 2 + 2 + 1;
-
-  // Get status icon and color
-  const getStatusDisplay = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'success':
-        return { icon: '✓', color: uiColors.success };
-      case 'failed':
-        return { icon: '✗', color: uiColors.error };
-      case 'error':
-        return { icon: '⚠', color: uiColors.error };
-      case 'skipped':
-        return { icon: '○', color: uiColors.textMuted };
-      default:
-        return { icon: '?', color: uiColors.textSecondary };
-    }
-  };
+  const hasFilterStatus = () => !!props.filterSummary || !!props.sortSummary;
+  const reservedLines = () => LAYOUT_CHROME_LINES + 2 + 2 + 2 + 1 + (hasFilterStatus() ? 1 : 0);
 
   // Format execution time
   const formatTime = (seconds: number) => {
@@ -104,21 +97,19 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
     <ContentPanel>
       {/* Header */}
       <box style={{ width: '100%', height: 1, marginBottom: 1 }}>
-        <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-          Test Results (ESC to go back)
-        </text>
+        <HighlightedText text="Test Results" highlight="primary" attributes={TextAttributes.BOLD} />
       </box>
 
       <Show when={props.loading}>
-        <CenteredState message="Loading test results..." color={uiColors.warning} height={1} />
+        <CenteredState message="Loading test results..." color={highlightColor('highlight')} height={1} />
       </Show>
 
       <Show when={!props.loading && props.error}>
-        <CenteredState message={`Error: ${props.error}`} color={uiColors.error} height={1} />
+        <CenteredState message={`Error: ${props.error}`} color={highlightColor('negative')} height={1} />
       </Show>
 
       <Show when={!props.loading && !props.error && (!props.testSuites || props.testSuites.length === 0)}>
-        <CenteredState message="No test results available" height={1} />
+        <CenteredState message={props.testResultsUnsupported ? 'Test results are only available for GitLab CI' : 'No test results available'} color={highlightColor('secondary')} height={1} />
       </Show>
 
       {/* Test Results Table */}
@@ -136,65 +127,55 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
           <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={filteredTests().length}>
                 <>
                   <box style={{ width: '65%' }}>
-                    <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                      Test Name
-                    </text>
+                    <HighlightedText text="Test Name" highlight="primary" attributes={TextAttributes.BOLD} />
                   </box>
                   <box style={{ width: '15%' }}>
-                    <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                      Time
-                    </text>
+                    <HighlightedText text="Time" highlight="primary" attributes={TextAttributes.BOLD} />
                   </box>
                   <box style={{ width: '20%' }}>
-                    <text fg={uiColors.textPrimary} attributes={TextAttributes.BOLD}>
-                      Status
-                    </text>
+                    <HighlightedText text="Status" highlight="primary" attributes={TextAttributes.BOLD} />
                   </box>
                 </>
           </SearchHeader>
+
+          <FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
 
           {/* Table Body — rendered via ScrollableList */}
           <ScrollableList<TestCase & { suiteName: string }>
             items={filteredTests()}
             selectedIndex={props.selectedIndex}
-            reservedLines={RESERVED_LINES}
+            reservedLines={reservedLines()}
             estimatedItemHeight={1}
             showScrollIndicator={false}
             renderItem={(test, isSelected) => {
-              const display = getStatusDisplay(test.status);
-              const isFailed = test.status === 'failed' || test.status === 'error';
+              const statusHighlight = test.status === 'failed' || test.status === 'error' ? 'negative' as const : test.status === 'success' ? 'positive' as const : test.status === 'skipped' ? 'secondary' as const : 'warning' as const;
               const testName = `${test.classname}.${test.name}`;
               return (
                 <box
-                  backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
+                  backgroundColor={isSelected() ? uiColors.bgSurface0 : undefined}
                   style={{
                     width: '100%',
                     height: 1,
                     flexDirection: 'row',
-                    paddingLeft: 1,
-                    paddingRight: 1,
                   }}
                 >
-                  <box style={{ width: '65%' }}>
-                    <text
-                      fg={isSelected() ? uiColors.textPrimary : display.color}
-                      attributes={isFailed ? TextAttributes.BOLD : undefined}
-                    >
-                      {testName}
-                    </text>
-                  </box>
-                  <box style={{ width: '15%' }}>
-                    <text fg={isSelected() ? uiColors.textPrimary : uiColors.textMuted}>
-                      {formatTime(test.execution_time)}
-                    </text>
-                  </box>
-                  <box style={{ width: '20%' }}>
-                    <text
-                      fg={isSelected() ? uiColors.textPrimary : display.color}
-                      attributes={isFailed ? TextAttributes.BOLD : undefined}
-                    >
-                      {test.status}
-                    </text>
+                  {/* Accent marker */}
+                  <box
+                    backgroundColor={isSelected() ? uiColors.highlight : undefined}
+                    style={{ width: 2, flexShrink: 0 }}
+                  />
+                  <box style={{ flexGrow: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
+                    <box style={{ width: '65%' }}>
+                      <MatchedText text={testName} query={props.searchQuery} fg={highlightColor(isSelected() ? 'primary' : 'secondary')} />
+                    </box>
+                    <box style={{ width: '15%' }}>
+                      <text fg={highlightColor('secondary')}>
+                        {formatTime(test.execution_time)}
+                      </text>
+                    </box>
+                    <box style={{ width: '20%' }}>
+                      <Badge text={test.status} highlight={statusHighlight} />
+                    </box>
                   </box>
                 </box>
               );

@@ -1,4 +1,5 @@
 import { uiColors } from './colors';
+import { highlightColor } from './components/Highlight';
 
 /**
  * Status styling utilities matching the Go TUI implementation
@@ -112,11 +113,11 @@ export function getIssueStateColor(state: string): string {
   switch (state.toLowerCase()) {
     case 'open':
     case 'opened':
-      return uiColors.success;
+      return highlightColor('positive');
     case 'merged':
-      return uiColors.primary;
+      return highlightColor('highlight');
     case 'closed':
-      return uiColors.textMuted;
+      return highlightColor('secondary');
     default:
       return uiColors.textSecondary;
   }

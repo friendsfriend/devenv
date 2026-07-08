@@ -1,9 +1,12 @@
+/** @jsxImportSource @opentui/solid */
 import { Show, createMemo } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import type { AgentGroup, AgentSessionInfo } from '@devenv/types';
 import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
+import { highlightColor } from './Highlight';
+import { MatchedText } from './MatchedText';
 
 export interface AgentSpaceViewProps {
   piAgentGroups: AgentGroup[];
@@ -42,17 +45,15 @@ export function getSelectableRows(rows: FlatRow[]): Array<{ row: FlatRow; flatIn
   return result;
 }
 
-function RowView(props: { row: FlatRow; isSelected: boolean }) {
-  const cursor = () => (props.isSelected ? '►' : ' ');
+function RowView(props: { row: FlatRow; isSelected: boolean; query?: string }) {
 
   if (props.row.kind === 'new') {
     return (
       <box
-        backgroundColor={props.isSelected ? uiColors.bgSurface1 : undefined}
+        backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
         style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1 }}
       >
-        <text fg={props.isSelected ? uiColors.primary : uiColors.textMuted}>{cursor()} </text>
-        <text
+          <text
           fg={props.isSelected ? uiColors.success : uiColors.textMuted}
           attributes={props.isSelected ? TextAttributes.BOLD : undefined}
         >
@@ -64,21 +65,21 @@ function RowView(props: { row: FlatRow; isSelected: boolean }) {
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface1 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1 }}
     >
-      <text fg={props.isSelected ? uiColors.primary : uiColors.textSecondary}>{cursor()} </text>
-      <text fg={uiColors.textMuted} style={{ flexShrink: 0 }}>
+      <text fg={highlightColor('secondary')} style={{ flexShrink: 0 }}>
         {`[${props.row.agentName}] `}
       </text>
-      <text
-        fg={props.isSelected ? uiColors.textPrimary : uiColors.textSecondary}
-        attributes={props.isSelected ? TextAttributes.BOLD : undefined}
-        style={{ flexGrow: 1 }}
-      >
-        {props.row.session.title || '(untitled)'}
-      </text>
-      <text fg={uiColors.textMuted}>
+      <box style={{ flexGrow: 1, overflow: 'hidden' }}>
+        <MatchedText
+          text={props.row.session.title || '(untitled)'}
+          query={props.query}
+          fg={props.isSelected ? uiColors.textPrimary : uiColors.textSecondary}
+          attributes={props.isSelected ? TextAttributes.BOLD : undefined}
+        />
+      </box>
+      <text fg={highlightColor('secondary')}>
         {` ${formatRelativeTime(props.row.session.timeUpdated)}`}
       </text>
     </box>
@@ -139,15 +140,14 @@ export function AgentSpaceView(props: AgentSpaceViewProps) {
       selectedIndex={selectedFlatIndex()}
       loading={props.sessionsLoading}
       loadingText="Loading sessions..."
-      reservedHeight={4}
       filterPlaceholder="filter sessions..."
       scrollIndicatorLabel="sessions"
       filterQuery={props.filterQuery}
       filterActive={props.filterActive}
       onFilterChange={props.onFilterChange}
-      emptyContent={<text fg={uiColors.textMuted}>No sessions found.</text>}
+      emptyContent={<text fg={highlightColor('secondary')}>No sessions found.</text>}
       renderItem={(item, isSelected) => (
-        <RowView row={item} isSelected={isSelected()} />
+        <RowView row={item} isSelected={isSelected()} query={props.searchQuery} />
       )}
     />
   );

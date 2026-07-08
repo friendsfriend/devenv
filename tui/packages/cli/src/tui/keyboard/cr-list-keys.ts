@@ -1,11 +1,11 @@
 import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } from './types';
 
-import { isDownKey, isUpKey } from './nav-keys';
+import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
 import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 /**
  * Handles keyboard events for the CR list view:
  * - Search mode (type query, clear)
- * - q to quit, / to search, ESC to go back
+ * - / to search, ESC to go back
  * - Enter to select CR
  * - j/k/g/G for navigation
  */
@@ -16,7 +16,7 @@ export async function handleCrListKeys(
   _ctx: KeyboardContext,
 ): Promise<boolean> {
   const { appStore, changeRequestStore } = stores;
-  const { appActions, crActions } = actions;
+  const { crActions } = actions;
 
   if (appStore.viewMode() !== 'changeRequests') return false;
 
@@ -57,13 +57,55 @@ export async function handleCrListKeys(
     return true; // swallow all other keys
   }
 
-  const crs = changeRequestStore.changeRequests();
-
-  // q to quit
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
+  if (changeRequestStore.showCrListFilterModal()) {
+    const params = changeRequestStore.crListFilterParameters();
+    const param = params[changeRequestStore.crListFilterParameterIndex()];
+    const values = param?.values ?? [];
+    if (event.name === 'x') { changeRequestStore.setCrListFilters({ state: [] }); changeRequestStore.setSelectedCRIndex(0); void crActions.loadAllChangeRequests(1, changeRequestStore.searchTerm() || undefined); return true; }
+    if (isLeftKey(event)) { changeRequestStore.setCrListFilterFocusedPane('parameter'); return true; }
+    if (isRightKey(event)) { changeRequestStore.setCrListFilterFocusedPane('value'); return true; }
+    if (isDownKey(event)) {
+      if (changeRequestStore.crListFilterFocusedPane() === 'parameter') { changeRequestStore.setCrListFilterParameterIndex(Math.min(changeRequestStore.crListFilterParameterIndex() + 1, params.length - 1)); changeRequestStore.setCrListFilterValueIndex(0); }
+      else changeRequestStore.setCrListFilterValueIndex(Math.min(changeRequestStore.crListFilterValueIndex() + 1, values.length - 1));
+      return true;
+    }
+    if (isUpKey(event)) {
+      if (changeRequestStore.crListFilterFocusedPane() === 'parameter') { changeRequestStore.setCrListFilterParameterIndex(Math.max(changeRequestStore.crListFilterParameterIndex() - 1, 0)); changeRequestStore.setCrListFilterValueIndex(0); }
+      else changeRequestStore.setCrListFilterValueIndex(Math.max(changeRequestStore.crListFilterValueIndex() - 1, 0));
+      return true;
+    }
+    if (event.name === 'space' || event.sequence === ' ') {
+      const value = values[changeRequestStore.crListFilterValueIndex()]?.value;
+      if (param && value) {
+        const filters = { ...changeRequestStore.crListFilters() };
+        const current = filters[param.key] ?? [];
+        filters[param.key] = current.includes(value) ? current.filter((item) => item !== value) : [value];
+        changeRequestStore.setCrListFilters(filters);
+        changeRequestStore.setSelectedCRIndex(0);
+        void crActions.loadAllChangeRequests(1, changeRequestStore.searchTerm() || undefined);
+      }
+      return true;
+    }
+    if (event.name === 'enter' || event.name === 'return' || event.name === 'escape' || event.name === 'q') { changeRequestStore.setShowCrListFilterModal(false); return true; }
     return true;
   }
+
+  if (changeRequestStore.showCrListSortModal()) {
+    const rules = changeRequestStore.crListSortRules();
+    const idx = changeRequestStore.crListSortSelectedIndex();
+    const cycle = (d: 'asc' | 'desc' | 'none') => d === 'none' ? 'asc' : d === 'asc' ? 'desc' : 'none';
+    if (event.name === 'x') { changeRequestStore.setCrListSortRules(rules.map((rule) => ({ ...rule, direction: 'none' }))); void crActions.loadAllChangeRequests(1, changeRequestStore.searchTerm() || undefined); return true; }
+    if (isDownKey(event)) { changeRequestStore.setCrListSortSelectedIndex(Math.min(idx + 1, rules.length - 1)); return true; }
+    if (isUpKey(event)) { changeRequestStore.setCrListSortSelectedIndex(Math.max(idx - 1, 0)); return true; }
+    if (event.name === 'space' || event.sequence === ' ') { changeRequestStore.setCrListSortRules(rules.map((rule, i) => i === idx ? { ...rule, direction: cycle(rule.direction) } : rule)); void crActions.loadAllChangeRequests(1, changeRequestStore.searchTerm() || undefined); return true; }
+    if (event.name === 'enter' || event.name === 'return' || event.name === 'escape' || event.name === 'q') { changeRequestStore.setShowCrListSortModal(false); return true; }
+    return true;
+  }
+
+  const crs = changeRequestStore.changeRequests();
+
+  if (event.name === 'F' || (event.name === 'f' && event.shift)) { changeRequestStore.setShowCrListFilterModal(true); return true; }
+  if (event.name === 'O' || (event.name === 'o' && event.shift)) { changeRequestStore.setShowCrListSortModal(true); return true; }
 
   // '/' to enter search mode
   if (event.name === '/' || event.sequence === '/') {
@@ -106,15 +148,12 @@ export async function handleCrListKeys(
     return true;
   }
 
-  // s to toggle CR state — works even when list is empty (lets user switch filter)
+  // s cycles state filter: opened → merged → closed → all → opened
   if (event.name === 's' && !event.shift && !event.ctrl) {
-    const current = changeRequestStore.crState();
-    const next =
-      current === 'opened' ? 'closed' :
-      current === 'closed' ? 'all' :
-      'opened';
-    changeRequestStore.setCrState(next);
-    void crActions.loadAllChangeRequests(1, undefined, next);
+    const current = changeRequestStore.crListFilters().state?.[0] ?? 'opened';
+    const next = current === 'opened' ? 'merged' : current === 'merged' ? 'closed' : current === 'closed' ? 'all' : 'opened';
+    changeRequestStore.setCrListFilters({ ...changeRequestStore.crListFilters(), state: next === 'all' ? [] : [next] });
+    void crActions.loadAllChangeRequests();
     return true;
   }
 

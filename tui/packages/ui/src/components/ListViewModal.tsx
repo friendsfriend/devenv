@@ -1,9 +1,11 @@
+/** @jsxImportSource @opentui/solid */
 import { type JSX } from 'solid-js';
 import { useTerminalDimensions } from '@opentui/solid';
 import { createMemo } from 'solid-js';
 import { GenericModal } from './GenericModal';
 import { ScrollableList } from './ScrollableList';
 import { formatHelpTextLines } from './HelpText';
+import { uiColors } from '../colors';
 
 export interface ListViewModalProps<T> {
   // ── Data ───────────────────────────────────────────────────────────────────
@@ -28,11 +30,9 @@ export interface ListViewModalProps<T> {
   estimatedItemHeight?: number;
 
   /**
-   * Additional lines of chrome rendered inside the modal **above** the list
-   * (e.g. the `header` slot).  GenericModal's own chrome (title row, help-text
-   * row, top/bottom padding = 4 lines) is already accounted for automatically.
-   *
-   * Default: `2`  (matches the historical `reservedHeight = 6 − 4` default).
+   * Lines consumed by the optional `header` slot above the list.
+   * Only needed when `header` is provided and has fixed known height.
+   * Defaults to `0` (no header reservation).
    */
   reservedHeight?: number;
 
@@ -90,13 +90,13 @@ export interface ListViewModalProps<T> {
 export function ListViewModal<T>(props: ListViewModalProps<T>): JSX.Element {
   const dimensions = useTerminalDimensions();
 
-  const heightPercent = () => props.heightPercent ?? 0.7;
+  const heightPercent = () => Math.max(props.heightPercent ?? 0.9, 0.9);
 
   /**
    * Height of the GenericModal dialog box in terminal lines.
    * Mirrors GenericModal's own computation.
    */
-  const dialogHeight = createMemo(() =>
+  const maxDialogHeight = createMemo(() =>
     Math.floor(dimensions().height * heightPercent()),
   );
   const dialogWidth = createMemo(() =>
@@ -114,12 +114,32 @@ export function ListViewModal<T>(props: ListViewModalProps<T>): JSX.Element {
    * excluding GenericModal's own chrome).
    *
    * GenericModal chrome:
-   *   paddingTop (1) + title row (1) + paddingBottom (1) + wrapped helpText rows (N) = 3 + N
+   *   paddingTop (1) + SearchHeader (1) + FilterStatusBar (1) + paddingBottom (1)
+   *   + wrapped helpText rows (N) = 4 + N
    *
    * `props.reservedHeight` covers extra slot content above the list (default 2).
    */
+  const chromeLines = createMemo(() =>
+    3 + helpLineCount() + (props.header ? (props.reservedHeight ?? 2) : 0),
+  );
+  const rowLines = createMemo(() =>
+    props.items.length * (props.estimatedItemHeight ?? 1),
+  );
+  const maxListLines = createMemo(() =>
+    Math.max(1, maxDialogHeight() - chromeLines()),
+  );
+  const listOverflows = createMemo(() =>
+    !props.loading && props.items.length > 0 && rowLines() > maxListLines(),
+  );
+  const desiredListLines = createMemo(() => {
+    if (props.loading || props.items.length === 0) return 1;
+    return rowLines() + (listOverflows() ? 1 : 0);
+  });
+  const dialogHeight = createMemo(() =>
+    Math.min(maxDialogHeight(), chromeLines() + desiredListLines()),
+  );
   const availableLines = createMemo(() =>
-    Math.max(4, dialogHeight() - (3 + helpLineCount()) - (props.reservedHeight ?? 2)),
+    Math.max(1, dialogHeight() - chromeLines()),
   );
 
   return (
@@ -127,26 +147,38 @@ export function ListViewModal<T>(props: ListViewModalProps<T>): JSX.Element {
       title={props.title}
       helpText={props.helpText}
       widthPercent={props.widthPercent}
-      heightPercent={props.heightPercent}
+      heightLines={dialogHeight()}
+      searchMode={props.filterPlaceholder ? props.filterActive : undefined}
+      searchQuery={props.filterPlaceholder ? props.filterQuery : undefined}
+      searchResultCount={props.filterPlaceholder ? props.items.length : undefined}
     >
-      {/* Optional header slot (rendered above filter bar + list) */}
+      {/* Optional header slot (rendered above list) */}
       {props.header}
 
       <ScrollableList<T>
         items={props.items}
         selectedIndex={props.selectedIndex}
-        renderItem={props.renderItem}
+        renderItem={(item, isSelected, absoluteIndex) => (
+          <box
+            backgroundColor={isSelected() ? uiColors.bgSurface0 : undefined}
+            style={{ width: '100%', flexDirection: 'row', flexShrink: 0 }}
+          >
+            <box
+              backgroundColor={isSelected() ? uiColors.highlight : undefined}
+              style={{ width: 2, flexShrink: 0 }}
+            />
+            <box style={{ flexGrow: 1, minWidth: 0, overflow: 'hidden' }}>
+              {props.renderItem(item, isSelected, absoluteIndex)}
+            </box>
+          </box>
+        )}
         availableLines={availableLines()}
         estimatedItemHeight={props.estimatedItemHeight}
-        showScrollIndicator={true}
+        showScrollIndicator={listOverflows()}
         scrollIndicatorLabel={props.scrollIndicatorLabel}
         loading={props.loading}
         loadingText={props.loadingText}
         emptyContent={props.emptyContent}
-        filterPlaceholder={props.filterPlaceholder}
-        filterActive={props.filterActive}
-        filterQuery={props.filterQuery}
-        onFilterChange={props.onFilterChange}
       />
     </GenericModal>
   );

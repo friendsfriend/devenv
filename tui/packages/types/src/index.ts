@@ -25,6 +25,17 @@ export interface ProviderUpdateRequest {
 	token?: string;
 }
 
+export interface AppRunTargetInfo {
+	runtime: ActionRuntime | string;
+	launchMode?: LaunchMode | string;
+	label?: string;
+	profile?: string;
+	targetId?: string;
+	sourcePath?: string;
+	startedAt: string;
+	display: string;
+}
+
 export interface App {
 	ident: string;
 	displayName: string;
@@ -40,6 +51,7 @@ export interface App {
 	dockerInfo?: DockerInfo;
 	gitStatus?: string;
 	operationStatus?: OperationStatus;
+	runTargetInfo?: AppRunTargetInfo;
 	status?: "running" | "stopped" | "failed" | string;
 	// Transitional table fields. App rows do not populate these, but keeping them
 	// optional allows generic table/action helpers to inspect TableRow safely.
@@ -132,6 +144,7 @@ export interface KubernetesClusterStatus {
 	nodes: KubernetesClusterNodeSummary[];
 	namespaces: KubernetesNamespaceSummary[];
 	pods: KubernetesPodSummary;
+	podList?: KubernetesPodListItem[];
 	releases: KubernetesDevEnvReleaseSummary[];
 	stats?: KubernetesClusterResourceStats;
 	warnings?: string[];
@@ -157,6 +170,12 @@ export interface KubernetesPodSummary {
 	succeeded: number;
 	failed: number;
 	unknown: number;
+}
+
+export interface KubernetesPodListItem {
+	name: string;
+	namespace: string;
+	status: string;
 }
 
 export interface KubernetesDevEnvReleaseSummary {
@@ -236,6 +255,7 @@ export interface AppStatus {
 	branch?: string;
 	activeWorktree?: string;
 	operationStatus?: OperationStatus; // NEW: Current operation status
+	runTargetInfo?: AppRunTargetInfo | null;
 	status?: "running" | "stopped" | "failed" | string;
 }
 
@@ -405,6 +425,7 @@ export interface ChangeRequest {
 	description: string;
 	source_branch: string;
 	target_branch: string;
+	default_branch?: string;
 	state: string; // opened, merged, closed
 	web_url: string;
 	created_at: string;
@@ -594,7 +615,7 @@ export interface StatusLogEntry {
 	AppIdent: string;
 	AppName: string;
 	Operation: string; // pull, push, fetch, build, start, stop
-	Status: string; // pending, in_progress, active, completed, failed
+	Status: string; // pending, in progress, active, completed, failed
 	Message: string;
 }
 
