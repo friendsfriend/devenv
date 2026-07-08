@@ -5,11 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
-	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/gitlab"
 )
 
@@ -38,30 +36,16 @@ func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Get parameters from query
-	appIdent := r.URL.Query().Get("appIdent")
-	state := r.URL.Query().Get("state")
-	allBranches := r.URL.Query().Get("allBranches") // "true" to get all MRs
-	pageStr := r.URL.Query().Get("page")
-	perPageStr := r.URL.Query().Get("perPage")
-	search := r.URL.Query().Get("search")
-	sortBy := r.URL.Query().Get("sort")
-	sortDirection := r.URL.Query().Get("direction")
-	labels := splitCSV(r.URL.Query().Get("labels"))
+	query := parseChangeRequestListQuery(r)
 
-	if appIdent == "" {
+	if query.AppIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
 		return
 	}
 
-	// Default to "opened" if no state specified
-	if state == "" {
-		state = "opened"
-	}
-
 	// Find the app
 	var targetApp *app.App
-	targetApp = s.findAppByIdent(appIdent)
+	targetApp = s.findAppByIdent(query.AppIdent)
 
 	if targetApp == nil {
 		respondNotFound(w, "App not found")
@@ -80,10 +64,7 @@ func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Determine which branch to filter by
-	var sourceBranchFilter string
-	if allBranches == "true" {
-		sourceBranchFilter = ""
-	} else {
+	if !query.AllBranches {
 		isFeatureBranch := currentBranch != "develop" &&
 			currentBranch != "master" &&
 			currentBranch != "main" &&
@@ -94,26 +75,9 @@ func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Reque
 			respondBadRequest(w, fmt.Sprintf("Branch '%s' is not a feature branch. No change request to show.", currentBranch))
 			return
 		}
-		sourceBranchFilter = currentBranch
+		query.Options.SourceBranch = currentBranch
 	}
-
-	// Parse pagination params
-	page := 1
-	if pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	perPage := 50
-	if perPageStr != "" {
-		if pp, err := strconv.Atoi(perPageStr); err == nil && pp > 0 {
-			perPage = pp
-		}
-	}
-
-	// Determine SkipDetails: use for paginated list view (when page params present),
-	// but keep backward compat when no page params (for detail views)
-	skipDetails := pageStr != "" || perPageStr != ""
+	query.Options.TargetBranch = "develop"
 
 	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
 	if err != nil {
@@ -123,18 +87,7 @@ func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Reque
 
 	// Get change requests with pagination options via the changerequest.Client adapter
 	mrClient := gitlab.NewMRClient(gitlabClient)
-	result, err := mrClient.GetChangeRequests(projectInfo.ToChangeRequest(), &changerequest.ChangeRequestListOptions{
-		SourceBranch:  sourceBranchFilter,
-		TargetBranch:  "develop",
-		State:         state,
-		Page:          page,
-		PerPage:       perPage,
-		Search:        search,
-		Labels:        labels,
-		SortBy:        sortBy,
-		SortDirection: sortDirection,
-		SkipDetails:   skipDetails,
-	})
+	result, err := mrClient.GetChangeRequests(projectInfo.ToChangeRequest(), &query.Options)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch change requests: %v", err), http.StatusInternalServerError)
 		return
@@ -149,7 +102,7 @@ func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Reque
 	// If no MRs found, return appropriate error
 	if len(result.ChangeRequests) == 0 {
 		var errorMsg string
-		if allBranches == "true" {
+		if query.AllBranches {
 			errorMsg = "No open change requests found for this project"
 		} else {
 			errorMsg = fmt.Sprintf("No open change request found for branch '%s' → develop", currentBranch)

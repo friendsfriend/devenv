@@ -99,18 +99,8 @@ func (s *Server) handleGitHubIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := 1
-	if pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	perPage := 50
-	if perPageStr != "" {
-		if pp, err := strconv.Atoi(perPageStr); err == nil && pp > 0 {
-			perPage = pp
-		}
-	}
+	page := parsePage(pageStr)
+	perPage := parsePerPage(perPageStr)
 
 	if state == "" {
 		state = "open"
@@ -263,18 +253,8 @@ func (s *Server) handleGitLabIssues(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page := 1
-	if pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	perPage := 50
-	if perPageStr != "" {
-		if pp, err := strconv.Atoi(perPageStr); err == nil && pp > 0 {
-			perPage = pp
-		}
-	}
+	page := parsePage(pageStr)
+	perPage := parsePerPage(perPageStr)
 
 	if state == "" {
 		state = "opened"

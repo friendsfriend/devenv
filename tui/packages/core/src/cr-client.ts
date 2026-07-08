@@ -177,8 +177,6 @@ export async function createCRComment(
     }
   }
 
-  console.error('[SDK] Payload being sent:', JSON.stringify(payload, null, 2));
-
   const response = await deps.fetchFn(`${deps.baseUrl}/api/gitlab/cr-comment`, {
     method: 'POST',
     headers: {

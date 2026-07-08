@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
-	"github.com/friendsfriend/devenv/pkg/changerequest"
 	"github.com/friendsfriend/devenv/pkg/github"
 	"github.com/friendsfriend/devenv/pkg/gitlab"
 )
@@ -40,23 +39,15 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	appIdent := r.URL.Query().Get("appIdent")
-	allBranches := r.URL.Query().Get("allBranches")
-	state := r.URL.Query().Get("state")
-	pageStr := r.URL.Query().Get("page")
-	perPageStr := r.URL.Query().Get("perPage")
-	search := r.URL.Query().Get("search")
-	sortBy := r.URL.Query().Get("sort")
-	sortDirection := r.URL.Query().Get("direction")
-	labels := splitCSV(r.URL.Query().Get("labels"))
+	query := parseChangeRequestListQuery(r)
 
-	if appIdent == "" {
+	if query.AppIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
 		return
 	}
 
 	var targetApp *app.App
-	targetApp = s.findAppByIdent(appIdent)
+	targetApp = s.findAppByIdent(query.AppIdent)
 
 	if targetApp == nil {
 		respondNotFound(w, "App not found")
@@ -79,23 +70,8 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		currentBranch == "qa" ||
 		currentBranch == "quality"
 
-	var sourceBranchFilter string
-	if allBranches != "true" && !isDefaultBranch {
-		sourceBranchFilter = currentBranch
-	}
-
-	// Parse pagination params
-	page := 1
-	if pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
-	}
-	perPage := 50
-	if perPageStr != "" {
-		if pp, err := strconv.Atoi(perPageStr); err == nil && pp > 0 {
-			perPage = pp
-		}
+	if !query.AllBranches && !isDefaultBranch {
+		query.Options.SourceBranch = currentBranch
 	}
 
 	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
@@ -104,25 +80,7 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Determine SkipDetails: use SkipDetails for paginated list view (when page params present)
-	// but keep backward compat when no page params (for detail views)
-	skipDetails := pageStr != "" || perPageStr != ""
-
-	if state == "" {
-		state = "opened"
-	}
-
-	result, err := ghClient.GetChangeRequests(repoInfo.ToChangeRequest(), &changerequest.ChangeRequestListOptions{
-		SourceBranch:  sourceBranchFilter,
-		State:         state,
-		Page:          page,
-		PerPage:       perPage,
-		Search:        search,
-		Labels:        labels,
-		SortBy:        sortBy,
-		SortDirection: sortDirection,
-		SkipDetails:   skipDetails,
-	})
+	result, err := ghClient.GetChangeRequests(repoInfo.ToChangeRequest(), &query.Options)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch pull requests: %v", err), http.StatusInternalServerError)
 		return
@@ -136,7 +94,7 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 
 	if len(result.ChangeRequests) == 0 {
 		var errorMsg string
-		if sourceBranchFilter != "" {
+		if query.Options.SourceBranch != "" {
 			errorMsg = fmt.Sprintf("No open pull request found for branch '%s'", currentBranch)
 		} else {
 			errorMsg = "No open pull requests found for this repository"
