@@ -1,6 +1,6 @@
 {
   "name": "@devenv/cli",
-  "version": "0.12.0",
+  "version": "0.12.3",
   "type": "module",
   "bin": {
     "devenv": "./src/spawn.ts"
