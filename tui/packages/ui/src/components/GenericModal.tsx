@@ -59,6 +59,8 @@ export interface GenericModalProps {
   widthPercent?: number;
   /** Height as percentage of screen (0-1), default 0.7 (70%) */
   heightPercent?: number;
+  /** Exact height in terminal lines. Overrides heightPercent when provided. */
+  heightLines?: number;
   /** Optional custom header content (replaces default title) */
   customHeader?: JSX.Element;
   /** Optional custom footer content (replaces default help text) */
@@ -92,7 +94,7 @@ export function GenericModal(props: GenericModalProps) {
   const dimensions = useTerminalDimensions();
 
   const dialogWidth = () => Math.floor(dimensions().width * (props.widthPercent ?? 0.5));
-  const dialogHeight = () => Math.floor(dimensions().height * (props.heightPercent ?? 0.7));
+  const dialogHeight = () => Math.min(dimensions().height, props.heightLines ?? Math.floor(dimensions().height * (props.heightPercent ?? 0.7)));
   const helpLines = createMemo(() => wrapHelpText(props.helpText, Math.max(1, dialogWidth() - 4)));
 
   return (

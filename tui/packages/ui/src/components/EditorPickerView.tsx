@@ -28,11 +28,10 @@ function EditorRow(props: {
   option: EditorOption;
   isSelected: boolean;
 }) {
-  const cursor = () => props.isSelected ? '► ' : '  ';
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 1,
@@ -45,7 +44,7 @@ function EditorRow(props: {
         fg={props.isSelected ? uiColors.primary : uiColors.textPrimary}
         attributes={props.isSelected ? TextAttributes.BOLD : undefined}
       >
-        {cursor()}{props.option.label}
+        {props.option.label}
       </text>
       <text fg={highlightColor('secondary')}>
         {'  '}{props.option.description}

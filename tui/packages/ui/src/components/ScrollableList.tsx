@@ -482,7 +482,6 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
                 width: '100%',
                 height: 1,
                 justifyContent: 'center',
-                marginTop: 1,
                 flexShrink: 0,
               }}
             >

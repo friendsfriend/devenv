@@ -132,7 +132,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
               }}
             >
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                {isSelected() ? '▸ ' : '  '}
               </text>
               <text
                 fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
@@ -161,7 +160,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
           return (
             <box style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0 }}>
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                {isSelected() ? '▸ ' : '  '}
               </text>
               <text
                 fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
@@ -191,7 +189,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
             return (
               <box style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0 }}>
                 <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                  {isSelected() ? '▸ ' : '  '}
                 </text>
                 <text
                   fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
@@ -229,7 +226,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
             return (
               <box style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0 }}>
                 <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                  {isSelected() ? '▸ ' : '  '}
                 </text>
                 <MatchedText
                   text={result.fullPath}
@@ -336,7 +332,6 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
               }}
             >
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                {isSelected() ? '▸ ' : '  '}
               </text>
               <MatchedText
                 text={branch}

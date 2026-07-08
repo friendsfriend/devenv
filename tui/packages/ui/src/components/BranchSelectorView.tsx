@@ -38,12 +38,11 @@ function BranchRow(props: {
   };
 
   const isBold = () => props.isCurrent || !props.branchInfo.isRemote || props.isSelected;
-  const cursor = () => props.isSelected ? '► ' : '  ';
   const suffix = () => props.isCurrent ? ' (current)' : '';
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 1,
@@ -55,7 +54,7 @@ function BranchRow(props: {
         fg={branchColor()}
         attributes={isBold() ? TextAttributes.BOLD : undefined}
       >
-        {cursor()}{props.branchInfo.name}{suffix()}
+        {props.branchInfo.name}{suffix()}
       </text>
     </box>
   );

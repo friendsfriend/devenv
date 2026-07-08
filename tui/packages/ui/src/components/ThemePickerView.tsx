@@ -16,7 +16,7 @@ export interface ThemePickerViewProps {
 }
 
 const label = (name: string) => name.split("-").map((part) => part ? part[0]!.toUpperCase() + part.slice(1) : part).join(" ");
-const nameColumn = (name: string, selected: boolean, active: boolean) => `${selected ? "› " : "  "}${active ? "✓ " : "  "}${label(name)}`.padEnd(32).slice(0, 32);
+const nameColumn = (name: string, selected: boolean, active: boolean) => `${active ? "✓ " : ""}${label(name)}`.padEnd(32).slice(0, 32);
 
 export function ThemePickerView(props: ThemePickerViewProps) {
   const dimensions = useTerminalDimensions();

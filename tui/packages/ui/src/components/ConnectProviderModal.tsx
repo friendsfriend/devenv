@@ -98,7 +98,6 @@ export function ConnectProviderModal(props: ConnectProviderModalProps) {
                 }}
               >
                 <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                  {isSelected() ? '▸ ' : '  '}
                 </text>
                 <text
                   fg={isSelected() ? uiColors.primary : uiColors.textPrimary}

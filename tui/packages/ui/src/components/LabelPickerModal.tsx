@@ -21,12 +21,11 @@ function LabelRow(props: {
 	isSelected: boolean;
 	isToggled: boolean;
 }) {
-	const cursor = () => (props.isSelected ? "► " : "  ");
-	const checkbox = () => (props.isToggled ? "☑ " : "☐ ");
+		const checkbox = () => (props.isToggled ? "☑ " : "☐ ");
 
 	return (
 		<box
-			backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+			backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
 			style={{
 				width: "100%",
 				height: 1,
@@ -38,7 +37,6 @@ function LabelRow(props: {
 				fg={uiColors.textPrimary}
 				attributes={props.isSelected ? TextAttributes.BOLD : undefined}
 			>
-				{cursor()}
 				{checkbox()}
 				{props.label}
 			</text>

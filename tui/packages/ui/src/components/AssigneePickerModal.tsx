@@ -20,12 +20,11 @@ function AssigneeRow(props: {
 	isSelected: boolean;
 	isCurrentAssignee: boolean;
 }) {
-	const cursor = () => (props.isSelected ? "► " : "  ");
-	const badge = () => (props.isCurrentAssignee ? "✓ " : "  ");
+		const badge = () => (props.isCurrentAssignee ? "✓ " : "  ");
 
 	return (
 		<box
-			backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+			backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
 			style={{
 				width: "100%",
 				height: 1,
@@ -37,7 +36,6 @@ function AssigneeRow(props: {
 				fg={uiColors.textPrimary}
 				attributes={props.isSelected ? TextAttributes.BOLD : undefined}
 			>
-				{cursor()}
 				{badge()}
 				{props.name}
 				{props.isCurrentAssignee ? " (current)" : ""}

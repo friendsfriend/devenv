@@ -16,11 +16,10 @@ const REASON_ITEMS: string[] = ["Completed", "Not planned", "Duplicate"];
 const REASON_VALUES: string[] = ["completed", "not_planned", ""];
 
 function ReasonRow(props: { label: string; isSelected: boolean }) {
-	const cursor = () => (props.isSelected ? "► " : "  ");
-
+	
 	return (
 		<box
-			backgroundColor={props.isSelected ? uiColors.bgSurface2 : undefined}
+			backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
 			style={{
 				width: "100%",
 				height: 1,
@@ -32,7 +31,6 @@ function ReasonRow(props: { label: string; isSelected: boolean }) {
 				fg={uiColors.textPrimary}
 				attributes={props.isSelected ? TextAttributes.BOLD : undefined}
 			>
-				{cursor()}
 				{props.label}
 			</text>
 		</box>

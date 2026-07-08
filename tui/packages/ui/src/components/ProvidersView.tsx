@@ -74,8 +74,7 @@ export function ProvidersView(props: ProvidersViewProps) {
                   backgroundColor={isSelected() ? uiColors.bgSurface2 : undefined}
                 >
                   <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
-                    {isSelected() ? '▸ ' : '  '}
-                  </text>
+                    </text>
                   <text
                     fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
                     attributes={isSelected() ? TextAttributes.BOLD : undefined}

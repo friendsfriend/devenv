@@ -20,7 +20,6 @@ export interface SshHostPickerViewProps {
 // ─── Host row ─────────────────────────────────────────────────────────────────
 
 function HostRow(props: { host: SshHost; isSelected: boolean; query?: string }) {
-  const cursor = () => (props.isSelected ? '►' : ' ');
   const target = () => {
     const h = props.host;
     const user = h.user ? `${h.user}@` : '';
@@ -31,7 +30,7 @@ function HostRow(props: { host: SshHost; isSelected: boolean; query?: string }) 
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface1 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{
         width: '100%',
         height: 1,
@@ -40,9 +39,6 @@ function HostRow(props: { host: SshHost; isSelected: boolean; query?: string }) 
         paddingLeft: 1,
       }}
     >
-      <text fg={props.isSelected ? uiColors.primary : uiColors.textSecondary}>
-        {cursor()}{' '}
-      </text>
       <box style={{ flexShrink: 0 }}>
         <MatchedText
           text={props.host.alias}
@@ -51,7 +47,6 @@ function HostRow(props: { host: SshHost; isSelected: boolean; query?: string }) 
           attributes={props.isSelected ? TextAttributes.BOLD : undefined}
         />
       </box>
-      <text fg={highlightColor('secondary')}>{'  '}</text>
       <MatchedText text={target()} query={props.query} fg={highlightColor('secondary')} />
     </box>
   );

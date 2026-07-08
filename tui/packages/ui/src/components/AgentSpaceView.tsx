@@ -46,16 +46,14 @@ export function getSelectableRows(rows: FlatRow[]): Array<{ row: FlatRow; flatIn
 }
 
 function RowView(props: { row: FlatRow; isSelected: boolean; query?: string }) {
-  const cursor = () => (props.isSelected ? '►' : ' ');
 
   if (props.row.kind === 'new') {
     return (
       <box
-        backgroundColor={props.isSelected ? uiColors.bgSurface1 : undefined}
+        backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
         style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1 }}
       >
-        <text fg={props.isSelected ? uiColors.primary : uiColors.textMuted}>{cursor()} </text>
-        <text
+          <text
           fg={props.isSelected ? uiColors.success : uiColors.textMuted}
           attributes={props.isSelected ? TextAttributes.BOLD : undefined}
         >
@@ -67,10 +65,9 @@ function RowView(props: { row: FlatRow; isSelected: boolean; query?: string }) {
 
   return (
     <box
-      backgroundColor={props.isSelected ? uiColors.bgSurface1 : undefined}
+      backgroundColor={props.isSelected ? uiColors.bgSurface0 : undefined}
       style={{ width: '100%', height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1 }}
     >
-      <text fg={props.isSelected ? uiColors.primary : uiColors.textSecondary}>{cursor()} </text>
       <text fg={highlightColor('secondary')} style={{ flexShrink: 0 }}>
         {`[${props.row.agentName}] `}
       </text>
