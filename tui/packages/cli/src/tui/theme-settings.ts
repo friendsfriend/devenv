@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import type { TerminalColors } from '@opentui/core';
 import { isThemeJson, setActiveThemeName, setCustomThemes, setSystemTheme, themeNames, type ThemeJson } from '@devenv/ui';
 
 const configDir = () => process.env.DEVENV_CONFIG_DIR || path.join(os.homedir(), ".config", "devenv");
@@ -37,50 +38,33 @@ function isLight(hex: string) {
   return 0.299 * r + 0.587 * g + 0.114 * b > 160;
 }
 
-function parseOscColor(value: string): string | undefined {
-  const match = value.match(/rgb:([0-9a-fA-F]{2,4})\/([0-9a-fA-F]{2,4})\/([0-9a-fA-F]{2,4})/);
-  if (!match) return undefined;
-  const toByte = (part: string) => part.length === 2 ? part : part.slice(0, 2);
-  return `#${toByte(match[1]!).toLowerCase()}${toByte(match[2]!).toLowerCase()}${toByte(match[3]!).toLowerCase()}`;
+function normalizeHexColor(value: string | null | undefined): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const match = value.trim().match(/^#?([0-9a-fA-F]{6})$/);
+  return match ? `#${match[1]!.toLowerCase()}` : undefined;
 }
 
-export async function queryTerminalThemeColors(timeoutMs = 250): Promise<TerminalThemeColors> {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) return {};
+export function terminalColorsToThemeColors(colors?: TerminalColors | null): TerminalThemeColors {
+  if (!colors) return {};
+  const palette = colors.palette
+    .slice(0, 16)
+    .map(normalizeHexColor)
+    .filter((color): color is string => Boolean(color));
 
-  return await new Promise((resolve) => {
-    const previousRaw = process.stdin.isRaw;
-    let buffer = "";
-    const done = () => {
-      clearTimeout(timer);
-      process.stdin.off("data", onData);
-      if (process.stdin.setRawMode) process.stdin.setRawMode(previousRaw);
-      const foreground = parseOscColor(buffer.match(/\]10;([^\u0007\u001b]+)/)?.[1] ?? "");
-      const background = parseOscColor(buffer.match(/\]11;([^\u0007\u001b]+)/)?.[1] ?? "");
-      const palette = [...buffer.matchAll(/\]4;(\d+);([^\u0007\u001b]+)/g)]
-        .filter(([_, idx]) => Number(idx) < 16)
-        .reduce<string[]>((acc, match) => {
-          const parsed = parseOscColor(match[2] ?? "");
-          if (parsed) acc[Number(match[1])] = parsed;
-          return acc;
-        }, []);
-      resolve({ foreground, background, palette });
-    };
-    const hasCompleteThemeResponse = () => {
-      const hasForeground = buffer.includes("]10;");
-      const hasBackground = buffer.includes("]11;");
-      const paletteCount = new Set([...buffer.matchAll(/\]4;(\d+);/g)].map((match) => Number(match[1])).filter((idx) => idx >= 0 && idx < 16)).size;
-      return hasForeground && hasBackground && paletteCount >= 16;
-    };
-    const onData = (chunk: Buffer) => {
-      buffer += chunk.toString("utf8");
-      if (hasCompleteThemeResponse() || buffer.length > 4096) done();
-    };
-    const timer = setTimeout(done, timeoutMs);
-    process.stdin.on("data", onData);
-    process.stdin.resume();
-    if (process.stdin.setRawMode) process.stdin.setRawMode(true);
-    process.stdout.write(`\x1b]10;?\x1b\\\x1b]11;?\x1b\\${Array.from({ length: 16 }, (_, i) => `\x1b]4;${i};?\x1b\\`).join("")}`);
-  });
+  return {
+    foreground: normalizeHexColor(colors.defaultForeground),
+    background: normalizeHexColor(colors.defaultBackground),
+    palette: palette.length ? palette : undefined,
+  };
+}
+
+export async function loadRendererThemeColors(renderer: { getPalette?: (options?: { size?: number; timeout?: number }) => Promise<TerminalColors> }, timeoutMs = 300): Promise<TerminalThemeColors> {
+  try {
+    if (typeof renderer.getPalette !== "function") return {};
+    return terminalColorsToThemeColors(await renderer.getPalette({ size: 16, timeout: timeoutMs }));
+  } catch {
+    return {};
+  }
 }
 
 export function loadSystemTheme(colors: TerminalThemeColors = {}) {

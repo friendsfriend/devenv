@@ -80,7 +80,7 @@ import {
 	getHeaderInfo,
 } from "./views";
 import type { ViewStores, ViewActions } from "./views";
-import { applyTheme, loadCustomThemes, loadSystemTheme, loadThemeName, queryTerminalThemeColors } from "./theme-settings";
+import { applyTheme, loadCustomThemes, loadRendererThemeColors, loadSystemTheme, loadThemeName } from "./theme-settings";
 
 interface TUIAppProps {
 	serverUrl: string;
@@ -480,8 +480,6 @@ export async function startTUI(serverUrl: string, options: StartTUIOptions = {})
 	try {
 		// Force enable color support for terminal
 		process.env.FORCE_COLOR = "3"; // Force truecolor
-		const terminalThemeColors = await queryTerminalThemeColors();
-		loadSystemTheme(terminalThemeColors);
 
 		const useConsole = process.env.DEVENV_TUI_CONSOLE === "1";
 		const renderer = await createCliRenderer({
@@ -502,6 +500,7 @@ export async function startTUI(serverUrl: string, options: StartTUIOptions = {})
 			} : {}),
 		});
 
+		loadSystemTheme(await loadRendererThemeColors(renderer));
 		setExitRenderer(renderer);
 
 		let destroyed = false;
