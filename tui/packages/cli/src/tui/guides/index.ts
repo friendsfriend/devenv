@@ -10,6 +10,13 @@ export interface Guide {
 // scan if guides ever exceed ~20.
 export const guides: Guide[] = [
   {
+    key: "system-utilities",
+    title: "System Utilities",
+    description: "Required and optional system tools with installation instructions",
+    category: "Setup",
+    import: () => import("./system-utilities.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
     key: "config-repository",
     title: "Configuration Repository",
     description: "Share DevEnv config across machines or with a team",

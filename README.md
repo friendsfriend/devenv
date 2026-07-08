@@ -47,6 +47,38 @@ The Go backend uses dependency injection via `services.Container` — no global 
 - **Docker** or **Podman** (for container management features)
 - Optional Kubernetes runtime tools: `kind`, `kubectl`, `helm`, and `k9s` for Helm/kind app runs
 
+## System Utilities
+
+### Required
+
+| Tool | Purpose |
+|------|---------|
+| **git** | Repository operations, worktrees, git integrations |
+| **Docker** or **Podman** | Container management, builds, runtime features |
+
+### Development Only
+
+| Tool | Purpose |
+|------|---------|
+| **bun** 1.3.14+ | TUI build and development (not needed with pre-built binary) |
+| **Go** 1.26.4+ | Server build (not needed with pre-built binary) |
+
+### Optional
+
+| Tool | Purpose |
+|------|---------|
+| **lazygit** | Terminal UI for git — staging, commits, branching, diffs |
+| **lazydocker** | Terminal UI for docker — containers, logs, stats |
+| **pi** | AI-powered coding agent for code review and assistance |
+| **kubectl** | Kubernetes cluster operations |
+| **helm** | Kubernetes package manager |
+| **kind** | Local Kubernetes clusters in Docker |
+| **k9s** | Terminal UI for Kubernetes |
+| **worktrunk** | Multi-repo worktree management |
+| **ssh** | Remote server access |
+
+See the [System Utilities Guide](tui/packages/cli/src/tui/guides/system-utilities.md) for installation instructions and details.
+
 ## Quick Start
 
 ### Development
@@ -72,6 +104,7 @@ bun run build
 
 Task-focused guides are available from the TUI Help view (`?`) and linked below:
 
+- [System Utilities](tui/packages/cli/src/tui/guides/system-utilities.md) — Required and optional system tools with installation instructions
 - [Configuration Repository](tui/packages/cli/src/tui/guides/config-repository.md) — Share DevEnv config across machines or with a team
 - [Container Runtime](tui/packages/cli/src/tui/guides/container-runtime.md) — Choose Docker or Podman via `DEVENV_CONTAINER_RUNTIME`
 - [Kubernetes Runtime](tui/packages/cli/src/tui/guides/kubernetes-runtime.md) — Run Helm app and infrastructure targets on managed kind
