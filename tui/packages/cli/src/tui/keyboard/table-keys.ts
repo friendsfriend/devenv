@@ -1,4 +1,5 @@
 import { getLogger } from '@devenv/core';
+import { themeNames } from '@devenv/ui';
 import { isDownKey, isUpKey } from './nav-keys';
 import type {
 	KeyboardEvent,
@@ -215,9 +216,6 @@ export async function handleTableKeys(
 		) {
 			appActions.closeAppDetail();
 		}
-		if (event.name === "q" || event.name === "Q") {
-			appActions.exitApp();
-		}
 		return true;
 	}
 
@@ -397,10 +395,6 @@ export async function handleTableKeys(
 	}
 
 	switch (key) {
-		case "q":
-		case "Q":
-			appActions.exitApp();
-			break;
 		case "/":
 			appStore.setTableSearchMode(true);
 			appStore.setTableSearchQuery("");
@@ -412,6 +406,15 @@ export async function handleTableKeys(
 		case "O":
 			appStore.setShowTableSortModal(true);
 			break;
+		case "T": {
+			const current = uiStore.activeThemeName();
+			uiStore.setThemePickerOriginalTheme(current);
+			uiStore.setThemePickerFilterActive(false);
+			uiStore.setThemePickerFilterQuery("");
+			uiStore.setThemePickerSelectedIndex(Math.max(0, themeNames.indexOf(current)));
+			uiStore.setShowThemePicker(true);
+			break;
+		}
 		case "return":
 		case "enter":
 			if (appStore.activeTab() === "scripts") {

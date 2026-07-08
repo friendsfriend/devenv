@@ -3,7 +3,7 @@ import type { KeyboardEvent, KeyboardStores, KeyboardActions, KeyboardContext } 
 import { isDownKey, isUpKey, isLeftKey, isRightKey } from './nav-keys';
 /**
  * Handles keyboard events for the Test Results view:
- * - q to quit, ? for help (early guard from parent handler)
+ * - ? for help (early guard from parent handler)
  * - Search mode (type query, clear)
  * - / to search, ESC to close detail modal / clear search / go back
  * - Enter to open test detail modal
@@ -17,15 +17,11 @@ export async function handleTestResultsKeys(
   _ctx: KeyboardContext,
 ): Promise<boolean> {
   const { appStore, changeRequestStore } = stores;
-  const { appActions, helpActions } = actions;
+  const { helpActions } = actions;
 
   if (appStore.viewMode() !== 'testResults') return false;
 
-  // q to quit, ? for help — these are global shortcuts for this view
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
-  }
+  // ? for help — global shortcut for this view
   if (event.name === '?' || event.sequence === '?') {
     helpActions.showHelp();
     return true;

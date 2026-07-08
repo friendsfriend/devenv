@@ -5,7 +5,7 @@ import { isNextRelatedKey, isPreviousRelatedKey } from './horizontal-scroll';
 /**
  * Handles keyboard events for the CR list view:
  * - Search mode (type query, clear)
- * - q to quit, / to search, ESC to go back
+ * - / to search, ESC to go back
  * - Enter to select CR
  * - j/k/g/G for navigation
  */
@@ -16,7 +16,7 @@ export async function handleCrListKeys(
   _ctx: KeyboardContext,
 ): Promise<boolean> {
   const { appStore, changeRequestStore } = stores;
-  const { appActions, crActions } = actions;
+  const { crActions } = actions;
 
   if (appStore.viewMode() !== 'changeRequests') return false;
 
@@ -103,12 +103,6 @@ export async function handleCrListKeys(
   }
 
   const crs = changeRequestStore.changeRequests();
-
-  // q to quit
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
-  }
 
   if (event.name === 'F' || (event.name === 'f' && event.shift)) { changeRequestStore.setShowCrListFilterModal(true); return true; }
   if (event.name === 'O' || (event.name === 'o' && event.shift)) { changeRequestStore.setShowCrListSortModal(true); return true; }

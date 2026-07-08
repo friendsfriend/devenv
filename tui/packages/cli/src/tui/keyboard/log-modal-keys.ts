@@ -17,7 +17,7 @@ export async function handleLogModalKeys(
   ctx: KeyboardContext,
 ): Promise<boolean> {
   const { logStore } = stores;
-  const { appActions, logActions, utilActions } = actions;
+  const { logActions, utilActions } = actions;
 
   if (!logStore.showLogModal()) return false;
 
@@ -99,12 +99,6 @@ export async function handleLogModalKeys(
       return true;
     }
     return true; // swallow all other keys while typing
-  }
-
-  // q to quit
-  if (event.name === 'q' || event.name === 'Q') {
-    appActions.exitApp();
-    return true;
   }
 
   const writeLogsToTempFile = async (): Promise<string | null> => {

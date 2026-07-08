@@ -5,7 +5,6 @@ import { routePastedText } from './paste-handler';
 import { isDownKey, isLeftKey, isRightKey, isUpKey } from './nav-keys';
 import { themeNames } from '@devenv/ui';
 import { applyTheme, saveThemeName } from '../theme-settings';
-import type { AppStore } from '../stores/app-store';
 /**
  * Handles global keys that apply regardless of view mode:
  * - ESC to close console overlay
@@ -19,6 +18,32 @@ import type { AppStore } from '../stores/app-store';
 // Track last quit-key press time for double-press exit detection
 let _lastQuitKey: 'q' | 'ctrl+c' | null = null;
 let _lastQuitKeyTime = 0;
+
+const isTextEntryActive = (stores: KeyboardStores): boolean => {
+  const { appStore, uiStore, logStore, changeRequestStore, issueStore, agentStore, providerStore } = stores;
+  return Boolean(
+    appStore.tableSearchMode() ||
+    appStore.statusLogSearchMode() ||
+    uiStore.branchFilterActive() ||
+    uiStore.showCreateBranchModal() ||
+    uiStore.themePickerFilterActive() ||
+    uiStore.taskArgsEditing() ||
+    uiStore.showTaskAddModal() ||
+    logStore.logSearchMode() ||
+    logStore.logAiPromptMode() ||
+    changeRequestStore.jobsSearchMode() ||
+    changeRequestStore.crSearchMode() ||
+    changeRequestStore.changedFilesSearchMode() ||
+    changeRequestStore.testSearchMode() ||
+    changeRequestStore.replyMode() ||
+    changeRequestStore.showCommentModal() ||
+    issueStore.issueSearchMode() ||
+    agentStore.sshFilterActive() ||
+    agentStore.agentFilterActive() ||
+    providerStore.showConnectProviderModal() ||
+    providerStore.showAddRepositoryModal()
+  );
+};
 
 const handleQuitConfirm = (key: 'q' | 'ctrl+c', uiStore: KeyboardStores['uiStore'], appActions: KeyboardActions['appActions']): boolean => {
   const now = Date.now();
@@ -96,19 +121,6 @@ export async function handleGlobalKeys(
     uiStore.setRunningTextEnabled(next);
     uiStore.setRunningTextOffset(0);
     uiStore.setNotification(next ? 'Running text on' : 'Running text off', 'info');
-    return true;
-  }
-
-  const diffTextInputActive = changeRequestStore.showDiffModal() && (changeRequestStore.showCommentModal() || !!changeRequestStore.replyMode());
-
-  // TABLE ONLY: Shift+T opens theme picker. Do not intercept text input in diff comments/replies.
-  if ((stores.appStore as unknown as AppStore).viewMode() === 'table' && !diffTextInputActive && !uiStore.showThemePicker() && (event.sequence === 'T' || (event.name === 't' && event.shift))) {
-    const current = uiStore.activeThemeName();
-    uiStore.setThemePickerOriginalTheme(current);
-    uiStore.setThemePickerFilterActive(false);
-    uiStore.setThemePickerFilterQuery('');
-    uiStore.setThemePickerSelectedIndex(Math.max(0, themeNames.indexOf(current)));
-    uiStore.setShowThemePicker(true);
     return true;
   }
 
@@ -390,7 +402,7 @@ export async function handleGlobalKeys(
   }
 
   // GLOBAL: q/Ctrl+C — first press warns, second quit key exits (1s window).
-  if (!event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'q') {
+  if (!isTextEntryActive(stores) && !event.ctrl && !event.shift && !event.meta && !event.super && event.name === 'q') {
     return handleQuitConfirm('q', uiStore, appActions);
   }
 
