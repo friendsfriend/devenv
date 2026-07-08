@@ -4,9 +4,15 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { APP_VERSION } from './version';
 import { getEmbeddedServerPath, resolveServerBinary, startManagedServer } from './server-lifecycle';
+import { configureOpenTuiConsoleEnv } from './tui/startup-env';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+async function importTuiApp() {
+  configureOpenTuiConsoleEnv();
+  return await import('./tui/app-opentui');
+}
 
 const program = new Command();
 
@@ -21,7 +27,7 @@ program
   .option('-p, --port <port>', 'Backend server port', '4050')
   .action(async (options) => {
     const port = options.port || '4050';
-    const { startTUI } = await import('./tui/app-opentui');
+    const { startTUI } = await importTuiApp();
     const { initializeLogging, getLogger } = await import('@devenv/core');
 
     initializeLogging();
@@ -59,7 +65,7 @@ program
   .command('attach <url>')
   .description('Attach TUI to a running DevEnv server')
   .action(async (url) => {
-    const { startTUI } = await import('./tui/app-opentui');
+    const { startTUI } = await importTuiApp();
     const { initializeLogging, getLogger } = await import('@devenv/core');
 
     initializeLogging();
