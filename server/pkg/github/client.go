@@ -1964,7 +1964,6 @@ func generateLineCode(filePath string, newLine *int, oldLine *int) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-
 func (c *client) GetWorkflowRunByID(info *RepoInfo, runID int64) (*ghWorkflowRun, error) {
 	if info == nil {
 		return nil, fmt.Errorf("repo info is nil")
