@@ -18,6 +18,10 @@ import (
 )
 
 func (s *Server) resolveGitHubClient(targetApp *app.App) (github.Client, *github.RepoInfo, string, error) {
+	return s.resolveGitHubClientWithContext(context.Background(), targetApp)
+}
+
+func (s *Server) resolveGitHubClientWithContext(ctx context.Context, targetApp *app.App) (github.Client, *github.RepoInfo, string, error) {
 	repoInfo, err := github.ExtractRepoInfo(targetApp.RepositoryPath)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to extract repo info: %w", err)
@@ -30,7 +34,7 @@ func (s *Server) resolveGitHubClient(targetApp *app.App) (github.Client, *github
 	if token == "" {
 		return nil, nil, "", fmt.Errorf("no token configured for provider %q", providerName)
 	}
-	client := github.NewClient(token, username)
+	client := github.NewClientWithContext(ctx, token, username)
 	return client, repoInfo, username, nil
 }
 func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +78,7 @@ func (s *Server) handleGitHubPullRequests(w http.ResponseWriter, r *http.Request
 		query.Options.SourceBranch = currentBranch
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -137,7 +141,7 @@ func (s *Server) handleGitHubPullRequest(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -185,7 +189,7 @@ func (s *Server) handleGitHubPRChanges(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -229,7 +233,7 @@ func (s *Server) handleGitHubPRDiscussions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -273,7 +277,7 @@ func (s *Server) handleGitHubPRApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -316,7 +320,7 @@ func (s *Server) handleGitHubPRUnapprove(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -359,7 +363,7 @@ func (s *Server) handleGitHubPRToggleApproval(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -402,7 +406,7 @@ func (s *Server) handleGitHubActionsJobs(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -438,7 +442,7 @@ func (s *Server) handleGitHubActionsTestSummary(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondError(w, fmt.Errorf("failed to init client: %w", err), http.StatusInternalServerError)
 		return
@@ -579,13 +583,13 @@ func (s *Server) handleGitHubActionsJobLogs(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ghClient, repoInfo, _, err := s.resolveGitHubClient(targetApp)
+	ghClient, repoInfo, _, err := s.resolveGitHubClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	logs, err := ghClient.GetJobLogs(repoInfo.ToChangeRequest(), jobID)
+	logs, err := ghClient.GetJobLogsContext(r.Context(), repoInfo.ToChangeRequest(), jobID)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch job logs: %v", err), http.StatusInternalServerError)
 		return

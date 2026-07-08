@@ -3,7 +3,6 @@ package gitlab
 import (
 	"crypto/sha1"
 	"fmt"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -39,19 +38,19 @@ func (c *ChangeRequestChange) calculateLineStats() {
 // For now, we parse the structure but don't use line_code in API calls
 func (c *ChangeRequestChange) parseDiffLines(baseSHA string) {
 	if c.Diff == "" {
-		log.Printf("[DEBUG] parseDiffLines: Empty diff for %s", c.NewPath)
+		debugLog("parseDiffLines: Empty diff for %s", c.NewPath)
 		return
 	}
 
 	if baseSHA == "" {
-		log.Printf("[DEBUG] parseDiffLines: Empty baseSHA for %s", c.NewPath)
+		debugLog("parseDiffLines: Empty baseSHA for %s", c.NewPath)
 		return
 	}
 
 	var diffLines []DiffLine
 	lines := strings.Split(c.Diff, "\n")
 
-	log.Printf("[DEBUG] parseDiffLines: Parsing %d lines for %s with baseSHA=%s", len(lines), c.NewPath, baseSHA[:8])
+	debugLog("parseDiffLines: Parsing %d lines for %s with baseSHA=%s", len(lines), c.NewPath, baseSHA[:8])
 
 	var currentOldLine int
 	var currentNewLine int

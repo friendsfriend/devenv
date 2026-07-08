@@ -128,6 +128,7 @@ export async function handleCrListKeys(
       }
       return true;
     }
+    crActions.abortViewLoads();
     appStore.setViewMode('table');
     changeRequestStore.setChangeRequests([]);
     changeRequestStore.setCrError('');

@@ -159,7 +159,7 @@ func (ic *IssuesClient) GetChangeRequestLinkedIssues(proj *ProjectInfo, mrIID in
 		}
 		if err := json.Unmarshal(body, &mrDetail); err == nil && mrDetail.Description != "" {
 			refs := parseIssueRefsFromChangeRequestBody(mrDetail.Description)
-			log.Printf("[DEBUG] GitLab GetChangeRequestLinkedIssues(!%d): %d closes_issues, %d inline refs", mrIID, len(closedIssues), len(refs))
+			debugLog("GitLab GetChangeRequestLinkedIssues(!%d): %d closes_issues, %d inline refs", mrIID, len(closedIssues), len(refs))
 			for _, refIID := range refs {
 				if seen[refIID] {
 					continue

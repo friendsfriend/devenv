@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -53,7 +52,7 @@ func (c *client) CreateMRDiffComment(projectInfo *ProjectInfo, mrIID int, body s
 	}
 
 	// Create request
-	req, err := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonPayload)))
+	req, err := http.NewRequestWithContext(c.requestContext(), "POST", apiURL, strings.NewReader(string(jsonPayload)))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -104,7 +103,7 @@ func (c *client) GetMRDiscussions(projectInfo *ProjectInfo, mrIID int) ([]Discus
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/discussions", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -138,7 +137,7 @@ func (c *client) GetMRDiscussions(projectInfo *ProjectInfo, mrIID int) ([]Discus
 		return nil, fmt.Errorf("failed to unmarshal discussions: %w", err)
 	}
 
-	log.Printf("[DEBUG] Fetched %d discussions for MR %d", len(discussions), mrIID)
+	debugLog("Fetched %d discussions for MR %d", len(discussions), mrIID)
 	return discussions, nil
 }
 
@@ -167,7 +166,7 @@ func (c *client) ReplyToDiscussion(projectInfo *ProjectInfo, mrIID int, discussi
 	}
 
 	// Create request
-	req, err := http.NewRequest("POST", apiURL, strings.NewReader(string(jsonPayload)))
+	req, err := http.NewRequestWithContext(c.requestContext(), "POST", apiURL, strings.NewReader(string(jsonPayload)))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -191,7 +190,7 @@ func (c *client) ReplyToDiscussion(projectInfo *ProjectInfo, mrIID int, discussi
 		return fmt.Errorf("GitLab API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("[DEBUG] Reply added to discussion %s for MR %d", discussionID, mrIID)
+	debugLog("Reply added to discussion %s for MR %d", discussionID, mrIID)
 	return nil
 }
 
@@ -220,7 +219,7 @@ func (c *client) ResolveDiscussion(projectInfo *ProjectInfo, mrIID int, discussi
 	}
 
 	// Create request
-	req, err := http.NewRequest("PUT", apiURL, strings.NewReader(string(jsonPayload)))
+	req, err := http.NewRequestWithContext(c.requestContext(), "PUT", apiURL, strings.NewReader(string(jsonPayload)))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -248,7 +247,7 @@ func (c *client) ResolveDiscussion(projectInfo *ProjectInfo, mrIID int, discussi
 	if !resolved {
 		action = "unresolved"
 	}
-	log.Printf("[DEBUG] Discussion %s %s for MR %d", discussionID, action, mrIID)
+	debugLog("Discussion %s %s for MR %d", discussionID, action, mrIID)
 	return nil
 }
 
@@ -266,7 +265,7 @@ func (c *client) GetMRVersions(projectInfo *ProjectInfo, mrIID int) ([]map[strin
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/versions", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -316,7 +315,7 @@ func (c *client) getMRVersionsFromDetails(projectInfo *ProjectInfo, mrIID int) (
 	projectPath := url.QueryEscape(fmt.Sprintf("%s/%s", projectInfo.Namespace, projectInfo.Project))
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d", c.baseURL, projectPath, mrIID)
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

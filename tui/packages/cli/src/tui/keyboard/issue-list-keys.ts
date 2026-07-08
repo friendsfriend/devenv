@@ -190,12 +190,14 @@ export async function handleIssueListKeys(
 				void issueActions.loadAllIssues(1);
 				return true;
 			}
+			issueActions.abortViewLoads();
 			appStore.setViewMode("table");
 			issueStore.setIssues([]);
 			issueStore.setIssueError("");
 			return true;
 		}
 		if (event.name === "q") {
+			issueActions.abortViewLoads();
 			appStore.setViewMode("table");
 			issueStore.setIssues([]);
 			issueStore.setIssueError("");

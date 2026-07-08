@@ -242,7 +242,7 @@ func (s *Server) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Printf("[DEBUG] Operation logs request: appIdent=%s, limit=%d", appIdent, limit)
+	debugLog("Operation logs request: appIdent=%s, limit=%d", appIdent, limit)
 
 	// Put current temp action log first. It contains live full command/output and the
 	// latest failure should be visible immediately in operation log view.
@@ -274,7 +274,7 @@ func (s *Server) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
 		logs = fmt.Sprintf("No operation logs found for %s", appIdent)
 	}
 
-	log.Printf("[DEBUG] Successfully fetched %d bytes of operation logs", len(logs))
+	debugLog("Successfully fetched %d bytes of operation logs", len(logs))
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write([]byte(logs))
@@ -590,7 +590,7 @@ func (s *Server) handleRepoSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if p.Type == provider.TypeGitHub {
-		client := github.NewClient(p.Token, p.Username)
+		client := github.NewClientWithContext(r.Context(), p.Token, p.Username)
 		results, err := client.Search(nil, req.Query, 20)
 		if err != nil {
 			respondInternalError(w, err)
@@ -632,7 +632,7 @@ func (s *Server) handleRepoSearch(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		client := gitlab.NewClient("https://"+host, p.Token, p.Username)
+		client := gitlab.NewClientWithContext(r.Context(), "https://"+host, p.Token, p.Username)
 		results, err := client.SearchProjects(req.Query, 20)
 		if err != nil {
 			respondInternalError(w, err)

@@ -274,7 +274,7 @@ func (c *client) GetDiscussions(info *changerequest.RepoInfo, mrNumber int) ([]c
 		discussions = append(discussions, d)
 	}
 
-	log.Printf("[DEBUG] Fetched %d discussions (incl. %d timeline events) for PR #%d",
+	debugLog("Fetched %d discussions (incl. %d timeline events) for PR #%d",
 		len(discussions), len(timelineEvents), mrNumber)
 	return discussions, nil
 }

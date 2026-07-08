@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -213,6 +214,13 @@ func (c *client) GetRunJobs(info *RepoInfo, runID int) ([]ghActionJob, error) {
 
 // GetJobLogs implements changerequest.Client.GetJobLogs.
 func (c *client) GetJobLogs(info *changerequest.RepoInfo, jobID int) (string, error) {
+	return c.GetJobLogsContext(c.requestContext(), info, jobID)
+}
+
+func (c *client) GetJobLogsContext(ctx context.Context, info *changerequest.RepoInfo, jobID int) (string, error) {
+	if ctx == nil {
+		ctx = c.requestContext()
+	}
 	ghInfo, err := FromChangeRequest(info)
 	if err != nil {
 		return "", err
@@ -229,7 +237,7 @@ func (c *client) GetJobLogs(info *changerequest.RepoInfo, jobID int) (string, er
 		Timeout:   c.httpClient.Timeout,
 	}
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -249,7 +257,11 @@ func (c *client) GetJobLogs(info *changerequest.RepoInfo, jobID int) (string, er
 		if location == "" {
 			return "", fmt.Errorf("redirect with no Location header")
 		}
-		redirectResp, err := http.Get(location)
+		redirectReq, err := http.NewRequestWithContext(ctx, "GET", location, nil)
+		if err != nil {
+			return "", fmt.Errorf("failed to create redirect request: %w", err)
+		}
+		redirectResp, err := http.DefaultClient.Do(redirectReq)
 		if err != nil {
 			return "", fmt.Errorf("failed to fetch logs from redirect: %w", err)
 		}

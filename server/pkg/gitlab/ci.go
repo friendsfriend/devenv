@@ -38,7 +38,7 @@ func (c *client) GetPipelines(projectInfo *ProjectInfo, limit int) ([]Pipeline, 
 	}
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -103,7 +103,7 @@ func (c *client) GetPipelineJobs(projectInfo *ProjectInfo, pipelineID int) ([]Jo
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/pipelines/%d/jobs", c.baseURL, projectPath, pipelineID)
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -156,6 +156,13 @@ func (c *client) GetPipelineJobs(projectInfo *ProjectInfo, pipelineID int) ([]Jo
 
 // GetJobLogs fetches the log/trace for a specific job
 func (c *client) GetJobLogs(projectInfo *ProjectInfo, jobID int) (string, error) {
+	return c.GetJobLogsContext(c.requestContext(), projectInfo, jobID)
+}
+
+func (c *client) GetJobLogsContext(ctx context.Context, projectInfo *ProjectInfo, jobID int) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if projectInfo == nil {
 		return "", fmt.Errorf("project info is nil")
 	}
@@ -167,7 +174,7 @@ func (c *client) GetJobLogs(projectInfo *ProjectInfo, jobID int) (string, error)
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/jobs/%d/trace", c.baseURL, projectPath, jobID)
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -316,7 +323,7 @@ func (c *client) GetTestSummary(projectInfo *ProjectInfo, pipelineID int) (*Test
 		pipelineID)
 
 	// Create request with shorter timeout for test reports
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -453,7 +460,7 @@ func (c *client) RestartJob(projectInfo *ProjectInfo, jobID int) error {
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/jobs/%d/retry", c.baseURL, projectPath, jobID)
 
 	// Create request
-	req, err := http.NewRequest("POST", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "POST", apiURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -502,7 +509,7 @@ func (c *client) CancelJob(projectInfo *ProjectInfo, jobID int) error {
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/jobs/%d/cancel", c.baseURL, projectPath, jobID)
 
 	// Create request
-	req, err := http.NewRequest("POST", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "POST", apiURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}

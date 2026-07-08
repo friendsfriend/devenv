@@ -114,7 +114,7 @@ func (c *client) SearchProjects(query string, limit int) ([]SearchResult, error)
 
 	apiURL := fmt.Sprintf("%s/api/v4/projects?%s", c.baseURL, params.Encode())
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

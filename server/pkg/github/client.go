@@ -19,6 +19,7 @@ import (
 // It provides merge/pull request operations for GitHub repositories.
 type Client interface {
 	changerequest.Client
+	GetJobLogsContext(ctx context.Context, info *changerequest.RepoInfo, jobID int) (string, error)
 	GetPullRequest(info *RepoInfo, prNumber int) (*ChangeRequest, error)
 	GetWorkflowRunByID(info *RepoInfo, runID int64) (*ghWorkflowRun, error)
 	GetCheckRunsForRef(info *RepoInfo, ref string) ([]ghCheckRun, error)
@@ -28,13 +29,22 @@ type client struct {
 	token      string
 	username   string
 	httpClient *http.Client
+	ctx        context.Context
 }
 
 func NewClient(token, username string) Client {
-	return newClient(token, username, nil)
+	return newClientWithContext(context.Background(), token, username, nil)
+}
+
+func NewClientWithContext(ctx context.Context, token, username string) Client {
+	return newClientWithContext(ctx, token, username, nil)
 }
 
 func newClient(token, username string, httpClient *http.Client) Client {
+	return newClientWithContext(context.Background(), token, username, httpClient)
+}
+
+func newClientWithContext(ctx context.Context, token, username string, httpClient *http.Client) Client {
 	if httpClient == nil {
 		httpClient = &http.Client{
 			Timeout: time.Second * 15,
@@ -45,11 +55,22 @@ func newClient(token, username string, httpClient *http.Client) Client {
 			},
 		}
 	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return &client{
 		token:      token,
 		username:   username,
 		httpClient: httpClient,
+		ctx:        ctx,
 	}
+}
+
+func (c *client) requestContext() context.Context {
+	if c.ctx == nil {
+		return context.Background()
+	}
+	return c.ctx
 }
 
 // --- GitHub API raw types (used internally for unmarshalling) ---
@@ -270,7 +291,14 @@ type NoteAuthor struct {
 // --- Helper: HTTP request with GitHub auth ---
 
 func (c *client) doRequest(method, apiURL string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, apiURL, body)
+	return c.doRequestContext(c.requestContext(), method, apiURL, body)
+}
+
+func (c *client) doRequestContext(ctx context.Context, method, apiURL string, body io.Reader) (*http.Response, error) {
+	if ctx == nil {
+		ctx = c.requestContext()
+	}
+	req, err := http.NewRequestWithContext(ctx, method, apiURL, body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

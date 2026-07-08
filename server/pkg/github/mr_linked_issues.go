@@ -27,7 +27,7 @@ func (ic *IssuesClient) GetChangeRequestLinkedIssues(ghInfo *RepoInfo, prNumber 
 	}
 
 	refs := parseIssueReferences(pr.Description)
-	log.Printf("[DEBUG] GitHub GetChangeRequestLinkedIssues(!%d): found %d issue references", prNumber, len(refs))
+	debugLog("GitHub GetChangeRequestLinkedIssues(!%d): found %d issue references", prNumber, len(refs))
 
 	if len(refs) == 0 {
 		return []issues.Issue{}, nil

@@ -183,6 +183,7 @@ export async function handleCrDetailKeys(
 		event.sequence === "\x1b" ||
 		event.raw === "\x1b"
 	) {
+		crActions.abortViewLoads();
 		crActions.backToCRList();
 		return true;
 	}

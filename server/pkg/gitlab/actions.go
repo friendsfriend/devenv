@@ -3,7 +3,6 @@ package gitlab
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -25,7 +24,7 @@ func (c *client) CloseChangeRequest(projectInfo *ProjectInfo, mrIID int) error {
 	reqBody := strings.NewReader("state_event=close")
 
 	// Create request
-	req, err := http.NewRequest("PUT", apiURL, reqBody)
+	req, err := http.NewRequestWithContext(c.requestContext(), "PUT", apiURL, reqBody)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -76,7 +75,7 @@ func (c *client) RebaseChangeRequest(projectInfo *ProjectInfo, mrIID int) error 
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/rebase", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("PUT", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "PUT", apiURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -128,7 +127,7 @@ func (c *client) ApproveChangeRequest(projectInfo *ProjectInfo, mrIID int) error
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/approve", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("POST", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "POST", apiURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -181,7 +180,7 @@ func (c *client) UnapproveChangeRequest(projectInfo *ProjectInfo, mrIID int) err
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/unapprove", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("POST", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "POST", apiURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -202,28 +201,28 @@ func (c *client) UnapproveChangeRequest(projectInfo *ProjectInfo, mrIID int) err
 	switch resp.StatusCode {
 	case http.StatusOK, http.StatusCreated:
 		// Approval successfully removed
-		log.Printf("[DEBUG] UnapproveChangeRequest: Success (status %d)", resp.StatusCode)
+		debugLog("UnapproveChangeRequest: Success (status %d)", resp.StatusCode)
 		return nil
 	case http.StatusNotFound:
-		log.Printf("[DEBUG] UnapproveChangeRequest: NotFound (status 404)")
+		debugLog("UnapproveChangeRequest: NotFound (status 404)")
 		return fmt.Errorf("change request not found")
 	case http.StatusUnauthorized:
-		log.Printf("[DEBUG] UnapproveChangeRequest: Unauthorized (status 401)")
+		debugLog("UnapproveChangeRequest: Unauthorized (status 401)")
 		return fmt.Errorf("GitLab authentication failed - check your token")
 	case http.StatusForbidden:
-		log.Printf("[DEBUG] UnapproveChangeRequest: Forbidden (status 403)")
+		debugLog("UnapproveChangeRequest: Forbidden (status 403)")
 		return fmt.Errorf("access forbidden - you may not have permission to unapprove this change request")
 	case http.StatusConflict:
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[DEBUG] UnapproveChangeRequest: Conflict (status 409): %s", string(body))
+		debugLog("UnapproveChangeRequest: Conflict (status 409): %s", string(body))
 		return fmt.Errorf("cannot unapprove change request: %s", string(body))
 	case http.StatusBadRequest:
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[DEBUG] UnapproveChangeRequest: BadRequest (status 400): %s", string(body))
+		debugLog("UnapproveChangeRequest: BadRequest (status 400): %s", string(body))
 		return fmt.Errorf("cannot unapprove change request: %s", string(body))
 	default:
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[DEBUG] UnapproveChangeRequest: Unknown status %d: %s", resp.StatusCode, string(body))
+		debugLog("UnapproveChangeRequest: Unknown status %d: %s", resp.StatusCode, string(body))
 		return fmt.Errorf("GitLab API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 }
@@ -242,14 +241,14 @@ func (c *client) ToggleMRApproval(projectInfo *ProjectInfo, mrIID int, currentUs
 	}
 
 	// Debug: Log approval details
-	log.Printf("[DEBUG] ToggleMRApproval: currentUsername=%s", currentUsername)
+	debugLog("ToggleMRApproval: currentUsername=%s", currentUsername)
 	if mr.Approvals != nil {
-		log.Printf("[DEBUG] MR has %d approvals", len(mr.Approvals.ApprovedBy))
+		debugLog("MR has %d approvals", len(mr.Approvals.ApprovedBy))
 		for i, approval := range mr.Approvals.ApprovedBy {
-			log.Printf("[DEBUG] Approval[%d]: username=%s, name=%s", i, approval.User.Username, approval.User.Name)
+			debugLog("Approval[%d]: username=%s, name=%s", i, approval.User.Username, approval.User.Name)
 		}
 	} else {
-		log.Printf("[DEBUG] MR Approvals is nil")
+		debugLog("MR Approvals is nil")
 	}
 
 	// Check if current user has already approved
@@ -258,7 +257,7 @@ func (c *client) ToggleMRApproval(projectInfo *ProjectInfo, mrIID int, currentUs
 	if mr.Approvals != nil {
 		for _, approval := range mr.Approvals.ApprovedBy {
 			if approval.User.Username == currentUsername || approval.User.Name == currentUsername {
-				log.Printf("[DEBUG] Match found: comparing '%s' with username='%s' or name='%s'",
+				debugLog("Match found: comparing '%s' with username='%s' or name='%s'",
 					currentUsername, approval.User.Username, approval.User.Name)
 				alreadyApproved = true
 				break
@@ -266,13 +265,13 @@ func (c *client) ToggleMRApproval(projectInfo *ProjectInfo, mrIID int, currentUs
 		}
 	}
 
-	log.Printf("[DEBUG] alreadyApproved=%v", alreadyApproved)
+	debugLog("alreadyApproved=%v", alreadyApproved)
 
 	// Toggle based on current state
 	if alreadyApproved {
-		log.Printf("[DEBUG] Calling UnapproveChangeRequest")
+		debugLog("Calling UnapproveChangeRequest")
 		return c.UnapproveChangeRequest(projectInfo, mrIID)
 	}
-	log.Printf("[DEBUG] Calling ApproveChangeRequest")
+	debugLog("Calling ApproveChangeRequest")
 	return c.ApproveChangeRequest(projectInfo, mrIID)
 }

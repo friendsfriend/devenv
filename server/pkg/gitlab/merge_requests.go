@@ -38,7 +38,7 @@ func (c *client) GetChangeRequests(projectInfo *ProjectInfo, sourceBranch, targe
 	apiURL += "?" + params.Encode()
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -158,7 +158,7 @@ func (c *client) GetChangeRequestsWithOptions(projectInfo *ProjectInfo, opts *ch
 
 	apiURL += "?" + params.Encode()
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -245,7 +245,7 @@ func (c *client) GetChangeRequest(projectInfo *ProjectInfo, mrIID int) (*ChangeR
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -303,7 +303,7 @@ func (c *client) GetMergeRequestApprovals(projectInfo *ProjectInfo, mrIID int) (
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/approvals", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -12,6 +13,10 @@ import (
 )
 
 func (s *Server) resolveGitLabClient(targetApp *app.App) (gitlab.Client, *gitlab.ProjectInfo, string, error) {
+	return s.resolveGitLabClientWithContext(context.Background(), targetApp)
+}
+
+func (s *Server) resolveGitLabClientWithContext(ctx context.Context, targetApp *app.App) (gitlab.Client, *gitlab.ProjectInfo, string, error) {
 	projectInfo, err := gitlab.ExtractProjectInfo(targetApp.RepositoryPath)
 	if err != nil {
 		return nil, nil, "", fmt.Errorf("failed to extract project info: %w", err)
@@ -25,7 +30,7 @@ func (s *Server) resolveGitLabClient(targetApp *app.App) (gitlab.Client, *gitlab
 		return nil, nil, "", fmt.Errorf("no token configured for provider %q", providerName)
 	}
 	baseURL := fmt.Sprintf("https://%s", projectInfo.Host)
-	client := gitlab.NewClient(baseURL, token, username)
+	client := gitlab.NewClientWithContext(ctx, baseURL, token, username)
 	return client, projectInfo, username, nil
 }
 
@@ -79,7 +84,7 @@ func (s *Server) handleGitLabChangeRequests(w http.ResponseWriter, r *http.Reque
 	}
 	query.Options.TargetBranch = "develop"
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -126,7 +131,7 @@ func (s *Server) handleGitLabPipelineJobs(w http.ResponseWriter, r *http.Request
 	appIdent := r.URL.Query().Get("appIdent")
 	pipelineIDStr := r.URL.Query().Get("pipelineId")
 
-	log.Printf("[DEBUG] Pipeline jobs request: appIdent=%s, pipelineId=%s", appIdent, pipelineIDStr)
+	debugLog("Pipeline jobs request: appIdent=%s, pipelineId=%s", appIdent, pipelineIDStr)
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -161,18 +166,18 @@ func (s *Server) handleGitLabPipelineJobs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	log.Printf("[DEBUG] Repository path: %s", targetApp.RepositoryPath)
+	debugLog("Repository path: %s", targetApp.RepositoryPath)
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] Project info: %s/%s on %s", projectInfo.Namespace, projectInfo.Project, projectInfo.Host)
+	debugLog("Project info: %s/%s on %s", projectInfo.Namespace, projectInfo.Project, projectInfo.Host)
 
-	log.Printf("[DEBUG] Fetching jobs for pipeline %d from %s/%s", pipelineID, projectInfo.Namespace, projectInfo.Project)
+	debugLog("Fetching jobs for pipeline %d from %s/%s", pipelineID, projectInfo.Namespace, projectInfo.Project)
 
 	// Get jobs for pipeline
 	jobs, err := gitlabClient.GetPipelineJobs(projectInfo, pipelineID)
@@ -182,7 +187,7 @@ func (s *Server) handleGitLabPipelineJobs(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	log.Printf("[DEBUG] Successfully fetched %d jobs", len(jobs))
+	debugLog("Successfully fetched %d jobs", len(jobs))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(jobs)
@@ -204,7 +209,7 @@ func (s *Server) handleGitLabTestSummary(w http.ResponseWriter, r *http.Request)
 	appIdent := r.URL.Query().Get("appIdent")
 	pipelineIDStr := r.URL.Query().Get("pipelineId")
 
-	log.Printf("[DEBUG] Test summary request: appIdent=%s, pipelineId=%s", appIdent, pipelineIDStr)
+	debugLog("Test summary request: appIdent=%s, pipelineId=%s", appIdent, pipelineIDStr)
 
 	if appIdent == "" || pipelineIDStr == "" {
 		respondBadRequest(w, "appIdent and pipelineId parameters required")
@@ -234,14 +239,14 @@ func (s *Server) handleGitLabTestSummary(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] Fetching test summary for pipeline %d", pipelineID)
+	debugLog("Fetching test summary for pipeline %d", pipelineID)
 
 	// Get test summary for pipeline
 	testSummary, err := gitlabClient.GetTestSummary(projectInfo, pipelineID)
@@ -251,7 +256,7 @@ func (s *Server) handleGitLabTestSummary(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Printf("[DEBUG] Test summary fetched successfully: %d total tests", testSummary.Total)
+	debugLog("Test summary fetched successfully: %d total tests", testSummary.Total)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(testSummary)
@@ -268,7 +273,7 @@ func (s *Server) handleGitLabChangeRequestChanges(w http.ResponseWriter, r *http
 	appIdent := r.URL.Query().Get("appIdent")
 	mrIIDStr := r.URL.Query().Get("crIID")
 
-	log.Printf("[DEBUG] MR changes request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
+	debugLog("MR changes request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
 
 	if appIdent == "" || mrIIDStr == "" {
 		respondBadRequest(w, "appIdent and crIID parameters required")
@@ -298,14 +303,14 @@ func (s *Server) handleGitLabChangeRequestChanges(w http.ResponseWriter, r *http
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] Fetching MR changes for MR %d", mrIID)
+	debugLog("Fetching MR changes for MR %d", mrIID)
 
 	// Get MR changes
 	changes, err := gitlabClient.GetChangeRequestChanges(projectInfo, mrIID)
@@ -315,7 +320,7 @@ func (s *Server) handleGitLabChangeRequestChanges(w http.ResponseWriter, r *http
 		return
 	}
 
-	log.Printf("[DEBUG] MR changes fetched successfully: %d files changed", len(changes))
+	debugLog("MR changes fetched successfully: %d files changed", len(changes))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(changes)
@@ -332,7 +337,7 @@ func (s *Server) handleGitLabMRVersions(w http.ResponseWriter, r *http.Request) 
 	appIdent := r.URL.Query().Get("appIdent")
 	mrIIDStr := r.URL.Query().Get("crIID")
 
-	log.Printf("[DEBUG] MR versions request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
+	debugLog("MR versions request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
 
 	if appIdent == "" || mrIIDStr == "" {
 		respondBadRequest(w, "appIdent and crIID parameters required")
@@ -361,14 +366,14 @@ func (s *Server) handleGitLabMRVersions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] Fetching MR versions: project=%s/%s, MR=%d", projectInfo.Namespace, projectInfo.Project, mrIID)
+	debugLog("Fetching MR versions: project=%s/%s, MR=%d", projectInfo.Namespace, projectInfo.Project, mrIID)
 
 	// Get MR versions
 	versions, err := gitlabClient.GetMRVersions(projectInfo, mrIID)
@@ -378,7 +383,7 @@ func (s *Server) handleGitLabMRVersions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	log.Printf("[DEBUG] Successfully fetched %d MR versions", len(versions))
+	debugLog("Successfully fetched %d MR versions", len(versions))
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(versions)
 }
@@ -427,7 +432,7 @@ func (s *Server) handleGitLabMRComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
@@ -435,10 +440,10 @@ func (s *Server) handleGitLabMRComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Debug logging
-	log.Printf("[DEBUG] Creating MR comment: project=%s/%s, MR=%d, body length=%d",
+	debugLog("Creating MR comment: project=%s/%s, MR=%d, body length=%d",
 		projectInfo.Namespace, projectInfo.Project, req.MRIID, len(req.Body))
 	if req.Position != nil {
-		log.Printf("[DEBUG] Comment position: base_sha=%s, head_sha=%s, start_sha=%s, path=%s, new_line=%v, old_line=%v",
+		debugLog("Comment position: base_sha=%s, head_sha=%s, start_sha=%s, path=%s, new_line=%v, old_line=%v",
 			req.Position.BaseSHA, req.Position.HeadSHA, req.Position.StartSHA,
 			req.Position.NewPath, req.Position.NewLine, req.Position.OldLine)
 	}
@@ -470,7 +475,7 @@ func (s *Server) handleGitLabMRDiscussions(w http.ResponseWriter, r *http.Reques
 	appIdent := r.URL.Query().Get("appIdent")
 	mrIIDStr := r.URL.Query().Get("crIID")
 
-	log.Printf("[DEBUG] MR discussions request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
+	debugLog("MR discussions request: appIdent=%s, mrIID=%s", appIdent, mrIIDStr)
 
 	if appIdent == "" || mrIIDStr == "" {
 		respondBadRequest(w, "appIdent and crIID parameters required")
@@ -500,14 +505,14 @@ func (s *Server) handleGitLabMRDiscussions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] Fetching discussions for MR %d", mrIID)
+	debugLog("Fetching discussions for MR %d", mrIID)
 
 	// Get MR discussions
 	discussions, err := gitlabClient.GetMRDiscussions(projectInfo, mrIID)
@@ -517,7 +522,7 @@ func (s *Server) handleGitLabMRDiscussions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	log.Printf("[DEBUG] Fetched %d discussions for MR %d", len(discussions), mrIID)
+	debugLog("Fetched %d discussions for MR %d", len(discussions), mrIID)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(discussions)
@@ -542,7 +547,7 @@ func (s *Server) handleGitLabMRDiscussionReply(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	log.Printf("[DEBUG] Discussion reply request: appIdent=%s, mrIID=%d, discussionID=%s", req.AppIdent, req.MRIID, req.DiscussionID)
+	debugLog("Discussion reply request: appIdent=%s, mrIID=%d, discussionID=%s", req.AppIdent, req.MRIID, req.DiscussionID)
 
 	// Validate required fields
 	if req.AppIdent == "" || req.MRIID == 0 || req.DiscussionID == "" || req.Body == "" {
@@ -566,14 +571,14 @@ func (s *Server) handleGitLabMRDiscussionReply(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] Adding reply to discussion %s on MR %d", req.DiscussionID, req.MRIID)
+	debugLog("Adding reply to discussion %s on MR %d", req.DiscussionID, req.MRIID)
 
 	// Add reply to discussion
 	err = gitlabClient.ReplyToDiscussion(projectInfo, req.MRIID, req.DiscussionID, req.Body)
@@ -583,7 +588,7 @@ func (s *Server) handleGitLabMRDiscussionReply(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	log.Printf("[DEBUG] Reply added successfully")
+	debugLog("Reply added successfully")
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -612,7 +617,7 @@ func (s *Server) handleGitLabMRDiscussionResolve(w http.ResponseWriter, r *http.
 		return
 	}
 
-	log.Printf("[DEBUG] Discussion resolve request: appIdent=%s, mrIID=%d, discussionID=%s, resolved=%t", req.AppIdent, req.MRIID, req.DiscussionID, req.Resolved)
+	debugLog("Discussion resolve request: appIdent=%s, mrIID=%d, discussionID=%s, resolved=%t", req.AppIdent, req.MRIID, req.DiscussionID, req.Resolved)
 
 	// Validate required fields
 	if req.AppIdent == "" || req.MRIID == 0 || req.DiscussionID == "" {
@@ -636,7 +641,7 @@ func (s *Server) handleGitLabMRDiscussionResolve(w http.ResponseWriter, r *http.
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
@@ -647,7 +652,7 @@ func (s *Server) handleGitLabMRDiscussionResolve(w http.ResponseWriter, r *http.
 	if !req.Resolved {
 		action = "Unresolving"
 	}
-	log.Printf("[DEBUG] %s discussion %s on MR %d", action, req.DiscussionID, req.MRIID)
+	debugLog("%s discussion %s on MR %d", action, req.DiscussionID, req.MRIID)
 
 	// Resolve/unresolve discussion
 	err = gitlabClient.ResolveDiscussion(projectInfo, req.MRIID, req.DiscussionID, req.Resolved)
@@ -657,7 +662,7 @@ func (s *Server) handleGitLabMRDiscussionResolve(w http.ResponseWriter, r *http.
 		return
 	}
 
-	log.Printf("[DEBUG] Discussion resolved successfully")
+	debugLog("Discussion resolved successfully")
 
 	// Return success
 	w.Header().Set("Content-Type", "application/json")
@@ -711,7 +716,7 @@ func (s *Server) handleGitLabMRApprove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
@@ -783,7 +788,7 @@ func (s *Server) handleGitLabMRUnapprove(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
@@ -856,7 +861,7 @@ func (s *Server) handleGitLabMRToggleApproval(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	gitlabClient, projectInfo, username, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, username, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
@@ -932,7 +937,7 @@ func (s *Server) handleGitLabMRRebase(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
@@ -971,7 +976,7 @@ func (s *Server) handleGitLabJobLogs(w http.ResponseWriter, r *http.Request) {
 	appIdent := r.URL.Query().Get("appIdent")
 	jobIDStr := r.URL.Query().Get("jobId")
 
-	log.Printf("[DEBUG] Job logs request: appIdent=%s, jobId=%s", appIdent, jobIDStr)
+	debugLog("Job logs request: appIdent=%s, jobId=%s", appIdent, jobIDStr)
 
 	if appIdent == "" {
 		respondBadRequest(w, "appIdent parameter required")
@@ -1006,28 +1011,28 @@ func (s *Server) handleGitLabJobLogs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DEBUG] Repository path: %s", targetApp.RepositoryPath)
+	debugLog("Repository path: %s", targetApp.RepositoryPath)
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		log.Printf("[ERROR] Failed to resolve GitLab client: %v", err)
 		respondBadRequest(w, err.Error())
 		return
 	}
 
-	log.Printf("[DEBUG] Project info: %s/%s on %s", projectInfo.Namespace, projectInfo.Project, projectInfo.Host)
+	debugLog("Project info: %s/%s on %s", projectInfo.Namespace, projectInfo.Project, projectInfo.Host)
 
-	log.Printf("[DEBUG] Fetching logs for job %d from %s/%s", jobID, projectInfo.Namespace, projectInfo.Project)
+	debugLog("Fetching logs for job %d from %s/%s", jobID, projectInfo.Namespace, projectInfo.Project)
 
 	// Get logs for job
-	logs, err := gitlabClient.GetJobLogs(projectInfo, jobID)
+	logs, err := gitlabClient.GetJobLogsContext(r.Context(), projectInfo, jobID)
 	if err != nil {
 		log.Printf("[ERROR] Failed to fetch job logs: %v", err)
 		respondErrorMessage(w, fmt.Sprintf("Failed to fetch job logs: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("[DEBUG] Successfully fetched %d bytes of logs", len(logs))
+	debugLog("Successfully fetched %d bytes of logs", len(logs))
 
 	// Return logs as plain text
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -1075,7 +1080,7 @@ func (s *Server) handleGitLabJobRetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return
@@ -1152,7 +1157,7 @@ func (s *Server) handleGitLabJobCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondBadRequest(w, err.Error())
 		return

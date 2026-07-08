@@ -166,6 +166,7 @@ export async function handleIssueDetailKeys(
 	// ─── Normal mode keybinds ───────────────────────────────────────────────
 
 	if (event.name === "escape" || event.name === "q") {
+		issueActions.abortViewLoads();
 		issueActions.backToIssueList();
 		return true;
 	}

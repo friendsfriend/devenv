@@ -5,168 +5,146 @@ import (
 	"net/http"
 )
 
+type routeSpec struct {
+	Domain  string
+	Method  string
+	Path    string
+	Handler func(http.ResponseWriter, *http.Request)
+}
+
+func (s *Server) routes() []routeSpec {
+	return []routeSpec{
+		{Domain: "app", Method: http.MethodGet, Path: "/api/apps", Handler: s.handleGetApps},
+		{Domain: "app", Method: http.MethodGet, Path: "/api/infra-services", Handler: s.handleGetInfraServices},
+		{Domain: "app", Method: http.MethodPost, Path: "/api/infra-services/{ident}/start", Handler: s.handleInfraServiceStart},
+		{Domain: "app", Method: http.MethodPost, Path: "/api/infra-services/{ident}/stop", Handler: s.handleInfraServiceStop},
+		{Domain: "app", Method: http.MethodGet, Path: "/api/infra-services/{ident}/logs", Handler: s.handleInfraServiceLogs},
+		{Domain: "app", Method: http.MethodGet, Path: "/api/status", Handler: s.handleGetStatus},
+		{Domain: "app", Method: http.MethodGet, Path: "/api/apps/{ident}/docker", Handler: s.handleGetDockerInfo},
+		{Domain: "app", Method: http.MethodGet, Path: "/api/apps/{ident}/git", Handler: s.handleGetGitInfo},
+		{Domain: "app", Method: http.MethodPost, Path: "/api/apps/create", Handler: s.handleCreateApp},
+		{Domain: "app", Method: http.MethodPost, Path: "/api/example-config", Handler: s.handleCreateExampleConfig},
+		{Domain: "app", Method: http.MethodDelete, Path: "/api/apps/{ident}/delete", Handler: s.handleDeleteApp},
+		{Domain: "app", Method: http.MethodGet, Path: "/api/apps/{ident}/profiles", Handler: s.handleGetProfiles},
+		{Domain: "app", Method: http.MethodGet, Path: "/api/apps/{ident}/actions/{action}/targets", Handler: s.handleGetActionTargets},
+
+		{Domain: "docker", Method: http.MethodPost, Path: "/api/docker/start", Handler: s.handleDockerStart},
+		{Domain: "docker", Method: http.MethodPost, Path: "/api/docker/stop", Handler: s.handleDockerStop},
+		{Domain: "docker", Method: http.MethodPost, Path: "/api/docker/restart", Handler: s.handleDockerRestart},
+		{Domain: "docker", Method: http.MethodGet, Path: "/api/docker/logs", Handler: s.handleDockerLogs},
+		{Domain: "docker", Method: http.MethodGet, Path: "/api/docker/logs/stream", Handler: s.handleDockerLogsStream},
+		{Domain: "docker", Method: http.MethodGet, Path: "/api/docker/stats/stream", Handler: s.handleDockerStatsStream},
+
+		{Domain: "kubernetes", Method: http.MethodGet, Path: "/api/kubernetes/logs", Handler: s.handleKubernetesLogs},
+		{Domain: "kubernetes", Method: http.MethodGet, Path: "/api/kubernetes/cluster", Handler: s.handleKubernetesClusterStatus},
+		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/create", Handler: s.handleKubernetesClusterCreate},
+		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/delete", Handler: s.handleKubernetesClusterDelete},
+		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/recreate", Handler: s.handleKubernetesClusterRecreate},
+		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/export-kubeconfig", Handler: s.handleKubernetesClusterExport},
+		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/refresh", Handler: s.handleKubernetesClusterRefresh},
+
+		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/operation/", Handler: s.handleOperationLogs},
+		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/action/", Handler: s.handleActionLog},
+		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/history/", Handler: s.handleLogHistory},
+		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/status", Handler: s.handleStatusLog},
+
+		{Domain: "git", Method: http.MethodPost, Path: "/api/git/pull", Handler: s.handleGitPull},
+		{Domain: "git", Method: http.MethodPost, Path: "/api/git/push", Handler: s.handleGitPush},
+		{Domain: "git", Method: http.MethodPost, Path: "/api/git/fetch", Handler: s.handleGitFetch},
+		{Domain: "git", Method: http.MethodGet, Path: "/api/git/branches", Handler: s.handleGitBranches},
+		{Domain: "git", Method: http.MethodPost, Path: "/api/git/checkout", Handler: s.handleGitCheckout},
+		{Domain: "git", Method: http.MethodGet, Path: "/api/git/worktrees", Handler: s.handleWorktrees},
+
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/start", Handler: s.handleStart},
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/build", Handler: s.handleBuild},
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/test", Handler: s.handleTest},
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/run", Handler: s.handleRun},
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/stop", Handler: s.handleStopApp},
+		{Domain: "actions", Method: http.MethodGet, Path: "/api/actions/shell-script", Handler: s.handleShellActionScript},
+
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/merge-requests", Handler: s.handleGitLabChangeRequests},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/jobs", Handler: s.handleGitLabJobs},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/test-summary", Handler: s.handleGitLabTestSummary},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/cr-changes", Handler: s.handleGitLabChangeRequestChanges},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/cr-versions", Handler: s.handleGitLabMRVersions},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/cr-comment", Handler: s.handleGitLabMRComment},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/cr-discussions", Handler: s.handleGitLabMRDiscussions},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/cr-discussion-reply", Handler: s.handleGitLabMRDiscussionReply},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/cr-discussion-resolve", Handler: s.handleGitLabMRDiscussionResolve},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/cr-approve", Handler: s.handleGitLabMRApprove},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/cr-unapprove", Handler: s.handleGitLabMRUnapprove},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/cr-toggle-approval", Handler: s.handleGitLabMRToggleApproval},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/cr-rebase", Handler: s.handleGitLabMRRebase},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/job-logs", Handler: s.handleGitLabJobLogs},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/job-retry", Handler: s.handleGitLabJobRetry},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/job-cancel", Handler: s.handleGitLabJobCancel},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/issues", Handler: s.handleGitLabIssues},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/issue", Handler: s.handleGitLabIssueDetail},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/issue-comments", Handler: s.handleGitLabIssueComments},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/issues/close", Handler: s.handleGitLabCloseIssue},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/issues/reopen", Handler: s.handleGitLabReopenIssue},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/issues/labels", Handler: s.handleGitLabSetLabels},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/issues/assignee", Handler: s.handleGitLabSetAssignee},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/issues/unassign", Handler: s.handleGitLabRemoveAssignee},
+		{Domain: "gitlab", Method: http.MethodPost, Path: "/api/gitlab/issues/comment", Handler: s.handleGitLabAddComment},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/issues/linked-crs", Handler: s.handleGitLabIssueLinkedCRs},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/issues/references", Handler: s.handleGitLabIssueReferencedIssues},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/cr/linked-issues", Handler: s.handleGitLabCRLinkedIssues},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/labels", Handler: s.handleGitLabRepoLabels},
+		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/collaborators", Handler: s.handleGitLabRepoCollaborators},
+
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/pull-requests", Handler: s.handleGitHubPullRequests},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/pull-request", Handler: s.handleGitHubPullRequest},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/pr-changes", Handler: s.handleGitHubPRChanges},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/pr-discussions", Handler: s.handleGitHubPRDiscussions},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/pr-approve", Handler: s.handleGitHubPRApprove},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/pr-unapprove", Handler: s.handleGitHubPRUnapprove},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/pr-toggle-approval", Handler: s.handleGitHubPRToggleApproval},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/actions-jobs", Handler: s.handleGitHubActionsJobs},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/actions-test-summary", Handler: s.handleGitHubActionsTestSummary},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/actions-job-logs", Handler: s.handleGitHubActionsJobLogs},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/issues", Handler: s.handleGitHubIssues},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/issue", Handler: s.handleGitHubIssueDetail},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/issue-comments", Handler: s.handleGitHubIssueComments},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/issues/close", Handler: s.handleGitHubCloseIssue},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/issues/reopen", Handler: s.handleGitHubReopenIssue},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/issues/labels", Handler: s.handleGitHubSetLabels},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/issues/assignee", Handler: s.handleGitHubSetAssignee},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/issues/unassign", Handler: s.handleGitHubRemoveAssignee},
+		{Domain: "github", Method: http.MethodPost, Path: "/api/github/issues/comment", Handler: s.handleGitHubAddComment},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/issues/linked-crs", Handler: s.handleGitHubIssueLinkedCRs},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/issues/references", Handler: s.handleGitHubIssueReferencedIssues},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/cr/linked-issues", Handler: s.handleGitHubCRLinkedIssues},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/labels", Handler: s.handleGitHubRepoLabels},
+		{Domain: "github", Method: http.MethodGet, Path: "/api/github/collaborators", Handler: s.handleGitHubRepoCollaborators},
+
+		{Domain: "ai", Method: http.MethodPost, Path: "/api/ai/analyze-logs", Handler: s.handleAIAnalyzeLogs},
+		{Domain: "ai", Method: http.MethodGet, Path: "/api/ai/analyze-logs-stream", Handler: s.handleAIAnalyzeLogsStream},
+		{Domain: "ai", Method: http.MethodGet, Path: "/api/ai/cr-review-stream", Handler: s.handleAICRReviewStream},
+		{Domain: "ai", Method: http.MethodPost, Path: "/api/ai/cr-comment-callback/", Handler: s.handleCRCommentCallback},
+
+		{Domain: "providers", Method: "", Path: "/api/providers", Handler: s.handleProviders},
+		{Domain: "providers", Method: "", Path: "/api/providers/", Handler: s.handleProviderByName},
+		{Domain: "repos", Method: http.MethodGet, Path: "/api/repos/search", Handler: s.handleRepoSearch},
+		{Domain: "repos", Method: http.MethodGet, Path: "/api/repos/branches", Handler: s.handleRepoBranches},
+
+		{Domain: "scripts", Method: http.MethodGet, Path: "/api/scripts", Handler: s.handleScripts},
+		{Domain: "scripts", Method: http.MethodPost, Path: "/api/scripts/create", Handler: s.handleCreateScript},
+		{Domain: "scripts", Method: http.MethodPost, Path: "/api/scripts/link", Handler: s.handleLinkScript},
+		{Domain: "scripts", Method: http.MethodDelete, Path: "/api/scripts/delete", Handler: s.handleDeleteScript},
+		{Domain: "scripts", Method: http.MethodGet, Path: "/api/scripts/history", Handler: s.handleScriptArgsHistory},
+		{Domain: "scripts", Method: http.MethodGet, Path: "/api/scripts/metadata", Handler: s.handleScriptMetadataRoute},
+
+		{Domain: "system", Method: http.MethodGet, Path: "/api/pi-sessions", Handler: s.handleGetPiSessions},
+		{Domain: "system", Method: http.MethodGet, Path: "/api/events", Handler: s.handleEvents},
+		{Domain: "system", Method: http.MethodGet, Path: "/api/health", Handler: s.handleHealth},
+	}
+}
+
 func (s *Server) registerRoutes(mux *http.ServeMux) {
-	s.registerAppRoutes(mux)
-	s.registerDockerRoutes(mux)
-	s.registerKubernetesRoutes(mux)
-	s.registerLogRoutes(mux)
-	s.registerGitRoutes(mux)
-	s.registerActionRoutes(mux)
-	s.registerGitLabRoutes(mux)
-	s.registerGitHubRoutes(mux)
-	s.registerAIRoutes(mux)
-	s.registerProviderRoutes(mux)
-	s.registerRepositoryRoutes(mux)
-	s.registerScriptRoutes(mux)
-	mux.HandleFunc("/api/pi-sessions", s.handleGetPiSessions)
-	mux.HandleFunc("/api/events", s.handleEvents)
-	mux.HandleFunc("/api/health", s.handleHealth)
-}
-
-func (s *Server) registerAppRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/apps", s.handleGetApps)
-	mux.HandleFunc("/api/infra-services", s.handleGetInfraServices)
-	mux.HandleFunc("/api/infra-services/{ident}/start", s.handleInfraServiceStart)
-	mux.HandleFunc("/api/infra-services/{ident}/stop", s.handleInfraServiceStop)
-	mux.HandleFunc("/api/infra-services/{ident}/logs", s.handleInfraServiceLogs)
-	mux.HandleFunc("/api/status", s.handleGetStatus)
-	mux.HandleFunc("/api/apps/{ident}/docker", s.handleGetDockerInfo)
-	mux.HandleFunc("/api/apps/{ident}/git", s.handleGetGitInfo)
-	mux.HandleFunc("/api/apps/create", s.handleCreateApp)
-	mux.HandleFunc("/api/example-config", s.handleCreateExampleConfig)
-	mux.HandleFunc("/api/apps/{ident}/delete", s.handleDeleteApp)
-	mux.HandleFunc("/api/apps/{ident}/profiles", s.handleGetProfiles)
-	mux.HandleFunc("/api/apps/{ident}/actions/{action}/targets", s.handleGetActionTargets)
-}
-
-func (s *Server) registerDockerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/docker/start", s.handleDockerStart)
-	mux.HandleFunc("/api/docker/stop", s.handleDockerStop)
-	mux.HandleFunc("/api/docker/restart", s.handleDockerRestart)
-	mux.HandleFunc("/api/docker/logs", s.handleDockerLogs)
-	mux.HandleFunc("/api/docker/logs/stream", s.handleDockerLogsStream)
-	mux.HandleFunc("/api/docker/stats/stream", s.handleDockerStatsStream)
-}
-
-func (s *Server) registerKubernetesRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/kubernetes/logs", s.handleKubernetesLogs)
-	mux.HandleFunc("/api/kubernetes/cluster", s.handleKubernetesClusterStatus)
-	mux.HandleFunc("/api/kubernetes/cluster/create", s.handleKubernetesClusterCreate)
-	mux.HandleFunc("/api/kubernetes/cluster/delete", s.handleKubernetesClusterDelete)
-	mux.HandleFunc("/api/kubernetes/cluster/recreate", s.handleKubernetesClusterRecreate)
-	mux.HandleFunc("/api/kubernetes/cluster/export-kubeconfig", s.handleKubernetesClusterExport)
-	mux.HandleFunc("/api/kubernetes/cluster/refresh", s.handleKubernetesClusterRefresh)
-}
-
-func (s *Server) registerLogRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/logs/operation/", s.handleOperationLogs)
-	mux.HandleFunc("/api/logs/action/", s.handleActionLog)
-	mux.HandleFunc("/api/logs/history/", s.handleLogHistory)
-	mux.HandleFunc("/api/logs/status", s.handleStatusLog)
-}
-
-func (s *Server) registerGitRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/git/pull", s.handleGitPull)
-	mux.HandleFunc("/api/git/push", s.handleGitPush)
-	mux.HandleFunc("/api/git/fetch", s.handleGitFetch)
-	mux.HandleFunc("/api/git/branches", s.handleGitBranches)
-	mux.HandleFunc("/api/git/checkout", s.handleGitCheckout)
-	mux.HandleFunc("/api/git/worktrees", s.handleWorktrees)
-}
-
-func (s *Server) registerActionRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/actions/start", s.handleStart)
-	mux.HandleFunc("/api/actions/build", s.handleBuild)
-	mux.HandleFunc("/api/actions/test", s.handleTest)
-	mux.HandleFunc("/api/actions/run", s.handleRun)
-	mux.HandleFunc("/api/actions/stop", s.handleStopApp)
-	mux.HandleFunc("/api/actions/shell-script", s.handleShellActionScript)
-}
-
-func (s *Server) registerGitLabRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/gitlab/merge-requests", s.handleGitLabChangeRequests)
-	mux.HandleFunc("/api/gitlab/jobs", s.handleGitLabJobs)
-	mux.HandleFunc("/api/gitlab/test-summary", s.handleGitLabTestSummary)
-	mux.HandleFunc("/api/gitlab/cr-changes", s.handleGitLabChangeRequestChanges)
-	mux.HandleFunc("/api/gitlab/cr-versions", s.handleGitLabMRVersions)
-	mux.HandleFunc("/api/gitlab/cr-comment", s.handleGitLabMRComment)
-	mux.HandleFunc("/api/gitlab/cr-discussions", s.handleGitLabMRDiscussions)
-	mux.HandleFunc("/api/gitlab/cr-discussion-reply", s.handleGitLabMRDiscussionReply)
-	mux.HandleFunc("/api/gitlab/cr-discussion-resolve", s.handleGitLabMRDiscussionResolve)
-	mux.HandleFunc("/api/gitlab/cr-approve", s.handleGitLabMRApprove)
-	mux.HandleFunc("/api/gitlab/cr-unapprove", s.handleGitLabMRUnapprove)
-	mux.HandleFunc("/api/gitlab/cr-toggle-approval", s.handleGitLabMRToggleApproval)
-	mux.HandleFunc("/api/gitlab/cr-rebase", s.handleGitLabMRRebase)
-	mux.HandleFunc("/api/gitlab/job-logs", s.handleGitLabJobLogs)
-	mux.HandleFunc("/api/gitlab/job-retry", s.handleGitLabJobRetry)
-	mux.HandleFunc("/api/gitlab/job-cancel", s.handleGitLabJobCancel)
-	mux.HandleFunc("/api/gitlab/issues", s.handleGitLabIssues)
-	mux.HandleFunc("/api/gitlab/issue", s.handleGitLabIssueDetail)
-	mux.HandleFunc("/api/gitlab/issue-comments", s.handleGitLabIssueComments)
-	mux.HandleFunc("/api/gitlab/issues/close", s.handleGitLabCloseIssue)
-	mux.HandleFunc("/api/gitlab/issues/reopen", s.handleGitLabReopenIssue)
-	mux.HandleFunc("/api/gitlab/issues/labels", s.handleGitLabSetLabels)
-	mux.HandleFunc("/api/gitlab/issues/assignee", s.handleGitLabSetAssignee)
-	mux.HandleFunc("/api/gitlab/issues/unassign", s.handleGitLabRemoveAssignee)
-	mux.HandleFunc("/api/gitlab/issues/comment", s.handleGitLabAddComment)
-	mux.HandleFunc("/api/gitlab/issues/linked-crs", s.handleGitLabIssueLinkedCRs)
-	mux.HandleFunc("/api/gitlab/issues/references", s.handleGitLabIssueReferencedIssues)
-	mux.HandleFunc("/api/gitlab/cr/linked-issues", s.handleGitLabCRLinkedIssues)
-	mux.HandleFunc("/api/gitlab/labels", s.handleGitLabRepoLabels)
-	mux.HandleFunc("/api/gitlab/collaborators", s.handleGitLabRepoCollaborators)
-}
-
-func (s *Server) registerGitHubRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/github/pull-requests", s.handleGitHubPullRequests)
-	mux.HandleFunc("/api/github/pull-request", s.handleGitHubPullRequest)
-	mux.HandleFunc("/api/github/pr-changes", s.handleGitHubPRChanges)
-	mux.HandleFunc("/api/github/pr-discussions", s.handleGitHubPRDiscussions)
-	mux.HandleFunc("/api/github/pr-approve", s.handleGitHubPRApprove)
-	mux.HandleFunc("/api/github/pr-unapprove", s.handleGitHubPRUnapprove)
-	mux.HandleFunc("/api/github/pr-toggle-approval", s.handleGitHubPRToggleApproval)
-	mux.HandleFunc("/api/github/actions-jobs", s.handleGitHubActionsJobs)
-	mux.HandleFunc("/api/github/actions-test-summary", s.handleGitHubActionsTestSummary)
-	mux.HandleFunc("/api/github/actions-job-logs", s.handleGitHubActionsJobLogs)
-	mux.HandleFunc("/api/github/issues", s.handleGitHubIssues)
-	mux.HandleFunc("/api/github/issue", s.handleGitHubIssueDetail)
-	mux.HandleFunc("/api/github/issue-comments", s.handleGitHubIssueComments)
-	mux.HandleFunc("/api/github/issues/close", s.handleGitHubCloseIssue)
-	mux.HandleFunc("/api/github/issues/reopen", s.handleGitHubReopenIssue)
-	mux.HandleFunc("/api/github/issues/labels", s.handleGitHubSetLabels)
-	mux.HandleFunc("/api/github/issues/assignee", s.handleGitHubSetAssignee)
-	mux.HandleFunc("/api/github/issues/unassign", s.handleGitHubRemoveAssignee)
-	mux.HandleFunc("/api/github/issues/comment", s.handleGitHubAddComment)
-	mux.HandleFunc("/api/github/issues/linked-crs", s.handleGitHubIssueLinkedCRs)
-	mux.HandleFunc("/api/github/issues/references", s.handleGitHubIssueReferencedIssues)
-	mux.HandleFunc("/api/github/cr/linked-issues", s.handleGitHubCRLinkedIssues)
-	mux.HandleFunc("/api/github/labels", s.handleGitHubRepoLabels)
-	mux.HandleFunc("/api/github/collaborators", s.handleGitHubRepoCollaborators)
-}
-
-func (s *Server) registerAIRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/ai/analyze-logs", s.handleAIAnalyzeLogs)
-	mux.HandleFunc("/api/ai/analyze-logs-stream", s.handleAIAnalyzeLogsStream)
-	mux.HandleFunc("/api/ai/cr-review-stream", s.handleAICRReviewStream)
-	mux.HandleFunc("/api/ai/cr-comment-callback/", s.handleCRCommentCallback)
-}
-
-func (s *Server) registerProviderRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/providers", s.handleProviders)
-	mux.HandleFunc("/api/providers/", s.handleProviderByName)
-}
-
-func (s *Server) registerRepositoryRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/repos/search", s.handleRepoSearch)
-	mux.HandleFunc("/api/repos/branches", s.handleRepoBranches)
-}
-
-func (s *Server) registerScriptRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/scripts", s.handleScripts)
-	mux.HandleFunc("/api/scripts/create", s.handleCreateScript)
-	mux.HandleFunc("/api/scripts/link", s.handleLinkScript)
-	mux.HandleFunc("/api/scripts/delete", s.handleDeleteScript)
-	mux.HandleFunc("/api/scripts/history", s.handleScriptArgsHistory)
-	mux.HandleFunc("/api/scripts/metadata", s.handleScriptMetadataRoute)
+	for _, route := range s.routes() {
+		mux.HandleFunc(route.Path, route.Handler)
+	}
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

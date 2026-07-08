@@ -18,6 +18,7 @@ export function handleAddRepositoryModalKeys(
   const step = providerStore.addRepositoryStep();
 
   if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
+    providerActions.abortRepositorySearch();
     if (step === 'selectProvider') {
       providerActions.resetAddRepositoryModal();
     } else if (step === 'selectDestination') {

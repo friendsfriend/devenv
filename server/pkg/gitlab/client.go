@@ -31,6 +31,7 @@ type Client interface {
 	RebaseChangeRequest(projectInfo *ProjectInfo, mrIID int) error
 	CloseChangeRequest(projectInfo *ProjectInfo, mrIID int) error
 	GetJobLogs(projectInfo *ProjectInfo, jobID int) (string, error)
+	GetJobLogsContext(ctx context.Context, projectInfo *ProjectInfo, jobID int) (string, error)
 	StreamJobLogs(ctx context.Context, projectInfo *ProjectInfo, jobID int) (chan string, error)
 	SearchProjects(query string, limit int) ([]SearchResult, error)
 	ValidateConnection() error
@@ -44,6 +45,14 @@ type client struct {
 	token      string
 	username   string
 	httpClient *http.Client
+	ctx        context.Context
+}
+
+func (c *client) requestContext() context.Context {
+	if c.ctx == nil {
+		return context.Background()
+	}
+	return c.ctx
 }
 
 // Username returns the authenticated username for approval toggling.
@@ -296,6 +305,13 @@ type NotePosition struct {
 
 // NewClient creates a new GitLab API client
 func NewClient(baseURL, token, username string) Client {
+	return NewClientWithContext(context.Background(), baseURL, token, username)
+}
+
+func NewClientWithContext(ctx context.Context, baseURL, token, username string) Client {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	// Ensure baseURL has the correct format
 	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
 		baseURL = "https://" + baseURL
@@ -308,6 +324,7 @@ func NewClient(baseURL, token, username string) Client {
 		baseURL:  baseURL,
 		token:    token,
 		username: username,
+		ctx:      ctx,
 		httpClient: &http.Client{
 			Timeout: time.Second * 15, // Reasonable timeout for API calls
 			Transport: &http.Transport{
@@ -733,7 +750,7 @@ func (c *client) ValidateConnection() error {
 	// Try to get user info to validate connection and authentication
 	apiURL := fmt.Sprintf("%s/api/v4/user", c.baseURL)
 
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create validation request: %w", err)
 	}

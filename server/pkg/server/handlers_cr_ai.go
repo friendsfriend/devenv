@@ -142,7 +142,7 @@ func (s *Server) handleCRCommentCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	gitlabClient, projectInfo, _, err := s.resolveGitLabClient(targetApp)
+	gitlabClient, projectInfo, _, err := s.resolveGitLabClientWithContext(r.Context(), targetApp)
 	if err != nil {
 		respondErrorMessage(w, fmt.Sprintf("GitLab client error: %v", err), http.StatusBadGateway)
 		return

@@ -847,13 +847,13 @@ func (s *Server) OnStatusUpdate(appStatus *status.AppStatus) {
 		Timestamp: time.Now(),
 	})
 
-	log.Printf("[DEBUG] Operation status updated: %s - %s (%s): %s", appStatus.AppIdent, appStatus.Operation, serverStatus, appStatus.Message)
+	debugLog("Operation status updated: %s - %s (%s): %s", appStatus.AppIdent, appStatus.Operation, serverStatus, appStatus.Message)
 }
 
 func (s *Server) OnStatusCleared(appIdent string) {
 	s.clearOperationStatus(appIdent)
 	s.broadcastAppStatusWithRetry(appIdent, "")
-	log.Printf("[DEBUG] Operation status cleared: %s", appIdent)
+	debugLog("Operation status cleared: %s", appIdent)
 }
 
 func (s *Server) reloadAppConfig() {

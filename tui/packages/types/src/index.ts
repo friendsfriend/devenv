@@ -403,7 +403,7 @@ export interface GitInfo {
 
 export interface ServerEvent {
 	type: string;
-	properties: Record<string, any>;
+	properties: Record<string, unknown>;
 	timestamp: string;
 }
 

@@ -97,7 +97,7 @@ func NewIssuesClient(c Client, project *ProjectInfo) issues.Client {
 }
 
 func (ic *IssuesClient) doGet(url string) ([]byte, int, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ic.c.requestContext(), "GET", url, nil)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -120,7 +120,7 @@ func (ic *IssuesClient) doGet(url string) ([]byte, int, error) {
 
 // doGetWithHeaders is like doGet but also returns response headers.
 func (ic *IssuesClient) doGetWithHeaders(url string) ([]byte, int, http.Header, error) {
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ic.c.requestContext(), "GET", url, nil)
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -361,7 +361,7 @@ func (ic *IssuesClient) GetIssueComments(info *issues.RepoInfo, number int) (*is
 // --- HTTP helpers for mutations ---
 
 func (ic *IssuesClient) doPost(urlStr string, body []byte) ([]byte, int, error) {
-	req, err := http.NewRequest("POST", urlStr, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ic.c.requestContext(), "POST", urlStr, bytes.NewReader(body))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -384,7 +384,7 @@ func (ic *IssuesClient) doPost(urlStr string, body []byte) ([]byte, int, error) 
 }
 
 func (ic *IssuesClient) doPut(urlStr string, body []byte) ([]byte, int, error) {
-	req, err := http.NewRequest("PUT", urlStr, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ic.c.requestContext(), "PUT", urlStr, bytes.NewReader(body))
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to create request: %w", err)
 	}

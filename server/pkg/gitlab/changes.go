@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 )
@@ -22,7 +21,7 @@ func (c *client) GetChangeRequestChanges(projectInfo *ProjectInfo, mrIID int) ([
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/merge_requests/%d/changes", c.baseURL, projectPath, mrIID)
 
 	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	req, err := http.NewRequestWithContext(c.requestContext(), "GET", apiURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -66,7 +65,7 @@ func (c *client) GetChangeRequestChanges(projectInfo *ProjectInfo, mrIID int) ([
 		for i := range mrWithChanges.Changes {
 			mrWithChanges.Changes[i].calculateLineStats()
 			mrWithChanges.Changes[i].parseDiffLines(mrWithChanges.DiffRefs.BaseSHA)
-			log.Printf("[DEBUG] Parsed %d diff lines for %s (base_sha: %s)",
+			debugLog("Parsed %d diff lines for %s (base_sha: %s)",
 				len(mrWithChanges.Changes[i].DiffLines),
 				mrWithChanges.Changes[i].NewPath,
 				mrWithChanges.DiffRefs.BaseSHA)

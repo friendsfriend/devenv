@@ -1,6 +1,6 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { StatusLogEntry } from '@devenv/types';
+import type { AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus, StatusLogEntry } from '@devenv/types';
 import type { AppStore } from '../stores/app-store';
 import type { AppDetailStore } from '../stores/app-detail-store';
 import type { UiStore } from '../stores/ui-store';
@@ -56,23 +56,35 @@ export function createAppActions(
         }
 
         if (event.type === 'status.updated') {
-          const { ident, dockerInfo, branch, gitStatus, operationStatus, activeWorktree, status, logPath, runTargetInfo } = event.properties;
+          const props = event.properties as {
+            ident: string;
+            dockerInfo?: DockerInfo;
+            branch?: string;
+            gitStatus?: string;
+            operationStatus?: OperationStatus | null;
+            activeWorktree?: string | null;
+            status?: string;
+            logPath?: string;
+            runTargetInfo?: AppRunTargetInfo | null;
+            executionHandle?: ExecutionHandle | null;
+          };
+          const { ident, dockerInfo, branch, gitStatus, operationStatus, activeWorktree, status, logPath, runTargetInfo } = props;
           appStore.setLastUpdateTime(new Date());
           appStore.setApps((prevApps) =>
             prevApps.map((app) => {
               if (app.ident !== ident) return app;
               const updated: typeof app = { ...app, dockerInfo: dockerInfo ?? app.dockerInfo, branch: branch || app.branch };
-              if ('status' in event.properties) updated.status = status;
-              if ('gitStatus' in event.properties) updated.gitStatus = gitStatus;
-              if ('activeWorktree' in event.properties) {
+              if ('status' in props) updated.status = status;
+              if ('gitStatus' in props) updated.gitStatus = gitStatus;
+              if ('activeWorktree' in props) {
                 if (activeWorktree == null) delete updated.activeWorktree;
                 else updated.activeWorktree = activeWorktree;
               }
-              if ('operationStatus' in event.properties) {
+              if ('operationStatus' in props) {
                 if (operationStatus == null) delete updated.operationStatus;
                 else updated.operationStatus = operationStatus;
               }
-              if ('runTargetInfo' in event.properties) {
+              if ('runTargetInfo' in props) {
                 if (runTargetInfo == null) delete updated.runTargetInfo;
                 else updated.runTargetInfo = runTargetInfo;
               }
@@ -82,15 +94,15 @@ export function createAppActions(
           appStore.setInfraServices((prev) =>
             prev.map((svc) => {
               if (svc.ident !== ident) return svc;
-              const { executionHandle } = event.properties;
+              const { executionHandle } = props;
               const updated: typeof svc = { ...svc, dockerInfo: dockerInfo ?? svc.dockerInfo };
-              if ('status' in event.properties) updated.status = status;
-              if ('logPath' in event.properties) updated.logPath = logPath;
-              if ('executionHandle' in event.properties) {
+              if ('status' in props) updated.status = status;
+              if ('logPath' in props) updated.logPath = logPath;
+              if ('executionHandle' in props) {
                 if (executionHandle == null) delete updated.executionHandle;
                 else updated.executionHandle = executionHandle;
               }
-              if ('operationStatus' in event.properties) {
+              if ('operationStatus' in props) {
                 if (operationStatus == null) delete updated.operationStatus;
                 else updated.operationStatus = operationStatus;
               }
@@ -100,14 +112,14 @@ export function createAppActions(
         }
 
         if (event.type === 'operation.status.changed') {
-          const { appIdent, operation, status, message } = event.properties;
+          const { appIdent, operation, status, message } = event.properties as unknown as OperationStatus & { appIdent: string };
           appStore.setApps((prevApps) =>
             prevApps.map((app) => (app.ident === appIdent ? { ...app, operationStatus: { operation, status, message } } : app)),
           );
         }
 
         if (event.type === 'operation.status.cleared') {
-          const { appIdent } = event.properties;
+          const { appIdent } = event.properties as { appIdent: string };
           appStore.setApps((prevApps) =>
             prevApps.map((app) => {
               if (app.ident !== appIdent) return app;
@@ -145,7 +157,14 @@ export function createAppActions(
         }
 
         if (event.type === 'statuslog.entry') {
-          const { timestamp, appIdent, appName, operation, status, message } = event.properties;
+          const { timestamp, appIdent, appName, operation, status, message } = event.properties as {
+            timestamp: string;
+            appIdent: string;
+            appName: string;
+            operation: string;
+            status: string;
+            message: string;
+          };
           const entry: StatusLogEntry = {
             Timestamp: timestamp,
             AppIdent: appIdent,
