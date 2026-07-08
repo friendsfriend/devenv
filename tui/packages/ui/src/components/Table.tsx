@@ -317,6 +317,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 								prefix={`[${appKind(app)}] `}
 								prefixColor={uiColors.primary}
 								title={app.displayName}
+								titleQuery={props.searchQuery}
 								statusText={isLib ? '' : appStatus(app)}
 								statusColor={appStatusColor(app)}
 								statusBadgeHighlight={isLib ? undefined : appStatusHighlight(app)}

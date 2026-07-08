@@ -5,6 +5,7 @@ import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 import { PropertiesList, propertyBadges } from './PropertiesList';
+import { MatchedText } from './MatchedText';
 
 export type AddRepositoryStep = 'selectProvider' | 'selectDestination' | 'findRepo' | 'repositoryName' | 'selectBranch' | 'confirm';
 export type FindRepoMode = 'selectMode' | 'search' | 'url';
@@ -230,12 +231,12 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
                 <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
                   {isSelected() ? '▸ ' : '  '}
                 </text>
-                <text
+                <MatchedText
+                  text={result.fullPath}
+                  query={props.searchQuery}
                   fg={isSelected() ? uiColors.primary : uiColors.textSecondary}
                   attributes={isSelected() ? TextAttributes.BOLD : undefined}
-                >
-                  {result.fullPath}
-                </text>
+                />
               </box>
             );
           })}
@@ -337,12 +338,12 @@ export function AddRepositoryModal(props: AddRepositoryModalProps) {
               <text fg={isSelected() ? uiColors.primary : uiColors.textMuted}>
                 {isSelected() ? '▸ ' : '  '}
               </text>
-              <text
+              <MatchedText
+                text={branch}
+                query={props.branchFilterQuery}
                 fg={isSelected() ? uiColors.primary : uiColors.textPrimary}
                 attributes={isSelected() ? TextAttributes.BOLD : undefined}
-              >
-                {branch}
-              </text>
+              />
             </box>
           );
         })}

@@ -7,6 +7,9 @@
 * For pill-style labels/status chips, use the shared Badge component only when information deserves prominent emphasis
 * Use standard keybinds from the help menu; do not invent custom shortcuts
 * List views must support the standard controls where applicable: `/` search, `F` filter, `O` order/sort. If a list cannot support one, document why.
+* View and modal headers must use the shared SearchHeader style: bgSurface1 one-line bar, title/summary content as fallback, and live `/query█` display while searching.
+* Views/modals with filtering or sorting must render the shared FilterStatusBar directly under SearchHeader; keep it present and empty only when the design needs stable header chrome.
+* Searchable row text must use the shared MatchedText component (or equivalent shared match renderer) so matched terms are highlighted consistently with theme colors (warning background, base foreground); do not hardcode palette colors for match highlighting.
 * Backend-driven list endpoints must expose search, filter, and sort parameters where applicable so TUI list controls can work consistently.
 * When using server-side paging, filtering, sorting, and searching must also happen server-side before pagination; never page first and filter/search/sort client-side afterward
 * For scrollbox content that should wrap (especially markdown/code renderers), set the rendered content width to the usable viewport width, leaving room for modal padding and the scrollbar; do not fix overlap by adding generic scrollbar padding/gaps

@@ -459,25 +459,7 @@ export function ContentRouter(props: ContentRouterProps) {
 						</Show>
 					}
 				>
-					<Show
-						when={!appStore.statusLogMaximized()}
-						fallback={
-							<StatusLogView
-								entries={appStore.statusLogEntries()}
-								height={30}
-								width={props.dimensions.width}
-								isMaximized={true}
-								sortDesc={appStore.statusLogSortDesc()}
-								filterSummary={appStore.statusLogSortDesc() ? 'status' : ''}
-								sortSummary={appStore.statusLogSortDesc() ? 'newest' : ''}
-								searchMode={appStore.statusLogSearchMode()}
-								searchQuery={appStore.statusLogSearchQuery()}
-								runningTextEnabled={props.runningTextEnabled}
-								runningTextOffset={props.runningTextOffset}
-							/>
-						}
-					>
-						<ContentStack
+					<ContentStack
 							items={[
 								<box
 									style={{
@@ -603,15 +585,10 @@ export function ContentRouter(props: ContentRouterProps) {
 									<StatusLogView
 										entries={appStore.statusLogEntries()}
 										height={STATUS_LOG_HEIGHT}
-										width={props.dimensions.width}
-										isMaximized={false}
-									runningTextEnabled={props.runningTextEnabled}
-									runningTextOffset={props.runningTextOffset}
 									/>
 								</box>,
 							]}
 						/>
-					</Show>
 				</Show>
 			)}
 			<Show when={appStore.loading()}>

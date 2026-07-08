@@ -6,10 +6,12 @@ import { uiColors } from '../colors';
 import { Badge } from './Badge';
 import type { Highlight } from './Highlight';
 import { RunningText } from './RunningText';
+import { MatchedText } from './MatchedText';
 
 export interface WorkItemCardProps {
   marker: string;
   title: string;
+  titleQuery?: string;
   statusText: string;
   statusColor?: string;
   statusBadgeHighlight?: string;
@@ -154,15 +156,21 @@ export function WorkItemCard(props: WorkItemCardProps) {
             }>
               {(badge) => <><Badge text={badge().text} highlight={badge().highlight} /><text> </text></>}
             </Show>
-            <RunningText
-              text={props.title}
-              width={titleWidth()}
-              fg={uiColors.textPrimary}
-              attributes={TextAttributes.BOLD}
-              enabled={props.runningTextEnabled}
-              active={props.selected}
-              offset={props.runningTextOffset}
-            />
+            <Show when={props.titleQuery && props.titleQuery.length > 0} fallback={
+              <RunningText
+                text={props.title}
+                width={titleWidth()}
+                fg={uiColors.textPrimary}
+                attributes={TextAttributes.BOLD}
+                enabled={props.runningTextEnabled}
+                active={props.selected}
+                offset={props.runningTextOffset}
+              />
+            }>
+              <box style={{ width: titleWidth(), overflow: 'hidden' }}>
+                <MatchedText text={props.title} query={props.titleQuery} fg={uiColors.textPrimary} attributes={TextAttributes.BOLD} />
+              </box>
+            </Show>
           </box>
           <Show when={(props.statusBadges && props.statusBadges.length > 0) || (props.statusBadgeHighlight || statusDisplay().text) || statusDisplay().suffix}>
             <box style={{ flexDirection: 'row', gap: 1, flexShrink: 0, marginLeft: 'auto' }}>

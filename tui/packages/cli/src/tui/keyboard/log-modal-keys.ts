@@ -52,6 +52,18 @@ export async function handleLogModalKeys(
   }
 
   // ── Search mode: capture typed characters into the query ──────────────
+  const logContentOffset = () => {
+    let offset = 0;
+    if (logStore.logHistoryError()) offset += 1;
+    if (logStore.logHistoryLoading()) offset += 1;
+    if (!logStore.logHistoryLoading() && !logStore.logHistoryHasMore() && logStore.logLines().length > 0) offset += 1;
+    return offset;
+  };
+
+  const scrollToLogLine = (line: number) => {
+    logStore.logScrollBoxRef?.scrollTo(line + logContentOffset());
+  };
+
   if (logStore.logSearchMode()) {
     if (
       event.name === 'escape' ||
@@ -70,7 +82,7 @@ export async function handleLogModalKeys(
       const matches = logStore.logSearchMatchLinesList();
       if (matches.length > 0 && logStore.logSearchMatchIndex() < 0) {
         logStore.setLogSearchMatchIndex(0);
-        logStore.logScrollBoxRef?.scrollTo(matches[0]);
+        scrollToLogLine(matches[0]);
         logActions.syncLogScroll();
       }
       return true;
@@ -254,7 +266,7 @@ export async function handleLogModalKeys(
     const next = (logStore.logSearchMatchIndex() + 1) % matches.length;
     logStore.setLogSearchMatchIndex(next);
     const line = matches[next];
-    if (sb) sb.scrollTo(line);
+    scrollToLogLine(line);
     logActions.syncLogScroll();
     return true;
   }
@@ -265,7 +277,7 @@ export async function handleLogModalKeys(
     const prev = (logStore.logSearchMatchIndex() - 1 + matches.length) % matches.length;
     logStore.setLogSearchMatchIndex(prev);
     const line = matches[prev];
-    if (sb) sb.scrollTo(line);
+    scrollToLogLine(line);
     logActions.syncLogScroll();
     return true;
   }

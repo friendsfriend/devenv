@@ -8,6 +8,7 @@ import type { Discussion } from '@devenv/types';
 import { GenericModal } from './GenericModal';
 import { formatHelpTextLines } from './HelpText';
 import { ScrollableContent } from './ScrollableContent';
+import { SearchHeader } from './SearchHeader';
 
 interface DiffViewModalProps {
   filePath: string;
@@ -426,8 +427,8 @@ export function DiffViewModal(props: DiffViewModalProps) {
 
   // Custom header showing filename, navigation, and mode indicators
   const customHeader = () => (
-    <box flexShrink={0}>
-      <box flexDirection="row" justifyContent="space-between" alignItems="center">
+    <SearchHeader>
+      <box flexDirection="row" justifyContent="space-between" alignItems="center" style={{ width: '100%' }}>
         <box flexDirection="row" gap={1} alignItems="center">
           <text fg={uiColors.textPrimary}>
             <b>{props.filePath}</b>
@@ -451,7 +452,7 @@ export function DiffViewModal(props: DiffViewModalProps) {
           </Show>
         </box>
       </box>
-    </box>
+    </SearchHeader>
   );
 
   // Custom footer with context-sensitive help text

@@ -6,6 +6,7 @@ import { uiColors } from '../colors';
 import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
 import { highlightColor } from './Highlight';
+import { MatchedText } from './MatchedText';
 
 export interface AgentSpaceViewProps {
   piAgentGroups: AgentGroup[];
@@ -44,7 +45,7 @@ export function getSelectableRows(rows: FlatRow[]): Array<{ row: FlatRow; flatIn
   return result;
 }
 
-function RowView(props: { row: FlatRow; isSelected: boolean }) {
+function RowView(props: { row: FlatRow; isSelected: boolean; query?: string }) {
   const cursor = () => (props.isSelected ? '►' : ' ');
 
   if (props.row.kind === 'new') {
@@ -73,13 +74,14 @@ function RowView(props: { row: FlatRow; isSelected: boolean }) {
       <text fg={highlightColor('secondary')} style={{ flexShrink: 0 }}>
         {`[${props.row.agentName}] `}
       </text>
-      <text
-        fg={props.isSelected ? uiColors.textPrimary : uiColors.textSecondary}
-        attributes={props.isSelected ? TextAttributes.BOLD : undefined}
-        style={{ flexGrow: 1 }}
-      >
-        {props.row.session.title || '(untitled)'}
-      </text>
+      <box style={{ flexGrow: 1, overflow: 'hidden' }}>
+        <MatchedText
+          text={props.row.session.title || '(untitled)'}
+          query={props.query}
+          fg={props.isSelected ? uiColors.textPrimary : uiColors.textSecondary}
+          attributes={props.isSelected ? TextAttributes.BOLD : undefined}
+        />
+      </box>
       <text fg={highlightColor('secondary')}>
         {` ${formatRelativeTime(props.row.session.timeUpdated)}`}
       </text>
@@ -148,7 +150,7 @@ export function AgentSpaceView(props: AgentSpaceViewProps) {
       onFilterChange={props.onFilterChange}
       emptyContent={<text fg={highlightColor('secondary')}>No sessions found.</text>}
       renderItem={(item, isSelected) => (
-        <RowView row={item} isSelected={isSelected()} />
+        <RowView row={item} isSelected={isSelected()} query={props.searchQuery} />
       )}
     />
   );

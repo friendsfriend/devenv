@@ -1,6 +1,8 @@
 /** @jsxImportSource @opentui/solid */
-import { For, JSX, createMemo } from 'solid-js';
+import { For, JSX, Show, createMemo } from 'solid-js';
 import { RGBA } from '@opentui/core';
+import { SearchHeader } from './SearchHeader';
+import { FilterStatusBar } from './FilterStatusBar';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { TextAttributes } from '@opentui/core';
@@ -61,6 +63,13 @@ export interface GenericModalProps {
   customHeader?: JSX.Element;
   /** Optional custom footer content (replaces default help text) */
   customFooter?: JSX.Element;
+  /** Optional search mode/query for SearchHeader */
+  searchMode?: boolean;
+  searchQuery?: string;
+  searchResultCount?: number;
+  /** Optional filter/sort summary for FilterStatusBar */
+  filterSummary?: string;
+  sortSummary?: string;
   /** Click handler for backdrop */
   onBackdropClick?: () => void;
 }
@@ -118,20 +127,23 @@ export function GenericModal(props: GenericModalProps) {
         {props.customHeader ? (
           props.customHeader
         ) : (
-          <box
-            style={{
-              width: '100%',
-              height: 1,
-              justifyContent: 'flex-start',
-              flexDirection: 'row',
-              flexShrink: 0,
-            }}
-          >
-            <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-              {props.title}
-            </text>
-          </box>
+          <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.searchResultCount}>
+            <box
+              style={{
+                width: '100%',
+                justifyContent: 'flex-start',
+                flexDirection: 'row',
+              }}
+            >
+              <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
+                {props.title}
+              </text>
+            </box>
+          </SearchHeader>
         )}
+
+        {/* FILTER STATUS */}
+        <FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
 
         {/* MIDDLE CONTENT */}
         <box

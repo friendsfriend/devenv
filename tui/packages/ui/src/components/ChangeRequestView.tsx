@@ -131,6 +131,7 @@ export function ChangeRequestView(props: ChangeRequestViewProps) {
                     prefix={`${mergeStatus.text} `}
                     prefixColor={mergeStatus.fg}
                     title={cr.title}
+                    titleQuery={props.searchQuery}
                     statusText={cr.state}
                     statusColor={getIssueStateColor(cr.state)}
                     statusBadgeHighlight={stateHighlight(cr.state)}

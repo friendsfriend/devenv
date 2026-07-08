@@ -48,13 +48,11 @@ export function ThemePickerView(props: ThemePickerViewProps) {
         { key: "Enter", action: "Apply" },
         { key: "Esc", action: "Close" },
       ])}
+      searchMode={props.filterActive}
+      searchQuery={props.filterQuery}
+      searchResultCount={items().length}
     >
       <box style={{ flexDirection: "column", width: "100%", height: "100%" }}>
-        <box style={{ width: "100%", height: 1, flexDirection: "row" }}>
-          <text fg={props.filterActive ? uiColors.primary : uiColors.textMuted}>
-            {props.filterActive ? "/" : "Filter: "}{props.filterQuery ?? ""}
-          </text>
-        </box>
         <For each={visible()}>
           {(item) => {
             const selected = () => item.index === props.selectedIndex;

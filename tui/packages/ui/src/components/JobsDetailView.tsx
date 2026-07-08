@@ -9,6 +9,7 @@ import { CenteredState } from './CenteredState';
 import { SearchHeader } from './SearchHeader';
 
 import { Badge } from './Badge';
+import { MatchedText } from './MatchedText';
 import { FilterStatusBar } from './FilterStatusBar';
 import { HighlightedText, highlightColor } from './Highlight';
 
@@ -221,15 +222,13 @@ export function JobsDetailView(props: JobsDetailViewProps) {
                   <Badge text={job.status} highlight={jobStatusHighlight(job.status)} />
                 </box>
                 <box style={{ width: '50%' }}>
-                  <text fg={highlightColor(isSelected() ? 'primary' : 'secondary')}>
-                    {job.name}
-                  </text>
+                  <MatchedText text={job.name} query={props.searchQuery} fg={highlightColor(isSelected() ? 'primary' : 'secondary')} />
                 </box>
                 <box style={{ width: '15%' }}>
                   <text fg={highlightColor('secondary')}>{formatDuration(job)}</text>
                 </box>
                 <box style={{ width: '20%' }}>
-                  <text fg={highlightColor('secondary')}>#{job.id}</text>
+                  <MatchedText text={`#${job.id}`} query={props.searchQuery} fg={highlightColor('secondary')} />
                 </box>
               </box>
             </box>

@@ -10,6 +10,7 @@ import { ContentPanel } from './ContentStack';
 import { FilterStatusBar } from './FilterStatusBar';
 import { HighlightedText, highlightColor } from './Highlight';
 import { Badge } from './Badge';
+import { MatchedText } from './MatchedText';
 
 interface TestResultsDetailViewProps {
   testSuites?: TestSuite[];
@@ -165,9 +166,7 @@ export function TestResultsDetailView(props: TestResultsDetailViewProps) {
                   />
                   <box style={{ flexGrow: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1 }}>
                     <box style={{ width: '65%' }}>
-                      <text fg={highlightColor(isSelected() ? 'primary' : 'secondary')}>
-                        {testName}
-                      </text>
+                      <MatchedText text={testName} query={props.searchQuery} fg={highlightColor(isSelected() ? 'primary' : 'secondary')} />
                     </box>
                     <box style={{ width: '15%' }}>
                       <text fg={highlightColor('secondary')}>

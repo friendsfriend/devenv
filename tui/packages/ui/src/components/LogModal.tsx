@@ -10,6 +10,7 @@ import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
 import { LogAiOverlay } from './LogAiOverlay';
 import { ScrollableContent } from './ScrollableContent';
+import { SearchHeader } from './SearchHeader';
 
 export interface LogModalProps {
   /** Modal title / header label (e.g. "Container Logs: my-app (auto-refresh: 10s)") */
@@ -148,36 +149,16 @@ export function LogModal(props: LogModalProps) {
   const matchCount = () => props.searchMatchLines.size;
 
   const customHeader = () => (
-    <box flexShrink={0} flexDirection="row" justifyContent="space-between" alignItems="center">
-      <box flexDirection="row" gap={1} alignItems="center">
+    <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={matchCount()}>
+      <box flexDirection="row" justifyContent="space-between" alignItems="center" style={{ width: '100%' }}>
         <text fg={highlightColor('primary')}>
           <b>{props.title}</b>
         </text>
-        {/* While typing: show live input; after confirm: show query + match count */}
-        <Show
-          when={props.searchMode}
-          fallback={
-            <Show when={props.searchQuery.length > 0}>
-              <text fg={colors.peach}>
-                {' '}/{props.searchQuery}
-                {matchCount() > 0
-                  ? ` (${(props.searchMatchIndex >= 0 ? props.searchMatchIndex + 1 : 1)}/${matchCount()})`
-                  : ' (no matches)'}
-              </text>
-            </Show>
-          }
-        >
-          <box flexDirection="row" alignItems="center">
-            <text fg={colors.peach}> /</text>
-            <text fg={highlightColor('primary')}>{props.searchQuery}</text>
-            <text fg={highlightColor('highlight')}>█</text>
-          </box>
-        </Show>
+        <text fg={highlightColor('secondary')}>
+          {props.historyLoading ? 'loading older… • ' : ''}{String(lineCount())} lines{props.historyHasMore ? ' • older logs available' : ''}
+        </text>
       </box>
-      <text fg={highlightColor('secondary')}>
-        {props.historyLoading ? 'loading older… • ' : ''}{String(lineCount())} lines{props.historyHasMore ? ' • older logs available' : ''}
-      </text>
-    </box>
+    </SearchHeader>
   );
 
   // ── keybind help text (standard modal style: plain string via formatHelpText) ──

@@ -131,6 +131,7 @@ export function IssueView(props: IssueViewProps) {
 									<WorkItemCard
 										marker={`#${issue.iid}`}
 										title={issue.title}
+										titleQuery={props.searchQuery}
 										statusText={issue.state}
 										statusColor={getIssueStateColor(issue.state)}
 										statusBadgeHighlight={issue.state === 'open' || issue.state === 'opened' ? 'positive' : issue.state === 'merged' ? 'highlight' : 'secondary'}

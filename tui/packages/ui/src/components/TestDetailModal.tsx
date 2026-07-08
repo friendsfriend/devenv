@@ -6,6 +6,7 @@ import type { TestCase } from '@devenv/types';
 import { GenericModal } from './GenericModal';
 import { HelpText } from './HelpText';
 import { Badge } from './Badge';
+import { SearchHeader } from './SearchHeader';
 import { PropertiesList, type PropertyRow } from './PropertiesList';
 
 interface TestDetailModalProps {
@@ -74,19 +75,21 @@ export function TestDetailModal(props: TestDetailModalProps) {
   });
 
   const customHeader = () => (
-    <box flexDirection="row" justifyContent="space-between" alignItems="center" flexShrink={0}>
-      <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
-        Test Detail
-      </text>
-      <box flexDirection="row" gap={2} alignItems="center">
-        <Show when={props.copyStatus}>
-          <text fg={uiColors.success} attributes={TextAttributes.BOLD}>
-            {props.copyStatus}
-          </text>
-        </Show>
-        <Badge text={display().label} highlight={statusHighlight()} />
+    <SearchHeader>
+      <box flexDirection="row" justifyContent="space-between" alignItems="center" style={{ width: '100%' }}>
+        <text fg={uiColors.borderHighlight} attributes={TextAttributes.BOLD}>
+          Test Detail
+        </text>
+        <box flexDirection="row" gap={2} alignItems="center">
+          <Show when={props.copyStatus}>
+            <text fg={uiColors.success} attributes={TextAttributes.BOLD}>
+              {props.copyStatus}
+            </text>
+          </Show>
+          <Badge text={display().label} highlight={statusHighlight()} />
+        </box>
       </box>
-    </box>
+    </SearchHeader>
   );
 
   const customFooter = () => (

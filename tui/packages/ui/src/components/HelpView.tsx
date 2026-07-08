@@ -7,11 +7,13 @@ import { HighlightedText } from './Highlight';
 import { formatHelpText } from './HelpText';
 import { GenericModal } from './GenericModal';
 import { ModalTabs } from './ModalTabs';
+import { SearchHeader } from './SearchHeader';
 import { focusSoon } from '../utils/focusSoon';
 import { ScrollableContent } from './ScrollableContent';
 import { ScrollableList } from './ScrollableList';
 import { RunningText } from './RunningText';
 import { WorkItemCard } from './WorkItemCard';
+import { MatchedText } from './MatchedText';
 
 export interface HelpSection {
   title: string;
@@ -103,10 +105,12 @@ export function HelpView(props: HelpViewProps): JSX.Element {
       ])}
       customHeader={
         <box style={{ width: '100%', flexDirection: 'column', flexShrink: 0 }}>
-          <box style={{ width: '100%', flexDirection: 'row' }}>
-            <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>Help</text>
-            <text fg={uiColors.textMuted}>{` — ${props.viewTitle}`}</text>
-          </box>
+          <SearchHeader searchMode={props.searchActive} searchQuery={props.searchQuery} resultCount={hasMatches() ? filteredSections().length : 0}>
+            <box style={{ width: '100%', flexDirection: 'row' }}>
+              <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>Help</text>
+              <text fg={uiColors.textMuted}>{` — ${props.viewTitle}`}</text>
+            </box>
+          </SearchHeader>
           <ModalTabs
             activeId={activeTab()}
             onChange={(id) => props.onTabChange?.(id as HelpTab)}
@@ -166,7 +170,13 @@ export function HelpView(props: HelpViewProps): JSX.Element {
                               highlight="highlight"
                               attributes={TextAttributes.BOLD}
                             />
-                            <RunningText text={item.description} width={descriptionWidth()} fg={uiColors.textPrimary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+                            <Show when={(props.searchQuery ?? '').length > 0} fallback={
+                              <RunningText text={item.description} width={descriptionWidth()} fg={uiColors.textPrimary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+                            }>
+                              <box style={{ width: descriptionWidth(), overflow: 'hidden' }}>
+                                <MatchedText text={item.description} query={props.searchQuery} fg={uiColors.textPrimary} />
+                              </box>
+                            </Show>
                           </box>
                         )}
                       </For>
@@ -189,6 +199,7 @@ export function HelpView(props: HelpViewProps): JSX.Element {
               <WorkItemCard
                 marker=""
                 title={guide.title}
+                titleQuery={props.searchQuery}
                 statusText={guide.category}
                 statusBadgeHighlight="highlight"
                 metadata={guide.description}

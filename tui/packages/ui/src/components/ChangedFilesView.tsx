@@ -1,7 +1,7 @@
 /** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
-import { Show, createMemo } from 'solid-js';
-import { uiColors } from '../colors';
+import { For, Show, createMemo } from 'solid-js';
+import { colors, uiColors } from '../colors';
 import type { ChangeRequestChange } from '@devenv/types';
 import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from './ScrollableList';
@@ -10,6 +10,39 @@ import { SearchHeader } from './SearchHeader';
 import { FilterStatusBar } from './FilterStatusBar';
 import { HighlightedText, highlightColor } from './Highlight';
 import { Badge } from './Badge';
+
+function splitMatches(text: string, query: string): Array<{ text: string; isMatch: boolean }> {
+  if (!query) return [{ text, isMatch: false }];
+  const lower = text.toLowerCase();
+  const segments: Array<{ text: string; isMatch: boolean }> = [];
+  let pos = 0;
+  while (pos < text.length) {
+    const idx = lower.indexOf(query, pos);
+    if (idx === -1) {
+      segments.push({ text: text.slice(pos), isMatch: false });
+      break;
+    }
+    if (idx > pos) segments.push({ text: text.slice(pos, idx), isMatch: false });
+    segments.push({ text: text.slice(idx, idx + query.length), isMatch: true });
+    pos = idx + query.length;
+  }
+  return segments;
+}
+
+function MatchedText(props: { text: string; query?: string; fg: string; attributes?: number }) {
+  const query = () => (props.query ?? '').toLowerCase();
+  return (
+    <text fg={props.fg} attributes={props.attributes}>
+      <For each={splitMatches(props.text, query())}>
+        {(segment) => (
+          <span style={segment.isMatch ? { fg: colors.base, bg: colors.yellow } : { fg: props.fg }}>
+            {segment.text}
+          </span>
+        )}
+      </For>
+    </text>
+  );
+}
 
 interface ChangedFilesViewProps {
   changes: ChangeRequestChange[];
@@ -154,12 +187,12 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
                   </box>
                   {/* File Path */}
                   <box style={{ width: '58%' }}>
-                    <text
+                    <MatchedText
+                      text={filePath}
+                      query={props.searchQuery}
                       fg={highlightColor(isSelected() ? 'primary' : 'secondary')}
                       attributes={isSelected() ? TextAttributes.BOLD : undefined}
-                    >
-                      {filePath}
-                    </text>
+                    />
                   </box>
                   {/* Stats */}
                   <box style={{ width: '25%' }}>

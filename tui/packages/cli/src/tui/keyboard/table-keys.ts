@@ -35,42 +35,6 @@ export async function handleTableKeys(
 	} = actions;
 	const { client, getSelectedApp, showError } = ctx;
 
-	// Status log maximized: search mode text capture
-	if (appStore.statusLogMaximized() && appStore.statusLogSearchMode()) {
-		if (event.name === 'escape') {
-			appStore.setStatusLogSearchMode(false);
-			appStore.setStatusLogSearchQuery('');
-			return true;
-		}
-		if (event.name === 'return') {
-			appStore.setStatusLogSearchMode(false);
-			return true;
-		}
-		if (event.name === 'backspace') {
-			appStore.setStatusLogSearchQuery((q: string) => q.slice(0, -1));
-			return true;
-		}
-		const ch = event.sequence ?? event.name ?? '';
-		if (ch.length === 1 && ch >= ' ') {
-			appStore.setStatusLogSearchQuery((q: string) => q + ch);
-			return true;
-		}
-		return true;
-	}
-
-	// Status log maximized: F toggle sort direction, O toggle order
-	if (appStore.statusLogMaximized()) {
-		if (event.name === 'F' || (event.name === 'f' && event.shift)) {
-			appStore.setStatusLogSortDesc((prev: boolean) => !prev);
-			return true;
-		}
-		if (event.name === 'O' || (event.name === 'o' && event.shift)) {
-			appStore.setStatusLogSortDesc((prev: boolean) => !prev);
-			return true;
-		}
-	}
-
-
 	// Branch selector overlay keyboard handler (runs while viewMode stays 'table')
 	if (uiStore.showBranchSelector()) {
 		// Create branch sub-modal guard — intercept all keys while the modal is open
@@ -537,15 +501,9 @@ export async function handleTableKeys(
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
 				logActions.loadContainerLogs();
 			break;
-		case "/":
-			if (appStore.statusLogMaximized()) {
-				appStore.setStatusLogSearchMode(true);
-				appStore.setStatusLogSearchQuery('');
-			}
-			break;
 		case "L":
-			// Toggle status log maximize (uppercase L)
-			appStore.setStatusLogMaximized((prev) => !prev);
+			// Open status log modal (uppercase L)
+			appStore.setShowStatusLogModal(true);
 			break;
 		case "o":
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)

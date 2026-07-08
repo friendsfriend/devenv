@@ -28,6 +28,7 @@ import {
 	AssigneePickerModal,
 	FilterModal,
 	SortModal,
+	StatusLogModal,
 	HelpView,
 	ThemePickerView,
 	ProvidersView,
@@ -634,6 +635,17 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 					onAiScrollBoxReady={(sb) => {
 						logStore.logAiScrollBoxRef = sb;
 					}}
+				/>
+			</Show>
+
+			<Show when={appStore.showStatusLogModal()}>
+				<StatusLogModal
+					entries={appStore.statusLogEntries()}
+					searchMode={appStore.statusLogSearchMode()}
+					searchQuery={appStore.statusLogSearchQuery()}
+					selectedIndex={appStore.statusLogSelectedIndex()}
+					onScrollBoxReady={(sb) => { appStore.statusLogModalScrollBoxRef = sb; }}
+					onClose={() => appStore.setShowStatusLogModal(false)}
 				/>
 			</Show>
 

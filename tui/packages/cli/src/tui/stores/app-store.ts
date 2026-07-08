@@ -212,10 +212,11 @@ export function createAppStore() {
 	const [statusLogEntries, setStatusLogEntries] = createSignal<
 		StatusLogEntry[]
 	>([]);
-	const [statusLogMaximized, setStatusLogMaximized] = createSignal(false);
 	const [statusLogSearchMode, setStatusLogSearchMode] = createSignal(false);
 	const [statusLogSearchQuery, setStatusLogSearchQuery] = createSignal("");
-	const [statusLogSortDesc, setStatusLogSortDesc] = createSignal(false);
+	const [showStatusLogModal, setShowStatusLogModal] = createSignal(false);
+	const [statusLogSelectedIndex, setStatusLogSelectedIndex] = createSignal(-1);
+	let statusLogModalScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
 	const [operationInProgressForApp, setOperationInProgressForApp] =
 		createSignal<string | null>(null);
 	const hasActiveOperation = createMemo(() =>
@@ -469,14 +470,20 @@ export function createAppStore() {
 		setTableSortRules,
 		statusLogEntries,
 		setStatusLogEntries,
-		statusLogMaximized,
-		setStatusLogMaximized,
 		statusLogSearchMode,
 		setStatusLogSearchMode,
 		statusLogSearchQuery,
 		setStatusLogSearchQuery,
-		statusLogSortDesc,
-		setStatusLogSortDesc,
+		showStatusLogModal,
+		setShowStatusLogModal,
+		statusLogSelectedIndex,
+		setStatusLogSelectedIndex,
+		get statusLogModalScrollBoxRef() {
+			return statusLogModalScrollBoxRef;
+		},
+		set statusLogModalScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) {
+			statusLogModalScrollBoxRef = value;
+		},
 		operationInProgressForApp,
 		setOperationInProgressForApp,
 		hasActiveOperation,
