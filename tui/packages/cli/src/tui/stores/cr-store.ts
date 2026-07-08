@@ -1,4 +1,7 @@
 import { createMemo, createSignal } from 'solid-js';
+import type { ScrollBoxRenderable } from '@opentui/core';
+
+export const CR_DETAIL_PANEL_COUNT = 7;
 import type {
 	Discussion,
 	Issue,
@@ -121,6 +124,10 @@ export function createChangeRequestStore() {
 		jobs: [{ key: "status", label: "Status", direction: "asc" }, { key: "stage", label: "Stage", direction: "none" }, { key: "name", label: "Name", direction: "none" }],
 		tests: [{ key: "status", label: "Status", direction: "asc" }, { key: "class", label: "Class", direction: "none" }, { key: "name", label: "Name", direction: "none" }],
 	});
+
+	// Panel focus navigation state
+	const [crDetailPanelIndex, setCrDetailPanelIndex] = createSignal(0);
+	const crDetailScrollBoxRefs: (ScrollBoxRenderable | undefined)[] = [];
 
 	// CR AI review overlay state
 	const [crAiVisible, setCrAiVisible] = createSignal(false);
@@ -388,6 +395,14 @@ export function createChangeRequestStore() {
 		setCurrentListSortRules,
 		changedFilesFiltered,
 		selectedTestForDetail,
+
+		// Panel focus navigation
+		crDetailPanelIndex,
+		setCrDetailPanelIndex,
+		crDetailPanelCount: CR_DETAIL_PANEL_COUNT,
+		get crDetailScrollBoxRefs() {
+			return crDetailScrollBoxRefs;
+		},
 
 		// CR AI review overlay
 		crAiVisible,

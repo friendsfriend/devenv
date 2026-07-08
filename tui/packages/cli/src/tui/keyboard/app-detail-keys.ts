@@ -1,5 +1,7 @@
 import type { KeyboardEvent } from './types';
-import type { AppDetailStore } from '../stores';
+import type { AppDetailStore, AppStore } from '../stores';
+import { isNextPanelKey, isPrevPanelKey, nextPanelIndex, prevPanelIndex } from './panel-keys';
+import { isDownKey, isUpKey } from './nav-keys';
 
 /**
  * Flatten visible tree nodes to compute flat index count and find node at index.
@@ -24,13 +26,40 @@ function nodeAtIndex(nodes: any[], index: number): any | null {
 export function handleAppDetailKeys(
   event: KeyboardEvent,
   appDetailStore: AppDetailStore,
+  appStore: AppStore,
   expandNode: (nodeKey: string) => void,
 ): boolean {
-  const isTreeFocused = appDetailStore.dependencyTreeFocused();
   const app = appDetailStore.appDetailApp();
   if (!app) return false;
 
+  const syncDependencyTreeFocus = (panelIndex: number) => {
+    const focusTree = panelIndex === 2 && appDetailStore.actionTargets().length > 0;
+    appDetailStore.setDependencyTreeFocused(focusTree);
+    if (focusTree) {
+      const maxIndex = Math.max(0, flattenTree(appDetailStore.dependencyTreeNodes()).length - 1);
+      appDetailStore.setDependencyTreeSelectedIndex((idx) => Math.min(idx, maxIndex));
+    }
+  };
+
+  // ── Panel focus navigation (always active, even when tree is focused) ──
+  const panelCount = appDetailStore.appDetailPanelCount;
+  if (panelCount > 1) {
+    if (isNextPanelKey(event)) {
+      const next = nextPanelIndex(appDetailStore.appDetailPanelIndex(), panelCount);
+      appDetailStore.setAppDetailPanelIndex(next);
+      syncDependencyTreeFocus(next);
+      return true;
+    }
+    if (isPrevPanelKey(event)) {
+      const prev = prevPanelIndex(appDetailStore.appDetailPanelIndex(), panelCount);
+      appDetailStore.setAppDetailPanelIndex(prev);
+      syncDependencyTreeFocus(prev);
+      return true;
+    }
+  }
+
   // ── Tree focused keys ────────────────────────────────────────────────
+  const isTreeFocused = appDetailStore.dependencyTreeFocused();
   if (isTreeFocused) {
     const nodes = appDetailStore.dependencyTreeNodes();
     const flatCount = flattenTree(nodes).length;
@@ -67,11 +96,26 @@ export function handleAppDetailKeys(
     return false;
   }
 
+  // When a scrollable panel is focused, delegate j/k to its scrollbox ref
+  if (isDownKey(event)) {
+    const refs = appDetailStore.appDetailScrollBoxRefs;
+    const ref = refs[appDetailStore.appDetailPanelIndex()];
+    ref?.scrollBy(1);
+    if (ref) return true;
+  }
+  if (isUpKey(event)) {
+    const refs = appDetailStore.appDetailScrollBoxRefs;
+    const ref = refs[appDetailStore.appDetailPanelIndex()];
+    ref?.scrollBy(-1);
+    if (ref) return true;
+  }
+
   // ── Main detail view keys ────────────────────────────────────────────
   switch (event.name) {
     case 'd': {
       // Focus dependency tree if deps exist
       if (appDetailStore.actionTargets().length > 0) {
+        appDetailStore.setAppDetailPanelIndex(2);
         appDetailStore.setDependencyTreeFocused(true);
         appDetailStore.setDependencyTreeSelectedIndex(0);
         return true;

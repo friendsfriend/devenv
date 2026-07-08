@@ -22,3 +22,11 @@ export { handleMiscModalKeys } from "./misc-modal-keys";
 export { handleWorktreeManagerKeys } from "./worktree-manager-keys";
 export { handleTableKeys } from "./table-keys";
 export { handlePaste } from "./paste-handler";
+export {
+	NO_PANEL_FOCUS,
+	isNextPanelKey,
+	isPrevPanelKey,
+	isReverseTabKey,
+	nextPanelIndex,
+	prevPanelIndex,
+} from "./panel-keys";

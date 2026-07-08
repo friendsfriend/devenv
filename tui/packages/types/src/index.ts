@@ -683,6 +683,7 @@ export interface StatusLogEntry {
 	Operation: string; // pull, push, fetch, build, start, stop
 	Status: string; // pending, in progress, active, completed, failed
 	Message: string;
+	source?: "app" | "task" | "infra";
 }
 
 // Agent space types

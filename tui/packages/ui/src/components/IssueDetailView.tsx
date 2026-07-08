@@ -33,8 +33,10 @@ interface IssueDetailViewProps {
 	spinnerFrames?: string[];
 	spinnerFrame?: () => number;
 	onDetailScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
+	onCommentsScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
 	runningTextEnabled?: boolean;
 	runningTextOffset?: number;
+	activePanelIndex?: number;
 }
 
 /**
@@ -133,8 +135,9 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 					gap: 0,
 				}}
 			>
-			{/* METADATA PANEL */}
+			{/* METADATA PANEL (panel 0) */}
 			<DetailSection
+				active={props.activePanelIndex === 0}
 				header={<RunningText text={issue().title} width={lineWidth()} fg={uiColors.textPrimary} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />}
 				style={{
 					width: "100%",
@@ -159,8 +162,9 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
 
-			{/* REFERENCES — combined issues + CRs */}
+			{/* REFERENCES PANEL (panel 1) */}
 			<DetailSection
+				active={props.activePanelIndex === 1}
 				title={`References${props.references && props.references.length > 0 ? ` (${props.references.length})` : ""}`}
 				style={{
 					width: "100%",
@@ -250,8 +254,9 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 			<box style={{ width: "100%", height: 1, flexShrink: 0 }} />
 
-			{/* COMMENTS PANEL */}
+			{/* COMMENTS PANEL (panel 2) */}
 			<DetailSection
+				active={props.activePanelIndex === 2}
 				title={`Comments${props.comments.length > 0 ? ` (${props.comments.length})` : ""}`}
 				style={{
 					width: "100%",
@@ -293,6 +298,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 				<Show when={!props.issueCommentsLoading && props.comments.length > 0}>
 					<ScrollableContent
+						onScrollBoxReady={props.onCommentsScrollBoxReady}
 												style={{
 							width: "100%",
 							maxHeight: 3,

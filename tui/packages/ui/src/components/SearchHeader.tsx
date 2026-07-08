@@ -6,6 +6,8 @@ export interface SearchHeaderProps {
   searchMode?: boolean;
   searchQuery?: string;
   resultCount?: number;
+  backgroundColor?: string;
+  active?: boolean;
   children: JSX.Element;
 }
 
@@ -14,13 +16,14 @@ export function SearchHeader(props: SearchHeaderProps) {
 
   return (
     <box
-      backgroundColor={uiColors.bgSurface1}
+      backgroundColor={props.backgroundColor ?? uiColors.bgSurface1}
       style={{
         width: '100%',
         height: 1,
         flexDirection: 'row',
         paddingLeft: 1,
         paddingRight: 1,
+        flexShrink: 0,
       }}
     >
       <Show

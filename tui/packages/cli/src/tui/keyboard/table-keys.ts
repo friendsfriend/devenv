@@ -1,6 +1,7 @@
 import { getLogger } from '@devenv/core';
 import { themeNames } from '@devenv/ui';
 import { isDownKey, isUpKey } from './nav-keys';
+import { isNextPanelKey, isPrevPanelKey, isReverseTabKey, nextPanelIndex, prevPanelIndex } from './panel-keys';
 import { handleAppDetailKeys } from './app-detail-keys';
 import type {
 	KeyboardEvent,
@@ -211,7 +212,7 @@ export async function handleTableKeys(
 
 	if (appStore.viewMode() === "appDetail") {
 		// Delegate to dependency tree handler first
-		if (await handleAppDetailKeys(event, stores.appDetailStore, appActions.expandDependencyNode)) {
+		if (await handleAppDetailKeys(event, stores.appDetailStore, stores.appStore, appActions.expandDependencyNode)) {
 			return true;
 		}
 		if (
@@ -377,6 +378,19 @@ export async function handleTableKeys(
 	}
 
 	if (appStore.activeTab() === "kubernetes") {
+		// Panel focus navigation for Kubernetes panels
+		const panelCount = appStore.kubernetesPanelCount;
+		if (panelCount > 1) {
+			if (isNextPanelKey(event)) {
+				appStore.setKubernetesPanelIndex((prev) => nextPanelIndex(prev, panelCount));
+				return true;
+			}
+			if (isPrevPanelKey(event)) {
+				appStore.setKubernetesPanelIndex((prev) => prevPanelIndex(prev, panelCount));
+				return true;
+			}
+		}
+
 		switch (key) {
 			case "s":
 				void dockerActions.createCluster();
@@ -445,14 +459,26 @@ export async function handleTableKeys(
 			break;
 		case "tab":
 		case "\t":
-			// Cycle through tabs
-			appStore.setActiveTab((tab) => {
-				if (tab === "applications") return "infrastructure";
-				if (tab === "infrastructure") return "libraries";
-				if (tab === "libraries") return "scripts";
-				if (tab === "scripts") return "kubernetes";
-				return "applications";
-			});
+			if (isReverseTabKey(event)) {
+				// Reverse cycle through tabs
+				appStore.setActiveTab((tab) => {
+					if (tab === "applications") return "kubernetes";
+					if (tab === "infrastructure") return "applications";
+					if (tab === "libraries") return "infrastructure";
+					if (tab === "scripts") return "libraries";
+					if (tab === "kubernetes") return "scripts";
+					return "applications";
+				});
+			} else {
+				// Forward cycle through tabs
+				appStore.setActiveTab((tab) => {
+					if (tab === "applications") return "infrastructure";
+					if (tab === "infrastructure") return "libraries";
+					if (tab === "libraries") return "scripts";
+					if (tab === "scripts") return "kubernetes";
+					return "applications";
+				});
+			}
 			appStore.setSelectedIndex(0); // Reset selection when switching tabs
 			appStore.setTableSearchQuery("");
 			appStore.setTableSearchMode(false);
@@ -485,6 +511,7 @@ export async function handleTableKeys(
 			break;
 		case "5":
 			appStore.setActiveTab("kubernetes");
+			appStore.setKubernetesPanelIndex(0);
 			appStore.setSelectedIndex(0);
 			appStore.setTableSearchQuery("");
 			appStore.setTableSearchMode(false);
@@ -492,6 +519,13 @@ export async function handleTableKeys(
 		case "down":
 		case "Down":
 		case "j":
+			// Kubernetes tab: delegate j to focused panel's scrollbox
+			if (appStore.activeTab() === "kubernetes") {
+				const refs = appStore.kubernetesScrollBoxRefs;
+				const ref = refs[appStore.kubernetesPanelIndex()];
+				ref?.scrollBy(1);
+				if (ref) break;
+			}
 			if (appList.length > 0) {
 				appStore.setSelectedIndex((prev) =>
 					Math.min(prev + 1, appList.length - 1),
@@ -501,6 +535,13 @@ export async function handleTableKeys(
 		case "up":
 		case "Up":
 		case "k":
+			// Kubernetes tab: delegate k to focused panel's scrollbox
+			if (appStore.activeTab() === "kubernetes") {
+				const refs = appStore.kubernetesScrollBoxRefs;
+				const ref = refs[appStore.kubernetesPanelIndex()];
+				ref?.scrollBy(-1);
+				if (ref) break;
+			}
 			if (appList.length > 0) {
 				appStore.setSelectedIndex((prev) => Math.max(prev - 1, 0));
 			}

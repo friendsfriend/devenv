@@ -5,6 +5,8 @@ import type {
 	KeyboardActions,
 	KeyboardContext,
 } from "./types";
+import { isNextPanelKey, isPrevPanelKey, nextPanelIndex, prevPanelIndex } from "./";
+import { isDownKey, isUpKey } from "./nav-keys";
 import { handleHorizontalScrollKey } from "./horizontal-scroll";
 
 /**
@@ -19,7 +21,7 @@ export async function handleCrDetailKeys(
 	_ctx: KeyboardContext,
 ): Promise<boolean> {
 	const { appStore, changeRequestStore } = stores;
-	const { crActions, pipelineActions, helpActions } = actions;
+	const { crActions, helpActions } = actions;
 
 	if (appStore.viewMode() !== "changeRequestDetail") return false;
 
@@ -94,6 +96,69 @@ export async function handleCrDetailKeys(
 		return true; // consume everything else while overlay is open
 	}
 
+	// --- Panel focus navigation ---
+	const panelCount = changeRequestStore.crDetailPanelCount;
+	if (panelCount > 1) {
+		if (isNextPanelKey(event)) {
+			changeRequestStore.setCrDetailPanelIndex((prev) => nextPanelIndex(prev, panelCount));
+			return true;
+		}
+		if (isPrevPanelKey(event)) {
+			changeRequestStore.setCrDetailPanelIndex((prev) => prevPanelIndex(prev, panelCount));
+			return true;
+		}
+	}
+
+	// When a scrollable panel is focused, delegate j/k to its scrollbox ref
+	if (isDownKey(event)) {
+		const refs = changeRequestStore.crDetailScrollBoxRefs;
+		const ref = refs[changeRequestStore.crDetailPanelIndex()];
+		ref?.scrollBy(1);
+		if (ref) return true;
+	}
+	if (isUpKey(event)) {
+		const refs = changeRequestStore.crDetailScrollBoxRefs;
+		const ref = refs[changeRequestStore.crDetailPanelIndex()];
+		ref?.scrollBy(-1);
+		if (ref) return true;
+	}
+
+	// --- 'o' opens panel detail view ---
+	if (event.sequence === 'o' || (event.name === 'o' && !event.shift && !event.ctrl)) {
+		const panelIdx = changeRequestStore.crDetailPanelIndex();
+		switch (panelIdx) {
+			case 2: // Changed Files
+				if (changeRequestStore.crChanges().length > 0) {
+					changeRequestStore.setSelectedChangedFileIndex(0);
+					appStore.setViewMode("changedFiles");
+				}
+				return true;
+			case 3: // Pipeline Jobs — open full jobs view
+				if ((changeRequestStore.crJobsForDetail()?.length ?? 0) > 0) {
+					appStore.setViewMode("jobs");
+				}
+				return true;
+			case 4: // Linked Issues
+				changeRequestStore.setSelectedCrLinkedIssueIndex(0);
+				appStore.setViewMode("changeRequestLinkedIssues");
+				return true;
+			case 5: // Discussions
+				const discussions = changeRequestStore.crDiscussions();
+				if (Array.isArray(discussions) && discussions.length > 0) {
+					changeRequestStore.setSelectedDiscussionIndex(0);
+					changeRequestStore.setDiscussionsShowOnlyComments(false);
+					appStore.setViewMode("discussionsView");
+				}
+				return true;
+			case 6: // Test Results
+				const testData = changeRequestStore.crTestSummary();
+				if (testData?.test_suites?.length) {
+					appStore.setViewMode("testResults");
+				}
+				return true;
+		}
+	}
+
 	// --- Normal CR detail keys ---
 
 	if (event.name === "?" || event.sequence === "?") {
@@ -107,12 +172,6 @@ export async function handleCrDetailKeys(
 			changeRequestStore.setSelectedChangedFileIndex(0);
 			appStore.setViewMode("changedFiles");
 		}
-		return true;
-	}
-
-	if (event.sequence === "J") {
-		const cr = changeRequestStore.selectedChangeRequest();
-		if (cr?.head_pipeline) pipelineActions.loadPipelineJobs();
 		return true;
 	}
 

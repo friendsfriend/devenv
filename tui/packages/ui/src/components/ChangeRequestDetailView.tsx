@@ -39,6 +39,10 @@ interface ChangeRequestDetailViewProps {
 	runningTextEnabled?: boolean;
 	runningTextOffset?: number;
 	onClose: () => void;
+	activePanelIndex?: number;
+	onMetadataScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
+	onChangedFilesScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
+	onPipelineJobsScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
 }
 
 /**
@@ -286,8 +290,9 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 						flexDirection: "column",
 					}}
 				>
-				{/* METADATA PANEL */}
+				{/* METADATA PANEL (panel 0) */}
 				<DetailSection
+					active={props.activePanelIndex === 0}
 					header={<RunningText text={cr().title} width={lineWidth()} fg={uiColors.textPrimary} attributes={TextAttributes.BOLD} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />}
 					style={{
 						width: "100%",
@@ -300,6 +305,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 
 					{/* Scrollable content */}
 					<ScrollableContent
+						onScrollBoxReady={props.onMetadataScrollBoxReady}
 												style={{
 							width: "100%",
 							flexGrow: 1,
@@ -313,8 +319,9 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-				{/* STATUS PANEL */}
+				{/* STATUS PANEL (panel 1) */}
 				<DetailSection
+					active={props.activePanelIndex === 1}
 					title="Status"
 					style={{
 						width: "100%",
@@ -329,8 +336,9 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-				{/* CHANGED FILES PANEL */}
+				{/* CHANGED FILES PANEL (panel 2) */}
 				<DetailSection
+					active={props.activePanelIndex === 2}
 					title="Changed Files"
 					style={{
 						width: "100%",
@@ -393,6 +401,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 						}
 					>
 						<ScrollableContent
+							onScrollBoxReady={props.onChangedFilesScrollBoxReady}
 														style={{ flexGrow: 1, minHeight: 0 }}
 						>
 							<For each={props.changes}>
@@ -438,8 +447,9 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					flexDirection: "column",
 				}}
 			>
-				{/* PIPELINE JOBS PANEL */}
+				{/* PIPELINE JOBS PANEL (panel 3) */}
 				<DetailSection
+					active={props.activePanelIndex === 3}
 					title="Pipeline Jobs"
 					style={{
 						width: "100%",
@@ -497,6 +507,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 						when={!props.jobsLoading && props.jobs && props.jobs.length > 0}
 					>
 						<ScrollableContent
+							onScrollBoxReady={props.onPipelineJobsScrollBoxReady}
 														style={{ flexGrow: 1, minHeight: 0 }}
 						>
 							<For each={Array.from(jobsByStage().entries())}>
@@ -544,8 +555,9 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-				{/* LINKED ISSUES PANEL - max 2 rows */}
+				{/* LINKED ISSUES PANEL (panel 4) */}
 				<DetailSection
+					active={props.activePanelIndex === 4}
 					title={`Linked Issues${props.linkedIssues && props.linkedIssues.length > 0 ? ` (${props.linkedIssues.length})` : ""}`}
 					style={{
 						width: "100%",
@@ -587,8 +599,9 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-				{/* DISCUSSIONS PANEL - Fixed height summary */}
+				{/* DISCUSSIONS PANEL (panel 5) */}
 				<DetailSection
+					active={props.activePanelIndex === 5}
 					title="Discussions"
 					style={{
 						width: "100%",
@@ -697,8 +710,9 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 
 				<box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-				{/* TEST RESULTS PANEL - Fixed height summary */}
+				{/* TEST RESULTS PANEL (panel 6) */}
 				<DetailSection
+					active={props.activePanelIndex === 6}
 					title="Test Results"
 					style={{
 						width: "100%",

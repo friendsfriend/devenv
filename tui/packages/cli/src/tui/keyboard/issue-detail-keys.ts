@@ -1,4 +1,5 @@
 import { isDownKey, isUpKey } from './nav-keys';
+import { isNextPanelKey, isPrevPanelKey, nextPanelIndex, prevPanelIndex } from './panel-keys';
 import type {
 	KeyboardEvent,
 	KeyboardStores,
@@ -171,33 +172,58 @@ export async function handleIssueDetailKeys(
 		return true;
 	}
 
-	// Vertical scrolling within the detail/description panel
-	const detailScrollBox = issueStore.issueDetailScrollBoxRef;
+	// ─── Panel focus navigation ─────────────────────────────────────────────
+	const panelCount = issueStore.issueDetailPanelCount;
+	if (panelCount > 1) {
+		if (isNextPanelKey(event)) {
+			issueStore.setIssueDetailPanelIndex((prev) => nextPanelIndex(prev, panelCount));
+			return true;
+		}
+		if (isPrevPanelKey(event)) {
+			issueStore.setIssueDetailPanelIndex((prev) => prevPanelIndex(prev, panelCount));
+			return true;
+		}
+	}
+
+	// Vertical scrolling within the focused panel
+	const refs = issueStore.issueDetailScrollBoxRefs;
+	const activeRef = refs[issueStore.issueDetailPanelIndex()];
 	if (isDownKey(event)) {
-		detailScrollBox?.scrollBy(1);
-		return true;
+		activeRef?.scrollBy(1);
+		if (activeRef) return true;
 	}
 	if (isUpKey(event)) {
-		detailScrollBox?.scrollBy(-1);
-		return true;
+		activeRef?.scrollBy(-1);
+		if (activeRef) return true;
 	}
 	if (event.name === "d" || event.sequence === "d") {
-		const half = Math.max(1, Math.floor((detailScrollBox?.viewport.height ?? 10) / 2));
-		detailScrollBox?.scrollBy(half);
-		return true;
+		const half = Math.max(1, Math.floor((activeRef?.viewport.height ?? 10) / 2));
+		activeRef?.scrollBy(half);
+		if (activeRef) return true;
 	}
 	if (event.name === "u" || event.sequence === "u") {
-		const half = Math.max(1, Math.floor((detailScrollBox?.viewport.height ?? 10) / 2));
-		detailScrollBox?.scrollBy(-half);
-		return true;
+		const half = Math.max(1, Math.floor((activeRef?.viewport.height ?? 10) / 2));
+		activeRef?.scrollBy(-half);
+		if (activeRef) return true;
 	}
 	if ((event.name === "g" || event.sequence === "g") && !event.shift) {
-		detailScrollBox?.scrollTo(0);
-		return true;
+		activeRef?.scrollTo(0);
+		if (activeRef) return true;
 	}
 	if (event.name === "G" || event.sequence === "G" || (event.name === "g" && event.shift)) {
-		detailScrollBox?.scrollTo(detailScrollBox?.scrollHeight ?? 0);
-		return true;
+		activeRef?.scrollTo(activeRef?.scrollHeight ?? 0);
+		if (activeRef) return true;
+	}
+
+	// o - Open detail view for the focused panel
+	if (event.sequence === 'o' || (event.name === 'o' && !event.shift && !event.ctrl)) {
+		const panelIdx = issueStore.issueDetailPanelIndex();
+		switch (panelIdx) {
+			case 1: // References — open combined references view
+				issueStore.setSelectedReferenceIndex(0);
+				issueActions.showReferencesSubView();
+				return true;
+		}
 	}
 
 	// c - Close issue (opens reason picker)

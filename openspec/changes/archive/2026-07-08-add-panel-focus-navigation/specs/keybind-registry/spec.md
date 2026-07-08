@@ -1,22 +1,4 @@
-## Purpose
-The keybind registry defines discoverable help and footer entries for TUI keyboard actions.
-## Requirements
-### Requirement: Registry covers Kubernetes cluster management keybinds
-The keybind registry SHALL include footer and help entries for Kubernetes cluster management actions.
-
-#### Scenario: Kubernetes cluster view keybinds are registered
-- **WHEN** the registry is built
-- **THEN** it SHALL include entries for Kubernetes cluster create/start, delete/stop, recreate, refresh, export kubeconfig, open k9s, help, and quit/back behavior
-- **THEN** each entry SHALL use the view context that the footer and help system use while the Kubernetes tab is active
-
-#### Scenario: Kubernetes footer shows cluster actions
-- **WHEN** the Kubernetes tab is active
-- **THEN** the footer SHALL show Kubernetes cluster keybind hints from the registry
-- **THEN** unrelated table actions SHALL NOT displace the Kubernetes cluster lifecycle hints
-
-#### Scenario: Kubernetes help shows cluster actions
-- **WHEN** help is opened from the Kubernetes tab
-- **THEN** help content SHALL include the registered Kubernetes cluster management keybinds
+## ADDED Requirements
 
 ### Requirement: Registry includes panel focus navigation keybinds
 The keybind registry SHALL include entries for panel focus cycling with Shift+J/K for each panel-based view context.
@@ -50,4 +32,3 @@ The keybind registry SHALL include Shift+Tab entries for each tab-based view con
 - **WHEN** the registry is built
 - **THEN** it SHALL include Shift+Tab entries for contexts "table", "jobs", and "help"
 - **THEN** each entry SHALL describe cycling tabs/stages in the reverse direction
-

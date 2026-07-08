@@ -198,10 +198,14 @@ export function ContentRouter(props: ContentRouterProps) {
 																										dependencyTreeSelectedIndex={appDetailStore.dependencyTreeSelectedIndex()}
 																										onDependencyNodeClick={(node, idx) => {
 																											console.error(`[HANDLER] key=${node.key}`);
+																											appDetailStore.setAppDetailPanelIndex(2);
 																											appDetailStore.setDependencyTreeSelectedIndex(idx);
 																											appDetailStore.setDependencyTreeFocused(true);
 																											appActions.expandDependencyNode(node.key);
 																										}}
+																										activePanelIndex={appDetailStore.appDetailPanelIndex()}
+																										onInfoScrollBoxReady={(ref) => { appDetailStore.appDetailScrollBoxRefs[0] = ref; }}
+																										onLogsScrollBoxReady={(ref) => { appDetailStore.appDetailScrollBoxRefs[3] = ref; }}
 																									/>
 																								</Show>
 																							}
@@ -317,9 +321,13 @@ export function ContentRouter(props: ContentRouterProps) {
 																linkedIssues={changeRequestStore.changeRequestLinkedIssues()}
 																linkedIssuesLoading={changeRequestStore.changeRequestLinkedIssuesLoading()}
 																linkedIssuesError={changeRequestStore.changeRequestLinkedIssuesError()}
+																activePanelIndex={changeRequestStore.crDetailPanelIndex()}
 																runningTextEnabled={props.runningTextEnabled}
 																runningTextOffset={props.runningTextOffset}
 																onClose={crActions.backToCRList}
+																onMetadataScrollBoxReady={(ref) => { changeRequestStore.crDetailScrollBoxRefs[0] = ref; }}
+																onChangedFilesScrollBoxReady={(ref) => { changeRequestStore.crDetailScrollBoxRefs[2] = ref; }}
+																onPipelineJobsScrollBoxReady={(ref) => { changeRequestStore.crDetailScrollBoxRefs[3] = ref; }}
 															/>
 														</Show>
 													}
@@ -367,8 +375,13 @@ export function ContentRouter(props: ContentRouterProps) {
 												references={issueStore.references()}
 												spinnerFrames={props.spinnerFrames}
 												spinnerFrame={appStore.spinnerFrame}
+												activePanelIndex={issueStore.issueDetailPanelIndex()}
 												onDetailScrollBoxReady={(scrollBox) => {
 													issueStore.issueDetailScrollBoxRef = scrollBox;
+													issueStore.issueDetailScrollBoxRefs[0] = scrollBox;
+												}}
+												onCommentsScrollBoxReady={(scrollBox) => {
+													issueStore.issueDetailScrollBoxRefs[2] = scrollBox;
 												}}
 											/>
 											</Show>
@@ -589,6 +602,10 @@ export function ContentRouter(props: ContentRouterProps) {
 											cpuHistory={appStore.kubernetesCPUHistory()}
 											memoryHistory={appStore.kubernetesMemoryHistory()}
 											height={availableTableLines}
+											activePanelIndex={appStore.kubernetesPanelIndex()}
+											onClusterInfoScrollBoxReady={(ref) => { appStore.kubernetesScrollBoxRefs[0] = ref; }}
+											onPodsScrollBoxReady={(ref) => { appStore.kubernetesScrollBoxRefs[2] = ref; }}
+											onWorkloadsScrollBoxReady={(ref) => { appStore.kubernetesScrollBoxRefs[3] = ref; }}
 										/>
 									</Show>
 								</box>,

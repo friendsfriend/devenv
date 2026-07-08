@@ -182,6 +182,7 @@ export function createAppActions(
             Operation: operation,
             Status: status,
             Message: message,
+            source: 'app',
           };
           appStore.setStatusLogEntries((prev) => [...prev, entry].slice(-50));
         }
@@ -316,6 +317,7 @@ export function createAppActions(
     appDetailStore.setActionTargetsLoading(false);
     appDetailStore.setDependencyTreeFocused(false);
     appDetailStore.setDependencyTreeSelectedIndex(0);
+    appDetailStore.setAppDetailPanelIndex(0);
     appStore.setViewMode('appDetail');
 
     if (kind !== 'infra') {
@@ -361,9 +363,8 @@ export function createAppActions(
         const appStatusMap = new Map(allApps.map((a) => [a.ident, a.status || a.dockerInfo?.Status || 'unknown']));
         const infraStatusMap = new Map(allInfra.map((s) => [s.ident, s.status || s.dockerInfo?.Status || 'unknown']));
         appDetailStore.setDependencyTreeNodes(buildDependencyTree(targets, appStatusMap, infraStatusMap));
-        // Auto-focus first item in dependency tree
+        // Keep dependency tree selection ready, but do not steal initial panel focus.
         if (targets.length > 0) {
-          appDetailStore.setDependencyTreeFocused(true);
           appDetailStore.setDependencyTreeSelectedIndex(0);
         }
       } catch {

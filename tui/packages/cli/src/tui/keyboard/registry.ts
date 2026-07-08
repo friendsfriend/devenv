@@ -51,7 +51,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	// ========== table — Navigation ==========
 	{ keys: ["↑", "k"], description: "Move selection up", context: "table", category: "Navigation" },
 	{ keys: ["↓", "j"], description: "Move selection down", context: "table", category: "Navigation" },
-	{ keys: ["Tab", "1", "2", "3", "4", "5"], description: "Switch tab (Applications/Infrastructure/Libraries/Tasks/Kubernetes)", context: "table", category: "Navigation" },
+	{ keys: ["Tab", "Shift+Tab", "1", "2", "3", "4", "5"], description: "Switch tab (Applications/Infrastructure/Libraries/Tasks/Kubernetes)", context: "table", category: "Navigation" },
 
 	// ========== table — Actions ==========
 	{ keys: ["l"], description: "View container logs for selected item", footerDescription: "Logs", context: "table", category: "Actions" },
@@ -84,6 +84,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["t"], description: "Test application / toggle test logs while running", context: "table", category: "Docker" },
 
 	// ========== kubernetes ==========
+	{ keys: ["Shift+J", "Shift+K"], description: "Cycle panel focus in Kubernetes cluster view", footerDescription: "Panels", context: "kubernetes", category: "Navigation" },
 	{ keys: ["s"], description: "Create/start managed kind cluster", footerDescription: "Start", context: "kubernetes", category: "Kubernetes" },
 	{ keys: ["S"], description: "Delete/stop managed kind cluster", footerDescription: "Delete", context: "kubernetes", category: "Kubernetes" },
 	{ keys: ["R"], description: "Recreate managed kind cluster", footerDescription: "Recreate", context: "kubernetes", category: "Kubernetes" },
@@ -127,6 +128,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["q"], description: "Quit DevEnv", context: "changeRequests", category: "General" },
 
 	// ========== changeRequestDetail ==========
+	{ keys: ["Shift+J", "Shift+K"], description: "Cycle panel focus in CR detail view", footerDescription: "Panels", context: "changeRequestDetail", category: "Navigation" },
 	{ keys: ["a"], description: "Toggle approval (approve/unapprove)", context: "changeRequestDetail", category: "Actions" },
 	{ keys: ["Shift+A"], description: "AI review — stream review, then post as comment", context: "changeRequestDetail", category: "Actions" },
 	{ keys: ["r"], description: "Rebase change request", context: "changeRequestDetail", category: "Actions" },
@@ -141,7 +143,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 
 	// ========== jobs ==========
 	{ keys: ["↑/↓", "j/k"], description: "Navigate jobs in current stage", context: "jobs", category: "Navigation" },
-	{ keys: ["Tab"], description: "Cycle through stages", context: "jobs", category: "Navigation" },
+	{ keys: ["Tab", "Shift+Tab"], description: "Cycle through stages", context: "jobs", category: "Navigation" },
 	{ keys: ["v"], description: "View logs for selected job", context: "jobs", category: "Actions" },
 	{ keys: ["r"], description: "Retry failed/canceled job", context: "jobs", category: "Actions" },
 	{ keys: ["c"], description: "Cancel running/pending job", context: "jobs", category: "Actions" },
@@ -190,6 +192,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["q"], description: "Quit DevEnv", context: "discussionsView", category: "General" },
 
 	// ========== appDetail ==========
+	{ keys: ["Shift+J", "Shift+K"], description: "Cycle panel focus in app detail view", footerDescription: "Panels", context: "appDetail", category: "Navigation" },
 	{ keys: ["d"], description: "Focus dependency tree", footerDescription: "Deps", context: "appDetail", category: "Navigation" },
 	{ keys: ["j/k", "\u2191/\u2193"], description: "Navigate tree nodes (when tree focused)", context: "appDetail", category: "Navigation" },
 	{ keys: ["Enter"], description: "Expand/collapse tree node (when tree focused)", context: "appDetail", category: "Actions" },
@@ -219,6 +222,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["q"], description: "Quit DevEnv", context: "issues", category: "General" },
 
 	// ========== issueDetail ==========
+	{ keys: ["Shift+J", "Shift+K"], description: "Cycle panel focus in issue detail view", footerDescription: "Panels", context: "issueDetail", category: "Navigation" },
 	{ keys: ["r"], description: "Add comment (reply)", context: "issueDetail", category: "Actions" },
 	{ keys: ["c"], description: "Close issue (with reason picker)", context: "issueDetail", category: "Actions" },
 	{ keys: ["Shift+C"], description: "Reopen issue", context: "issueDetail", category: "Actions" },
@@ -364,7 +368,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	{ keys: ["j/k", "↑/↓"], description: "Scroll keybinds or navigate guides", context: "help", category: "Navigation" },
 	{ keys: ["u/d"], description: "Half-page keybind list up/down", context: "help", category: "Navigation" },
 	{ keys: ["g/G"], description: "Go to top/bottom of keybind list", context: "help", category: "Navigation" },
-	{ keys: ["Tab"], description: "Switch keybindings/guides tab", context: "help", category: "Actions" },
+	{ keys: ["Tab", "Shift+Tab"], description: "Switch keybindings/guides tab", context: "help", category: "Actions" },
 	{ keys: ["/"], description: "Search keybinds", context: "help", category: "Actions" },
 	{ keys: ["s"], description: "Toggle current/all-context keybind scope", context: "help", category: "Actions" },
 	{ keys: ["Enter"], description: "Open selected guide", context: "help", category: "Actions" },
@@ -399,7 +403,7 @@ const FOOTER_LABELS = new Map<string, string>([
 	["Close theme picker", "Close"],
 	["Move selection up", "Up"],
 	["Move selection down", "Down"],
-	["Switch tab (Applications/Infrastructure/Libraries/Tasks)", "Tabs"],
+	["Switch tab (Applications/Infrastructure/Libraries/Tasks/Kubernetes)", "Tabs"],
 	["Search table", "Search"],
 	["Filter table", "Filter"],
 	["Order/sort table", "Sort"],

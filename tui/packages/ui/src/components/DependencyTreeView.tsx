@@ -187,60 +187,64 @@ export function DependencyTreeView(props: DependencyTreeViewProps) {
                   width: '100%',
                   height: 1,
                   flexDirection: 'row',
-                  paddingLeft: 1,
-                  paddingRight: 1,
                 }}
               >
-                {/* Tree connector prefix */}
-                <text fg={uiColors.textMuted}>{prefix}</text>
+                <box
+                  backgroundColor={rowHighlight()}
+                  style={{ width: 1, height: '100%', flexShrink: 0 }}
+                />
+                <box style={{ flexGrow: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, minWidth: 0 }}>
+                  {/* Tree connector prefix */}
+                  <text fg={uiColors.textMuted}>{prefix}</text>
 
-                {/* Expand/collapse indicator */}
-                <Show when={hasChildren()}>
-                  <text fg={row.node.expanded ? uiColors.textSecondary : uiColors.textMuted}>
-                    {row.node.expanded ? '▾ ' : '▸ '}
+                  {/* Expand/collapse indicator */}
+                  <Show when={hasChildren()}>
+                    <text fg={row.node.expanded ? uiColors.textSecondary : uiColors.textMuted}>
+                      {row.node.expanded ? '▾ ' : '▸ '}
+                    </text>
+                  </Show>
+                  <Show when={!hasChildren()}>
+                    <text>{'  '}</text>
+                  </Show>
+
+                  {/* Node icon */}
+                  <text>{nodeIcon(row.node.kind)} </text>
+
+                  {/* Node name */}
+                  <text
+                    fg={isSelected() && props.focused ? highlightColor('highlight') as string : uiColors.textPrimary}
+                    attributes={isSelected() && props.focused ? TextAttributes.BOLD : undefined}
+                  >
+                    {row.node.name}
                   </text>
-                </Show>
-                <Show when={!hasChildren()}>
-                  <text>{'  '}</text>
-                </Show>
 
-                {/* Node icon */}
-                <text>{nodeIcon(row.node.kind)} </text>
+                  {/* Runtime/profile badge (apps only) */}
+                  <Show when={row.node.runtime}>
+                    <text fg={uiColors.textMuted}>
+                      {` (${row.node.runtime}${row.node.profile ? '/' + row.node.profile : ''})`}
+                    </text>
+                  </Show>
 
-                {/* Node name */}
-                <text
-                  fg={isSelected() && props.focused ? highlightColor('highlight') as string : uiColors.textPrimary}
-                  attributes={isSelected() && props.focused ? TextAttributes.BOLD : undefined}
-                >
-                  {row.node.name}
-                </text>
+                  {/* Deduped indicator */}
+                  <Show when={row.node.deduped}>
+                    <text fg={uiColors.textMuted}> ↻</text>
+                  </Show>
 
-                {/* Runtime/profile badge (apps only) */}
-                <Show when={row.node.runtime}>
-                  <text fg={uiColors.textMuted}>
-                    {` (${row.node.runtime}${row.node.profile ? '/' + row.node.profile : ''})`}
+                  {/* Cycle indicator */}
+                  <Show when={row.node.cycled}>
+                    <text fg={uiColors.warning}> ⚠ cycle</text>
+                  </Show>
+
+                  {/* Loading spinner */}
+                  <Show when={row.node.loading}>
+                    <text fg={uiColors.primary}> ⏳</text>
+                  </Show>
+
+                  {/* Status badge */}
+                  <text fg={highlightColor(statusHighlight(row.node.status))}>
+                    {' '}{statusLabel(row.node.status)}
                   </text>
-                </Show>
-
-                {/* Deduped indicator */}
-                <Show when={row.node.deduped}>
-                  <text fg={uiColors.textMuted}> ↻</text>
-                </Show>
-
-                {/* Cycle indicator */}
-                <Show when={row.node.cycled}>
-                  <text fg={uiColors.warning}> ⚠ cycle</text>
-                </Show>
-
-                {/* Loading spinner */}
-                <Show when={row.node.loading}>
-                  <text fg={uiColors.primary}> ⏳</text>
-                </Show>
-
-                {/* Status badge */}
-                <text fg={highlightColor(statusHighlight(row.node.status))}>
-                  {' '}{statusLabel(row.node.status)}
-                </text>
+                </box>
               </box>
             );
           }}

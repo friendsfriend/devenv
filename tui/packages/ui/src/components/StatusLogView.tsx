@@ -47,6 +47,9 @@ export function StatusLogView(props: StatusLogViewProps) {
                 <HighlightedText text={formatTimestamp(entry.Timestamp)} highlight="highlight" />
                 <HighlightedText text={entry.AppName || entry.AppIdent || ''} highlight="primary" attributes={TextAttributes.BOLD} />
                 <HighlightedText text={displayStatus(entry.Status)} highlight={statusHighlight(entry.Status)} attributes={TextAttributes.BOLD} />
+                {entry.source === 'task' && (
+                  <HighlightedText text="[task]" highlight="secondary" attributes={TextAttributes.BOLD} />
+                )}
                 <HighlightedText text={entry.Message} highlight="primary" />
               </box>
             )}

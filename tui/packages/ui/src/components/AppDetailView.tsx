@@ -29,6 +29,9 @@ interface AppDetailViewProps {
   dependencyTreeFocused: boolean;
   dependencyTreeSelectedIndex: number;
   onDependencyNodeClick?: (node: any, flatIndex: number) => void;
+  activePanelIndex?: number;
+  onInfoScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
+  onLogsScrollBoxReady?: (ref: import('@opentui/core').ScrollBoxRenderable) => void;
 }
 
 function roughDurationSince(startedAt: string): string | null {
@@ -169,8 +172,9 @@ export function AppDetailView(props: AppDetailViewProps) {
             flexDirection: 'row',
           }}
         >
-          {/* Info Panel */}
+          {/* Info Panel (panel 0) */}
           <DetailSection
+            active={props.activePanelIndex === 0}
             header={
               <box style={{ flexDirection: 'row', width: '100%' }}>
                 <Show when={providerIcon()}>
@@ -189,7 +193,7 @@ export function AppDetailView(props: AppDetailViewProps) {
               overflow: 'hidden',
             }}
           >
-            <ScrollableContent axes={["x", "y"]} style={{ width: '100%', flexGrow: 1, minHeight: 0 }}>
+            <ScrollableContent axes={["x", "y"]} style={{ width: '100%', flexGrow: 1, minHeight: 0 }} onScrollBoxReady={props.onInfoScrollBoxReady}>
               <PropertiesList rows={overviewRows()} labelWidth={12} />
             </ScrollableContent>
           </DetailSection>
@@ -197,8 +201,9 @@ export function AppDetailView(props: AppDetailViewProps) {
           <Show when={hasDocker()}>
             <box style={{ width: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-            {/* Stats Panel */}
+            {/* Stats Panel (panel 1) */}
             <DetailSection
+              active={props.activePanelIndex === 1}
               title="Container Stats"
               style={{
                 width: statsWidth(),
@@ -241,6 +246,7 @@ export function AppDetailView(props: AppDetailViewProps) {
         <Show when={hasDependencies()}>
           <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
           <DetailSection
+            active={props.activePanelIndex === 2}
             title="Dependencies"
             style={{
               width: '100%',
@@ -273,8 +279,9 @@ export function AppDetailView(props: AppDetailViewProps) {
         <Show when={hasDocker()}>
           <box style={{ width: '100%', height: 1, flexShrink: 0 }} backgroundColor={uiColors.bgBase} />
 
-          {/* Logs Panel */}
+          {/* Logs Panel (panel 3) */}
           <DetailSection
+            active={props.activePanelIndex === 3}
             title="Container Logs"
             style={{
               width: '100%',
@@ -285,7 +292,7 @@ export function AppDetailView(props: AppDetailViewProps) {
               overflow: 'hidden',
             }}
           >
-            <ScrollableContent axes={["x", "y"]} style={{ width: '100%', flexGrow: 1, minHeight: 0 }}>
+            <ScrollableContent axes={["x", "y"]} style={{ width: '100%', flexGrow: 1, minHeight: 0 }} onScrollBoxReady={props.onLogsScrollBoxReady}>
               <Show
                 when={props.logs.trim().length > 0}
                 fallback={
