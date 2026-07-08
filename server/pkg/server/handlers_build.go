@@ -128,17 +128,27 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] Run initiated for app: %s", req.Ident)
 
+	// Check for missing env vars before starting compose.
+	var missingEnvVars []string
+	if req.TargetID == "" {
+		missingEnvVars = s.services.BuildService().ComposeMissingEnvVars(targetApp.Ident, targetApp.LocalDirectoryPath, req.Profile)
+	}
+
 	if req.TargetID != "" {
 		go s.services.BuildService().RunAppTargetWithStatus(targetApp, req.TargetID)
 	} else {
 		go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	resp := map[string]interface{}{
 		"success": true,
 		"message": fmt.Sprintf("Run initiated for %s", targetApp.DisplayName),
-	})
+	}
+	if len(missingEnvVars) > 0 {
+		resp["missingEnvVars"] = missingEnvVars
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // handleTest triggers a test operation for an app

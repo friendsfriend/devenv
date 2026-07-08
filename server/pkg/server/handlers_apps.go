@@ -442,21 +442,23 @@ func (s *Server) handleProviders(w http.ResponseWriter, r *http.Request) {
 		providers := s.services.ProviderStore().List()
 		invalidProviders := s.services.ProviderStore().InvalidProviders()
 		type providerResponse struct {
-			Name     string `json:"name"`
-			Type     string `json:"type"`
-			Username string `json:"username"`
-			HasToken bool   `json:"has_token"`
-			Invalid  bool   `json:"invalid,omitempty"`
-			Reason   string `json:"reason,omitempty"`
-			Message  string `json:"message,omitempty"`
+			Name        string   `json:"name"`
+			Type        string   `json:"type"`
+			Username    string   `json:"username"`
+			HasToken    bool     `json:"has_token"`
+			MissingVars []string `json:"missing_vars,omitempty"`
+			Invalid     bool     `json:"invalid,omitempty"`
+			Reason      string   `json:"reason,omitempty"`
+			Message     string   `json:"message,omitempty"`
 		}
 		result := make([]providerResponse, 0, len(providers)+len(invalidProviders))
 		for _, p := range providers {
 			result = append(result, providerResponse{
-				Name:     p.Name,
-				Type:     p.Type,
-				Username: p.Username,
-				HasToken: p.Token != "",
+				Name:        p.Name,
+				Type:        p.Type,
+				Username:    p.Username,
+				HasToken:    p.Token != "",
+				MissingVars: p.MissingVars,
 			})
 		}
 		for _, p := range invalidProviders {
@@ -507,12 +509,16 @@ func (s *Server) handleProviderByName(w http.ResponseWriter, r *http.Request) {
 			respondNotFound(w, fmt.Sprintf("Provider %q not found", name))
 			return
 		}
-		respondJSON(w, map[string]interface{}{
+		resp := map[string]interface{}{
 			"name":      p.Name,
 			"type":      p.Type,
 			"username":  p.Username,
 			"has_token": p.Token != "",
-		}, http.StatusOK)
+		}
+		if len(p.MissingVars) > 0 {
+			resp["missing_vars"] = p.MissingVars
+		}
+		respondJSON(w, resp, http.StatusOK)
 
 	case http.MethodPut:
 		var req provider.Provider

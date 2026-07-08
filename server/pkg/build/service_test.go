@@ -85,6 +85,10 @@ func (f *fakeResourceMgr) EnvFilePath() (string, bool) {
 	return "", false
 }
 
+func (f *fakeResourceMgr) ComposeMissingEnvVars(_, _, _ string) []string {
+	return nil
+}
+
 func (f *fakeResourceMgr) CopyTemplatesDir(_ string) ([]string, error) {
 	if f.copyTemplatesErr != nil {
 		return nil, f.copyTemplatesErr

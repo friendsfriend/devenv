@@ -67,3 +67,59 @@ func TestUpsertEnvFileCreatesFile(t *testing.T) {
 		t.Fatalf("unexpected vars: %#v", vars)
 	}
 }
+
+func TestSubstituteVarsWithWarnings(t *testing.T) {
+	t.Run("all variables resolved", func(t *testing.T) {
+		result, missing := SubstituteVarsWithWarnings("db=${DB_HOST}", map[string]string{"DB_HOST": "localhost"})
+		if result != "db=localhost" {
+			t.Fatalf("expected db=localhost, got %q", result)
+		}
+		if len(missing) != 0 {
+			t.Fatalf("expected no missing vars, got %v", missing)
+		}
+	})
+
+	t.Run("single missing variable", func(t *testing.T) {
+		result, missing := SubstituteVarsWithWarnings("db=${DB_HOST}:${DB_PORT}", map[string]string{"DB_HOST": "localhost"})
+		if result != "db=localhost:${DB_PORT}" {
+			t.Fatalf("expected db=localhost:${DB_PORT}, got %q", result)
+		}
+		if len(missing) != 1 || missing[0] != "DB_PORT" {
+			t.Fatalf("expected [DB_PORT], got %v", missing)
+		}
+	})
+
+	t.Run("multiple missing variables", func(t *testing.T) {
+		_, missing := SubstituteVarsWithWarnings("${A}-${B}-${C}", map[string]string{"B": "val"})
+		if len(missing) != 2 {
+			t.Fatalf("expected 2 missing vars, got %d: %v", len(missing), missing)
+		}
+		missingSet := make(map[string]bool)
+		for _, m := range missing {
+			missingSet[m] = true
+		}
+		if !missingSet["A"] || !missingSet["C"] {
+			t.Fatalf("expected A and C missing, got %v", missing)
+		}
+	})
+
+	t.Run("empty placeholder ignored", func(t *testing.T) {
+		result, missing := SubstituteVarsWithWarnings("test-${}-end", map[string]string{})
+		if result != "test-${}-end" {
+			t.Fatalf("expected test-${}-end, got %q", result)
+		}
+		if len(missing) != 0 {
+			t.Fatalf("expected no missing vars for empty placeholder, got %v", missing)
+		}
+	})
+
+	t.Run("no placeholders", func(t *testing.T) {
+		result, missing := SubstituteVarsWithWarnings("hello world", map[string]string{"A": "b"})
+		if result != "hello world" {
+			t.Fatalf("expected hello world, got %q", result)
+		}
+		if len(missing) != 0 {
+			t.Fatalf("expected no missing vars, got %v", missing)
+		}
+	})
+}

@@ -136,6 +136,7 @@ function TUIApp(props: TUIAppProps) {
 		providerStore,
 		client,
 		showError,
+		uiStore,
 	);
 	const agentActions = createAgentActions(appStore, agentStore, client);
 	const utilActions = createUtilActions(

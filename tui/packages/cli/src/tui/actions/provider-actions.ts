@@ -2,12 +2,14 @@ import type { DevEnvClient } from '@devenv/core';
 import type { CreateAppRequest } from '@devenv/types';
 import type { AppStore } from '../stores/app-store';
 import type { ProviderStore } from '../stores/provider-store';
+import type { NotificationType } from '../stores/ui-store';
 
 export function createProviderActions(
   appStore: AppStore,
   providerStore: ProviderStore,
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
+  uiStore?: { setNotification: (message: string, type: NotificationType) => void },
 ) {
   let repoSearchAbortController: AbortController | null = null;
   const abortRepositorySearch = () => {
@@ -19,7 +21,15 @@ export function createProviderActions(
     providerStore.setProvidersLoading(true);
     providerStore.setProvidersError('');
     try {
-      providerStore.setProviders(await client.getProviders());
+      const providers = await client.getProviders();
+      providerStore.setProviders(providers);
+      if (uiStore) {
+        for (const p of providers) {
+          if (p.missing_vars && p.missing_vars.length > 0) {
+            uiStore.setNotification(`Missing env vars for ${p.name}: ${p.missing_vars.join(', ')}`, 'warning');
+          }
+        }
+      }
     } catch (e) {
       providerStore.setProvidersError(e instanceof Error ? e.message : 'Unknown error');
       providerStore.setProviders([]);

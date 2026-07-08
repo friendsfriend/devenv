@@ -47,7 +47,12 @@ export function createDockerActions(
         await client.stopInfraService(appIdent);
       } else if (action === 'start') {
         if ('type' in app) await client.startInfraService(appIdent);
-        else await client.startApp(appIdent, profile || '', targetId);
+        else {
+          const startResp = await client.startApp(appIdent, profile || '', targetId);
+          if (startResp.missingEnvVars && startResp.missingEnvVars.length > 0) {
+            uiStore.setNotification(`Missing env vars: ${startResp.missingEnvVars.join(', ')}`, 'warning');
+          }
+        }
       } else if (action === 'stop') {
         if ('type' in app) {
           const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;

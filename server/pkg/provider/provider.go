@@ -18,10 +18,11 @@ const (
 
 // Provider represents a named git provider configuration.
 type Provider struct {
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Username string `json:"username"`
-	Token    string `json:"token"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Username    string   `json:"username"`
+	Token       string   `json:"token"`
+	MissingVars []string `json:"missing_vars,omitempty"`
 }
 
 // HasCredentials returns true when both username and token are non-empty.
@@ -122,8 +123,11 @@ func (s *store) Load() error {
 			continue
 		}
 
+		var missingVars []string
 		if envVars != nil {
-			data = []byte(resources.SubstituteVars(string(data), envVars))
+			substituted, missing := resources.SubstituteVarsWithWarnings(string(data), envVars)
+			data = []byte(substituted)
+			missingVars = missing
 		}
 
 		var p Provider
@@ -141,6 +145,8 @@ func (s *store) Load() error {
 		if p.Name == "" {
 			p.Name = strings.TrimSuffix(entry.Name(), ".json")
 		}
+
+		p.MissingVars = missingVars
 
 		s.providers[p.Name] = p
 	}

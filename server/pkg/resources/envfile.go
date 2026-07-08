@@ -55,6 +55,25 @@ func SubstituteVars(s string, vars map[string]string) string {
 	})
 }
 
+// SubstituteVarsWithWarnings replaces ${VAR} placeholders in s with values
+// from vars and returns any unresolved variable names. Malformed placeholders
+// (empty name) are left as-is but not reported as missing.
+func SubstituteVarsWithWarnings(s string, vars map[string]string) (string, []string) {
+	var missing []string
+	result := varPattern.ReplaceAllStringFunc(s, func(match string) string {
+		key := match[2 : len(match)-1]
+		if key == "" {
+			return match
+		}
+		if val, ok := vars[key]; ok {
+			return val
+		}
+		missing = append(missing, key)
+		return match
+	})
+	return result, missing
+}
+
 // UpsertEnvFile updates or appends key-value pairs while preserving unrelated lines.
 func UpsertEnvFile(path string, values map[string]string) error {
 	lines, err := readEnvLines(path)
