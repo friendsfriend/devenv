@@ -27,10 +27,9 @@ func (c *client) GetPipelines(projectInfo *ProjectInfo, limit int) ([]Pipeline, 
 	apiURL := fmt.Sprintf("%s/api/v4/projects/%s/pipelines", c.baseURL, projectPath)
 
 	// Add query parameters
+	limit = clampProviderLimit(limit)
 	params := url.Values{}
-	if limit > 0 {
-		params.Set("per_page", fmt.Sprintf("%d", limit))
-	}
+	params.Set("per_page", fmt.Sprintf("%d", limit))
 	params.Set("order_by", "id")
 	params.Set("sort", "desc") // Get newest first
 

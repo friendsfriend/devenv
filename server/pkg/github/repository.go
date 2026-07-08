@@ -91,9 +91,7 @@ type SearchResult struct {
 
 // Search implements changerequest.Client.Search.
 func (c *client) Search(info *changerequest.RepoInfo, query string, limit int) ([]changerequest.SearchResult, error) {
-	if limit <= 0 {
-		limit = 20
-	}
+	limit = clampProviderLimit(limit)
 
 	params := url.Values{}
 	params.Set("q", query)

@@ -1,4 +1,4 @@
-import type { Discussion, ChangeRequestChange, ChangeRequest, ChangeRequestListResult } from '@devenv/types';
+import type { CRCommentPosition, CRCommentRequest, CRMutationResult, CRVersion, Discussion, ChangeRequestChange, ChangeRequest, ChangeRequestListResult } from '@devenv/types';
 import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 
@@ -97,7 +97,7 @@ export async function getChangeRequestChanges(
 /**
  * Get CR versions (SHAs) for a specific change request
  */
-export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: number): Promise<any[]> {
+export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: number): Promise<CRVersion[]> {
   const url = `${deps.baseUrl}/api/gitlab/cr-versions?appIdent=${encodeURIComponent(appIdent)}&crIID=${crIID}`;
   const response = await deps.fetchFn(url);
 
@@ -105,7 +105,7 @@ export async function getCRVersions(deps: ClientDeps, appIdent: string, crIID: n
     await handleFetchError(response, deps.onError);
   }
 
-  return (await response.json()) as any[];
+  return (await response.json()) as CRVersion[];
 }
 
 /**
@@ -126,21 +126,10 @@ export async function createCRComment(
     newLine?: number;
     oldLine?: number;
     lineCode?: string;
-    lineRange?: {
-      start: {
-        type: string;
-        oldLine?: number;
-        newLine?: number;
-      };
-      end: {
-        type: string;
-        oldLine?: number;
-        newLine?: number;
-      };
-    };
+    lineRange?: CRCommentPosition['lineRange'];
   }
-): Promise<{ status: string; message: string }> {
-  const payload: any = {
+): Promise<CRMutationResult> {
+  const payload: CRCommentRequest = {
     appIdent,
     crIID,
     body,
@@ -189,7 +178,7 @@ export async function createCRComment(
     await handleFetchError(response, deps.onError);
   }
 
-  return (await response.json()) as { status: string; message: string };
+  return (await response.json()) as CRMutationResult;
 }
 
 /**

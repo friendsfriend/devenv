@@ -59,11 +59,11 @@ bun run dev
 ### Build
 
 ```bash
-# Build self-contained binaries for all platforms
-bun run build
-
-# Build for current platform only (faster)
+# Build for current platform only (recommended for development)
 bun run build:single
+
+# Release build for all platforms
+bun run build
 ```
 
 **Output:** `dist/tui/devenv-<platform>-<arch>/bin/devenv`
@@ -868,8 +868,8 @@ bun run type-check
 ### Building for Distribution
 
 ```bash
-bun run build          # All platforms
-bun run build:single   # Current platform only
+bun run build:single   # Current platform only (recommended for development)
+bun run build          # All platforms (release builds)
 ```
 
 ### Debugging

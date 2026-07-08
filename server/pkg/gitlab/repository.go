@@ -104,9 +104,7 @@ func ExtractProjectInfo(gitURL string) (*ProjectInfo, error) {
 
 // SearchProjects searches for GitLab projects the authenticated user has access to.
 func (c *client) SearchProjects(query string, limit int) ([]SearchResult, error) {
-	if limit <= 0 {
-		limit = 20
-	}
+	limit = clampProviderLimit(limit)
 
 	params := url.Values{}
 	params.Set("search", query)

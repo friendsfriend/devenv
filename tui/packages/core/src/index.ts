@@ -12,6 +12,7 @@ import type {
 	RepoSearchResult,
 	ServerEvent,
 	StatusLogEntry,
+	CRVersion,
 } from "@devenv/types";
 import type { ClientDeps, FetchFunction } from "./client-types";
 import { getPiSessions } from "./agent-client";
@@ -475,7 +476,7 @@ export class DevEnvClient {
 	): Promise<import("@devenv/types").ChangeRequestChange[]> {
 		return getChangeRequestChanges(this.deps, appIdent, crIID, sourceType);
 	}
-	getCRVersions(appIdent: string, crIID: number): Promise<any[]> {
+	getCRVersions(appIdent: string, crIID: number): Promise<CRVersion[]> {
 		return getCRVersions(this.deps, appIdent, crIID);
 	}
 	createCRComment(

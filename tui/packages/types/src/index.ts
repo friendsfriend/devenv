@@ -515,6 +515,70 @@ export interface NoteAuthor {
 	avatar_url: string;
 }
 
+export interface CRVersion {
+	base_commit_sha: string;
+	head_commit_sha: string;
+	start_commit_sha: string;
+}
+
+export interface CRCommentPosition {
+	baseSHA: string;
+	headSHA: string;
+	startSHA: string;
+	positionType: string;
+	newPath: string;
+	oldPath: string;
+	newLine?: number;
+	oldLine?: number;
+	lineCode?: string;
+	lineRange?: {
+		start: {
+			type: string;
+			oldLine?: number;
+			newLine?: number;
+		};
+		end: {
+			type: string;
+			oldLine?: number;
+			newLine?: number;
+		};
+	};
+}
+
+export interface CRCommentRequest {
+	appIdent: string;
+	crIID: number;
+	body: string;
+	position?: {
+		base_sha: string;
+		head_sha: string;
+		start_sha: string;
+		position_type: string;
+		new_path: string;
+		old_path: string;
+		new_line?: number;
+		old_line?: number;
+		line_code?: string;
+		line_range?: {
+			start: {
+				type: string;
+				old_line?: number;
+				new_line?: number;
+			};
+			end: {
+				type: string;
+				old_line?: number;
+				new_line?: number;
+			};
+		};
+	};
+}
+
+export interface CRMutationResult {
+	status: string;
+	message: string;
+}
+
 export interface NotePosition {
 	base_sha: string;
 	start_sha: string;

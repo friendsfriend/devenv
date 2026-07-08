@@ -442,9 +442,7 @@ func (c *client) GetPipelines(info *changerequest.RepoInfo, limit int) ([]change
 	if err != nil {
 		return nil, err
 	}
-	if limit <= 0 {
-		limit = 20
-	}
+	limit = clampProviderLimit(limit)
 
 	params := url.Values{}
 	params.Set("per_page", fmt.Sprintf("%d", limit))
