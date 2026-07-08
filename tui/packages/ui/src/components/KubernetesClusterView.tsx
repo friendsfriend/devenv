@@ -1,13 +1,13 @@
 /** @jsxImportSource @opentui/solid */
-import { TextAttributes } from '@opentui/core';
-import { For, Show } from 'solid-js';
+import { For, Show, type JSX } from 'solid-js';
 import type { KubernetesClusterStatus } from '@devenv/types';
 
 import { ScrollableContent } from './ScrollableContent';
 import { uiColors } from '../colors';
-import { highlightColor } from './Highlight';
+import { highlightColor, HighlightedText } from './Highlight';
 import { ResourceTimelineCharts } from './ResourceTimelineCharts';
 import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
+import { SearchHeader } from './SearchHeader';
 
 export interface KubernetesClusterViewProps {
   status?: KubernetesClusterStatus | null;
@@ -39,6 +39,17 @@ export function kubernetesClusterSummaryLines(status?: KubernetesClusterStatus |
 function formatMB(bytes: number): string {
   const mb = Math.round(bytes / (1024 * 1024));
   return `${mb}MB`;
+}
+
+function PanelHeader(props: { title: string; children?: JSX.Element }) {
+  return (
+    <SearchHeader>
+      <box style={{ width: '100%', flexDirection: 'row' }}>
+        <HighlightedText text={props.title} highlight="primary" />
+        {props.children}
+      </box>
+    </SearchHeader>
+  );
 }
 
 export function KubernetesClusterView(props: KubernetesClusterViewProps) {
@@ -104,10 +115,9 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>Cluster</text>
+            <PanelHeader title="Cluster">
               <Show when={props.loading}><text fg={highlightColor('secondary')}> refreshing...</text></Show>
-            </box>
+            </PanelHeader>
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
@@ -131,11 +141,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>
-                Resources
-              </text>
-            </box>
+            <PanelHeader title="Resources" />
             <Show when={stats() !== undefined} fallback={
               <box style={{ paddingLeft: 1, paddingRight: 1, flexGrow: 1 }}>
                 <text fg={highlightColor('secondary')}>No container resources — cluster may be missing or using podman</text>
@@ -184,11 +190,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>
-                Pods
-              </text>
-            </box>
+            <PanelHeader title="Pods" />
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}
@@ -220,11 +222,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
               overflow: 'hidden',
             }}
           >
-            <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-              <text fg={highlightColor('primary')} attributes={TextAttributes.BOLD}>
-                Workloads
-              </text>
-            </box>
+            <PanelHeader title="Workloads" />
             <ScrollableContent
               axes={['x', 'y']}
               style={{ width: '100%', flexGrow: 1, minHeight: 0 }}

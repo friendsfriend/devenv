@@ -9,6 +9,7 @@ import { calculateVisibleItems } from '../utils/virtualScroll';
 import { LAYOUT_CHROME_LINES } from './ScrollableList';
 import { ContentPanel } from './ContentStack';
 import { Badge } from './Badge';
+import { SearchHeader } from './SearchHeader';
 import { FilterStatusBar } from './FilterStatusBar';
 import { highlightColor, HighlightedText, type Highlight } from './Highlight';
 import type { Discussion, ChangeRequestChange, IssueComment, NotePosition } from '@devenv/types';
@@ -387,23 +388,23 @@ export function TimelineView(props: TimelineViewProps) {
 
       <Show when={!props.loading && !props.error}>
         {/* Header */}
-        <box backgroundColor={uiColors.bgSurface1} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-          <HighlightedText text={props.title || (props.isIssueTimeline ? 'Timeline' : 'Discussions')} highlight="primary" attributes={TextAttributes.BOLD} />
-          <Show when={props.showOnlyComments}>
-            <HighlightedText text=" [comments only]" highlight="highlight" />
-          </Show>
-          <box style={{ width: 'auto', marginLeft: 'auto' }}>
-            <HighlightedText text={`${stats().userComments} comments, ${stats().systemNotes} events`} highlight="secondary" />
+        <SearchHeader>
+          <box style={{ width: '100%', flexDirection: 'row' }}>
+            <HighlightedText text={props.title || (props.isIssueTimeline ? 'Timeline' : 'Discussions')} highlight="primary" attributes={TextAttributes.BOLD} />
+            <Show when={props.showOnlyComments}>
+              <HighlightedText text=" [comments only]" highlight="highlight" />
+            </Show>
+            <box style={{ width: 'auto', marginLeft: 'auto' }}>
+              <HighlightedText text={`${stats().userComments} comments, ${stats().systemNotes} events`} highlight="secondary" />
+            </box>
           </box>
-        </box>
+        </SearchHeader>
 
         <Show when={!props.isIssueTimeline}>
-          <box backgroundColor={uiColors.bgSurface2} style={{ width: '100%', height: 1, flexDirection: 'row', paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-            <HighlightedText text={`${stats().resolved}/${stats().userComments} Resolved`} highlight={stats().resolved === stats().userComments ? 'positive' : 'warning'} />
-            <Show when={stats().outdated > 0}>
-              <HighlightedText text={` • ${stats().outdated} Outdated`} highlight="warning" />
-            </Show>
-          </box>
+          <FilterStatusBar
+            filterSummary={`${stats().resolved}/${stats().userComments} Resolved`}
+            sortSummary={stats().outdated > 0 ? `${stats().outdated} Outdated` : undefined}
+          />
         </Show>
 
         <Show when={sortedItems().length === 0}>

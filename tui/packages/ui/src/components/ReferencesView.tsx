@@ -1,7 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { Show } from 'solid-js';
 import type { Issue, ChangeRequest } from '@devenv/types';
-import { uiColors } from "../colors";
 import { ContentPanel } from "./ContentStack";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { CenteredState } from "./CenteredState";
@@ -9,6 +8,7 @@ import { WorkItemCard } from "./WorkItemCard";
 import { formatShortDate, getIssueStateColor } from "../statusUtils";
 import { highlightColor, HighlightedText } from "./Highlight";
 import { FilterStatusBar } from './FilterStatusBar';
+import { SearchHeader } from './SearchHeader';
 
 type RefItem =
 	| { type: "cr"; data: ChangeRequest }
@@ -31,8 +31,7 @@ interface ReferencesViewProps {
  * ReferencesView Component — Full-screen sub-view of combined references (issues + CRs).
  */
 export function ReferencesView(props: ReferencesViewProps) {
-	const hasFilterStatus = () => !!filterSummary() || !!sortSummary();
-	const reservedLines = () => LAYOUT_CHROME_LINES + 3 + (hasFilterStatus() ? 1 : 0);
+	const reservedLines = () => LAYOUT_CHROME_LINES + 3 + 1;
 
 	const typeLabel = (ref: RefItem) => ref.type === "cr" ? "CR" : "Issue";
 	const typeHighlight = (ref: RefItem) => ref.type === "cr" ? "highlight1" as const : "highlight2" as const;
@@ -70,21 +69,14 @@ export function ReferencesView(props: ReferencesViewProps) {
 
 			<Show when={!props.loading && !props.error}>
 				<box style={{ width: "100%", flexDirection: "column" }}>
-					<box
-						backgroundColor={uiColors.bgSurface1}
-						style={{
-							width: "100%",
-							height: 1,
-							flexDirection: "row",
-							paddingLeft: 1,
-							paddingRight: 1,
-						}}
-					>
-						<HighlightedText text="References" highlight="primary" />
-						<box style={{ width: "auto", marginLeft: "auto" }}>
-							<HighlightedText text={countSummary()} highlight="secondary" />
+					<SearchHeader>
+						<box style={{ width: "100%", flexDirection: "row" }}>
+							<HighlightedText text="References" highlight="primary" />
+							<box style={{ width: "auto", marginLeft: "auto" }}>
+								<HighlightedText text={countSummary()} highlight="secondary" />
+							</box>
 						</box>
-					</box>
+					</SearchHeader>
 					<FilterStatusBar filterSummary={filterSummary()} sortSummary={sortSummary()} />
 				</box>
 

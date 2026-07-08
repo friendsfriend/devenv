@@ -8,6 +8,7 @@ import { highlightColor, HighlightedText } from './Highlight';
 import { GenericModal } from './GenericModal';
 import { SearchHeader } from './SearchHeader';
 import { FilterStatusBar } from './FilterStatusBar';
+import { MatchedText } from './MatchedText';
 
 import type { ScrollBoxRenderable } from '@opentui/core';
 
@@ -37,38 +38,6 @@ const formatTimestamp = (timestamp: string): string => {
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   } catch { return '--'; }
 };
-
-function splitMatches(text: string, query: string): Array<{ text: string; isMatch: boolean }> {
-  if (!query) return [{ text, isMatch: false }];
-  const lower = text.toLowerCase();
-  const segments: Array<{ text: string; isMatch: boolean }> = [];
-  let pos = 0;
-  while (pos < text.length) {
-    const idx = lower.indexOf(query, pos);
-    if (idx === -1) {
-      segments.push({ text: text.slice(pos), isMatch: false });
-      break;
-    }
-    if (idx > pos) segments.push({ text: text.slice(pos, idx), isMatch: false });
-    segments.push({ text: text.slice(idx, idx + query.length), isMatch: true });
-    pos = idx + query.length;
-  }
-  return segments;
-}
-
-function MatchedText(props: { text: string; query: string; fg: string; attributes?: number }) {
-  return (
-    <text fg={props.fg} attributes={props.attributes}>
-      <For each={splitMatches(props.text, props.query.toLowerCase())}>
-        {(segment) => (
-          <span style={segment.isMatch ? { fg: uiColors.bgBase, bg: uiColors.warning } : { fg: props.fg }}>
-            {segment.text}
-          </span>
-        )}
-      </For>
-    </text>
-  );
-}
 
 export function StatusLogModal(props: StatusLogModalProps) {
   const q = () => (props.searchQuery || '').toLowerCase();

@@ -3,7 +3,7 @@ import { createMemo, For, Show } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import type { TextChunk } from '@opentui/core';
 import { useRenderer } from '@opentui/solid';
-import { colors, uiColors } from '../colors';
+import { uiColors } from '../colors';
 import { highlightColor } from './Highlight';
 import { ansiToStyledText, stripAnsi } from '../ansiToStyledText';
 import { GenericModal } from './GenericModal';
@@ -253,8 +253,8 @@ export function LogModal(props: LogModalProps) {
                           fallback={<text fg={highlightColor('primary')}>{seg.text}</text>}
                         >
                           <text
-                            fg={colors.base}
-                            bg={isCurrentMatch() ? colors.peach : colors.yellow}
+                            fg={uiColors.bgBase}
+                            bg={isCurrentMatch() ? uiColors.primary : uiColors.warning}
                           >
                             {seg.text}
                           </text>
