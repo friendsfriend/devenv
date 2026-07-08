@@ -7,7 +7,7 @@ import {
 import { createCliRenderer } from '@opentui/core';
 import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui';
 import { KeymapProvider, useKeymap } from '@opentui/keymap/solid';
-import { setExitRenderer, getExitSignal } from "./exit";
+import { abortExitSignal, destroyExitRenderer, exitApp, getExitSignal, registerGracefulShutdownHandler, setExitRenderer } from "./exit";
 import { onMount, createEffect, on, onCleanup } from 'solid-js';
 import "opentui-spinner/solid";
 import { APP_VERSION } from "../version";
@@ -84,6 +84,11 @@ import { applyTheme, loadCustomThemes, loadSystemTheme, loadThemeName, queryTerm
 
 interface TUIAppProps {
 	serverUrl: string;
+	managedServer?: import('../server-lifecycle').ManagedServer;
+}
+
+interface StartTUIOptions {
+	managedServer?: import('../server-lifecycle').ManagedServer;
 }
 
 function TUIApp(props: TUIAppProps) {
@@ -191,6 +196,7 @@ function TUIApp(props: TUIAppProps) {
 		appStore.startupState().phase !== "complete" ||
 		appStore.exampleConfigLoading() ||
 		!!appStore.operationInProgressForApp() ||
+		appStore.isShuttingDown() ||
 		appStore.hasActiveOperation() ||
 		changeRequestStore.crLoading() ||
 		changeRequestStore.crChangesLoading() ||
@@ -230,6 +236,66 @@ function TUIApp(props: TUIAppProps) {
 			refreshProviders: providerActions.refreshProviders,
 			abortSignal: getExitSignal(),
 		});
+	});
+
+	const shutdownDelay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+	const runWithTimeout = async (label: string, fn: () => void | Promise<void>, timeoutMs = 2000) => {
+		let timeout: ReturnType<typeof setTimeout> | undefined;
+		try {
+			await Promise.race([
+				Promise.resolve().then(fn),
+				new Promise<never>((_, reject) => {
+					timeout = setTimeout(() => reject(new Error(`${label} timed out`)), timeoutMs);
+				}),
+			]);
+		} finally {
+			if (timeout) clearTimeout(timeout);
+		}
+	};
+	const runShutdownStep = async (
+		phase: "preparing" | "canceling-background-work" | "stopping-input" | "stopping-server" | "destroying-renderer" | "complete",
+		message: string,
+		fn: () => void | Promise<void>,
+		timeoutMs?: number,
+	) => {
+		appStore.setShutdownState({ phase, message, error: null });
+		await shutdownDelay(50);
+		await runWithTimeout(message, fn, timeoutMs);
+	};
+	onMount(() => {
+		const unregister = registerGracefulShutdownHandler(async () => {
+			appStore.setIsShuttingDown(true);
+			try {
+				await runShutdownStep("preparing", "Preparing DevEnv shutdown...", () => shutdownDelay(50));
+				await runShutdownStep("canceling-background-work", "Canceling background work...", () => abortExitSignal());
+				await runShutdownStep("stopping-input", "Stopping input handlers...", () => shutdownDelay(50));
+				if (props.managedServer) {
+					appStore.setShutdownState({ phase: "stopping-server", message: "Stopping DevEnv server...", error: null });
+					await shutdownDelay(50);
+					await props.managedServer.stop(2000);
+				}
+				appStore.setShutdownState({ phase: "destroying-renderer", message: "Destroying terminal renderer...", error: null });
+				await shutdownDelay(50);
+				appStore.setShutdownState({ phase: "complete", message: "Shutdown complete.", error: null });
+				await shutdownDelay(120);
+				renderer.destroy();
+			} catch (error) {
+				const currentShutdownPhase = appStore.shutdownState().phase;
+				const failedPhase = currentShutdownPhase === "failed" || currentShutdownPhase === "idle"
+					? "preparing"
+					: currentShutdownPhase;
+				appStore.setShutdownState({
+					phase: "failed",
+					message: "Shutdown failed.",
+					error: error instanceof Error ? error.message : String(error),
+					failedPhase,
+				});
+				abortExitSignal();
+				await shutdownDelay(600);
+				renderer.destroy();
+			}
+		});
+		onCleanup(unregister);
 	});
 
 	// --- Columns ---
@@ -272,6 +338,10 @@ function TUIApp(props: TUIAppProps) {
 	const keymap = useKeymap();
 	onMount(() => {
 		const dispose = keymap.intercept("key", (input) => {
+			if (appStore.isShuttingDown()) {
+				input.consume();
+				return;
+			}
 			void (async () => {
 				const event = input.event;
 				const handled =
@@ -299,7 +369,10 @@ function TUIApp(props: TUIAppProps) {
 		onCleanup(dispose);
 	});
 
-	usePaste((event) => handlePaste(event, providerStore));
+	usePaste((event) => {
+		if (appStore.isShuttingDown()) return;
+		handlePaste(event, providerStore);
+	});
 
 	// --- View props ---
 	const viewStores: ViewStores = {
@@ -403,7 +476,7 @@ function TUIApp(props: TUIAppProps) {
 	);
 }
 
-export async function startTUI(serverUrl: string) {
+export async function startTUI(serverUrl: string, options: StartTUIOptions = {}) {
 	try {
 		// Force enable color support for terminal
 		process.env.FORCE_COLOR = "3"; // Force truecolor
@@ -417,6 +490,7 @@ export async function startTUI(serverUrl: string) {
 			exitOnCtrlC: false,
 			consoleMode: useConsole ? "console-overlay" : "disabled",
 			useKittyKeyboard: {},
+			exitSignals: [],
 			...(useConsole ? {
 				consoleOptions: {
 					onCopySelection: (text: string) => {
@@ -434,18 +508,25 @@ export async function startTUI(serverUrl: string) {
 		const cleanup = () => {
 			if (destroyed) return;
 			destroyed = true;
-			process.off("SIGINT", cleanup);
-			process.off("SIGTERM", cleanup);
+			process.off("SIGINT", gracefulSignalCleanup);
+			process.off("SIGTERM", gracefulSignalCleanup);
 			process.off("SIGHUP", cleanup);
-			renderer.destroy();
+			abortExitSignal();
+			destroyExitRenderer();
 		};
-		process.on("SIGINT", cleanup);
-		process.on("SIGTERM", cleanup);
+		const gracefulSignalCleanup = () => {
+			void exitApp();
+		};
+		process.on("SIGINT", gracefulSignalCleanup);
+		process.on("SIGTERM", gracefulSignalCleanup);
 		process.on("SIGHUP", cleanup);
 		const unregisterFatalCleanup = registerFatalCleanup(cleanup);
 
 		const rendererDestroyed = new Promise<void>((resolve) => {
-			renderer.once("destroy", resolve);
+			renderer.once("destroy", () => {
+				destroyed = true;
+				resolve();
+			});
 		});
 
 		const keymap = createDefaultOpenTuiKeymap(renderer);
@@ -454,16 +535,17 @@ export async function startTUI(serverUrl: string) {
 			await render(
 				() => (
 					<KeymapProvider keymap={keymap}>
-						<TUIApp serverUrl={serverUrl} />
+						<TUIApp serverUrl={serverUrl} managedServer={options.managedServer} />
 					</KeymapProvider>
 				),
 				renderer,
 			);
 			await rendererDestroyed;
+			await new Promise<void>((resolve) => queueMicrotask(resolve));
 		} finally {
 			unregisterFatalCleanup();
-			process.off("SIGINT", cleanup);
-			process.off("SIGTERM", cleanup);
+			process.off("SIGINT", gracefulSignalCleanup);
+			process.off("SIGTERM", gracefulSignalCleanup);
 			process.off("SIGHUP", cleanup);
 			cleanup();
 		}

@@ -25,6 +25,7 @@ import {
 import { getGuide, guides as allGuides } from "../guides";
 import type { ContentRouterProps } from "./types";
 import { StartupSplash } from "./startup-splash";
+import { ShutdownSplash } from "./shutdown-splash";
 
 export function ContentRouter(props: ContentRouterProps) {
 	const { appStore, issueStore, changeRequestStore, appDetailStore } =
@@ -621,6 +622,9 @@ export function ContentRouter(props: ContentRouterProps) {
 			)}
 			<Show when={appStore.loading()}>
 				<StartupSplash appStore={appStore} spinnerFrames={props.spinnerFrames} spinnerFrame={appStore.spinnerFrame} />
+			</Show>
+			<Show when={appStore.isShuttingDown() || appStore.shutdownState().phase !== "idle"}>
+				<ShutdownSplash appStore={appStore} spinnerFrames={props.spinnerFrames} spinnerFrame={appStore.spinnerFrame} />
 			</Show>
 		</>
 	);

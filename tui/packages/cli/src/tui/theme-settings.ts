@@ -44,7 +44,7 @@ function parseOscColor(value: string): string | undefined {
   return `#${toByte(match[1]!).toLowerCase()}${toByte(match[2]!).toLowerCase()}${toByte(match[3]!).toLowerCase()}`;
 }
 
-export async function queryTerminalThemeColors(timeoutMs = 120): Promise<TerminalThemeColors> {
+export async function queryTerminalThemeColors(timeoutMs = 250): Promise<TerminalThemeColors> {
   if (!process.stdin.isTTY || !process.stdout.isTTY) return {};
 
   return await new Promise((resolve) => {
@@ -65,9 +65,15 @@ export async function queryTerminalThemeColors(timeoutMs = 120): Promise<Termina
         }, []);
       resolve({ foreground, background, palette });
     };
+    const hasCompleteThemeResponse = () => {
+      const hasForeground = buffer.includes("]10;");
+      const hasBackground = buffer.includes("]11;");
+      const paletteCount = new Set([...buffer.matchAll(/\]4;(\d+);/g)].map((match) => Number(match[1])).filter((idx) => idx >= 0 && idx < 16)).size;
+      return hasForeground && hasBackground && paletteCount >= 16;
+    };
     const onData = (chunk: Buffer) => {
       buffer += chunk.toString("utf8");
-      if ((buffer.includes("]10;") && buffer.includes("]11;")) || buffer.length > 4096) done();
+      if (hasCompleteThemeResponse() || buffer.length > 4096) done();
     };
     const timer = setTimeout(done, timeoutMs);
     process.stdin.on("data", onData);
