@@ -101,11 +101,56 @@ type containerCache struct {
 	mutex      sync.RWMutex
 }
 
+// noopClient implements Client with safe defaults when no container runtime is available.
+type noopClient struct{}
+
+func (noopClient) GetInfo(App) Info                                    { return Info{Status: "not found"} }
+func (noopClient) GetInfoForInfra(InfraService) Info                   { return Info{Status: "not found"} }
+func (noopClient) BatchGetInfo(apps []App, infra []InfraService) (map[string]Info, error) {
+	results := make(map[string]Info, len(apps)+len(infra))
+	for _, a := range apps {
+		results[a.GetIdent()] = Info{Status: "not found"}
+	}
+	for _, s := range infra {
+		results[s.GetIdent()] = Info{Status: "not found"}
+	}
+	return results, nil
+}
+func (noopClient) GetAllContainerIDsForApp(App) []string               { return nil }
+func (noopClient) GetContainerLogs(string) (string, error)             { return "", fmt.Errorf("no container runtime available") }
+func (noopClient) StartContainer(string) error                         { return fmt.Errorf("no container runtime available") }
+func (noopClient) StopContainer(string) error                          { return fmt.Errorf("no container runtime available") }
+func (noopClient) RestartContainer(string) error                       { return fmt.Errorf("no container runtime available") }
+func (noopClient) KillAndRemoveContainer(string) error                 { return fmt.Errorf("no container runtime available") }
+func (noopClient) KillAndRemoveAllContainersForApp(App) error          { return fmt.Errorf("no container runtime available") }
+func (noopClient) KillAllRunningContainers([]App, []InfraService) error { return nil }
+func (noopClient) RefreshCache() error                                 { return nil }
+func (noopClient) InvalidateContainerCache()                           {}
+func (noopClient) SubscribeToEvents(ctx context.Context) (<-chan ContainerEvent, <-chan error) {
+	eventCh := make(chan ContainerEvent)
+	errCh := make(chan error)
+	// Block until cancelled to prevent reconnect loops in the event listener.
+	go func() {
+		<-ctx.Done()
+		close(eventCh)
+		close(errCh)
+	}()
+	return eventCh, errCh
+}
+func (noopClient) StreamContainerStats(ctx context.Context, containerID string) (<-chan ContainerStatsEntry, error) {
+	return nil, fmt.Errorf("no container runtime available")
+}
+func (noopClient) StreamContainerLogs(ctx context.Context, containerID string, tail string) (<-chan string, error) {
+	return nil, fmt.Errorf("no container runtime available")
+}
+
 // NewClient creates a Docker-compatible client (Docker or Podman).
+// When no container runtime is available, returns a noop client that safely
+// reports "not found" / errors, allowing the server to start regardless.
 func NewClient(configuredRuntime string) (Client, error) {
 	rt, err := SelectRuntime(configuredRuntime)
 	if err != nil {
-		return nil, err
+		return noopClient{}, nil
 	}
 
 	opts := []client.Opt{client.WithAPIVersionNegotiation()}
