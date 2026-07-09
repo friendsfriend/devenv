@@ -32,6 +32,9 @@ type fakeResourceMgr struct {
 	copyTemplates    []string
 	dockerfileErr    error
 	composeErr       error
+	composePath      string
+	envFilePath      string
+	envFileOK        bool
 	targets          []resources.ActionTarget
 }
 
@@ -53,6 +56,9 @@ func (f *fakeResourceMgr) ResolveDockerfileForAction(_, _ string, _ resources.Ac
 func (f *fakeResourceMgr) ResolveComposeFile(_, _ string, _ string) (string, error) {
 	if f.composeErr != nil {
 		return "", f.composeErr
+	}
+	if f.composePath != "" {
+		return f.composePath, nil
 	}
 	return "/fake/compose.yml", nil
 }
@@ -82,6 +88,9 @@ func (f *fakeResourceMgr) DiscoverActionTargets(_, _ string, action resources.Ap
 }
 
 func (f *fakeResourceMgr) EnvFilePath() (string, bool) {
+	if f.envFileOK || f.envFilePath != "" {
+		return f.envFilePath, true
+	}
 	return "", false
 }
 
