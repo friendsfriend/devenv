@@ -130,30 +130,30 @@ export async function handleCrDetailKeys(
 			case 2: // Changed Files
 				if (changeRequestStore.crChanges().length > 0) {
 					changeRequestStore.setSelectedChangedFileIndex(0);
-					appStore.setViewMode("changedFiles");
+					appStore.pushView("changedFiles");
 				}
 				return true;
 			case 3: // Pipeline Jobs — open full jobs view
 				if ((changeRequestStore.crJobsForDetail()?.length ?? 0) > 0) {
-					appStore.setViewMode("jobs");
+					appStore.pushView("jobs");
 				}
 				return true;
 			case 4: // Linked Issues
 				changeRequestStore.setSelectedCrLinkedIssueIndex(0);
-				appStore.setViewMode("changeRequestLinkedIssues");
+				appStore.pushView("changeRequestLinkedIssues");
 				return true;
 			case 5: // Discussions
 				const discussions = changeRequestStore.crDiscussions();
 				if (Array.isArray(discussions) && discussions.length > 0) {
 					changeRequestStore.setSelectedDiscussionIndex(0);
 					changeRequestStore.setDiscussionsShowOnlyComments(false);
-					appStore.setViewMode("discussionsView");
+					appStore.pushView("discussionsView");
 				}
 				return true;
 			case 6: // Test Results
 				const testData = changeRequestStore.crTestSummary();
 				if (testData?.test_suites?.length) {
-					appStore.setViewMode("testResults");
+					appStore.pushView("testResults");
 				}
 				return true;
 		}
@@ -170,14 +170,14 @@ export async function handleCrDetailKeys(
 		const changes = changeRequestStore.crChanges();
 		if (changes && changes.length > 0) {
 			changeRequestStore.setSelectedChangedFileIndex(0);
-			appStore.setViewMode("changedFiles");
+			appStore.pushView("changedFiles");
 		}
 		return true;
 	}
 
 	if (event.sequence === "T") {
 		const testData = changeRequestStore.crTestSummary();
-		if (testData?.test_suites?.length) appStore.setViewMode("testResults");
+		if (testData?.test_suites?.length) appStore.pushView("testResults");
 		return true;
 	}
 
@@ -195,7 +195,7 @@ export async function handleCrDetailKeys(
 			if (Array.isArray(discussions) && discussions.length > 0) {
 				changeRequestStore.setSelectedDiscussionIndex(0);
 				changeRequestStore.setDiscussionsShowOnlyComments(false);
-				appStore.setViewMode("discussionsView");
+				appStore.pushView("discussionsView");
 				getLogger().write(
 					"INFO",
 					`Switched to discussionsView mode with ${discussions.length} discussions`,
@@ -231,7 +231,7 @@ export async function handleCrDetailKeys(
 	// I (Shift+I) — open linked issues sub-view
 	if ((event.name === "i" && event.shift) || event.name === "I") {
 		changeRequestStore.setSelectedCrLinkedIssueIndex(0);
-		appStore.setViewMode("changeRequestLinkedIssues");
+		appStore.pushView("changeRequestLinkedIssues");
 		return true;
 	}
 

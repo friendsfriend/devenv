@@ -104,7 +104,7 @@ export async function handleDiscussionsKeys(
     event.sequence === '\x1b' ||
     event.raw === '\x1b'
   ) {
-    appStore.setViewMode('changeRequestDetail');
+    appStore.popView();
     changeRequestStore.setSelectedDiscussionIndex(0);
     return true;
   }
@@ -158,7 +158,7 @@ export async function handleDiscussionsKeys(
   // Shift+C to switch to Changed Files view
   if (event.sequence === 'C' || event.name === 'C' || (event.name === 'c' && event.shift)) {
     getLogger().write('DEBUG', `[DISCUSSIONS VIEW] Shift+C detected! Switching to changedFiles view`);
-    appStore.setViewMode('changedFiles');
+    appStore.pushView('changedFiles');
     changeRequestStore.setSelectedChangedFileIndex(0);
     return true;
   }

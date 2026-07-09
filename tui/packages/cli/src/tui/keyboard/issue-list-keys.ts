@@ -60,7 +60,7 @@ export async function handleIssueListKeys(
 		}
 		if (event.name === "escape" || event.name === "q") {
 			changeRequestStore.setSelectedCrLinkedIssueIndex(0);
-			appStore.setViewMode("changeRequestDetail");
+			appStore.popView();
 			return true;
 		}
 		return true;
@@ -191,14 +191,14 @@ export async function handleIssueListKeys(
 				return true;
 			}
 			issueActions.abortViewLoads();
-			appStore.setViewMode("table");
+			appStore.popView();
 			issueStore.setIssues([]);
 			issueStore.setIssueError("");
 			return true;
 		}
 		if (event.name === "q") {
 			issueActions.abortViewLoads();
-			appStore.setViewMode("table");
+			appStore.popView();
 			issueStore.setIssues([]);
 			issueStore.setIssueError("");
 			return true;

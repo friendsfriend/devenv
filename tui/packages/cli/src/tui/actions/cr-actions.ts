@@ -63,7 +63,7 @@ export function createCrActions(
 		changeRequestStore.setCurrentPage(1);
 		changeRequestStore.setTotalPages(0);
 		changeRequestStore.setTotalCount(0);
-		appStore.setViewMode("changeRequests");
+		appStore.pushView("changeRequests");
 		try {
 			const result = await client.getChangeRequests(
 				app.ident,
@@ -151,7 +151,7 @@ export function createCrActions(
 		changeRequestStore.setCrLoading(true);
 		changeRequestStore.setCrError("");
 		changeRequestStore.setSelectedCRIndex(0);
-		appStore.setViewMode("changeRequests");
+		appStore.pushView("changeRequests");
 		try {
 			const result = await client.getChangeRequests(
 				app.ident,
@@ -202,7 +202,7 @@ export function createCrActions(
 		changeRequestStore.setCrDiscussions([]);
 		changeRequestStore.setCrDiscussionsError("");
 		changeRequestStore.setCrDetailPanelIndex(0);
-		appStore.setViewMode("changeRequestDetail");
+		appStore.pushView("changeRequestDetail");
 		void loadCRDetailData(cr);
 	};
 
@@ -424,7 +424,7 @@ export function createCrActions(
 		changeRequestStore.setSelectedCR(null);
 		changeRequestStore.setCrSearchMode(false);
 		changeRequestStore.setCrSearchQuery("");
-		appStore.setViewMode("changeRequests");
+		appStore.pushView("changeRequests");
 	};
 
 	const toggleCRApproval = async () => {

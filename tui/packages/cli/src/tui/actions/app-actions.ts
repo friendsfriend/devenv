@@ -318,7 +318,7 @@ export function createAppActions(
     appDetailStore.setDependencyTreeFocused(false);
     appDetailStore.setDependencyTreeSelectedIndex(0);
     appDetailStore.setAppDetailPanelIndex(0);
-    appStore.setViewMode('appDetail');
+    appStore.pushView('appDetail');
 
     if (kind !== 'infra') {
       try {
@@ -404,7 +404,7 @@ export function createAppActions(
       appDetailAbortController.abort();
       appDetailAbortController = null;
     }
-    appStore.setViewMode('table');
+    appStore.resetViewStack('table');
   };
 
 

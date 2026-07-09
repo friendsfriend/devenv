@@ -151,7 +151,7 @@ export async function handleChangedFilesKeys(
       return true;
     }
     changeRequestStore.setSelectedChangedFileIndex(0);
-    appStore.setViewMode('changeRequestDetail');
+    appStore.popView();
     return true;
   }
 
@@ -159,7 +159,7 @@ export async function handleChangedFilesKeys(
   if (event.sequence === 'D' || event.name === 'D' || (event.name === 'd' && event.shift)) {
     getLogger().write('DEBUG', `[CHANGED FILES VIEW] Shift+D detected! Switching to discussionsView`);
     changeRequestStore.setDiscussionsShowOnlyComments(false);
-    appStore.setViewMode('discussionsView');
+    appStore.pushView('discussionsView');
     changeRequestStore.setSelectedDiscussionIndex(0);
     return true;
   }

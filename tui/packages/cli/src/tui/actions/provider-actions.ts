@@ -40,7 +40,7 @@ export function createProviderActions(
 
   const loadProviders = async () => {
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
-    appStore.setViewMode('providers');
+    appStore.pushView('providers');
     await refreshProviders();
   };
 

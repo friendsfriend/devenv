@@ -8,7 +8,7 @@ export function createAgentActions(appStore: AppStore, agentStore: AgentStore, c
     agentStore.setAgentSessionsLoading(true);
     agentStore.setSelectedAgentItemIndex(0);
     agentStore.setAgentSearchQuery('');
-    appStore.setViewMode('agentView');
+    appStore.pushView('agentView');
     client.getPiSessions().then(agentStore.setPiAgentGroups).catch((e) => {
       getLogger().write('WARN', `Failed to fetch pi sessions: ${e}`);
       agentStore.setPiAgentGroups([]);
