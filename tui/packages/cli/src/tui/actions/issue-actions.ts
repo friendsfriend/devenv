@@ -69,7 +69,7 @@ export function createIssueActions(
 		issueStore.setIssueError("");
 		issueStore.setSelectedIssueIndex(0);
 		issueStore.setIssues([]);
-		appStore.setViewMode("issues");
+		appStore.pushView("issues");
 
 		try {
 			const result = await client.getIssues(
@@ -133,7 +133,7 @@ export function createIssueActions(
 		issueStore.setReferencedIssuesLoading(true);
 		issueStore.setReferences([]);
 		issueStore.setIssueDetailPanelIndex(0);
-		appStore.setViewMode("issueDetail");
+		appStore.pushView("issueDetail");
 
 		const app = getSelectedApp();
 		if (!app) {
@@ -226,7 +226,7 @@ export function createIssueActions(
 		issueStore.setSelectedIssue(null);
 		issueStore.setIssueSearchMode(false);
 		issueStore.setIssueSearchQuery("");
-		appStore.setViewMode("issues");
+		appStore.popView();
 	};
 
 	const selectScope = (scope: string) => {
@@ -470,30 +470,30 @@ export function createIssueActions(
 	const showLinkedCRsSubView = () => {
 		issueStore.setReferenceFilters({ type: ["cr"], state: [] });
 		issueStore.setSelectedReferenceIndex(0);
-		appStore.setViewMode("references");
+		appStore.pushView("references");
 	};
 
 	const backToIssueDetailFromLinkedCRs = () => {
 		issueStore.setSelectedLinkedCRIndex(0);
-		appStore.setViewMode("issueDetail");
+		appStore.popView();
 	};
 
 	const showReferencedIssuesSubView = () => {
 		issueStore.setReferenceFilters({ type: ["issue"], state: [] });
 		issueStore.setSelectedReferenceIndex(0);
-		appStore.setViewMode("references");
+		appStore.pushView("references");
 	};
 
 	const showReferencesSubView = () => {
 		issueStore.setReferenceFilters({ type: [], state: [] });
 		issueStore.setSelectedReferenceIndex(0);
-		appStore.setViewMode("references");
+		appStore.pushView("references");
 	};
 
 	const backToIssueDetailFromReferences = () => {
 		issueStore.setSelectedReferencedIssueIndex(0);
 		issueStore.setSelectedReferenceIndex(0);
-		appStore.setViewMode("issueDetail");
+		appStore.popView();
 	};
 
 	return {

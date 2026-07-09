@@ -454,7 +454,7 @@ export async function handleTableKeys(
 				appStore.setTableSearchQuery("");
 				appStore.setSelectedIndex(0);
 			} else {
-				appStore.setViewMode("table"); // no-op if already table, but harmless
+				appStore.resetViewStack("table");
 			}
 			break;
 		case "tab":

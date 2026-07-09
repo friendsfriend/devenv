@@ -1,5 +1,7 @@
 import type { HelpSection } from '@devenv/ui';
+import type { Keymap } from '@opentui/keymap';
 import { KEYBINDS } from "../keyboard/registry";
+import { allContextHelpSectionsFromKeymap, getActiveFooterKeybindsFromKeymap, helpSectionsFromKeymap } from "../keyboard/keymap-metadata";
 import type { AppStore } from "../stores/app-store";
 import type { IssueStore } from "../stores/issue-store";
 import type { LogStore } from "../stores/log-store";
@@ -125,19 +127,27 @@ export function createHelpActions(
 	changeRequestStore: ChangeRequestStore,
 	uiStore: UiStore,
 ) {
+	let keymap: Keymap<any, any> | undefined;
+	const setKeymap = (nextKeymap: Keymap<any, any> | undefined) => {
+		keymap = nextKeymap;
+	};
+
 	const showHelp = () => {
 		appStore.setPreviousViewMode(appStore.viewMode());
-		appStore.setViewMode("help");
+		appStore.pushView("help");
 	};
 
 	const closeHelp = () => {
-		appStore.setViewMode(appStore.previousViewMode() ?? "table");
+		appStore.popView();
 	};
 
 	const getHelpContent = (
 		allContexts?: boolean,
 	): { sections: HelpSection[]; title: string } => {
 		if (allContexts) {
+			if (keymap) {
+				return { title: "All Contexts", sections: [{ title: "Navigation", items: COMMON_NAVIGATION_ITEMS }, ...allContextHelpSectionsFromKeymap(keymap)] };
+			}
 			// Group all keybinds by context name with context as section title
 			const contextGroups = new Map<string, Array<{ key: string; description: string }>>();
 			for (const def of KEYBINDS) {
@@ -162,10 +172,13 @@ export function createHelpActions(
 		const currentView = appStore.previousViewMode() ?? "table";
 		const context = currentView === "table" && appStore.activeTab() === "kubernetes" ? "kubernetes" : currentView;
 		const title = CONTEXT_TITLES[context] ?? (context === "kubernetes" ? "Kubernetes" : "Help");
-		return { title, sections: getSectionsForContext(context) };
+		return { title, sections: keymap ? helpSectionsFromKeymap(keymap, context) : getSectionsForContext(context) };
 	};
 
 	const getKeybinds = () => {
+		const activeKeymapBinds = keymap ? filterFooterKeybinds(getActiveFooterKeybindsFromKeymap(keymap)) : [];
+		if (activeKeymapBinds.length > 0) return activeKeymapBinds;
+
 		// Modal state overrides — these depend on runtime state, not registry
 		if (uiStore.showPassphraseModal())
 			return filterFooterKeybinds([
@@ -235,7 +248,7 @@ export function createHelpActions(
 		return binds;
 	};
 
-	return { showHelp, closeHelp, getHelpContent, getKeybinds };
+	return { showHelp, closeHelp, getHelpContent, getKeybinds, setKeymap };
 }
 
 export type HelpActions = ReturnType<typeof createHelpActions>;

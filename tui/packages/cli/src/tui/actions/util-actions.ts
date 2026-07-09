@@ -628,7 +628,7 @@ export function createUtilActions(
     agentStore.setSshHosts(parseSshConfig());
     agentStore.setSelectedSshIndex(0);
     agentStore.setSshSearchQuery('');
-    appStore.setViewMode('sshPicker');
+    appStore.pushView('sshPicker');
   };
 
   const isKeyLoadedInAgent = (identityFile: string): Promise<boolean> => new Promise((resolve) => {
@@ -687,7 +687,7 @@ export function createUtilActions(
         return;
       }
     }
-    appStore.setViewMode('table');
+    appStore.resetViewStack('table');
     const { spawnSync } = require('child_process') as typeof import('child_process');
     const args: string[] = [];
     if (host.port && host.port !== 22) args.push('-p', String(host.port));

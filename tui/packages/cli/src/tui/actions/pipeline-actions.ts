@@ -21,7 +21,7 @@ export function createPipelineActions(
     changeRequestStore.setJobsLoading(true);
     changeRequestStore.setJobsError('');
     changeRequestStore.setCurrentPipelineId(cr!.head_pipeline!.id);
-    appStore.setViewMode('jobs');
+    appStore.pushView('jobs');
     try {
       changeRequestStore.setJobs(await client.getPipelineJobs(app!.ident, cr!.head_pipeline!.id, app!.sourceType));
     } catch (e) {
@@ -57,7 +57,7 @@ export function createPipelineActions(
     changeRequestStore.setSelectedJobIndex(0);
     changeRequestStore.setJobsSearchMode(false);
     changeRequestStore.setJobsSearchQuery('');
-    appStore.setViewMode('changeRequestDetail');
+    appStore.pushView('changeRequestDetail');
   };
 
   const retryJob = async (jobId: number, jobName: string) => {

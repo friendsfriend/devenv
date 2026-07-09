@@ -326,7 +326,7 @@ export async function handleMiscModalKeys(
       uiStore.setPassphraseText('');
       uiStore.setPassphraseError(null);
       uiStore.setPendingSshHost(null);
-      appStore.setViewMode('table');
+      appStore.popView();
       return true;
     }
     if (
@@ -380,7 +380,7 @@ export async function handleMiscModalKeys(
       }
       // Close the picker
       agentStore.setSelectedSshIndex(0);
-      appStore.setViewMode('table');
+      appStore.popView();
       return true;
     }
 
@@ -497,7 +497,7 @@ export async function handleMiscModalKeys(
         }
         // Close the pi session view
         agentStore.setSelectedAgentItemIndex(0);
-        appStore.setViewMode('table');
+        appStore.popView();
         return true;
       }
 
@@ -768,7 +768,7 @@ export async function handleMiscModalKeys(
       event.raw === '\x1b'
     ) {
       // Go back to table (CR detail and other views already handled above)
-      appStore.setViewMode('table');
+      appStore.popView();
     }
     return true;
   }

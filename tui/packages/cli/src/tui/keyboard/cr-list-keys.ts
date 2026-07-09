@@ -129,7 +129,7 @@ export async function handleCrListKeys(
       return true;
     }
     crActions.abortViewLoads();
-    appStore.setViewMode('table');
+    appStore.popView();
     changeRequestStore.setChangeRequests([]);
     changeRequestStore.setCrError('');
     changeRequestStore.setSelectedCR(null);

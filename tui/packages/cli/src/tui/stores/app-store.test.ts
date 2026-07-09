@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { SHUTDOWN_PHASE_ORDER, getShutdownPhaseStatus, type ShutdownState } from './app-store';
+import { SHUTDOWN_PHASE_ORDER, createAppStore, getShutdownPhaseStatus, type ShutdownState } from './app-store';
 
 const state = (phase: ShutdownState['phase'], failedPhase?: ShutdownState['failedPhase']): ShutdownState => ({
   phase,
@@ -36,5 +36,53 @@ describe('shutdown phase status', () => {
       'destroying-renderer',
       'complete',
     ]);
+  });
+});
+
+describe('view route stack', () => {
+  test('pushes and pops view routes', () => {
+    const store = createAppStore();
+    expect(store.viewMode()).toBe('table');
+    store.pushView('issues');
+    store.pushView('issueDetail');
+    expect(store.viewStack().map((route) => route.mode)).toEqual(['table', 'issues', 'issueDetail']);
+    expect(store.viewMode()).toBe('issueDetail');
+    expect(store.canGoBack()).toBe(true);
+    expect(store.popView()).toBe('issues');
+    expect(store.viewMode()).toBe('issues');
+    expect(store.popView()).toBe('table');
+    expect(store.viewMode()).toBe('table');
+    expect(store.canGoBack()).toBe(false);
+  });
+
+  test('setViewMode remains replace-current compatibility adapter', () => {
+    const store = createAppStore();
+    store.pushView('issues');
+    store.setViewMode('providers');
+    expect(store.viewStack().map((route) => route.mode)).toEqual(['table', 'providers']);
+    store.resetViewStack('table');
+    expect(store.viewStack().map((route) => route.mode)).toEqual(['table']);
+  });
+
+  test('main table survives issues detail escape chain', () => {
+    const store = createAppStore();
+    store.pushView('issues');
+    store.pushView('issueDetail');
+    expect(store.popView()).toBe('issues');
+    expect(store.popView()).toBe('table');
+    expect(store.viewStack().map((route) => route.mode)).toEqual(['table']);
+    expect(store.viewMode()).toBe('table');
+  });
+
+  test('modal stack preserves overlay open order and active modal', () => {
+    const store = createAppStore();
+    store.syncModalStack(['diff']);
+    store.syncModalStack(['diff', 'comment']);
+    expect(store.modalStack().map((route) => route.name)).toEqual(['diff', 'comment']);
+    expect(store.activeModal()).toBe('comment');
+    store.syncModalStack(['diff']);
+    expect(store.activeModal()).toBe('diff');
+    store.syncModalStack([]);
+    expect(store.activeModal()).toBe('none');
   });
 });

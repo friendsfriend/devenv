@@ -49,25 +49,14 @@ import {
 import { setupLogEffects } from "./effects/log-effects";
 import { createColumns, createScriptColumns } from "./columns";
 import {
-	handleGlobalKeys,
-	handleAddRepositoryModalKeys,
-	handleConnectProviderModalKeys,
-	handleDiffModalKeys,
-	handleLogModalKeys,
-	handleJobsKeys,
-	handleCrListKeys,
-	handleCrDetailKeys,
-	handleChangedFilesKeys,
-	handleTestResultsKeys,
-	handleDiscussionsKeys,
-	handleIssueTimelineKeys,
-	handleMiscModalKeys,
-	handleWorktreeManagerKeys,
-	handleIssueListKeys,
-	handleIssueDetailKeys,
-	handleReferencesKeys,
-	handleTableKeys,
+
 	handlePaste,
+	setupDevenvKeymap,
+	syncKeymapRuntimeState,
+	registerGlobalKeymapLayers,
+	registerModalKeymapLayers,
+	registerTableKeymapLayer,
+	registerWorkflowKeymapLayers,
 	type KeyboardStores,
 	type KeyboardActions,
 	type KeyboardContext,
@@ -336,37 +325,20 @@ function TUIApp(props: TUIAppProps) {
 	};
 
 	const keymap = useKeymap();
+	helpActions.setKeymap(keymap);
+	onCleanup(() => helpActions.setKeymap(undefined));
+	syncKeymapRuntimeState(keymap, kbStores);
 	onMount(() => {
-		const dispose = keymap.intercept("key", (input) => {
-			if (appStore.isShuttingDown()) {
-				input.consume();
-				return;
-			}
-			void (async () => {
-				const event = input.event;
-				const handled =
-					(await handleGlobalKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleAddRepositoryModalKeys(event, kbStores, kbActions)) ||
-					(await handleConnectProviderModalKeys(event, kbStores, kbActions)) ||
-					(await handleDiffModalKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleLogModalKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleJobsKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleCrListKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleCrDetailKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleIssueListKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleIssueDetailKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleIssueTimelineKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleReferencesKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleChangedFilesKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleTestResultsKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleDiscussionsKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleMiscModalKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleWorktreeManagerKeys(event, kbStores, kbActions, kbCtx)) ||
-					(await handleTableKeys(event, kbStores, kbActions, kbCtx));
-				if (handled) input.consume();
-			})();
+		const disposeGlobalLayers = registerGlobalKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
+		const disposeModalLayers = registerModalKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
+		const disposeTableLayer = registerTableKeymapLayer(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
+		const disposeWorkflowLayers = registerWorkflowKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
+		onCleanup(() => {
+			disposeWorkflowLayers();
+			disposeTableLayer();
+			disposeModalLayers();
+			disposeGlobalLayers();
 		});
-		onCleanup(dispose);
 	});
 
 	usePaste((event) => {
@@ -529,6 +501,7 @@ export async function startTUI(serverUrl: string, options: StartTUIOptions = {})
 		});
 
 		const keymap = createDefaultOpenTuiKeymap(renderer);
+		const disposeDevenvKeymap = setupDevenvKeymap(keymap);
 
 		try {
 			await render(
@@ -542,6 +515,7 @@ export async function startTUI(serverUrl: string, options: StartTUIOptions = {})
 			await rendererDestroyed;
 			await new Promise<void>((resolve) => queueMicrotask(resolve));
 		} finally {
+			disposeDevenvKeymap();
 			unregisterFatalCleanup();
 			process.off("SIGINT", gracefulSignalCleanup);
 			process.off("SIGTERM", gracefulSignalCleanup);

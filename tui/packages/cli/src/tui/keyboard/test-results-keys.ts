@@ -191,7 +191,7 @@ export async function handleTestResultsKeys(
       changeRequestStore.setSelectedTestIndex(0);
       return true;
     }
-    appStore.setViewMode('changeRequestDetail');
+    appStore.popView();
     changeRequestStore.setSelectedTestIndex(0);
     return true;
   }

@@ -33,6 +33,14 @@ export type ViewMode =
 	| "changeRequestLinkedIssues"
 	| "references";
 
+export interface ViewRoute {
+	mode: ViewMode;
+}
+
+export interface ModalRoute {
+	name: string;
+}
+
 export type TabType =
 	| "applications"
 	| "infrastructure"
@@ -229,7 +237,62 @@ export function createAppStore() {
 	const kubernetesScrollBoxRefs: (ScrollBoxRenderable | undefined)[] = [];
 	const [loading, setLoading] = createSignal(true);
 	const [error, setError] = createSignal<string | null>(null);
-	const [viewMode, setViewMode] = createSignal<ViewMode>("table");
+	const [viewStack, setViewStack] = createSignal<ViewRoute[]>([{ mode: "table" }]);
+	const [modalStack, setModalStack] = createSignal<ModalRoute[]>([]);
+	const viewMode = () => viewStack().at(-1)?.mode ?? "table";
+	const replaceView = (mode: ViewMode) => {
+		setViewStack((stack) => stack.length === 0 ? [{ mode }] : [...stack.slice(0, -1), { mode }]);
+	};
+	const pushView = (mode: ViewMode) => {
+		setViewStack((stack) => {
+			const current = stack.at(-1)?.mode;
+			if (current === mode) return stack;
+			return [...stack, { mode }];
+		});
+	};
+	const popView = (): ViewMode => {
+		let nextMode: ViewMode = "table";
+		setViewStack((stack) => {
+			if (stack.length <= 1) {
+				nextMode = "table";
+				return [{ mode: "table" }];
+			}
+			const next = stack.slice(0, -1);
+			nextMode = next.at(-1)?.mode ?? "table";
+			return next;
+		});
+		return nextMode;
+	};
+	const resetViewStack = (mode: ViewMode = "table") => setViewStack([{ mode }]);
+	const canGoBack = () => viewStack().length > 1;
+	const setViewMode = replaceView;
+	const pushModal = (name: string) => {
+		setModalStack((stack) => stack.at(-1)?.name === name ? stack : [...stack.filter((route) => route.name !== name), { name }]);
+	};
+	const popModal = (name?: string): string | undefined => {
+		let popped: string | undefined;
+		setModalStack((stack) => {
+			if (stack.length === 0) return stack;
+			if (!name) {
+				popped = stack.at(-1)?.name;
+				return stack.slice(0, -1);
+			}
+			popped = name;
+			return stack.filter((route) => route.name !== name);
+		});
+		return popped;
+	};
+	const resetModalStack = () => setModalStack([]);
+	const activeModal = () => modalStack().at(-1)?.name ?? "none";
+	const syncModalStack = (openModals: string[]) => {
+		const openSet = new Set(openModals);
+		setModalStack((stack) => {
+			const kept = stack.filter((route) => openSet.has(route.name));
+			const known = new Set(kept.map((route) => route.name));
+			const added = openModals.filter((name) => !known.has(name)).map((name) => ({ name }));
+			return [...kept, ...added];
+		});
+	};
 	const [activeTab, setActiveTab] = createSignal<TabType>("applications");
 	const [selectedIndex, setSelectedIndex] = createSignal(0);
 	const [liveUpdatesActive, setLiveUpdatesActive] = createSignal(false);
@@ -507,6 +570,20 @@ export function createAppStore() {
 		setError,
 		viewMode,
 		setViewMode,
+		viewStack,
+		setViewStack,
+		modalStack,
+		setModalStack,
+		pushModal,
+		popModal,
+		resetModalStack,
+		activeModal,
+		syncModalStack,
+		pushView,
+		replaceView,
+		popView,
+		resetViewStack,
+		canGoBack,
 		activeTab,
 		setActiveTab,
 		selectedIndex,

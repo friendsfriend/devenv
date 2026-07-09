@@ -132,7 +132,7 @@ export async function handleDiffModalKeys(
 
     // Return to previous view if it was discussions view
     if (appStore.previousViewMode() === 'discussionsView') {
-      appStore.setViewMode('discussionsView');
+      appStore.pushView('discussionsView');
       appStore.setPreviousViewMode(null);
     }
 

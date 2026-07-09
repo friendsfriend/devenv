@@ -267,7 +267,7 @@ export async function handleIssueDetailKeys(
 
 	// t — Open full timeline view
 	if (event.name === "t" && !event.ctrl && !event.shift) {
-		appStore.setViewMode("issueTimeline");
+		appStore.pushView("issueTimeline");
 		issueStore.setSelectedTimelineIndex(0);
 		return true;
 	}

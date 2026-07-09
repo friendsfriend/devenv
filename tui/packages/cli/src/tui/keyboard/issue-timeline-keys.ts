@@ -20,7 +20,7 @@ export async function handleIssueTimelineKeys(
 
   // ESC/q to go back to issue detail
   if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc' || event.name === 'q') {
-    appStore.setViewMode('issueDetail');
+    appStore.popView();
     issueStore.setSelectedTimelineIndex(0);
     return true;
   }
