@@ -36,6 +36,12 @@ func ComposeCommand() string {
 	return "docker-compose"
 }
 
+func SetRuntimeForTest(rt Runtime) func() {
+	previous := selectedRuntime
+	selectedRuntime = rt
+	return func() { selectedRuntime = previous }
+}
+
 func SelectRuntime(configured string) (Runtime, error) {
 	name := strings.ToLower(strings.TrimSpace(configured))
 	if name == "" {

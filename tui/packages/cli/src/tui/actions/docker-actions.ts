@@ -59,7 +59,8 @@ export function createDockerActions(
           if (!containerID) throw new Error('No container identifier available for stop operation');
           await client.stopContainer(containerID, appIdent);
         } else {
-          await client.stopApp(appIdent);
+          const activeTargetId = 'runTargetInfo' in app ? app.runTargetInfo?.targetId : undefined;
+          await client.stopApp(appIdent, activeTargetId);
         }
       } else {
         const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;
