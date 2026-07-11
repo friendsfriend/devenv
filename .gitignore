@@ -29,6 +29,7 @@ logs/
 devenv
 server/tui/
 tui/server-binaries/
+.pi-subagents/
 
 # project folders
 devenv-apps/*
