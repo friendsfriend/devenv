@@ -1,8 +1,9 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus, StatusLogEntry } from '@devenv/types';
+import type { ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus } from '@devenv/types';
 import { buildDependencyTree } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
+import type { ActionRunStore } from '../stores/action-run-store';
 import type { AppDetailStore } from '../stores/app-detail-store';
 import type { UiStore } from '../stores/ui-store';
 import { exitApp } from '../exit';
@@ -18,12 +19,18 @@ function normalizeNodeStatus(raw: string | undefined): 'running' | 'stopped' | '
 
 let appDetailAbortController: AbortController | null = null;
 
+export function handleActionStarted(appStore: Pick<AppStore, 'pushModal'>, actionRunStore: ActionRunStore, properties: Record<string, unknown>) {
+  actionRunStore.handleEvent('action.started', properties);
+  appStore.pushModal('actions');
+}
+
 export function createAppActions(
   appStore: AppStore,
   appDetailStore: AppDetailStore,
   uiStore: UiStore,
   client: DevEnvClient,
   showError: (title: string, message: string) => void,
+  actionRunStore?: ActionRunStore,
 ) {
   const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
 
@@ -55,11 +62,28 @@ export function createAppActions(
     }
   };
 
+  let actionHistoryHydrated = false;
   const subscribeToUpdates = async (signal?: AbortSignal) => {
     try {
+      if (actionRunStore && !actionHistoryHydrated) {
+        const replay = (history: Awaited<ReturnType<typeof client.getActionHistory>>) => {
+          for (const event of history) {
+            if (event.type.startsWith('action.')) actionRunStore.handleEvent(event.type, event.properties as Record<string, unknown>);
+          }
+        };
+        replay(await client.getActionHistory());
+        actionRunStore.configureHistoryLoader(async () => replay(await client.getActionHistory(true)));
+        actionHistoryHydrated = true;
+      }
       appStore.setLiveUpdatesActive(true);
       getLogger().write('INFO', 'Starting SSE subscription...');
       for await (const event of client.subscribeToEvents(signal)) {
+        if (event.type.startsWith('action.')) {
+          if (event.type === 'action.started') handleActionStarted(appStore, actionRunStore!, event.properties as Record<string, unknown>);
+          else actionRunStore?.handleEvent(event.type, event.properties as Record<string, unknown>);
+          continue;
+        }
+
         if (event.type === 'connection.established') {
           appStore.setLiveUpdatesActive(true);
           continue;
@@ -166,26 +190,6 @@ export function createAppActions(
           continue;
         }
 
-        if (event.type === 'statuslog.entry') {
-          const { timestamp, appIdent, appName, operation, status, message } = event.properties as {
-            timestamp: string;
-            appIdent: string;
-            appName: string;
-            operation: string;
-            status: string;
-            message: string;
-          };
-          const entry: StatusLogEntry = {
-            Timestamp: timestamp,
-            AppIdent: appIdent,
-            AppName: appName,
-            Operation: operation,
-            Status: status,
-            Message: message,
-            source: 'app',
-          };
-          appStore.setStatusLogEntries((prev) => [...prev, entry].slice(-50));
-        }
       }
     } catch (e) {
       appStore.setLiveUpdatesActive(false);
@@ -194,13 +198,6 @@ export function createAppActions(
     }
   };
 
-  const fetchStatusLog = async () => {
-    try {
-      appStore.setStatusLogEntries(await client.getStatusLog(50));
-    } catch (e) {
-      console.error('Failed to fetch status log:', e);
-    }
-  };
 
   const normalizeScriptRelativePath = (value: string) => value.replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/g, '');
 
@@ -530,7 +527,6 @@ export function createAppActions(
   return {
     fetchStatus,
     subscribeToUpdates,
-    fetchStatusLog,
     loadScripts,
     openAddTaskModal,
     closeAddTaskModal,

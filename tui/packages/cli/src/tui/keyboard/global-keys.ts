@@ -23,7 +23,6 @@ const isTextEntryActive = (stores: KeyboardStores): boolean => {
   const { appStore, uiStore, logStore, changeRequestStore, issueStore, agentStore, providerStore } = stores;
   return Boolean(
     appStore.tableSearchMode() ||
-    appStore.statusLogSearchMode() ||
     uiStore.branchFilterActive() ||
     uiStore.showCreateBranchModal() ||
     uiStore.themePickerFilterActive() ||

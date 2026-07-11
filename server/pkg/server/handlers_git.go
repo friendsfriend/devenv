@@ -8,7 +8,6 @@ import (
 	"time"
 
 	git "github.com/friendsfriend/devenv/pkg/git"
-	"github.com/friendsfriend/devenv/pkg/logging"
 )
 
 // handleGitPull performs a git pull operation on an app's repository
@@ -425,9 +424,6 @@ func (s *Server) handleRemoveWorktree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log.Printf("[INFO] Removed worktree for app %s branch %s", appIdent, branch)
-	if logger := s.services.Logger(); logger != nil {
-		_ = logger.LogStatus(appIdent, appIdent, logging.OpCheckout, logging.StatusCompleted, "Removed worktree "+branch)
-	}
 	respondJSON(w, map[string]interface{}{"success": true}, http.StatusOK)
 }
 
@@ -460,9 +456,6 @@ func (s *Server) handleCreateWorktree(w http.ResponseWriter, r *http.Request) {
 	}
 	s.reloadAppConfig()
 	log.Printf("[INFO] Created worktree for app %s branch %s", req.AppIdent, req.Branch)
-	if logger := s.services.Logger(); logger != nil {
-		_ = logger.LogStatus(req.AppIdent, req.AppIdent, logging.OpCheckout, logging.StatusCompleted, "Created worktree "+req.Branch)
-	}
 	s.broadcastAppStatusWithBranch(req.AppIdent, req.Branch)
 	respondJSON(w, map[string]interface{}{"success": true, "appIdent": req.AppIdent, "branch": req.Branch}, http.StatusCreated)
 }
@@ -494,9 +487,6 @@ func (s *Server) handleSwitchWorktree(w http.ResponseWriter, r *http.Request) {
 	}
 	s.reloadAppConfig()
 	log.Printf("[INFO] Switched active worktree for app %s to branch %s", req.AppIdent, req.Branch)
-	if logger := s.services.Logger(); logger != nil {
-		_ = logger.LogStatus(req.AppIdent, req.AppIdent, logging.OpCheckout, logging.StatusCompleted, "Switched worktree to "+req.Branch)
-	}
 	s.broadcastAppStatusWithBranch(req.AppIdent, req.Branch)
 	respondJSON(w, map[string]interface{}{"success": true, "appIdent": req.AppIdent, "branch": req.Branch}, http.StatusOK)
 }

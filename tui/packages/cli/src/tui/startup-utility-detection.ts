@@ -1,5 +1,4 @@
 import { getLogger } from '@devenv/core';
-import type { DevEnvClient } from '@devenv/core';
 
 const OPTIONAL_UTILITIES = ['lazygit', 'lazydocker', 'pi', 'kubectl', 'helm', 'kind', 'k9s', 'worktrunk', 'ssh'] as const;
 
@@ -18,11 +17,9 @@ function commandExists(bin: string): boolean {
 }
 
 /**
- * Detect which optional utilities are installed and log to status log.
- * Runs synchronously but is designed to be called in a fire-and-forget manner
- * so it does not block TUI startup.
+ * Detect optional utilities and write diagnostic logging only.
  */
-export function detectOptionalUtilities(client: DevEnvClient): void {
+export function detectOptionalUtilities(): void {
   const found: string[] = [];
   for (const util of OPTIONAL_UTILITIES) {
     if (commandExists(util)) {
@@ -34,11 +31,4 @@ export function detectOptionalUtilities(client: DevEnvClient): void {
 
   getLogger().write('INFO', `Found utilities: ${found.join(', ')}`);
 
-  void client.addStatusLog({
-    AppIdent: 'system',
-    AppName: 'DevEnv',
-    Operation: 'startup',
-    Status: 'completed',
-    Message: `Found: ${found.join(', ')}`,
-  });
 }

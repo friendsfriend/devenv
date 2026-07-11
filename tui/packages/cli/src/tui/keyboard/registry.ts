@@ -55,8 +55,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 
 	// ========== table — Actions ==========
 	{ keys: ["l"], description: "View container logs for selected item", footerDescription: "Logs", context: "table", category: "Actions" },
-	{ keys: ["o"], description: "View operation logs for selected item", footerDescription: "Op logs", context: "table", category: "Actions" },
-	{ keys: ["L"], description: "Toggle status log maximize", footerDescription: "Max logs", context: "table", category: "Actions" },
+	{ keys: ["L"], description: "Toggle action history", footerDescription: "Actions", context: "table", category: "Actions" },
 	{ keys: ["m"], description: "View CR for current branch", footerDescription: "CR", context: "table", category: "Actions" },
 	{ keys: ["M"], description: "View all open CRs", footerDescription: "All CRs", context: "table", category: "Actions" },
 	{ keys: ["i"], description: "Open issue scope picker", footerDescription: "Issues", context: "table", category: "Actions" },
@@ -85,6 +84,7 @@ const RAW_KEYBINDS: KeybindDef[] = [
 
 	// ========== kubernetes ==========
 	{ keys: ["Shift+J", "Shift+K"], description: "Cycle panel focus in Kubernetes cluster view", footerDescription: "Panels", context: "kubernetes", category: "Navigation" },
+	{ keys: ["Shift+J", "Shift+K"], description: "Switch action steps/log panel", footerDescription: "Panels", context: "modal", category: "Navigation" },
 	{ keys: ["s"], description: "Create/start managed kind cluster", footerDescription: "Start", context: "kubernetes", category: "Kubernetes" },
 	{ keys: ["S"], description: "Delete/stop managed kind cluster", footerDescription: "Delete", context: "kubernetes", category: "Kubernetes" },
 	{ keys: ["R"], description: "Recreate managed kind cluster", footerDescription: "Recreate", context: "kubernetes", category: "Kubernetes" },

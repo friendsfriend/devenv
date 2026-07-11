@@ -184,10 +184,10 @@ Stopping a Kubernetes app only uninstalls that app release and stops its port-fo
 
 - Press `s` while a run/start is active to open the live action command log.
 - Press `9` to open k9s for the managed cluster.
-- Use operation logs to inspect full command output (`kind`, `helm`, `kubectl`, Docker/Podman).
+- Use action history (`L`) to inspect full command output (`kind`, `helm`, `kubectl`, Docker/Podman).
 - Podman kind command issue: some `kind get clusters` calls can fail with a Podman template error; DevEnv falls back to create/export kubeconfig and continues when the node already exists.
 - Missing tool: install `kind`, `kubectl`, `helm`, Docker/Podman, or `k9s`.
 - Podman cluster issues: verify `podman machine start`, `podman ps`, and `DEVENV_CONTAINER_RUNTIME=podman`.
-- Helm timeout: check operation log, k9s pods/events, and `kubectl --context kind-devenv get events -A`.
+- Helm timeout: check action history, k9s pods/events, and `kubectl --context kind-devenv get events -A`.
 - Image not used: verify chart image value paths match chart templates.
 - Missing Secret key: add key to config `.env` or remove it from allowlist.

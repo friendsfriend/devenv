@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // openTemp opens a fresh state store in a temporary directory and registers
@@ -357,6 +358,85 @@ func TestSetAppStateUpsertWithMainWorktreeBranch(t *testing.T) {
 
 // TestMigrationIdempotentWithMainWorktreeBranch verifies that v2 migration
 // preserves existing rows and allows MainWorktreeBranch to be set afterward.
+func TestActionEventHistoryPersistsAndRetainsOrder(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddActionEvent(`{"type":"old"}`, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddActionEvent(`{"type":"action.started"}`, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddActionEvent(`{"type":"action.completed"}`, 2); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	events, err := store.GetActionEvents(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 2 || events[0] != `{"type":"action.started"}` || events[1] != `{"type":"action.completed"}` {
+		t.Fatalf("events = %v", events)
+	}
+}
+
+func TestActionEventHistoryFiltersRecentWindow(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddActionEvent(`{"type":"old"}`, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddActionEvent(`{"type":"recent"}`, 10); err != nil {
+		t.Fatal(err)
+	}
+	sqlite := store.(*sqliteStore)
+	if _, err := sqlite.db.Exec(`UPDATE action_events SET created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-20 minutes') WHERE id = (SELECT MIN(id) FROM action_events)`); err != nil {
+		t.Fatal(err)
+	}
+	events, err := store.GetActionEventsSince(10, time.Now().Add(-10*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0] != `{"type":"recent"}` {
+		t.Fatalf("recent events = %v", events)
+	}
+}
+
+func TestActionEventHistoryExpiresAfter24Hours(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddActionEvent(`{"type":"action.started"}`, 10); err != nil {
+		t.Fatal(err)
+	}
+	sqlite := store.(*sqliteStore)
+	if _, err := sqlite.db.Exec(`UPDATE action_events SET created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-25 hours')`); err != nil {
+		t.Fatal(err)
+	}
+	events, err := store.GetActionEvents(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 0 {
+		t.Fatalf("expired events = %v", events)
+	}
+}
+
 func TestMigrationIdempotentWithMainWorktreeBranch(t *testing.T) {
 	dir := t.TempDir()
 

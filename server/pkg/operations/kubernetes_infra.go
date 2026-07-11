@@ -14,12 +14,7 @@ import (
 )
 
 func (s *service) StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error {
-	logPath, logErr := s.startOperationLog(infra.Ident, "start")
-	if logErr != nil {
-		callback := s.statusMgr.StartOperation(infra.Ident, status.OpStart)
-		callback("Error: " + logErr.Error())
-		return logErr
-	}
+	logPath := ""
 	return s.startKubernetesInfrastructureService(infra, logPath)
 }
 
@@ -83,11 +78,7 @@ func (s *service) startKubernetesInfrastructureService(infra app.InfraService, l
 func (s *service) StopKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error {
 	callback := s.statusMgr.StartOperation(infra.Ident, status.OpStop)
 	callback("stopping Kubernetes infrastructure...")
-	logPath, logErr := s.startOperationLog(infra.Ident, "stop")
-	if logErr != nil {
-		callback("Error: " + logErr.Error())
-		return logErr
-	}
+	logPath := ""
 	if infra.Kubernetes == nil {
 		callback("Error: missing Kubernetes infrastructure config")
 		return nil

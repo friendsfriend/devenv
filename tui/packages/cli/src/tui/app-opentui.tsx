@@ -31,6 +31,7 @@ import {
 	createUiStore,
 	createAgentStore,
 	createAppDetailStore,
+	createActionRunStore,
 } from "./stores";
 import {
 	createAppActions,
@@ -93,6 +94,7 @@ function TUIApp(props: TUIAppProps) {
 	const uiStore = createUiStore();
 	const agentStore = createAgentStore();
 	const appDetailStore = createAppDetailStore();
+	const actionRunStore = createActionRunStore();
 	loadCustomThemes();
 	const initialTheme = loadThemeName();
 	applyTheme(initialTheme);
@@ -108,6 +110,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		client,
 		showError,
+		actionRunStore,
 	);
 	const issueActions = createIssueActions(
 		appStore,
@@ -123,7 +126,7 @@ function TUIApp(props: TUIAppProps) {
 		client,
 		showError,
 	);
-	const dockerActions = createDockerActions(appStore, uiStore, client, showError, (appIdent, appName) => logActions.openActionLogForApp(appIdent, appName, "Action Log"));
+	const dockerActions = createDockerActions(appStore, uiStore, client, showError, async () => { appStore.pushModal("actions"); });
 	const gitActions = createGitActions(appStore, uiStore, client, showError);
 	const providerActions = createProviderActions(
 		appStore,
@@ -139,6 +142,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		renderer,
 		client,
+		actionRunStore,
 	);
 	const pipelineActions = createPipelineActions(
 		appStore,
@@ -301,6 +305,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		agentStore,
 		appDetailStore,
+		actionRunStore,
 	};
 	const kbActions: KeyboardActions = {
 		appActions,
@@ -356,6 +361,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		agentStore,
 		appDetailStore,
+		actionRunStore,
 	};
 	const viewActions: ViewActions = {
 		appActions,

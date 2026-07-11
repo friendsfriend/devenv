@@ -104,8 +104,8 @@ type containerCache struct {
 // noopClient implements Client with safe defaults when no container runtime is available.
 type noopClient struct{}
 
-func (noopClient) GetInfo(App) Info                                    { return Info{Status: "not found"} }
-func (noopClient) GetInfoForInfra(InfraService) Info                   { return Info{Status: "not found"} }
+func (noopClient) GetInfo(App) Info                  { return Info{Status: "not found"} }
+func (noopClient) GetInfoForInfra(InfraService) Info { return Info{Status: "not found"} }
 func (noopClient) BatchGetInfo(apps []App, infra []InfraService) (map[string]Info, error) {
 	results := make(map[string]Info, len(apps)+len(infra))
 	for _, a := range apps {
@@ -116,16 +116,22 @@ func (noopClient) BatchGetInfo(apps []App, infra []InfraService) (map[string]Inf
 	}
 	return results, nil
 }
-func (noopClient) GetAllContainerIDsForApp(App) []string               { return nil }
-func (noopClient) GetContainerLogs(string) (string, error)             { return "", fmt.Errorf("no container runtime available") }
-func (noopClient) StartContainer(string) error                         { return fmt.Errorf("no container runtime available") }
-func (noopClient) StopContainer(string) error                          { return fmt.Errorf("no container runtime available") }
-func (noopClient) RestartContainer(string) error                       { return fmt.Errorf("no container runtime available") }
-func (noopClient) KillAndRemoveContainer(string) error                 { return fmt.Errorf("no container runtime available") }
-func (noopClient) KillAndRemoveAllContainersForApp(App) error          { return fmt.Errorf("no container runtime available") }
+func (noopClient) GetAllContainerIDsForApp(App) []string { return nil }
+func (noopClient) GetContainerLogs(string) (string, error) {
+	return "", fmt.Errorf("no container runtime available")
+}
+func (noopClient) StartContainer(string) error   { return fmt.Errorf("no container runtime available") }
+func (noopClient) StopContainer(string) error    { return fmt.Errorf("no container runtime available") }
+func (noopClient) RestartContainer(string) error { return fmt.Errorf("no container runtime available") }
+func (noopClient) KillAndRemoveContainer(string) error {
+	return fmt.Errorf("no container runtime available")
+}
+func (noopClient) KillAndRemoveAllContainersForApp(App) error {
+	return fmt.Errorf("no container runtime available")
+}
 func (noopClient) KillAllRunningContainers([]App, []InfraService) error { return nil }
-func (noopClient) RefreshCache() error                                 { return nil }
-func (noopClient) InvalidateContainerCache()                           {}
+func (noopClient) RefreshCache() error                                  { return nil }
+func (noopClient) InvalidateContainerCache()                            {}
 func (noopClient) SubscribeToEvents(ctx context.Context) (<-chan ContainerEvent, <-chan error) {
 	eventCh := make(chan ContainerEvent)
 	errCh := make(chan error)
@@ -368,7 +374,9 @@ func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (
 }
 
 func (dc *dockerClient) GetAllContainerIDsForApp(app App) []string {
-	containers, err := dc.getContainers()
+	// Action readiness must observe containers created by command that just ran,
+	// not status cache from before startup.
+	containers, err := dc.refreshContainerCache()
 	if err != nil {
 		return []string{}
 	}
@@ -376,6 +384,9 @@ func (dc *dockerClient) GetAllContainerIDsForApp(app App) []string {
 	var containerIDs []string
 
 	for _, ctr := range containers {
+		if ctr.State != "running" {
+			continue
+		}
 		for _, name := range ctr.Names {
 			// Check for main container
 			if ContainerNameMatches(name, app.GetIdent(), app.GetContainerBaseName()) {

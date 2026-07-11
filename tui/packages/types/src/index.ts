@@ -1,4 +1,5 @@
 // Type definitions for DevEnv TUI
+export * from './action-run';
 
 // Provider types
 export type ProviderType = "github" | "gitlab";
@@ -673,17 +674,6 @@ export interface TestSummary {
 	error: number;
 	test_suites?: TestSuite[];
 	failed_test_groups?: FailedTestGroup[];
-}
-
-// Status Log types
-export interface StatusLogEntry {
-	Timestamp: string; // ISO 8601 format from Go
-	AppIdent: string;
-	AppName: string;
-	Operation: string; // pull, push, fetch, build, start, stop
-	Status: string; // pending, in progress, active, completed, failed
-	Message: string;
-	source?: "app" | "task" | "infra";
 }
 
 // Agent space types

@@ -12,6 +12,7 @@ import { handleDiscussionsKeys } from './discussions-keys';
 import { handleTestResultsKeys } from './test-results-keys';
 import { handleJobsKeys } from './jobs-keys';
 import { handleWorktreeManagerKeys } from './worktree-manager-keys';
+import { handleActionsKeys } from './actions-keys';
 import type { KeyboardActions, KeyboardContext, KeyboardStores } from './types';
 
 export interface WorkflowKeymapLayerDeps {
@@ -74,6 +75,7 @@ export function registerWorkflowKeymapLayers(
 		{ viewMode: 'discussionsView', command: 'discussions.handle', title: 'Discussions', handler: run(handleDiscussionsKeys) },
 		{ viewMode: 'testResults', command: 'test-results.handle', title: 'Test results', handler: run(handleTestResultsKeys) },
 		{ viewMode: 'jobs', command: 'jobs.handle', title: 'Jobs', handler: run(handleJobsKeys) },
+		{ viewMode: 'actions', command: 'actions.handle', title: 'Actions', handler: (event: KeyEvent) => handleActionsKeys(withSequence(event), deps.stores.actionRunStore, deps.stores.appStore) },
 	] as const;
 
 	const disposers = layers.map(({ viewMode, command, title, handler }) => keymap.registerLayer({

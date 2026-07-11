@@ -1,86 +1,83 @@
 ## ADDED Requirements
 
-### Requirement: Wait for dependency health before starting dependent apps
-The system SHALL wait for each dependency to be healthy before starting the next target in the dependency plan.
+### Requirement: Dependency-first step execution
+The system SHALL resolve dependencies into dependency-first ordered steps and SHALL not start a dependent step until all dependencies are healthy.
 
-#### Scenario: Simple dependency chain
-- **WHEN** `frontend` depends on `backend` which depends on `postgres`
-- **THEN** the system SHALL start `postgres` first
-- **THEN** the system SHALL wait for `postgres` to be healthy
-- **THEN** the system SHALL start `backend`
-- **THEN** the system SHALL wait for `backend` to be healthy
-- **THEN** the system SHALL start `frontend`
+#### Scenario: Recursive dependency chain
+- **WHEN** A depends on B and B depends on C
+- **THEN** the system SHALL start C, wait until healthy, start B, wait until healthy, then start A
 
-#### Scenario: Already-running dependency is skipped
-- **WHEN** a dependency is already running and healthy
-- **THEN** the system SHALL skip it and proceed to the next target
-- **THEN** no health check wait SHALL occur for that dependency
+#### Scenario: Shared dependency
+- **WHEN** A and B both depend on C
+- **THEN** C SHALL start once and become healthy before A or B starts
 
-#### Scenario: Shared dependency started once
-- **WHEN** both `backend` and `worker` depend on `postgres`
-- **THEN** `postgres` SHALL be started and made healthy before either `backend` or `worker`
-- **THEN** `postgres` SHALL NOT be started twice
+### Requirement: Docker health readiness
+The system SHALL poll Docker container state every 2 seconds after starting each dependency.
 
-### Requirement: Health check via Docker inspect
-The system SHALL determine container health by polling Docker container state.
-
-#### Scenario: Container with healthcheck
-- **WHEN** a container has a Docker healthcheck configured
-- **THEN** the system SHALL poll `docker inspect` for `State.Health.Status`
-- **THEN** the container SHALL be considered healthy when status is `healthy`
+#### Scenario: Healthcheck container
+- **WHEN** `State.Health.Status` becomes `healthy`
+- **THEN** the step SHALL become ready
 
 #### Scenario: Container without healthcheck
-- **WHEN** a container has no Docker healthcheck
-- **THEN** the system SHALL consider it healthy when `State.Running` is `true`
+- **WHEN** container has no healthcheck and `State.Running` is true
+- **THEN** the step SHALL become ready
 
-#### Scenario: Container healthcheck reports unhealthy
-- **WHEN** a container's healthcheck reports `unhealthy`
-- **THEN** the system SHALL consider the dependency failed
-- **THEN** the entire start operation SHALL fail with an error identifying the unhealthy dependency
+#### Scenario: Health failure or timeout
+- **WHEN** status becomes `unhealthy` or readiness exceeds configurable timeout
+- **THEN** step SHALL fail with dependency name and timeout
+- **THEN** dependent steps SHALL not start
 
-### Requirement: Health check timeout
-The system SHALL enforce a timeout per dependency health check.
+### Requirement: Action screen opens for triggered actions
+The TUI SHALL open an action screen whenever an action is triggered.
 
-#### Scenario: Dependency becomes healthy within timeout
-- **WHEN** a dependency becomes healthy within 60 seconds
-- **THEN** the system SHALL proceed to start the next target
+#### Scenario: Action starts
+- **WHEN** user triggers an action
+- **THEN** action screen SHALL open
+- **THEN** screen SHALL show ordered steps required by action
 
-#### Scenario: Dependency times out
-- **WHEN** a dependency does not become healthy within 60 seconds
-- **THEN** the system SHALL abort the start operation
-- **THEN** the error message SHALL identify the timed-out dependency and the duration
+### Requirement: Step overview
+The action screen SHALL show each step with lifecycle state.
 
-#### Scenario: Health check poll interval
-- **WHEN** polling for container health
-- **THEN** the system SHALL poll every 2 seconds
+#### Scenario: Active step
+- **WHEN** step is executing
+- **THEN** step SHALL show active loading indicator using shared splash/shutdown modal styling
 
-### Requirement: Emit dependency startup progress events
-The system SHALL emit SSE events showing dependency startup progress.
+#### Scenario: Completed or failed step
+- **WHEN** step completes or fails
+- **THEN** step SHALL show completed or failed state
+- **THEN** failed state SHALL include error summary
 
-#### Scenario: Dependency starting
-- **WHEN** the system starts a dependency container
-- **THEN** it SHALL emit `{ type: "dependency.starting", app: "postgres", status: "starting" }`
+### Requirement: Live command output
+The action screen SHALL show executed commands and live stdout/stderr output.
 
-#### Scenario: Dependency healthy
-- **WHEN** a dependency becomes healthy
-- **THEN** it SHALL emit `{ type: "dependency.starting", app: "postgres", status: "healthy" }`
+#### Scenario: Command output arrives
+- **WHEN** command emits output
+- **THEN** output SHALL appear in log pane without waiting for command completion
 
-#### Scenario: Dependency failed
-- **WHEN** a dependency fails health check or times out
-- **THEN** it SHALL emit `{ type: "dependency.starting", app: "postgres", status: "failed" }`
+### Requirement: Per-step logs
+The action screen SHALL retain command output per step.
 
-### Requirement: TUI displays dependency startup progress
-The TUI SHALL show which dependencies are being started in the main table.
+#### Scenario: Focus changes
+- **WHEN** user focuses step
+- **THEN** log pane SHALL show that step's command and accumulated output
 
-#### Scenario: Dependency startup in status column
-- **WHEN** a dependency is being started
-- **THEN** the status column for that app SHALL show "⏳ Starting dependency: postgres"
+### Requirement: Automatic focus
+The action screen SHALL focus latest started step by default, then failed step when failure occurs.
 
-#### Scenario: Dependency ready
-- **WHEN** a dependency becomes healthy
-- **THEN** the status column SHALL update to show the dependency is ready
+#### Scenario: User has not moved focus
+- **WHEN** step starts
+- **THEN** focus SHALL move to most recently started step
+- **WHEN** step fails
+- **THEN** focus SHALL move to failed step
 
-#### Scenario: Dependency failed
-- **WHEN** a dependency fails or times out
-- **THEN** the status column SHALL show the failure status
-- **THEN** a notification SHALL appear with the error details
+#### Scenario: User manually moves focus
+- **WHEN** user manually changes focused step
+- **THEN** automatic focus changes SHALL stop for remainder of action run
+
+### Requirement: Structured action events
+The server SHALL emit action lifecycle events containing run ID and step ID.
+
+#### Scenario: Action lifecycle
+- **WHEN** action starts, emits output, completes, or fails
+- **THEN** server SHALL emit corresponding structured SSE event
+- **THEN** output event SHALL identify stream and step

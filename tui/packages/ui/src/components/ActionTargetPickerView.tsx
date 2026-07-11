@@ -17,7 +17,7 @@ function targetBadge(target: ActionTarget): string {
   return `[${target.runtime}]`;
 }
 
-function targetText(target: ActionTarget): string {
+export function formatActionTargetLabel(target: ActionTarget): string {
   const profile = target.profile ? ` (${target.profile})` : '';
   return `${targetBadge(target)} ${target.label}${profile}`;
 }
@@ -42,8 +42,8 @@ function truncate(value: string, max: number): string {
 function ActionTargetRow(props: { target: ActionTarget; isSelected: boolean }) {
   const details = () => targetDetails(props.target);
   const text = () => details()
-    ? `${targetText(props.target)} — ${details()}`
-    : targetText(props.target);
+    ? `${formatActionTargetLabel(props.target)} — ${details()}`
+    : formatActionTargetLabel(props.target);
 
   return (
     <box

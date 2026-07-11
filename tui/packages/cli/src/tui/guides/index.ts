@@ -110,14 +110,14 @@ export const guides: Guide[] = [
   {
     key: "using-log-viewer",
     title: "Using the Log Viewer",
-    description: "Container logs, operation logs, search, viewport scrolling, keyboard shortcuts",
+    description: "Action history, runtime logs, search, scrolling, keyboard shortcuts",
     category: "Logs",
     import: () => import("./using-log-viewer.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
     key: "finding-logs",
     title: "Finding Logs",
-    description: "Log directory structure, status log format, per-item logs, server log",
+    description: "Action retention, remaining runtime logs, server diagnostics",
     category: "Logs",
     import: () => import("./finding-logs.md", { with: { type: "text" } }).then((m) => m.default),
   },

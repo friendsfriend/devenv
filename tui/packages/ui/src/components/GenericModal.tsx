@@ -7,6 +7,7 @@ import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { TextAttributes } from '@opentui/core';
 import { invokeGlobalSelectionMouseUpHandler } from '../selectionCopy';
+import { HelpText, type HelpEntry } from './HelpText';
 
 function hexToRgba(hex: string, alpha: number): RGBA {
   const normalized = hex.replace('#', '');
@@ -52,7 +53,7 @@ export interface GenericModalProps {
   /** Modal title displayed in header */
   title: string;
   /** Footer help text */
-  helpText: string;
+  helpText: string | HelpEntry[];
   /** Main content to render in the middle section */
   children: JSX.Element;
   /** Width as percentage of screen (0-1), default 0.5 (50%) */
@@ -63,6 +64,8 @@ export interface GenericModalProps {
   heightLines?: number;
   /** Optional custom header content (replaces default title) */
   customHeader?: JSX.Element;
+  /** Hide modal header when child panels provide their own headers. */
+  hideHeader?: boolean;
   /** Optional custom footer content (replaces default help text) */
   customFooter?: JSX.Element;
   /** Optional search mode/query for SearchHeader */
@@ -95,7 +98,7 @@ export function GenericModal(props: GenericModalProps) {
 
   const dialogWidth = () => Math.floor(dimensions().width * (props.widthPercent ?? 0.5));
   const dialogHeight = () => Math.min(dimensions().height, props.heightLines ?? Math.floor(dimensions().height * (props.heightPercent ?? 0.7)));
-  const helpLines = createMemo(() => wrapHelpText(props.helpText, Math.max(1, dialogWidth() - 4)));
+  const helpLines = createMemo(() => typeof props.helpText === 'string' ? wrapHelpText(props.helpText, Math.max(1, dialogWidth() - 4)) : ['']);
 
   return (
     <box
@@ -126,7 +129,7 @@ export function GenericModal(props: GenericModalProps) {
         }}
       >
         {/* HEADER */}
-        {props.customHeader ? (
+        {!props.hideHeader && (props.customHeader ? (
           props.customHeader
         ) : (
           <SearchHeader searchMode={props.searchMode} searchQuery={props.searchQuery} resultCount={props.searchResultCount}>
@@ -142,7 +145,7 @@ export function GenericModal(props: GenericModalProps) {
               </text>
             </box>
           </SearchHeader>
-        )}
+        ))}
 
         {/* FILTER STATUS */}
         <FilterStatusBar filterSummary={props.filterSummary} sortSummary={props.sortSummary} />
@@ -174,9 +177,7 @@ export function GenericModal(props: GenericModalProps) {
               flexShrink: 0,
             }}
           >
-            <For each={helpLines()}>
-              {(line) => <text style={{ fg: uiColors.textSecondary }}>{line}</text>}
-            </For>
+            {Array.isArray(props.helpText) ? <HelpText entries={props.helpText} /> : <For each={helpLines()}>{(line) => <text style={{ fg: uiColors.textSecondary }}>{line}</text>}</For>}
           </box>
         )}
       </box>

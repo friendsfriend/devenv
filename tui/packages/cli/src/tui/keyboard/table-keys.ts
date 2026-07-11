@@ -550,14 +550,6 @@ export async function handleTableKeys(
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
 				logActions.loadContainerLogs();
 			break;
-		case "L":
-			// Open status log modal (uppercase L)
-			appStore.setShowStatusLogModal(true);
-			break;
-		case "o":
-			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				logActions.loadOperationLogs();
-			break;
 		case "m":
 			// Show CR detail for current branch (lowercase m)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
@@ -597,7 +589,7 @@ export async function handleTableKeys(
 				const app = getSelectedApp();
 				if (!app) break;
 				if (app.operationStatus?.status === "active") {
-					await logActions.openActionLogForApp(app.ident, app.displayName || app.ident, "Action Log");
+					appStore.pushModal('actions');
 					break;
 				}
 				if (appStore.operationInProgressForApp()) {
@@ -606,7 +598,7 @@ export async function handleTableKeys(
 					const active = appStore.apps().find((a) => a.ident === activeIdent)
 						|| appStore.infraServices().find((svc) => svc.ident === activeIdent)
 						|| app;
-					await logActions.openActionLogForApp(activeIdent, active.displayName || active.ident, "Action Log");
+					appStore.pushModal('actions');
 					break;
 				}
 				if (appStore.activeTab() === "infrastructure") {
@@ -695,13 +687,13 @@ export async function handleTableKeys(
 			break;
 		case "b":
 		case "B": {
-			// Build. If build already running, toggle live operation logs.
+			// Build. If already running, open unified action history.
 			if (appStore.activeTab() !== "scripts" && appList.length > 0) {
 				const selected = getSelectedApp();
 				if (!selected) break;
 				const app = appStore.apps().find((a) => a.ident === selected.ident) ?? selected;
 				if (app.operationStatus?.operation === "build" && app.operationStatus.status === "active") {
-					void logActions.toggleActionLogForApp(app.ident, app.displayName, "Build Output");
+					appStore.pushModal("actions");
 				} else {
 					void dockerActions.performBuild();
 				}
@@ -709,13 +701,13 @@ export async function handleTableKeys(
 			break;
 		}
 		case "t": {
-			// Test. If test already running, toggle live operation logs.
+			// Test. If already running, open unified action history.
 			if (appStore.activeTab() !== "scripts" && appList.length > 0) {
 				const selected = getSelectedApp();
 				if (!selected) break;
 				const app = appStore.apps().find((a) => a.ident === selected.ident) ?? selected;
 				if (app.operationStatus?.operation === "test" && app.operationStatus.status === "active") {
-					void logActions.toggleActionLogForApp(app.ident, app.displayName, "Test Output");
+					appStore.pushModal("actions");
 				} else {
 					void dockerActions.performTest();
 				}

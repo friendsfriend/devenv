@@ -13,9 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/friendsfriend/devenv/pkg/actionrun"
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
-	"github.com/friendsfriend/devenv/pkg/logging"
 	"github.com/friendsfriend/devenv/pkg/services"
 	"github.com/friendsfriend/devenv/pkg/status"
 )
@@ -31,6 +31,7 @@ type Server struct {
 	opStatusMu     sync.RWMutex
 	statusEventMu  sync.Mutex
 	statusEventSig map[string]string
+	actionRuns     *actionrun.Registry
 
 	// CR review sessions: token → session (created per review, cleaned up on stream close)
 	crSessions   map[string]*crReviewSession
@@ -95,6 +96,7 @@ func NewServer(port int) *Server {
 		listeners:      make(map[chan Event]bool),
 		opStatus:       make(map[string]*OperationStatus),
 		statusEventSig: make(map[string]string),
+		actionRuns:     actionrun.NewRegistry(),
 		crSessions:     make(map[string]*crReviewSession),
 	}
 	return s
@@ -115,21 +117,6 @@ func (s *Server) Start() error {
 	s.services.BuildService().RecoverShellTmuxRuns(s.apps)
 	s.services.OperationsService().RecoverScriptInfrastructureRuns(s.infraServices)
 
-	logging.SetStatusLogBroadcaster(func(entry logging.LogEntry) {
-		s.BroadcastEvent(Event{
-			Type: "statuslog.entry",
-			Properties: map[string]interface{}{
-				"timestamp": entry.Timestamp.Format(time.RFC3339),
-				"appIdent":  entry.AppIdent,
-				"appName":   entry.AppName,
-				"operation": string(entry.Operation),
-				"status":    string(entry.Status),
-				"message":   entry.Message,
-			},
-			Timestamp: time.Now(),
-		})
-	})
-
 	s.services.StatusManager().AddListener(s)
 	log.Printf("[INFO] Registered server as StatusManager listener for SSE broadcasts")
 
@@ -149,7 +136,6 @@ func (s *Server) Start() error {
 	go s.startScriptHealthPoller()
 	go s.startKubernetesStatusWatchers()
 	go s.startKubernetesClusterPoller()
-	go s.startStatusLogCleanup()
 
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
@@ -270,25 +256,6 @@ func (s *Server) findIdentByContainerName(containerName string) string {
 		}
 	}
 	return ""
-}
-
-func (s *Server) startStatusLogCleanup() {
-	// Clean old entries daily (runs 1h after startup, then every 24h)
-	const cleanupInterval = 24 * time.Hour
-	const maxAge = 3 * 24 * time.Hour
-
-	timer := time.NewTimer(1 * time.Hour)
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-timer.C:
-			if logger := s.services.Logger(); logger != nil {
-				_ = logger.CleanOldLogEntries(maxAge)
-			}
-			timer.Reset(cleanupInterval)
-		}
-	}
 }
 
 func (s *Server) startScriptHealthPoller() {
@@ -469,7 +436,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	eventChan := make(chan Event, 100)
+	// Action output is bursty; keep enough backlog to avoid dropping chunks while
+	// TUI batches rendering. Other SSE events remain small.
+	eventChan := make(chan Event, 10000)
 	s.listenerMu.Lock()
 	s.listeners[eventChan] = true
 	s.listenerMu.Unlock()
@@ -483,6 +452,11 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	data, _ := json.Marshal(Event{Type: "connection.established", Properties: map[string]string{"status": "connected"}, Timestamp: time.Now()})
 	fmt.Fprintf(w, "data: %s\n\n", data)
+	s.actionRuns.Cleanup(time.Now())
+	for _, run := range s.actionRuns.Active() {
+		active, _ := json.Marshal(Event{Type: "action.started", Properties: map[string]interface{}{"run": run}, Timestamp: time.Now()})
+		fmt.Fprintf(w, "data: %s\n\n", active)
+	}
 	w.(http.Flusher).Flush()
 
 	for {
@@ -501,10 +475,21 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) BroadcastEvent(event Event) {
+	if strings.HasPrefix(event.Type, "action.") && s.services != nil {
+		if payload, err := json.Marshal(event); err == nil {
+			if err := s.services.StateStore().AddActionEvent(string(payload), 50000); err != nil {
+				log.Printf("[WARN] Failed to persist action event: %v", err)
+			}
+		}
+	}
 	s.listenerMu.RLock()
 	defer s.listenerMu.RUnlock()
 
 	for listener := range s.listeners {
+		if event.Type == "action.command.output" || event.Type == "action.step.output" {
+			listener <- event
+			continue
+		}
 		select {
 		case listener <- event:
 		default:
@@ -759,22 +744,6 @@ func (s *Server) setOperationStatus(appIdent, operation, status, message string)
 	s.opStatus[appIdent] = &OperationStatus{Operation: operation, Status: status, Message: message}
 
 	s.opStatusMu.Unlock()
-
-	// Log to status log
-	if logger := s.services.Logger(); logger != nil {
-		appName := appIdent
-		if app := s.findAppByIdent(appIdent); app != nil {
-			appName = app.DisplayName
-		}
-		logOpType := logging.OperationType(operation)
-		logStatusType := logging.StatusCompleted
-		if status == "active" {
-			logStatusType = logging.StatusInProgress
-		} else if status == "failed" {
-			logStatusType = logging.StatusFailed
-		}
-		_ = logger.LogStatus(appIdent, appName, logOpType, logStatusType, message)
-	}
 
 	s.BroadcastEvent(Event{
 		Type: "operation.status.changed",

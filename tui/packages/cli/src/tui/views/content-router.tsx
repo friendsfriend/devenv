@@ -4,7 +4,7 @@ import {
 	RepositoryTable,
 	InfrastructureTable,
 	TaskTable,
-	StatusLogView,
+	ActionStatusStrip,
 	IssueView,
 	IssueDetailView,
 	ReferencesView,
@@ -26,9 +26,10 @@ import { getGuide, guides as allGuides } from "../guides";
 import type { ContentRouterProps } from "./types";
 import { StartupSplash } from "./startup-splash";
 import { ShutdownSplash } from "./shutdown-splash";
+import { ActionsView } from "./actions-view";
 
 export function ContentRouter(props: ContentRouterProps) {
-	const { appStore, issueStore, changeRequestStore, appDetailStore } =
+	const { appStore, issueStore, changeRequestStore, appDetailStore, actionRunStore } =
 		props.stores;
 	const { helpActions, issueActions, pipelineActions, logActions, crActions, dockerActions, appActions } =
 		props.actions;
@@ -39,14 +40,14 @@ export function ContentRouter(props: ContentRouterProps) {
 		void dockerActions.refreshKubernetesCluster();
 	});
 
-	// Table shares content area with StatusLogView (4 lines below it).
-	// Include three 1-line gutters: header-tabs, table-log, log-footer.
-	const STATUS_LOG_HEIGHT = 4;
+	// Table shares content area with one-row action strip.
+	// Include three 1-line gutters: header-tabs, table-strip, strip-footer.
+	const ACTION_STRIP_HEIGHT = 1;
 	const TABLE_VIEW_GUTTERS = 3;
 	const TAB_BAR_LINES = 3;
 	const availableTableLines = Math.max(
 		1,
-		props.dimensions.height - LAYOUT_CHROME_LINES - STATUS_LOG_HEIGHT - TABLE_VIEW_GUTTERS - TAB_BAR_LINES,
+		props.dimensions.height - LAYOUT_CHROME_LINES - ACTION_STRIP_HEIGHT - TABLE_VIEW_GUTTERS - TAB_BAR_LINES,
 	);
 	const tableColumns = () =>
 		appStore.activeTab() === "scripts"
@@ -74,7 +75,9 @@ export function ContentRouter(props: ContentRouterProps) {
 
 	return (
 		<>
-			{appStore.viewMode() === "references" ? (
+			{appStore.viewMode() === "actions" ? (
+				<ActionsView store={actionRunStore} />
+			) : appStore.viewMode() === "references" ? (
 				<ReferencesView
 					references={issueStore.referencesFiltered()}
 					allReferencesCount={issueStore.references().length}
@@ -610,10 +613,11 @@ export function ContentRouter(props: ContentRouterProps) {
 										/>
 									</Show>
 								</box>,
-								<box style={{ flexShrink: 0 }}>
-									<StatusLogView
-										entries={appStore.statusLogEntries()}
-										height={STATUS_LOG_HEIGHT}
+								<box style={{ flexShrink: 0, height: ACTION_STRIP_HEIGHT }}>
+									<ActionStatusStrip
+										runs={actionRunStore.runs()}
+										width={props.dimensions.width}
+										onActivate={() => appStore.pushModal("actions")}
 									/>
 								</box>,
 							]}

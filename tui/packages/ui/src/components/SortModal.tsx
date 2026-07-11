@@ -32,7 +32,10 @@ export function SortModal(props: SortModalProps) {
 	return (
 		<GenericModal
 			title="Order / Sort"
-			helpText="j/k select • Space mode • K/J priority • x clear all • Enter apply • Esc close"
+			helpText={[
+			{ key: 'j/k', action: 'Select' }, { key: 'Space', action: 'Mode' }, { key: 'K/J', action: 'Priority' },
+			{ key: 'x', action: 'Clear all' }, { key: 'Enter', action: 'Apply' }, { key: 'Esc', action: 'Close' },
+		]}
 			widthPercent={0.6}
 			heightPercent={0.55}
 		>

@@ -68,6 +68,22 @@ describe('table keymap layer', () => {
 		}
 	});
 
+	test('uppercase L opens action history without starting action', () => {
+		const { keymap, host, cleanup } = createTestKeymap({ defaultKeys: true });
+		let pushed = '';
+		const stores = makeStores({ pushModal: (name: string) => { pushed = name; } });
+		try {
+			setupDevenvKeymap(keymap as never);
+			setRuntime(keymap);
+			registerTableKeymapLayer(keymap as never, { stores, actions: actions(), ctx: ctx() });
+			host.press('L');
+			expect(pushed).toBe('actions');
+			expect(keymap.getCommandEntries().some((entry: any) => entry.command.name === 'actions.toggle')).toBe(true);
+		} finally {
+			cleanup();
+		}
+	});
+
 	test('inactive view layer does not handle table keys', () => {
 		const { keymap, host, cleanup } = createTestKeymap({ defaultKeys: true });
 		const stores = makeStores();

@@ -14,29 +14,23 @@ export function createGitActions(
     return row?.rowKind === 'app' ? row : undefined;
   };
 
-  const appendStatusLog = (app: { ident: string; displayName: string }, operation: string, status: string, message: string) => {
-    void client.addStatusLog({
-      AppIdent: app.ident,
-      AppName: app.displayName,
-      Operation: operation,
-      Status: status,
-      Message: message,
-    });
+  const logActionDiagnostic = (app: { ident: string; displayName: string }, operation: string, status: string, message: string) => {
+    getLogger().write(status === 'failed' ? 'ERROR' : 'INFO', `${operation} ${app.ident}: ${message}`);
   };
 
   const performGitPull = async () => {
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
     const app = getSelectedApp();
     if (!app) return;
-    appendStatusLog(app, 'pull', 'in progress', `Pulling ${app.branch}...`);
+    logActionDiagnostic(app, 'pull', 'in progress', `Pulling ${app.branch}...`);
     uiStore.setLoadingModalMessage(`Pulling ${app.displayName} (${app.branch})...`);
     uiStore.setShowLoadingModal(true);
     try {
       await client.gitPull(app.ident);
-      appendStatusLog(app, 'pull', 'completed', `Pulled ${app.branch}`);
+      logActionDiagnostic(app, 'pull', 'completed', `Pulled ${app.branch}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'pull', 'failed', msg);
+      logActionDiagnostic(app, 'pull', 'failed', msg);
       showError('Git Pull Failed', `Failed to pull changes for ${app.displayName}.\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -47,15 +41,15 @@ export function createGitActions(
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
     const app = getSelectedApp();
     if (!app) return;
-    appendStatusLog(app, 'push', 'in progress', `Pushing ${app.branch}...`);
+    logActionDiagnostic(app, 'push', 'in progress', `Pushing ${app.branch}...`);
     uiStore.setLoadingModalMessage(`Pushing ${app.displayName} (${app.branch})...`);
     uiStore.setShowLoadingModal(true);
     try {
       await client.gitPush(app.ident);
-      appendStatusLog(app, 'push', 'completed', `Pushed ${app.branch}`);
+      logActionDiagnostic(app, 'push', 'completed', `Pushed ${app.branch}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'push', 'failed', msg);
+      logActionDiagnostic(app, 'push', 'failed', msg);
       showError('Git Push Failed', `Failed to push changes for ${app.displayName}.\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -66,15 +60,15 @@ export function createGitActions(
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
     const app = getSelectedApp();
     if (!app) return;
-    appendStatusLog(app, 'fetch', 'in progress', `Fetching ${app.displayName}...`);
+    logActionDiagnostic(app, 'fetch', 'in progress', `Fetching ${app.displayName}...`);
     uiStore.setLoadingModalMessage(`Fetching ${app.displayName}...`);
     uiStore.setShowLoadingModal(true);
     try {
       await client.gitFetch(app.ident);
-      appendStatusLog(app, 'fetch', 'completed', `Fetch completed for ${app.displayName}`);
+      logActionDiagnostic(app, 'fetch', 'completed', `Fetch completed for ${app.displayName}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'fetch', 'failed', msg);
+      logActionDiagnostic(app, 'fetch', 'failed', msg);
       showError('Git Fetch Failed', `Failed to fetch changes for ${app.displayName}.\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -159,15 +153,15 @@ export function createGitActions(
     if (!app || !selected) return;
     const branchName = selected.name.startsWith('origin/') ? selected.name.substring(7) : selected.name;
     closeBranchSelector();
-    appendStatusLog(app, 'checkout', 'in progress', `Checking out ${branchName}...`);
+    logActionDiagnostic(app, 'checkout', 'in progress', `Checking out ${branchName}...`);
     uiStore.setLoadingModalMessage(`Checking out ${branchName}...`);
     uiStore.setShowLoadingModal(true);
     try {
       await client.gitCheckout(app.ident, branchName);
-      appendStatusLog(app, 'checkout', 'completed', `Checked out ${branchName}`);
+      logActionDiagnostic(app, 'checkout', 'completed', `Checked out ${branchName}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'checkout', 'failed', msg);
+      logActionDiagnostic(app, 'checkout', 'failed', msg);
       showError('Git Checkout Failed', `Failed to checkout branch "${selected.name}" for ${app.displayName}.\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -182,15 +176,15 @@ export function createGitActions(
     uiStore.setShowCreateBranchModal(false);
     uiStore.setCreateBranchName('');
     closeBranchSelector();
-    appendStatusLog(app, 'create-branch', 'in progress', `Creating branch ${branchName}...`);
+    logActionDiagnostic(app, 'create-branch', 'in progress', `Creating branch ${branchName}...`);
     uiStore.setLoadingModalMessage(`Creating branch ${branchName}...`);
     uiStore.setShowLoadingModal(true);
     try {
       await client.gitCreateBranch(app.ident, branchName);
-      appendStatusLog(app, 'create-branch', 'completed', `Created branch ${branchName}`);
+      logActionDiagnostic(app, 'create-branch', 'completed', `Created branch ${branchName}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'create-branch', 'failed', msg);
+      logActionDiagnostic(app, 'create-branch', 'failed', msg);
       showError('Create Branch Failed', `Failed to create branch "${branchName}" for ${app.displayName}.\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -219,7 +213,7 @@ export function createGitActions(
     }
 
     closeBranchSelector();
-    appendStatusLog(app, 'create-worktree', 'in progress', `Creating worktree ${branchName}...`);
+    logActionDiagnostic(app, 'create-worktree', 'in progress', `Creating worktree ${branchName}...`);
     uiStore.setLoadingModalMessage(`Creating worktree ${branchName} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -227,10 +221,10 @@ export function createGitActions(
       // Refresh the worktree manager list
       const updated = await client.listWorktrees(app.ident);
       uiStore.setWorktreeManagerWorktrees(updated);
-      appendStatusLog(app, 'create-worktree', 'completed', `Created worktree ${branchName}`);
+      logActionDiagnostic(app, 'create-worktree', 'completed', `Created worktree ${branchName}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'create-worktree', 'failed', msg);
+      logActionDiagnostic(app, 'create-worktree', 'failed', msg);
       showError('Create Worktree Failed', `Failed to create worktree for "${branchName}".\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -248,15 +242,15 @@ export function createGitActions(
       return showError('Cannot Remove Worktree', 'Cannot remove the active or primary worktree.');
     }
     closeBranchSelector();
-    appendStatusLog(app, 'remove-worktree', 'in progress', `Removing worktree ${branchName}...`);
+    logActionDiagnostic(app, 'remove-worktree', 'in progress', `Removing worktree ${branchName}...`);
     uiStore.setLoadingModalMessage(`Removing worktree ${branchName} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {
       await client.removeWorktree(app.ident, branchName);
-      appendStatusLog(app, 'remove-worktree', 'completed', `Removed worktree ${branchName}`);
+      logActionDiagnostic(app, 'remove-worktree', 'completed', `Removed worktree ${branchName}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'remove-worktree', 'failed', msg);
+      logActionDiagnostic(app, 'remove-worktree', 'failed', msg);
       showError('Remove Worktree Failed', `Failed to remove worktree "${branchName}".\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -277,7 +271,7 @@ export function createGitActions(
       return showError('Cannot Remove Worktree', 'Cannot remove the active or primary worktree.');
     }
 
-    appendStatusLog(app, 'remove-worktree', 'in progress', `Removing worktree ${selected.branch}...`);
+    logActionDiagnostic(app, 'remove-worktree', 'in progress', `Removing worktree ${selected.branch}...`);
     uiStore.setLoadingModalMessage(`Removing worktree ${selected.branch} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -287,10 +281,10 @@ export function createGitActions(
       uiStore.setWorktreeManagerWorktrees(updated);
       // Clamp selected index
       uiStore.setWorktreeManagerSelectedIndex((prev) => Math.min(prev, Math.max(0, updated.length - 1)));
-      appendStatusLog(app, 'remove-worktree', 'completed', `Removed worktree ${selected.branch}`);
+      logActionDiagnostic(app, 'remove-worktree', 'completed', `Removed worktree ${selected.branch}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'remove-worktree', 'failed', msg);
+      logActionDiagnostic(app, 'remove-worktree', 'failed', msg);
       showError('Remove Worktree Failed', `Failed to remove worktree "${selected.branch}".\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -310,7 +304,7 @@ export function createGitActions(
     const app = appStore.apps().find((a) => a.ident === appId);
     if (!app) return;
 
-    appendStatusLog(app, 'switch-worktree', 'in progress', `Switching worktree ${selected.branch}...`);
+    logActionDiagnostic(app, 'switch-worktree', 'in progress', `Switching worktree ${selected.branch}...`);
     uiStore.setLoadingModalMessage(`Switching worktree ${selected.branch} (${app.displayName})...`);
     uiStore.setShowLoadingModal(true);
     try {
@@ -320,10 +314,10 @@ export function createGitActions(
       uiStore.setWorktreeManagerAppId(null);
       uiStore.setWorktreeManagerWorktrees([]);
       uiStore.setWorktreeManagerSelectedIndex(0);
-      appendStatusLog(app, 'switch-worktree', 'completed', `Switched worktree ${selected.branch}`);
+      logActionDiagnostic(app, 'switch-worktree', 'completed', `Switched worktree ${selected.branch}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Unknown error';
-      appendStatusLog(app, 'switch-worktree', 'failed', msg);
+      logActionDiagnostic(app, 'switch-worktree', 'failed', msg);
       showError('Switch Worktree Failed', `Failed to switch to worktree "${selected.branch}".\n\nError: ${msg}`);
     } finally {
       uiStore.setShowLoadingModal(false);

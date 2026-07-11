@@ -10,6 +10,7 @@ function createStores(app: any) {
     operationInProgressForApp: () => operationInProgressForApp,
     setOperationInProgressForApp: (ident: string | null) => { operationInProgressForApp = ident; },
     setError: () => {},
+    pushModal: () => {},
     apps: () => apps,
     setApps: (next: any[] | ((prev: any[]) => any[])) => { apps = typeof next === 'function' ? next(apps) : next; },
     infraServices: () => [],
@@ -27,6 +28,19 @@ function createStores(app: any) {
 }
 
 describe('docker actions', () => {
+  test('build passes exact target-picker label', async () => {
+    const app = { ident: 'web', displayName: 'Web' };
+    const target = { id: 'app/web/build/docker/with-redis', action: 'build', runtime: 'docker', label: 'with-redis', profile: 'with-redis' };
+    const { appStore, uiStore } = createStores(app);
+    const calls: unknown[][] = [];
+    const client = { buildApp: async (...args: unknown[]) => { calls.push(args); } };
+    const actions = createDockerActions(appStore as any, uiStore as any, client as any, () => {});
+
+    await actions.runSelectedTarget(app as any, 'build', target as any);
+
+    expect(calls).toEqual([['web', 'app/web/build/docker/with-redis', 'with-redis', '[docker] with-redis (with-redis)']]);
+  });
+
   test('app stop passes active run target id', async () => {
     const app = {
       ident: 'web',

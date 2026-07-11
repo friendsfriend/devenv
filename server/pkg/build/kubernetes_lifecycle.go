@@ -251,28 +251,19 @@ func (s *service) ClearKubernetesRuntimeState() {
 	s.lastRunMu.Unlock()
 }
 
-func (s *service) logSilentCommand(logPath, command string, args []string, envVars []string, workingDir, output string, err error) {
-	if logPath == "" {
-		return
+func (s *service) logSilentCommand(_ string, command string, args []string, _ []string, _ string, output string, err error) {
+	s.actionMu.RLock()
+	binding := s.actionBindings[s.actionAppIdent]
+	s.actionMu.RUnlock()
+	if binding.command != nil {
+		binding.command(binding.step, command, args)
 	}
-	timestamp := func() string { return time.Now().Format("2006-01-02 15:04:05") }
-	s.appendOperationLog(logPath, "[%s] Command: %s\n", timestamp(), shellQuoteForActionLog(command, args))
-	if workingDir != "" {
-		s.appendOperationLog(logPath, "[%s] Working directory: %s\n", timestamp(), workingDir)
+	if binding.output != nil && output != "" {
+		binding.output(binding.step, "stdout", output)
 	}
-	if len(envVars) > 0 {
-		s.appendOperationLog(logPath, "[%s] Environment overrides: %s\n", timestamp(), strings.Join(envVars, " "))
+	if binding.done != nil {
+		binding.done(binding.step, err)
 	}
-	s.appendOperationLog(logPath, "[%s] Output:\n%s", timestamp(), output)
-	if output != "" && !strings.HasSuffix(output, "\n") {
-		s.appendOperationLog(logPath, "\n")
-	}
-	if err != nil {
-		s.appendOperationLog(logPath, "[%s] Exit: ERROR (%s)\n", timestamp(), err.Error())
-	} else {
-		s.appendOperationLog(logPath, "[%s] Exit: SUCCESS\n", timestamp())
-	}
-	s.appendOperationLog(logPath, "[%s] ---\n\n", timestamp())
 }
 
 func shellQuoteForActionLog(command string, args []string) string {

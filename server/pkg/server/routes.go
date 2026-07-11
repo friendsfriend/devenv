@@ -43,11 +43,6 @@ func (s *Server) routes() []routeSpec {
 		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/export-kubeconfig", Handler: s.handleKubernetesClusterExport},
 		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/refresh", Handler: s.handleKubernetesClusterRefresh},
 
-		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/operation/", Handler: s.handleOperationLogs},
-		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/action/", Handler: s.handleActionLog},
-		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/history/", Handler: s.handleLogHistory},
-		{Domain: "logs", Method: http.MethodGet, Path: "/api/logs/status", Handler: s.handleStatusLog},
-
 		{Domain: "git", Method: http.MethodPost, Path: "/api/git/pull", Handler: s.handleGitPull},
 		{Domain: "git", Method: http.MethodPost, Path: "/api/git/push", Handler: s.handleGitPush},
 		{Domain: "git", Method: http.MethodPost, Path: "/api/git/fetch", Handler: s.handleGitFetch},
@@ -60,6 +55,9 @@ func (s *Server) routes() []routeSpec {
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/test", Handler: s.handleTest},
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/run", Handler: s.handleRun},
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/stop", Handler: s.handleStopApp},
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/cancel", Handler: s.handleCancelAction},
+		{Domain: "actions", Method: http.MethodGet, Path: "/api/actions/history", Handler: s.handleActionHistory},
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/events", Handler: s.handleReportedActionEvent},
 		{Domain: "actions", Method: http.MethodGet, Path: "/api/actions/shell-script", Handler: s.handleShellActionScript},
 
 		{Domain: "gitlab", Method: http.MethodGet, Path: "/api/gitlab/merge-requests", Handler: s.handleGitLabChangeRequests},
@@ -143,7 +141,7 @@ func (s *Server) routes() []routeSpec {
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	for _, route := range s.routes() {
-		mux.HandleFunc(route.Path, route.Handler)
+		mux.HandleFunc(route.Path, s.withRecordedAction(route.Handler))
 	}
 }
 

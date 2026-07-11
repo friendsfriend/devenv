@@ -1,47 +1,62 @@
-## 1. Docker Health Check Polling
+## 1. Dependency-aware execution
 
-- [ ] 1.1 Add `WaitForHealthy(ctx, containerName, timeout) error` to `server/pkg/docker/`
-- [ ] 1.2 Poll `docker inspect` for `State.Health.Status` every 2 seconds
-- [ ] 1.3 For containers without healthcheck, check `State.Running` instead
-- [ ] 1.4 Return error on timeout (60s default) or unhealthy status
-- [ ] 1.5 Return nil when healthy
+- [x] 1.1 Resolve dependency-first ordered action steps
+- [x] 1.2 Add `WaitForHealthy(ctx, containerName, timeout)` Docker polling
+- [x] 1.3 Poll health every 2 seconds; fallback to `State.Running`
+- [x] 1.4 Make readiness timeout configurable, default 60 seconds
+- [x] 1.5 Abort dependent steps on unhealthy/timeout failure
+- [x] 1.6 Skip already-running healthy dependencies
 
-## 2. Executor Integration
+## 2. Action-run protocol
 
-- [ ] 2.1 In `server/pkg/operations/executor.go`, after starting each dependency in the plan, call `WaitForHealthy`
-- [ ] 2.2 If health check fails, abort the entire start operation with clear error
-- [ ] 2.3 Skip health check for already-running dependencies
+- [x] 2.1 Define shared action-run and step types
+- [x] 2.2 Define SSE event payloads for action and step lifecycle
+- [x] 2.3 Emit action.started with ordered step metadata
+- [x] 2.4 Emit step started/completed/failed events
+- [x] 2.5 Stream stdout/stderr chunks with run and step IDs
 
-## 3. SSE Progress Events
+## 3. Server integration
 
-- [ ] 3.1 Emit `{ type: "dependency.starting", app: string, status: "starting" }` when starting a dependency
-- [ ] 3.2 Emit `{ type: "dependency.starting", app: string, status: "healthy" }` when healthy
-- [ ] 3.3 Emit `{ type: "dependency.starting", app: string, status: "failed" }` on failure/timeout
-- [ ] 3.4 Include dependency name in the event payload
+- [x] 3.1 Associate executed commands with action steps
+- [x] 3.2 Preserve per-step output while command runs
+- [x] 3.3 Emit final action status on success/failure
+- [x] 3.4 Keep existing operation status and status-log events compatible
 
-## 4. TUI Event Handling
+## 4. TUI action store
 
-- [ ] 4.1 Handle `dependency.starting` SSE events in `app-store.ts`
-- [ ] 4.2 Update app status signal with dependency progress info
-- [ ] 4.3 Show notification on dependency failure via `uiStore.setNotification`
+- [x] 4.1 Add action-run signal/store
+- [x] 4.2 Handle action lifecycle SSE events
+- [x] 4.3 Append live output to correct step
+- [x] 4.4 Track focused step and manual-focus flag
+- [x] 4.5 Auto-focus latest started step before manual navigation
+- [x] 4.6 Auto-focus failed step before manual navigation
 
-## 5. Table Status Rendering
+## 5. Actions screen
 
-- [ ] 5.1 In `RepositoryTable.tsx`, render dependency startup state in status column
-- [ ] 5.2 Show "⏳ Starting dependency: {name}" during startup
-- [ ] 5.3 Show normal status after dependency is healthy
-- [ ] 5.4 Show error status on failure
+- [x] 5.1 Open actions screen when action triggers
+- [x] 5.2 Render ordered step overview
+- [x] 5.3 Render shared loading indicator for active step
+- [x] 5.4 Render command and live output log pane
+- [x] 5.5 Switch log pane when focused step changes
+- [x] 5.6 Render completed and failed states with error details
+- [x] 5.7 Use app view stack and standard keymap navigation
 
-## 6. Configuration
+## 6. Tests
 
-- [ ] 6.1 Make health check timeout configurable (default 60s)
-- [ ] 6.2 Add timeout to `docker.WaitForHealthy` parameters
-- [ ] 6.3 Consider adding to `.env` or app definition (optional)
+- [x] 6.1 Test action screen opens on trigger
+- [x] 6.2 Test lifecycle event handling and live output
+- [x] 6.3 Test per-step log switching
+- [x] 6.4 Test automatic focus behavior
+- [x] 6.5 Test manual focus disables automatic focus
+- [x] 6.6 Test failed-step focus and final action status
 
-## 7. Testing
+## 7. Multi-command dependency action modal correction
 
-- [ ] 7.1 Test simple dependency chain: A→B, wait for B healthy before A
-- [ ] 7.2 Test shared dependency: A→C, B→C, C started once
-- [ ] 7.3 Test already-running dependency is skipped
-- [ ] 7.4 Test timeout: dependency never becomes healthy, operation fails
-- [ ] 7.5 Test SSE events emitted during startup sequence
+- [x] 7.1 Replace single-command step model with per-step command executions
+- [x] 7.2 Build dependency-first step metadata for start actions
+- [x] 7.3 Pass run/step/command context explicitly through command execution
+- [x] 7.4 Stream stdout and stderr into selected step command
+- [x] 7.5 Apply action execution model to start, stop, build, and test
+- [x] 7.6 Render shared two-panel modal with step status and scrollable command log
+- [x] 7.7 Add Shift+J/Shift+K panel focus and focused-panel navigation
+- [x] 7.8 Test plans, command retention, streaming, panel focus, and scrolling

@@ -49,7 +49,7 @@ export interface TableProps<T = string> {
 	/** Optional: total lines available for this component before its own chrome (border, tabs, header).
 	 *  When provided, `reservedLines` is ignored and the list height is computed from this value
 	 *  minus the Table's own chrome.  Used when the Table shares the content area with other elements
-	 *  (e.g. StatusLogView) so the caller can communicate the exact height budget. */
+	 *  (e.g. ActionStatusStrip) so caller can communicate exact height budget. */
 	availableLines?: number;
 	spinnerFrames?: string[];
 	spinnerFrame?: () => number;
@@ -208,7 +208,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 	 *   Table column-header row          = 1
 	 */
 	// When caller provides an exact height budget (e.g. content-router knows
-	// Layout chrome + StatusLogView consumption), subtract Table's own chrome
+	// Layout chrome + compact action strip consumption), subtract Table's own chrome
 	// and pass the remainder to ScrollableList via availableLines.
 	const scrollableLines = (): number | undefined => {
 		if (props.availableLines === undefined) return undefined;

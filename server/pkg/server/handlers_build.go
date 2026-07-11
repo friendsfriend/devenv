@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/resources"
@@ -20,8 +21,10 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 
 	// Parse request body
 	var req struct {
-		Ident    string `json:"ident"`
-		TargetID string `json:"targetId"`
+		Ident       string `json:"ident"`
+		Profile     string `json:"profile"`
+		TargetID    string `json:"targetId"`
+		TargetLabel string `json:"targetLabel"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -43,13 +46,18 @@ func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[INFO] Build started for app: %s", req.Ident)
+	runID, stepID, actionErr := s.beginAction(fmt.Sprintf("Build %s", targetApp.DisplayName), "", targetApp.Ident, "build", req.Profile, req.TargetLabel)
+	if actionErr != nil {
+		respondErrorMessage(w, actionErr.Error(), http.StatusConflict)
+		return
+	}
 
 	// Perform build operation asynchronously using BuildService
 	// The BuildService will handle status updates via the status manager
 	if req.TargetID != "" {
-		go s.services.BuildService().BuildAppTargetWithStatus(targetApp, req.TargetID)
+		s.runAction(targetApp.Ident, runID, stepID, "build", false, s.services.BuildService(), func() { s.services.BuildService().BuildAppTargetWithStatus(targetApp, req.TargetID) })
 	} else {
-		go s.services.BuildService().BuildAppWithStatus(targetApp)
+		s.runAction(targetApp.Ident, runID, stepID, "build", false, s.services.BuildService(), func() { s.services.BuildService().BuildAppWithStatus(targetApp) })
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -95,8 +103,9 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	if infraService != nil {
 		if s.services.OperationsService() != nil {
+			runID, stepID := s.emitActionStarted(fmt.Sprintf("Start %s", infraService.DisplayName), "start")
 			log.Printf("[INFO] Starting infrastructure service: %s", req.Ident)
-			go s.services.OperationsService().StartInfrastructureServiceWithStatus(*infraService)
+			s.runAction(infraService.Ident, runID, stepID, "start", false, s.services.OperationsService(), func() { s.services.OperationsService().StartInfrastructureServiceWithStatus(*infraService) })
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]interface{}{
 				"success": true,
@@ -127,6 +136,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[INFO] Run initiated for app: %s", req.Ident)
+	s.emitActionStarted(fmt.Sprintf("Run %s", targetApp.DisplayName), "docker compose up -d")
 
 	// Check for missing env vars before starting compose.
 	var missingEnvVars []string
@@ -159,8 +169,10 @@ func (s *Server) handleTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Ident    string `json:"ident"`
-		TargetID string `json:"targetId"`
+		Ident       string `json:"ident"`
+		Profile     string `json:"profile"`
+		TargetID    string `json:"targetId"`
+		TargetLabel string `json:"targetLabel"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -181,11 +193,16 @@ func (s *Server) handleTest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[INFO] Test started for app: %s", req.Ident)
+	runID, stepID, actionErr := s.beginAction(fmt.Sprintf("Test %s", targetApp.DisplayName), "", targetApp.Ident, "test", req.Profile, req.TargetLabel)
+	if actionErr != nil {
+		respondErrorMessage(w, actionErr.Error(), http.StatusConflict)
+		return
+	}
 
 	if req.TargetID != "" {
-		go s.services.BuildService().TestAppTargetWithStatus(targetApp, req.TargetID)
+		s.runAction(targetApp.Ident, runID, stepID, "", false, s.services.BuildService(), func() { s.services.BuildService().TestAppTargetWithStatus(targetApp, req.TargetID) })
 	} else {
-		go s.services.BuildService().TestAppWithStatus(targetApp)
+		s.runAction(targetApp.Ident, runID, stepID, "", false, s.services.BuildService(), func() { s.services.BuildService().TestAppWithStatus(targetApp) })
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -203,9 +220,10 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Ident    string `json:"ident"`
-		Profile  string `json:"profile"`
-		TargetID string `json:"targetId"`
+		Ident       string `json:"ident"`
+		Profile     string `json:"profile"`
+		TargetID    string `json:"targetId"`
+		TargetLabel string `json:"targetLabel"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondBadRequest(w, "Invalid request body")
@@ -226,11 +244,25 @@ func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Printf("[INFO] Run initiated for app: %s", req.Ident)
+	steps, planErr := s.services.BuildService().ResolveRunActionSteps(targetApp, req.TargetID, req.Profile)
+	if planErr != nil {
+		respondErrorMessage(w, planErr.Error(), http.StatusBadRequest)
+		return
+	}
+	runID, actionErr := s.beginActionPlan(fmt.Sprintf("Run %s", targetApp.DisplayName), targetApp.Ident, "run", req.Profile, req.TargetLabel, steps)
+	if actionErr != nil {
+		respondErrorMessage(w, actionErr.Error(), http.StatusConflict)
+		return
+	}
+	stepID := "app:" + targetApp.Ident
+	if len(steps) > 0 {
+		stepID = steps[len(steps)-1].ID
+	}
 
 	if req.TargetID != "" {
-		go s.services.BuildService().RunAppTargetWithStatus(targetApp, req.TargetID)
+		s.runAction(targetApp.Ident, runID, stepID, "docker compose up -d", true, s.services.BuildService(), func() { s.services.BuildService().RunAppTargetWithStatus(targetApp, req.TargetID) })
 	} else {
-		go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
+		s.runAction(targetApp.Ident, runID, stepID, "docker compose up -d", true, s.services.BuildService(), func() { s.services.BuildService().RunAppWithStatus(targetApp, req.Profile) })
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -373,6 +405,26 @@ func (s *Server) handleGetProfiles(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handleCancelAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondMethodNotAllowed(w)
+		return
+	}
+	var req struct {
+		Ident string `json:"ident"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Ident == "" {
+		respondBadRequest(w, "ident field required")
+		return
+	}
+	s.services.BuildService().CancelAction(req.Ident)
+	for _, run := range s.actionRuns.ActiveForApp(req.Ident) {
+		s.actionRuns.Cancel(run.ID)
+		s.BroadcastEvent(Event{Type: "action.completed", Properties: map[string]interface{}{"runId": run.ID, "status": "canceled"}, Timestamp: time.Now()})
+	}
+	respondJSON(w, map[string]interface{}{"success": true}, http.StatusOK)
+}
+
 func (s *Server) handleStopApp(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondMethodNotAllowed(w)
@@ -395,6 +447,11 @@ func (s *Server) handleStopApp(w http.ResponseWriter, r *http.Request) {
 		respondNotFound(w, "App not found")
 		return
 	}
-	go s.services.BuildService().StopAppWithStatus(targetApp, req.TargetID)
+	runID, stepID, actionErr := s.beginAction(fmt.Sprintf("Stop %s", targetApp.DisplayName), "", targetApp.Ident, "stop", "", "")
+	if actionErr != nil {
+		respondErrorMessage(w, actionErr.Error(), http.StatusConflict)
+		return
+	}
+	s.runAction(targetApp.Ident, runID, stepID, "", false, s.services.BuildService(), func() { s.services.BuildService().StopAppWithStatus(targetApp, req.TargetID) })
 	respondJSON(w, map[string]interface{}{"success": true, "message": fmt.Sprintf("Stop initiated for %s", targetApp.DisplayName)}, http.StatusOK)
 }

@@ -8,7 +8,6 @@ import type {
 	KubernetesClusterStatus,
 	ScriptNode,
 	ScriptVisibleRow,
-	StatusLogEntry,
 	TableRow,
 } from '@devenv/types';
 import type { TableTab } from '@devenv/ui';
@@ -31,7 +30,8 @@ export type ViewMode =
 	| "issueTimeline"
 	| "issueScopePicker"
 	| "changeRequestLinkedIssues"
-	| "references";
+	| "references"
+	| "actions";
 
 export interface ViewRoute {
 	mode: ViewMode;
@@ -290,7 +290,9 @@ export function createAppStore() {
 			const kept = stack.filter((route) => openSet.has(route.name));
 			const known = new Set(kept.map((route) => route.name));
 			const added = openModals.filter((name) => !known.has(name)).map((name) => ({ name }));
-			return [...kept, ...added];
+			const next = [...kept, ...added];
+			if (next.length === stack.length && next.every((route, index) => route.name === stack[index]?.name)) return stack;
+			return next;
 		});
 	};
 	const [activeTab, setActiveTab] = createSignal<TabType>("applications");
@@ -334,14 +336,6 @@ export function createAppStore() {
 		scripts: scriptSortRules(),
 		kubernetes: appSortRules(),
 	});
-	const [statusLogEntries, setStatusLogEntries] = createSignal<
-		StatusLogEntry[]
-	>([]);
-	const [statusLogSearchMode, setStatusLogSearchMode] = createSignal(false);
-	const [statusLogSearchQuery, setStatusLogSearchQuery] = createSignal("");
-	const [showStatusLogModal, setShowStatusLogModal] = createSignal(false);
-	const [statusLogSelectedIndex, setStatusLogSelectedIndex] = createSignal(-1);
-	let statusLogModalScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
 	const [operationInProgressForApp, setOperationInProgressForApp] =
 		createSignal<string | null>(null);
 	const hasActiveOperation = createMemo(() =>
@@ -625,22 +619,6 @@ export function createAppStore() {
 		setTableSortSelectedIndex,
 		tableSortRules,
 		setTableSortRules,
-		statusLogEntries,
-		setStatusLogEntries,
-		statusLogSearchMode,
-		setStatusLogSearchMode,
-		statusLogSearchQuery,
-		setStatusLogSearchQuery,
-		showStatusLogModal,
-		setShowStatusLogModal,
-		statusLogSelectedIndex,
-		setStatusLogSelectedIndex,
-		get statusLogModalScrollBoxRef() {
-			return statusLogModalScrollBoxRef;
-		},
-		set statusLogModalScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) {
-			statusLogModalScrollBoxRef = value;
-		},
 		operationInProgressForApp,
 		setOperationInProgressForApp,
 		hasActiveOperation,

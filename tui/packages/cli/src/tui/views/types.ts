@@ -7,6 +7,7 @@ import type {
 	UiStore,
 	AgentStore,
 	AppDetailStore,
+	ActionRunStore,
 } from "../stores";
 import type {
 	AppActions,
@@ -32,6 +33,7 @@ export interface ViewStores {
 	uiStore: UiStore;
 	agentStore: AgentStore;
 	appDetailStore: AppDetailStore;
+	actionRunStore: ActionRunStore;
 }
 
 export interface ViewActions {

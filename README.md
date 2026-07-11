@@ -18,7 +18,7 @@ devenv-cli/
 │       ├── git/           # Git repository operations
 │       ├── github/        # GitHub API client
 │       ├── gitlab/        # GitLab API client
-│       ├── logging/       # Status log + per-item log writer
+│       ├── logging/       # Runtime and diagnostic log writer
 │       ├── operations/    # Clone/checkout/run operations + executor
 │       ├── provider/      # Git provider credential management
 │       ├── resources/     # Home dir, config dir, env file, templates
@@ -116,8 +116,8 @@ Task-focused guides are available from the TUI Help view (`?`) and linked below:
 - [Using Worktrees](tui/packages/cli/src/tui/guides/using-worktrees.md) — Single checkout vs worktrees, worktrunk, IDE setup
 - [Using AI Features](tui/packages/cli/src/tui/guides/using-ai-features.md) — pi session view, sessions, pi integration
 - [Using Git Integrations](tui/packages/cli/src/tui/guides/using-git-integrations.md) — Providers, Change Request browsing, diff, discussions, approvals, AI review, pipelines, test results
-- [Using the Log Viewer](tui/packages/cli/src/tui/guides/using-log-viewer.md) — Container logs, operation logs, search, visual mode, keyboard shortcuts
-- [Finding Logs](tui/packages/cli/src/tui/guides/finding-logs.md) — Log directory structure, status log format, per-item logs, server log
+- [Using Logs and Action History](tui/packages/cli/src/tui/guides/using-log-viewer.md) — Unified actions, runtime logs, search, visual mode, keyboard shortcuts
+- [Finding Logs](tui/packages/cli/src/tui/guides/finding-logs.md) — Action retention, runtime logs, and server diagnostics
 
 ### Run
 
@@ -334,7 +334,7 @@ Each deployable application is defined by a single JSON file in `apps/definition
 - **Status dashboard** — real-time container status via SSE, port mapping, resource stats
 - **Change requests** — browse, diff, discuss, approve, rebase (`m` / `M`)
 - **CI/CD pipelines** — view pipeline jobs, logs, test results
-- **Logs** — container logs (`l`), operation logs (`o`)
+- **History and logs** — action history (`L`), container logs (`l`)
 
 **Schema (`apps/definitions/<ident>.json`):**
 
@@ -574,7 +574,7 @@ Libraries use the same schema as apps, but their type is derived from their defi
 - **Docker lifecycle** — build (`B`), test
 - **Change requests** — full Change Request workflow
 - **CI/CD pipelines** — pipeline jobs, logs, test results
-- **Logs** — operation logs
+- **History** — unified action history
 
 Libraries do **not** support running containers (`s`/`S`/`R`), container logs, or the real-time status dashboard since they are not deployed as services.
 
@@ -757,7 +757,6 @@ The home directory (default `~/devenv`) is where repositories are cloned and ope
 ~/devenv/
 ├── <repository-localDirectoryPath>/   # Cloned repositories
 ├── logs/
-│   ├── status.log              # Operation status log (structured)
 │   └── <app-ident>.log         # Per-app command output logs
 ```
 
@@ -907,5 +906,6 @@ bun run build          # All platforms (release builds)
 
 ### Debugging
 
-- **Server logs:** `<devenv_home>/logs/status.log`
+- **Operational history:** action modal (`L`), retained in SQLite for 24 hours
+- **Server diagnostics:** server process output or configured diagnostic destination
 - **Item logs:** `<devenv_home>/logs/<item-ident>.log`

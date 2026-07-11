@@ -9,7 +9,7 @@ import (
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
 
-func TestStatusLogsAndPortForwardCommands(t *testing.T) {
+func TestRuntimeStatusAndPortForwardCommands(t *testing.T) {
 	r := Runner{KubectlCommand: "kubectl", HelmCommand: "helm", ContextName: "kind-devenv"}
 	if got := MapHelmStatus(`{"info":{"status":"deployed"}}`, nil); got != app.InfraStatusRunning {
 		t.Fatalf("status = %s", got)

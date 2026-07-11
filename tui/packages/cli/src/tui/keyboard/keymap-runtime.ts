@@ -31,13 +31,13 @@ export function getOpenModalNames(stores: KeyboardStores): string[] {
 		bool(changeRequestStore.showDiffModal) && 'diff',
 		bool(changeRequestStore.showCommentModal) && 'comment',
 		bool(logStore.showLogModal) && 'log',
-		bool(appStore.showStatusLogModal) && 'status-log',
 		bool((uiStore as unknown as { showEditorPicker?: unknown }).showEditorPicker) && 'editor-picker',
 		bool(uiStore.showTaskAddModal) && 'task-add',
 		bool(uiStore.showTaskArgsModal) && 'task-args',
 		bool(uiStore.showPassphraseModal) && 'passphrase',
 		bool(uiStore.showCreateBranchModal) && 'branch',
 		bool(appStore.showFirstSteps) && 'first-steps',
+		(appStore.modalStack?.() ?? []).some((route) => route.name === 'actions') && 'actions',
 	].filter((name): name is string => typeof name === 'string');
 }
 
@@ -57,7 +57,6 @@ export function isKeymapTextEntryActive(stores: KeyboardStores): boolean {
 	const { appStore, uiStore, logStore, changeRequestStore, issueStore, agentStore, providerStore } = stores;
 	return Boolean(
 		bool(appStore.tableSearchMode) ||
-		bool(appStore.statusLogSearchMode) ||
 		bool(uiStore.branchFilterActive) ||
 		bool(uiStore.showCreateBranchModal) ||
 		bool(uiStore.themePickerFilterActive) ||
@@ -81,6 +80,7 @@ export function isKeymapTextEntryActive(stores: KeyboardStores): boolean {
 
 export function getFocusedPanelName(stores: KeyboardStores): string {
 	const viewMode = stringOr(stores.appStore.viewMode, 'table');
+	if (stringOr(stores.appStore.activeModal, 'none') === 'actions') return `actions:${stringOr(stores.actionRunStore.focusedPanel, '0')}`;
 	if (viewMode === 'table' && stringOr(stores.appStore.activeTab, 'apps') === 'kubernetes') {
 		return `kubernetes:${stringOr(stores.appStore.kubernetesPanelIndex, '0')}`;
 	}

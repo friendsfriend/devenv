@@ -1,6 +1,7 @@
 package build
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,8 +10,64 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
+	"github.com/friendsfriend/devenv/pkg/docker"
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
+
+type countingHealthWaiter struct {
+	calls        int
+	containerIDs []string
+	waitedFor    []string
+}
+
+func (w *countingHealthWaiter) WaitForHealthy(_ context.Context, container string, _ time.Duration) error {
+	w.calls++
+	w.waitedFor = append(w.waitedFor, container)
+	return nil
+}
+func (w *countingHealthWaiter) GetAllContainerIDsForApp(docker.App) []string { return w.containerIDs }
+func (w *countingHealthWaiter) GetContainerLogs(string) (string, error)      { return "", nil }
+
+func TestTmuxRunTargetSkipsContainerReadiness(t *testing.T) {
+	waiter := &countingHealthWaiter{}
+	svc := &service{healthWaiter: waiter}
+	target := resources.ActionTarget{Runtime: resources.ActionRuntimeShell, LaunchMode: resources.LaunchModeTmux}
+	if err := svc.waitForRunTarget(&app.App{}, target); err != nil {
+		t.Fatal(err)
+	}
+	if waiter.calls != 0 {
+		t.Fatalf("tmux target performed %d container health checks", waiter.calls)
+	}
+}
+
+func TestDockerRunTargetWaitsForResolvedProfileContainers(t *testing.T) {
+	waiter := &countingHealthWaiter{containerIDs: []string{"debug-api", "debug-worker"}}
+	svc := &service{healthWaiter: waiter}
+	target := resources.ActionTarget{Runtime: resources.ActionRuntimeDocker, Profile: "debug"}
+	if err := svc.waitForRunTarget(&app.App{Ident: "api"}, target); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(waiter.waitedFor, ",") != "debug-api,debug-worker" {
+		t.Fatalf("waited for %v", waiter.waitedFor)
+	}
+}
+
+func TestDependencyLeaseOnlyDeduplicatesConcurrentRuns(t *testing.T) {
+	svc := &service{}
+	first, owner := svc.acquireDependency("postgres")
+	if !owner {
+		t.Fatal("first acquisition must own lease")
+	}
+	svc.finishDependency(first, nil)
+	second, owner := svc.acquireDependency("postgres")
+	if !owner {
+		t.Fatal("completed lease must not suppress later action")
+	}
+	if second == first {
+		t.Fatal("later action must receive fresh lease")
+	}
+	svc.finishDependency(second, nil)
+}
 
 func TestBuildAppNoCheckout(t *testing.T) {
 	svc := &service{
@@ -589,28 +646,5 @@ func TestRunAppDependencyCyclePreventsStart(t *testing.T) {
 	}
 	if runner.lastCmd != "" {
 		t.Fatalf("runner called despite cycle: %s", runner.lastCmd)
-	}
-}
-
-func TestCleanupOperationLogsRemovesOldTempLogs(t *testing.T) {
-	dir := t.TempDir()
-	oldPath := filepath.Join(dir, "old.log")
-	newPath := filepath.Join(dir, "new.log")
-	if err := os.WriteFile(oldPath, []byte("old"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(newPath, []byte("new"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	oldTime := time.Now().Add(-48 * time.Hour)
-	if err := os.Chtimes(oldPath, oldTime, oldTime); err != nil {
-		t.Fatal(err)
-	}
-	cleanupOperationLogs(dir, 24*time.Hour)
-	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
-		t.Fatalf("old log still exists or stat failed: %v", err)
-	}
-	if _, err := os.Stat(newPath); err != nil {
-		t.Fatalf("new log missing: %v", err)
 	}
 }

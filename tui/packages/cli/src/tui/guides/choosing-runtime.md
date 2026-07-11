@@ -50,7 +50,7 @@ Trade-offs:
 
 - Slower than Docker Compose due to kind, image load, and Helm wait.
 - Requires `kind`, `kubectl`, `helm`, and Docker/Podman.
-- More moving parts; use `k9s` and operation logs for diagnostics.
+- More moving parts; use `k9s` and action history for diagnostics.
 
 Use when:
 
@@ -172,4 +172,4 @@ If you want the least surprise, keep Kubernetes apps with Kubernetes infrastruct
 - `S`: stop selected item.
 - `9`: open `k9s --context kind-devenv`.
 - Press `s` during an active operation to open live action logs.
-- Operation logs show full commands and output for build/run/start/stop actions.
+- Action history shows full commands and output for build/run/start/stop actions.

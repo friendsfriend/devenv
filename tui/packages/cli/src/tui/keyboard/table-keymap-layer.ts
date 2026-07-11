@@ -15,7 +15,7 @@ const KUBERNETES_PRIORITY = 120;
 const TABLE_KEYS = [
 	'tab', 'shift+tab', 'up', 'down', 'left', 'right', 'escape', 'return', 'enter', 'backspace', 'delete',
 	'j', 'k', 'h', 'l', 'g', 'G', 'd', 'u', '/', 'F', 'O', 'space', '?',
-	'r', 'R', 's', 'S', 'x', 'X', 'b', 'B', 'm', 'M', 'p', 'P', 'o', 'a', 'e', 'n', 'w', 'i', 'T', '1', '2', '3', '4', '5', '9',
+	'r', 'R', 's', 'S', 'x', 'X', 'b', 'B', 'm', 'M', 'p', 'P', 'L', 'a', 'e', 'n', 'w', 'i', 'T', '1', '2', '3', '4', '5', '9',
 	'ctrl+d', 'ctrl+u', 'ctrl+n', 'ctrl+p', 'ctrl+r',
 ] as const;
 
@@ -49,9 +49,11 @@ export function registerTableKeymapLayer(
 				{ name: 'table.search.open', context: 'table', category: 'List controls', title: 'Search', desc: 'Open table/list search where supported.', footer: '/', discoverable: true, run: ({ event }) => runTable(event) },
 				{ name: 'table.filter.open', context: 'table', category: 'List controls', title: 'Filter', desc: 'Open table/list filter where supported.', footer: 'F', discoverable: true, run: ({ event }) => runTable(event) },
 				{ name: 'table.sort.open', context: 'table', category: 'List controls', title: 'Order/sort', desc: 'Open table/list sort where supported.', footer: 'O', discoverable: true, run: ({ event }) => runTable(event) },
+				{ name: 'actions.toggle', context: 'table', category: 'Actions', title: 'Action history', desc: 'Toggle action history without starting an action.', footer: 'L', discoverable: true, run: () => { deps.stores.appStore.pushModal('actions'); return true; } },
 			],
 			bindings: [
-				...bind(TABLE_KEYS.filter((key) => key !== '/' && key !== 'F' && key !== 'O' && key !== 'shift+tab'), 'table.handle', 'Table'),
+				{ key: 'L', cmd: 'actions.toggle', context: 'table', category: 'Actions', footer: 'L', discoverable: true },
+				...bind(TABLE_KEYS.filter((key) => key !== '/' && key !== 'F' && key !== 'O' && key !== 'L' && key !== 'shift+tab'), 'table.handle', 'Table'),
 				{ key: 'shift+tab', cmd: 'table.tab.previous', context: 'table', category: 'Navigation', footer: 'Shift+Tab', discoverable: true },
 				{ key: '/', cmd: 'table.search.open', context: 'table', category: 'List controls', footer: '/', discoverable: true },
 				{ key: 'F', cmd: 'table.filter.open', context: 'table', category: 'List controls', footer: 'F', discoverable: true },

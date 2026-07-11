@@ -78,6 +78,27 @@ func (r TargetRegistry) ResolveRef(ref DependencyRef) (string, error) {
 	return id, nil
 }
 
+func (r TargetRegistry) Target(id string) (RegistryTarget, bool) {
+	target, ok := r.targets[id]
+	return target, ok
+}
+
+func (r TargetRegistry) Dependencies(id string) ([]RegistryTarget, error) {
+	target, ok := r.targets[id]
+	if !ok {
+		return nil, fmt.Errorf("unknown target %q", id)
+	}
+	deps := make([]RegistryTarget, 0, len(target.Requires))
+	for _, ref := range target.Requires {
+		depID, err := r.ResolveRef(ref)
+		if err != nil {
+			return nil, err
+		}
+		deps = append(deps, r.targets[depID])
+	}
+	return deps, nil
+}
+
 func (r TargetRegistry) ResolveStartPlan(rootID string) ([]RegistryTarget, error) {
 	if _, ok := r.targets[rootID]; !ok {
 		return nil, fmt.Errorf("unknown target %q", rootID)

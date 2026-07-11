@@ -11,7 +11,6 @@ import type {
 	ProviderUpdateRequest,
 	RepoSearchResult,
 	ServerEvent,
-	StatusLogEntry,
 	CRVersion,
 } from "@devenv/types";
 import type { ClientDeps, FetchFunction } from "./client-types";
@@ -40,6 +39,7 @@ import {
 import { createCustomFetch, createCustomFetchWithSSE } from "./custom-fetch";
 import {
 	buildApp,
+	cancelAction,
 	createShellActionScript,
 	getActionTargets,
 	getContainerLogs,
@@ -61,7 +61,7 @@ import {
 	streamContainerStats,
 	testApp,
 } from "./docker-client";
-import { health, subscribeToEvents } from "./events-client";
+import { getActionHistory, health, reportActionEvent, subscribeToEvents } from "./events-client";
 import { createExampleConfig } from "./example-config-client";
 import {
 	getBranches,
@@ -95,11 +95,6 @@ import {
 	analyzeLogsWithAI,
 	analyzeLogsWithAIStream,
 	analyzeCRWithAIStream,
-	getActionLog,
-	getLogHistory,
-	getOperationLogs,
-	getStatusLog,
-	addStatusLog,
 } from "./logs-client";
 import {
 	approveChangeRequest,
@@ -270,26 +265,6 @@ export class DevEnvClient {
 		onError?: (err: Error) => void,
 	): Promise<void> {
 		return streamJobLogs(this.deps, appIdent, jobId, signal, onLine, onError);
-	}
-	getOperationLogs(appIdent: string, limit: number = 100): Promise<string> {
-		return getOperationLogs(this.deps, appIdent, limit);
-	}
-	getActionLog(appIdent: string): Promise<string> {
-		return getActionLog(this.deps, appIdent);
-	}
-	getLogHistory(type: import("./logs-client").LogHistoryType, appIdent: string, before?: number, limit: number = 1000) {
-		return getLogHistory(this.deps, type, appIdent, before, limit);
-	}
-	getStatusLog(limit: number = 50): Promise<StatusLogEntry[]> {
-		return getStatusLog(this.deps, limit);
-	}
-	addStatusLog(
-		entry: Pick<
-			StatusLogEntry,
-			"AppIdent" | "AppName" | "Operation" | "Status" | "Message"
-		>,
-	): Promise<void> {
-		return addStatusLog(this.deps, entry);
 	}
 	getChangeRequests(
 		appIdent: string,
@@ -682,11 +657,11 @@ export class DevEnvClient {
 	): Promise<import("@devenv/types").ActionTarget[]> {
 		return getActionTargets(this.deps, appIdent, action);
 	}
-	testApp(appIdent: string, targetId?: string): Promise<void> {
-		return testApp(this.deps, appIdent, targetId);
+	testApp(appIdent: string, targetId?: string, profile?: string, targetLabel?: string): Promise<void> {
+		return testApp(this.deps, appIdent, targetId, profile, targetLabel);
 	}
-	runApp(appIdent: string, profile: string = "", targetId?: string): Promise<void> {
-		return runApp(this.deps, appIdent, profile, targetId);
+	runApp(appIdent: string, profile: string = "", targetId?: string, targetLabel?: string): Promise<void> {
+		return runApp(this.deps, appIdent, profile, targetId, targetLabel);
 	}
 	stopApp(appIdent: string, targetId?: string): Promise<void> {
 		return stopApp(this.deps, appIdent, targetId);
@@ -737,14 +712,21 @@ export class DevEnvClient {
 	gitCreateBranch(appIdent: string, branchName: string): Promise<void> {
 		return gitCreateBranch(this.deps, appIdent, branchName);
 	}
-	buildApp(appIdent: string, targetId?: string): Promise<void> {
-		return buildApp(this.deps, appIdent, targetId);
+	cancelAction(appIdent: string): Promise<void> { return cancelAction(this.deps, appIdent); }
+	buildApp(appIdent: string, targetId?: string, profile?: string, targetLabel?: string): Promise<void> {
+		return buildApp(this.deps, appIdent, targetId, profile, targetLabel);
 	}
 	retryJob(appIdent: string, jobId: number): Promise<void> {
 		return retryJob(this.deps, appIdent, jobId);
 	}
 	cancelJob(appIdent: string, jobId: number): Promise<void> {
 		return cancelJob(this.deps, appIdent, jobId);
+	}
+	reportActionEvent(type: string, properties: Record<string, unknown>): Promise<void> {
+		return reportActionEvent(this.deps, type, properties);
+	}
+	getActionHistory(loadAll?: boolean, limit?: number): Promise<ServerEvent[]> {
+		return getActionHistory(this.deps, loadAll, limit);
 	}
 	subscribeToEvents(signal?: AbortSignal): AsyncGenerator<ServerEvent> {
 		return subscribeToEvents(this.deps, signal);
@@ -766,7 +748,6 @@ export function createClient(
 }
 
 export type { FetchFunction };
-export type { LogHistoryType } from "./logs-client";
 export * from "@devenv/types";
 export * from "./logger";
 export * from "./custom-fetch";

@@ -56,7 +56,7 @@ function PanelHeader(props: { title: string; children?: JSX.Element }) {
   );
 }
 
-function PanelBox(props: { title: string; active: boolean; headerChildren?: JSX.Element; children: JSX.Element; style?: any }) {
+export function PanelBox(props: { title: string; active: boolean; headerChildren?: JSX.Element; children: JSX.Element; style?: any }) {
   return (
     <box
       backgroundColor={uiColors.bgMantle}

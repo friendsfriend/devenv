@@ -2,6 +2,25 @@ import type { ServerEvent } from '@devenv/types';
 import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 
+export async function reportActionEvent(deps: ClientDeps, type: string, properties: Record<string, unknown>): Promise<void> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, properties }),
+  });
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
+export async function getActionHistory(deps: ClientDeps, loadAll = false, limit = 50000): Promise<ServerEvent[]> {
+  const scope = loadAll ? 'all' : 'recent';
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/history?scope=${scope}&limit=${limit}`);
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+    throw new Error(`Failed to load action history: ${response.statusText}`);
+  }
+  return response.json() as Promise<ServerEvent[]>;
+}
+
 /**
  * Subscribe to server events (SSE).
  * Pass optional AbortSignal to cancel the subscription gracefully.

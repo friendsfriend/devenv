@@ -47,7 +47,7 @@ func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
 		s.services.BuildService().SetLastRunRuntime(appIdent, "docker")
 	}
 
-	// Update status log
+	// Update transient operation status
 	if statusCallback != nil {
 		statusCallback("start successful")
 	}
@@ -110,7 +110,7 @@ func (s *Server) handleDockerStop(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] Successfully stopped container: %s", containerID)
 
-	// Update status log
+	// Update transient operation status
 	if statusCallback != nil {
 		statusCallback("stop successful")
 	}
@@ -176,7 +176,7 @@ func (s *Server) handleDockerRestart(w http.ResponseWriter, r *http.Request) {
 		s.services.BuildService().SetLastRunRuntime(appIdent, "docker")
 	}
 
-	// Update status log
+	// Update transient operation status
 	if statusCallback != nil {
 		statusCallback("restart successful")
 	}

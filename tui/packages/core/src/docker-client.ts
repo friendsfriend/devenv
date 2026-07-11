@@ -80,7 +80,7 @@ export async function startApp(deps: ClientDeps, appIdent: string, profile: stri
   }
 }
 
-export async function testApp(deps: ClientDeps, appIdent: string, targetId?: string): Promise<void> {
+export async function testApp(deps: ClientDeps, appIdent: string, targetId?: string, profile?: string, targetLabel?: string): Promise<void> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -90,7 +90,7 @@ export async function testApp(deps: ClientDeps, appIdent: string, targetId?: str
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ident: appIdent, targetId }),
+      body: JSON.stringify({ ident: appIdent, targetId, profile, targetLabel }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -174,7 +174,7 @@ export async function refreshKubernetesCluster(deps: ClientDeps): Promise<Kubern
   return (await response.json()) as KubernetesClusterStatus;
 }
 
-export async function runApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string): Promise<void> {
+export async function runApp(deps: ClientDeps, appIdent: string, profile: string = '', targetId?: string, targetLabel?: string): Promise<void> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 60000);
 
@@ -184,7 +184,7 @@ export async function runApp(deps: ClientDeps, appIdent: string, profile: string
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ident: appIdent, profile, targetId }),
+      body: JSON.stringify({ ident: appIdent, profile, targetId, targetLabel }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -208,13 +208,18 @@ export async function runApp(deps: ClientDeps, appIdent: string, profile: string
 /**
  * Trigger build operation for an app
  */
-export async function buildApp(deps: ClientDeps, appIdent: string, targetId?: string): Promise<void> {
+export async function cancelAction(deps: ClientDeps, appIdent: string): Promise<void> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/cancel`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ident: appIdent }) });
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
+export async function buildApp(deps: ClientDeps, appIdent: string, targetId?: string, profile?: string, targetLabel?: string): Promise<void> {
   const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/build`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ ident: appIdent, targetId }),
+    body: JSON.stringify({ ident: appIdent, targetId, profile, targetLabel }),
   });
 
   if (!response.ok) {

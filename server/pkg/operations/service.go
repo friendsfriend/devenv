@@ -3,7 +3,6 @@ package operations
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -28,10 +27,22 @@ type Service interface {
 	ScriptInfrastructureStatus(ident string) (string, string)
 	ScriptInfrastructureExecutionHandle(ident string) *app.ExecutionHandle
 	RecoverScriptInfrastructureRuns(infra []app.InfraService)
-	ActiveOperationLogPath(ident string) (string, bool)
 	KillAndRemoveAllContainersForAppWithStatus(a *app.App)
 	KillAllRunningContainersWithStatus(apps []app.App)
 	SetOnComplete(callback func(appIdent string))
+	ConfigureActionOutput(appIdent, runID, stepID string, output func(stepID, stream, chunk string))
+	ConfigureActionCommand(appIdent string, command func(stepID, command string, args []string))
+	ConfigureActionCommandDone(appIdent string, done func(stepID string, err error))
+	ConfigureActionStepEvent(appIdent string, event func(stepID, status, message string))
+	SetActionStep(stepID string)
+	ClearActionOutput()
+}
+
+type operationActionBinding struct {
+	step    string
+	output  func(string, string, string)
+	command func(string, string, []string)
+	done    func(string, error)
 }
 
 type service struct {
@@ -45,6 +56,9 @@ type service struct {
 	scriptRuns     map[string]*scriptRunState
 	activeLogMu    sync.RWMutex
 	activeLogMap   map[string]string
+	actionMu       sync.Mutex
+	actionApp      string
+	actionBindings map[string]operationActionBinding
 	scriptTerminal map[string]scriptTerminalState
 	OnComplete     func(appIdent string)
 }
@@ -59,7 +73,56 @@ func NewService(dockerClient docker.Client, exec *Executor, statusMgr status.Man
 		scriptRuns:     make(map[string]*scriptRunState),
 		scriptTerminal: make(map[string]scriptTerminalState),
 		activeLogMap:   make(map[string]string),
+		actionBindings: make(map[string]operationActionBinding),
 	}
+}
+
+func (s *service) ConfigureActionOutput(appIdent, _ string, stepID string, output func(string, string, string)) {
+	s.actionMu.Lock()
+	defer s.actionMu.Unlock()
+	s.actionApp = appIdent
+	binding := s.actionBindings[appIdent]
+	binding.step, binding.output = stepID, output
+	s.actionBindings[appIdent] = binding
+	s.executor.SetActionStepForApp(appIdent, stepID)
+	s.executor.ConfigureActionForApp(appIdent, output, binding.command, binding.done)
+}
+
+func (s *service) ConfigureActionCommand(appIdent string, command func(string, string, []string)) {
+	s.actionMu.Lock()
+	defer s.actionMu.Unlock()
+	binding := s.actionBindings[appIdent]
+	binding.command = command
+	s.actionBindings[appIdent] = binding
+	s.executor.ConfigureActionForApp(appIdent, binding.output, command, binding.done)
+}
+
+func (s *service) ConfigureActionCommandDone(appIdent string, done func(string, error)) {
+	s.actionMu.Lock()
+	defer s.actionMu.Unlock()
+	binding := s.actionBindings[appIdent]
+	binding.done = done
+	s.actionBindings[appIdent] = binding
+	s.executor.ConfigureActionForApp(appIdent, binding.output, binding.command, done)
+}
+
+func (s *service) ConfigureActionStepEvent(string, func(string, string, string)) {}
+
+func (s *service) SetActionStep(stepID string) {
+	s.actionMu.Lock()
+	defer s.actionMu.Unlock()
+	binding := s.actionBindings[s.actionApp]
+	binding.step = stepID
+	s.actionBindings[s.actionApp] = binding
+	s.executor.SetActionStepForApp(s.actionApp, stepID)
+}
+
+func (s *service) ClearActionOutput() {
+	s.actionMu.Lock()
+	defer s.actionMu.Unlock()
+	s.executor.ClearActionForApp(s.actionApp)
+	delete(s.actionBindings, s.actionApp)
+	s.actionApp = ""
 }
 
 func (s *service) SetOnComplete(callback func(appIdent string)) {
@@ -81,11 +144,7 @@ func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
 	}
 	callback := s.statusMgr.StartOperation(infra.Ident, status.OpStart)
 	callback("starting...")
-	logPath, err := s.startOperationLog(infra.Ident, "start")
-	if err != nil {
-		callback("Error: " + err.Error())
-		return
-	}
+	logPath := ""
 
 	composeFilePath, err := s.resourceMgr.ResolveInfrastructureComposeFile(infra.Ident)
 
@@ -119,16 +178,12 @@ func (s *service) KillAndRemoveAllContainersForAppWithStatus(a *app.App) {
 
 func (s *service) killAndRemoveContainersForAppInternal(a *app.App, statusCb func(string)) {
 	statusCb("killing containers...")
-	logPath, err := s.startOperationLog(a.Ident, "stop")
-	if err != nil {
-		statusCb("Error: " + err.Error())
-		return
-	}
+	logPath := ""
 
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ = s.executor.RunCommandWithLoggingToFile(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
+	err, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -150,16 +205,12 @@ func (s *service) KillAllRunningContainersWithStatus(apps []app.App) {
 
 func (s *service) killAllRunningContainersInternal(apps []app.App, statusCb func(string)) {
 	statusCb("killing all containers...")
-	logPath, err := s.startOperationLog("all-apps", "stop")
-	if err != nil {
-		statusCb("Error: " + err.Error())
-		return
-	}
+	logPath := ""
 
 	composeArgs := s.newComposeArgs()
 	composeArgs = append(composeArgs, "down", "--remove-orphans")
 
-	err, _ = s.executor.RunCommandWithLoggingToFile("all-apps", docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
+	err, _ := s.executor.RunCommandWithLoggingToFile("all-apps", docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -378,59 +429,5 @@ func (s *service) ScriptInfrastructureStatus(ident string) (string, string) {
 			return app.InfraStatusStopped, st.logPath
 		}
 		return app.InfraStatusRunning, st.logPath
-	}
-}
-
-func (s *service) startOperationLog(ident, operation string) (string, error) {
-	logDir := filepath.Join(os.TempDir(), "devenv-action-logs")
-	cleanupOperationLogs(logDir, 24*time.Hour)
-	path := filepath.Join(logDir, fmt.Sprintf("%s-%s-%d.log", ident, operation, time.Now().UnixNano()))
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
-		return "", err
-	}
-	now := time.Now().Format("2006-01-02 15:04:05")
-	if err := os.WriteFile(path, []byte(fmt.Sprintf("[%s] Operation log started: ident=%s operation=%s\n[%s] Retention: temporary log, auto-cleaned after 24h\n\n", now, ident, operation, now)), 0644); err != nil {
-		return "", err
-	}
-	s.activeLogMu.Lock()
-	if s.activeLogMap == nil {
-		s.activeLogMap = make(map[string]string)
-	}
-	s.activeLogMap[ident] = path
-	s.activeLogMu.Unlock()
-
-	// Clear the persistent individual app log so the operation view shows
-	// only the current operation's output. The full output will be written
-	// again by RunCommandWithLoggingToFile as the command runs.
-	persistentPath := filepath.Join(s.homeDir, "logs", ident+".log")
-	os.Remove(persistentPath)
-
-	return path, nil
-}
-
-func (s *service) ActiveOperationLogPath(ident string) (string, bool) {
-	s.activeLogMu.RLock()
-	defer s.activeLogMu.RUnlock()
-	path, ok := s.activeLogMap[ident]
-	return path, ok
-}
-
-func cleanupOperationLogs(logDir string, maxAge time.Duration) {
-	entries, err := os.ReadDir(logDir)
-	if err != nil {
-		return
-	}
-	cutoff := time.Now().Add(-maxAge)
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		info, err := entry.Info()
-		if err != nil {
-			continue
-		}
-		if info.ModTime().Before(cutoff) {
-			_ = os.Remove(filepath.Join(logDir, entry.Name()))
-		}
 	}
 }

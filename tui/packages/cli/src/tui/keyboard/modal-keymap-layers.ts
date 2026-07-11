@@ -7,6 +7,7 @@ import { handleDiffModalKeys } from './diff-modal-keys';
 import { handleLogModalKeys } from './log-modal-keys';
 import { handleMiscModalKeys } from './misc-modal-keys';
 import { handleTableKeys } from './table-keys';
+import { handleActionsKeys } from './actions-keys';
 import type { KeyboardActions, KeyboardContext, KeyboardStores } from './types';
 
 export interface ModalKeymapLayerDeps {
@@ -41,6 +42,13 @@ export function registerModalKeymapLayers(
 	const runLog = (event: KeyEvent) => handleLogModalKeys(event, deps.stores, deps.actions, deps.ctx);
 	const runMisc = (event: KeyEvent) => handleMiscModalKeys(event, deps.stores, deps.actions, deps.ctx);
 	const runTable = (event: KeyEvent) => handleTableKeys(event, deps.stores, deps.actions, deps.ctx);
+	const runActions = async (event: KeyEvent) => {
+		if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
+			return handleActionsKeys(event, deps.stores.actionRunStore, deps.stores.appStore, deps.actions.dockerActions);
+		}
+		if (await runGlobalModal(event)) return true;
+		return handleActionsKeys(event, deps.stores.actionRunStore, deps.stores.appStore, deps.actions.dockerActions);
+	};
 
 	const modalLayers = [
 		{ modal: 'error', command: 'modal.error.handle', title: 'Error dialog', run: runGlobalModal },
@@ -54,7 +62,7 @@ export function registerModalKeymapLayers(
 		{ modal: 'connect-provider', command: 'modal.connect-provider.handle', title: 'Connect provider', run: runConnectProvider },
 		{ modal: 'diff', command: 'modal.diff.handle', title: 'Diff modal', run: runDiff },
 		{ modal: 'log', command: 'modal.log.handle', title: 'Log modal', run: runLog },
-		{ modal: 'status-log', command: 'modal.status-log.handle', title: 'Status log modal', run: runMisc },
+		{ modal: 'actions', command: 'modal.actions.handle', title: 'Action progress modal', run: runActions },
 		{ modal: 'editor-picker', command: 'modal.editor-picker.handle', title: 'Editor picker', run: runMisc },
 		{ modal: 'task-add', command: 'modal.task-add.handle', title: 'Task add modal', run: runMisc },
 		{ modal: 'task-args', command: 'modal.task-args.handle', title: 'Task args modal', run: runMisc },

@@ -126,10 +126,9 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
 
     void appActions.fetchStatus();
     void appActions.subscribeToUpdates(deps.abortSignal);
-    void appActions.fetchStatusLog();
 
     // Detect optional utilities in background (non-blocking)
-    void detectOptionalUtilities(client);
+    detectOptionalUtilities();
   } catch (e) {
     const errorMsg = e instanceof Error ? e.message : 'Unknown error occurred during initialization';
     getLogger().write('ERROR', `Initialization error: ${errorMsg}`);

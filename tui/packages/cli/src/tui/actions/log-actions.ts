@@ -24,47 +24,6 @@ export function createLogActions(
     logStore.setLogHistoryError(null);
   };
 
-  const initializeHistoricalLog = async (type: import('@devenv/core').LogHistoryType, appIdent: string, fallback: () => Promise<string>) => {
-    resetLogHistory();
-    const page = await client.getLogHistory(type, appIdent, undefined, 1000);
-    if (page.lines.length > 0) {
-      logStore.setLogLines(page.lines);
-      logStore.setLogHistoryCursor(page.nextBefore);
-      logStore.setLogHistoryHasMore(page.hasMore);
-      return;
-    }
-    logStore.setLogs(await fallback());
-  };
-
-  const loadOlderLogs = async () => {
-    const params = logStore.logRefreshParams();
-    if ((params.type !== 'action' && params.type !== 'operation') || !params.appIdent) return;
-    if (!logStore.logHistoryHasMore() || logStore.logHistoryLoading()) return;
-    const before = logStore.logHistoryCursor() ?? undefined;
-    const oldScrollTop = logStore.logScrollBoxRef?.scrollTop ?? 0;
-    const oldCount = logStore.logLines().length;
-    logStore.setLogHistoryLoading(true);
-    logStore.setLogHistoryError(null);
-    try {
-      const page = await client.getLogHistory(params.type, params.appIdent, before, 1000);
-      logStore.prependLogLines(page.lines);
-      logStore.setLogHistoryCursor(page.nextBefore);
-      logStore.setLogHistoryHasMore(page.hasMore);
-      const added = logStore.logLines().length - oldCount;
-      if (added > 0) setTimeout(() => logStore.logScrollBoxRef?.scrollTo(oldScrollTop + added), 0);
-    } catch (e) {
-      logStore.setLogHistoryError(e instanceof Error ? e.message : 'Unknown error');
-    } finally {
-      logStore.setLogHistoryLoading(false);
-    }
-  };
-
-  const maybeLoadOlderLogs = () => {
-    const sb = logStore.logScrollBoxRef;
-    if (!sb || sb.scrollTop > 5) return;
-    void loadOlderLogs();
-  };
-
   /**
    * Set logScrollTop to the bottom of the current log content so the viewport
    * starts at the last lines. No sb.scrollTo() here — stickyScroll handles the
@@ -134,7 +93,7 @@ export function createLogActions(
       }
       logStore.setLogs('');
       logStore.setLogTitle(`Script Logs: ${app.displayName}`);
-      logStore.setLogType('operation');
+      logStore.setLogType('container');
       logStore.setShowLogModal(true);
       logStore.setLogRefreshParams({ type: null });
       try {
@@ -148,7 +107,7 @@ export function createLogActions(
     if (('type' in app && app.type === 'kubernetes') || (typeof app.status === 'string' && (app.status.includes('pods') || app.status.startsWith('running') && !app.dockerInfo?.ContainerID))) {
       logStore.setLogs('');
       logStore.setLogTitle(`Kubernetes Logs: ${app.displayName} (live)`);
-      logStore.setLogType('operation');
+      logStore.setLogType('container');
       logStore.setShowLogModal(true);
       logStore.setLogRefreshParams({ type: null });
       try {
@@ -181,72 +140,6 @@ export function createLogActions(
     } catch (e) {
       logStore.setLogs(`Error fetching container logs: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
-  };
-
-  const loadOperationLogs = async () => {
-    const app = appStore.tableFilteredApps()[appStore.selectedIndex()];
-    if (!app) return;
-    logStore.setLogs('');
-    logStore.setLogTitle(`Operation Logs: ${app.displayName}`);
-    logStore.setLogType('operation');
-    logStore.setShowLogModal(true);
-    logStore.setLogRefreshParams({ type: null });
-    try {
-      await initializeHistoricalLog('operation', app.ident, () => client.getOperationLogs(app.ident, 100));
-      scrollToLogBottom();
-      logStore.setLogTitle(`Operation Logs: ${app.displayName} (auto-refresh: 10s)`);
-      logStore.setLogRefreshParams({ type: 'operation', appIdent: app.ident });
-    } catch (e) {
-      logStore.setLogs(`Error fetching operation logs: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-  };
-
-  const openActionLogForApp = async (appIdent: string, appName: string, titlePrefix = 'Action Log') => {
-    logStore.setLogs('');
-    logStore.setLogTitle(`${titlePrefix}: ${appName} (live)`);
-    logStore.setLogType('action');
-    logStore.setShowLogModal(true);
-    logStore.setLogRefreshParams({ type: null });
-    try {
-      await initializeHistoricalLog('action', appIdent, () => client.getActionLog(appIdent));
-      scrollToLogBottom();
-      logStore.setLogRefreshParams({ type: 'action', appIdent });
-    } catch (e) {
-      logStore.setLogs(`Error fetching action log: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-  };
-
-  const toggleActionLogForApp = async (appIdent: string, appName: string, titlePrefix = 'Action Log') => {
-    const params = logStore.logRefreshParams();
-    if (logStore.showLogModal() && params.type === 'action' && params.appIdent === appIdent) {
-      closeLogModal();
-      return;
-    }
-    await openActionLogForApp(appIdent, appName, titlePrefix);
-  };
-
-  const openOperationLogsForApp = async (appIdent: string, appName: string, titlePrefix = 'Operation Logs') => {
-    logStore.setLogs('');
-    logStore.setLogTitle(`${titlePrefix}: ${appName} (live)`);
-    logStore.setLogType('operation');
-    logStore.setShowLogModal(true);
-    logStore.setLogRefreshParams({ type: null });
-    try {
-      await initializeHistoricalLog('operation', appIdent, () => client.getOperationLogs(appIdent, 500));
-      scrollToLogBottom();
-      logStore.setLogRefreshParams({ type: 'operation', appIdent });
-    } catch (e) {
-      logStore.setLogs(`Error fetching operation logs: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-  };
-
-  const toggleOperationLogsForApp = async (appIdent: string, appName: string, titlePrefix = 'Operation Logs') => {
-    const params = logStore.logRefreshParams();
-    if (logStore.showLogModal() && params.type === 'operation' && params.appIdent === appIdent) {
-      closeLogModal();
-      return;
-    }
-    await openOperationLogsForApp(appIdent, appName, titlePrefix);
   };
 
   const loadJobLogs = async (jobId: number, jobName: string) => {
@@ -335,18 +228,11 @@ export function createLogActions(
 
   return {
     loadContainerLogs,
-    loadOperationLogs,
     loadJobLogs,
-    openActionLogForApp,
-    toggleActionLogForApp,
-    openOperationLogsForApp,
-    toggleOperationLogsForApp,
     runAiAnalysis,
     dismissAiOverlay,
     clearAiState,
     closeLogModal,
-    loadOlderLogs,
-    maybeLoadOlderLogs,
     syncLogScroll,
     scrollToLogBottom,
     setLogStreamAbortController,

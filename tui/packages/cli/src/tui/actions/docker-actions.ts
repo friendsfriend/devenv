@@ -1,5 +1,6 @@
 import type { DevEnvClient } from '@devenv/core';
 import type { ActionTarget, App, AppAction, InfraService } from '@devenv/types';
+import { formatActionTargetLabel } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
 import type { UiStore } from '../stores/ui-store';
 
@@ -10,6 +11,10 @@ export function createDockerActions(
   showError: (title: string, message: string) => void,
   showActionLog?: (appIdent: string, appName: string) => Promise<void>,
 ) {
+  const cancelAction = async (appIdent: string) => {
+    try { await client.cancelAction(appIdent); } catch (e) { showError('Cancel Action Failed', e instanceof Error ? e.message : String(e)); }
+  };
+
   const getSelectedApp = (): App | InfraService | undefined => appStore.filteredApps()[appStore.selectedIndex()] as App | InfraService | undefined;
 
   const performDockerOperation = async (action: 'start' | 'stop' | 'restart', app: App | InfraService, profile?: string, targetId?: string, runner?: 'shell' | 'powershell') => {
@@ -48,6 +53,7 @@ export function createDockerActions(
       } else if (action === 'start') {
         if ('type' in app) await client.startInfraService(appIdent);
         else {
+          appStore.pushModal('actions');
           const startResp = await client.startApp(appIdent, profile || '', targetId);
           if (startResp.missingEnvVars && startResp.missingEnvVars.length > 0) {
             uiStore.setNotification(`Missing env vars: ${startResp.missingEnvVars.join(', ')}`, 'warning');
@@ -100,8 +106,7 @@ export function createDockerActions(
       const activeIdent = appStore.operationInProgressForApp();
       if (!activeIdent) return;
       const active = appStore.apps().find((a) => a.ident === activeIdent) || appStore.infraServices().find((svc) => svc.ident === activeIdent) || app;
-      if (showActionLog) await showActionLog(activeIdent, active.displayName || active.ident);
-      else showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      appStore.pushModal('actions');
       return;
     }
     void performDockerOperation(action, app);
@@ -142,9 +147,11 @@ export function createDockerActions(
     appStore.setError(null);
     setActionStatus(appIdent, action, `${action.charAt(0).toUpperCase() + action.slice(1)}ing ${target.label}...`);
     try {
-      if (action === 'build') await client.buildApp(appIdent, target.id);
-      else if (action === 'test') await client.testApp(appIdent, target.id);
-      else await client.runApp(appIdent, target.profile || '', target.id);
+      appStore.pushModal('actions');
+      const targetLabel = formatActionTargetLabel(target);
+      if (action === 'build') await client.buildApp(appIdent, target.id, target.profile, targetLabel);
+      else if (action === 'test') await client.testApp(appIdent, target.id, target.profile, targetLabel);
+      else await client.runApp(appIdent, target.profile || '', target.id, targetLabel);
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
       showError(`${action.charAt(0).toUpperCase() + action.slice(1)} Failed`, `Failed to ${action} ${app.displayName}.\n\nError: ${errorMsg}`);
@@ -174,16 +181,14 @@ export function createDockerActions(
 
     const currentApp = appStore.apps().find((a) => a.ident === app.ident) ?? app;
     if (currentApp.operationStatus?.status === 'active') {
-      if (showActionLog) await showActionLog(app.ident, app.displayName);
-      else showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      appStore.pushModal('actions');
       return;
     }
     if (appStore.operationInProgressForApp()) {
       const activeIdent = appStore.operationInProgressForApp();
       if (!activeIdent) return;
       const active = appStore.apps().find((a) => a.ident === activeIdent) || appStore.infraServices().find((svc) => svc.ident === activeIdent) || app;
-      if (showActionLog) await showActionLog(activeIdent, active.displayName || active.ident);
-      else showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+      appStore.pushModal('actions');
       return;
     }
 
@@ -235,12 +240,9 @@ export function createDockerActions(
     uiStore.setLoadingModalMessage('Creating Kubernetes cluster...');
     uiStore.setShowLoadingModal(true);
     try {
-      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in progress', Message: 'Creating managed kind cluster...' });
       await client.createKubernetesCluster();
-      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'completed', Message: 'Kubernetes cluster ready' });
       await refreshKubernetesCluster();
     } catch (e) {
-      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'failed', Message: e instanceof Error ? e.message : 'Unknown error' });
       showError('Kubernetes Create Failed', e instanceof Error ? e.message : 'Unknown error');
     } finally {
       uiStore.setShowLoadingModal(false);
@@ -250,7 +252,6 @@ export function createDockerActions(
   const exportKubeconfig = async () => {
     try {
       await client.exportKubernetesKubeconfig();
-      await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'completed', Message: 'Kubeconfig exported for kind-devenv' });
       uiStore.setNotification('Kubeconfig exported for kind-devenv', 'info');
     } catch (e) {
       showError('Kubeconfig Export Failed', e instanceof Error ? e.message : 'Unknown error');
@@ -264,14 +265,11 @@ export function createDockerActions(
       uiStore.setLoadingModalMessage('Deleting Kubernetes cluster...');
       uiStore.setShowLoadingModal(true);
       try {
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in progress', Message: 'Deleting managed kind cluster...' });
         await client.deleteKubernetesCluster();
         appStore.setKubernetesCPUHistory([]);
         appStore.setKubernetesMemoryHistory([]);
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'completed', Message: 'Kubernetes cluster deleted' });
         await refreshKubernetesCluster();
       } catch (e) {
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'failed', Message: e instanceof Error ? e.message : 'Unknown error' });
         showError('Kubernetes Delete Failed', e instanceof Error ? e.message : 'Unknown error');
       } finally {
         uiStore.setShowLoadingModal(false);
@@ -287,16 +285,12 @@ export function createDockerActions(
       uiStore.setLoadingModalMessage('Recreating Kubernetes cluster...');
       uiStore.setShowLoadingModal(true);
       try {
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'stop', Status: 'in progress', Message: 'Deleting managed kind cluster...' });
         await client.deleteKubernetesCluster();
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'in progress', Message: 'Creating fresh kind cluster...' });
         await client.createKubernetesCluster();
         appStore.setKubernetesCPUHistory([]);
         appStore.setKubernetesMemoryHistory([]);
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'completed', Message: 'Kubernetes cluster recreated' });
         await refreshKubernetesCluster();
       } catch (e) {
-        await client.addStatusLog({ AppIdent: 'kubernetes', AppName: 'Kubernetes', Operation: 'start', Status: 'failed', Message: e instanceof Error ? e.message : 'Unknown error' });
         showError('Kubernetes Recreate Failed', e instanceof Error ? e.message : 'Unknown error');
       } finally {
         uiStore.setShowLoadingModal(false);
@@ -309,7 +303,7 @@ export function createDockerActions(
     await performAppAction('test');
   };
 
-  return { requestDockerOperation, performDockerOperation, performBuild, performTest, performAppAction, runSelectedTarget, refreshKubernetesCluster, createCluster, exportKubeconfig, requestDeleteCluster, requestRecreateCluster };
+  return { cancelAction, requestDockerOperation, performDockerOperation, performBuild, performTest, performAppAction, runSelectedTarget, refreshKubernetesCluster, createCluster, exportKubeconfig, requestDeleteCluster, requestRecreateCluster };
 }
 
 export type DockerActions = ReturnType<typeof createDockerActions>;
