@@ -10,23 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-func actionKind(action string) string {
-	switch {
-	case strings.Contains(action, "worktree"):
-		return "worktree"
-	case strings.HasPrefix(action, "git") || action == "checkout" || action == "pull" || action == "push" || action == "fetch":
-		return "git"
-	case strings.Contains(action, "kubernetes"):
-		return "kubernetes"
-	case strings.Contains(action, "infra"):
-		return "infrastructure"
-	case strings.Contains(action, "task") || strings.Contains(action, "script"):
-		return "task"
-	default:
-		return "app"
-	}
-}
-
 // emitActionStarted publishes structured action metadata.
 func (s *Server) reserveAction(appIdent, action string, run actionrun.Run) error {
 	return s.actionRuns.Start(run, appIdent, action, nil)
@@ -63,7 +46,7 @@ func (s *Server) emitActionPlanStarted(title string, steps []actionrun.Step, met
 	}
 	if len(metadata) > 1 {
 		run.Action = metadata[1]
-		run.Kind = actionKind(metadata[1])
+		run.Kind = actionrun.ActionKind(metadata[1])
 	}
 	if len(metadata) > 2 {
 		run.Profile = metadata[2]
@@ -89,7 +72,7 @@ func (s *Server) emitActionStarted(title, command string, metadata ...string) (s
 	}
 	if len(metadata) > 1 {
 		run.Action = metadata[1]
-		run.Kind = actionKind(metadata[1])
+		run.Kind = actionrun.ActionKind(metadata[1])
 	}
 	if len(metadata) > 2 {
 		run.Profile = metadata[2]
@@ -105,72 +88,113 @@ type actionOutputConfigurator interface {
 	ConfigureActionOutput(appIdent, runID, stepID string, output func(stepID, stream, chunk string))
 	ConfigureActionCommand(appIdent string, command func(stepID, command string, args []string))
 	ConfigureActionCommandDone(appIdent string, done func(stepID string, err error))
-	ConfigureActionStepEvent(appIdent string, event func(stepID, status, message string))
+	// ConfigureActionStepEvent's kind is a StepKind (optionally packed via
+	// actionrun.EncodeStepKind) resolved through the shared label registry;
+	// producers must not invent labels from step IDs or ad hoc parsing.
+	ConfigureActionStepEvent(appIdent string, event func(stepID, kind, status, message string))
 	SetActionStep(stepID string)
 	ClearActionOutput()
 }
 
-func (s *Server) runAction(appIdent, runID, stepID, command string, nestedSteps bool, configurator actionOutputConfigurator, fn func()) {
+func (s *Server) runAction(appIdent, runID, stepID, operation string, nestedSteps bool, configurator actionOutputConfigurator, fn func()) {
 	eventStepID := func(id string) string {
 		if nestedSteps && id != "" {
 			return id
 		}
 		return stepID
 	}
-	s.BroadcastEvent(Event{Type: "action.step.started", Properties: map[string]interface{}{"runId": runID, "stepId": stepID, "command": command, "index": 0}, Timestamp: time.Now()})
+	s.BroadcastEvent(Event{Type: "action.step.started", Properties: map[string]interface{}{"runId": runID, "stepId": stepID, "command": operation, "index": 0}, Timestamp: time.Now()})
 	go func() {
 		var commandMu sync.RWMutex
-		commandIndex, commandID, commandText, failedStepID := 0, "", "", ""
+		// commandContexts tracks the current command per originating step
+		// (parentStepID), not a single shared "last command" pointer. Output
+		// and completion for a step must always resolve to that step's own
+		// command, never a different step's most-recently-started command
+		// (e.g. a readiness check for step A must not attach to step B's
+		// already-completed docker compose command just because it ran last).
+		type commandContext struct{ id, stepID, text string }
+		commandContexts := map[string]*commandContext{}
+		commandIndex := 0
+		failedStepID := ""
 		if configurator != nil {
 			configurator.ConfigureActionOutput(appIdent, runID, stepID, func(sourceStepID, stream, chunk string) {
-				eventStepID := eventStepID(sourceStepID)
+				parentStepID := eventStepID(sourceStepID)
 				commandMu.Lock()
-				id := commandID
-				if id == "" {
-					id = eventStepID + "-diagnostic"
-					commandID, commandText = id, "readiness / container logs"
+				ctx, ok := commandContexts[parentStepID]
+				if !ok {
+					ctx = &commandContext{id: parentStepID + "-diagnostic", stepID: parentStepID, text: "readiness / container logs"}
+					commandContexts[parentStepID] = ctx
 				}
+				id, outputStepID, text := ctx.id, ctx.stepID, ctx.text
 				commandMu.Unlock()
-				s.emitActionOutput(runID, eventStepID, id, commandText, chunk, stream)
+				s.emitActionOutput(runID, outputStepID, id, text, chunk, stream)
 			})
 			configurator.ConfigureActionCommand(appIdent, func(sourceStepID, command string, args []string) {
-				eventStepID := eventStepID(sourceStepID)
+				parentStepID := eventStepID(sourceStepID)
 				commandMu.Lock()
-				commandID = fmt.Sprintf("%s-command-%d", eventStepID, commandIndex)
-				commandText = strings.Join(append([]string{command}, args...), " ")
-				id := commandID
+				index := commandIndex
 				commandIndex++
+				dynamicStepID := fmt.Sprintf("%s:command-step-%d", parentStepID, index)
+				id := dynamicStepID + "-command-0"
+				text := strings.TrimSpace(strings.Join(append([]string{command}, args...), " "))
+				label := actionrun.StepLabel(string(actionrun.CommandStepKind(operation, command, args)), text)
+				commandContexts[parentStepID] = &commandContext{id: id, stepID: dynamicStepID, text: text}
 				commandMu.Unlock()
-				s.BroadcastEvent(Event{Type: "action.command.started", Properties: map[string]interface{}{"runId": runID, "stepId": eventStepID, "commandId": id, "command": commandText, "index": commandIndex - 1}, Timestamp: time.Now()})
+				dynamicStep := actionrun.Step{ID: dynamicStepID, ParentID: parentStepID, Label: label, Status: actionrun.StatusPending, Commands: []actionrun.Command{}}
+				s.actionRuns.AddStep(runID, dynamicStep)
+				s.BroadcastEvent(Event{Type: "action.step.started", Properties: map[string]interface{}{"runId": runID, "stepId": dynamicStepID, "parentId": parentStepID, "label": label, "index": index}, Timestamp: time.Now()})
+				s.BroadcastEvent(Event{Type: "action.command.started", Properties: map[string]interface{}{"runId": runID, "stepId": dynamicStepID, "commandId": id, "command": text, "index": 0}, Timestamp: time.Now()})
 			})
-			configurator.ConfigureActionStepEvent(appIdent, func(sourceStepID, status, message string) {
+			configurator.ConfigureActionStepEvent(appIdent, func(sourceStepID, kind, status, message string) {
 				eventStepID := eventStepID(sourceStepID)
 				typeName := "action.step." + status
 				props := map[string]interface{}{"runId": runID, "stepId": eventStepID}
+				if status == "started" && eventStepID != stepID && !s.actionRuns.HasStep(runID, eventStepID) {
+					label := actionrun.StepLabel(kind, eventStepID)
+					dynamicStep := actionrun.Step{ID: eventStepID, ParentID: stepID, Label: label, Status: actionrun.StatusPending, Commands: []actionrun.Command{}}
+					s.actionRuns.AddStep(runID, dynamicStep)
+					props["parentId"], props["label"] = stepID, label
+				}
 				if message != "" {
 					props["error"] = message
 				}
 				if status == "failed" {
 					commandMu.Lock()
 					failedStepID = eventStepID
+					// A step that fails while it still has an unresolved command
+					// context (e.g. a readiness poll running after its own
+					// docker compose command already completed) must not leave
+					// that context lingering for a later, unrelated step to
+					// reuse; the client also fails the step's active command.
+					delete(commandContexts, eventStepID)
 					commandMu.Unlock()
 				}
 				s.BroadcastEvent(Event{Type: typeName, Properties: props, Timestamp: time.Now()})
 			})
 			configurator.ConfigureActionCommandDone(appIdent, func(sourceStepID string, err error) {
-				eventStepID := eventStepID(sourceStepID)
-				commandMu.RLock()
-				id := commandID
-				commandMu.RUnlock()
+				parentStepID := eventStepID(sourceStepID)
+				commandMu.Lock()
+				ctx, ok := commandContexts[parentStepID]
+				delete(commandContexts, parentStepID)
+				commandMu.Unlock()
+				if !ok {
+					return
+				}
+				id, completedStepID := ctx.id, ctx.stepID
 				typeName := "action.command.completed"
-				props := map[string]interface{}{"runId": runID, "stepId": eventStepID, "commandId": id}
+				props := map[string]interface{}{"runId": runID, "stepId": completedStepID, "commandId": id, "exitCode": 0}
+				stepType := "action.step.completed"
+				stepProps := map[string]interface{}{"runId": runID, "stepId": completedStepID}
 				if err != nil {
 					typeName, props["error"] = "action.command.failed", err.Error()
+					props["exitCode"] = commandExitCode(err)
+					stepType, stepProps["error"] = "action.step.failed", err.Error()
 					commandMu.Lock()
-					failedStepID = eventStepID
+					failedStepID = completedStepID
 					commandMu.Unlock()
 				}
 				s.BroadcastEvent(Event{Type: typeName, Properties: props, Timestamp: time.Now()})
+				s.BroadcastEvent(Event{Type: stepType, Properties: stepProps, Timestamp: time.Now()})
 			})
 		}
 		status := actionrun.StatusCompleted

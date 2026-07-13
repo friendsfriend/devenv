@@ -6,6 +6,12 @@ describe('action run store', () => {
     { id: 'one', label: 'One', command: 'one', status: 'pending' as const },
     { id: 'two', label: 'Two', command: 'two', status: 'pending' as const },
   ] };
+  test('hydrates removed action history from definition snapshot', () => {
+    const store = createActionRunStore();
+    store.handleEvent('action.started', { run: { id: 'old', title: 'Old action', status: 'completed', steps: [], definitionSnapshot: { id: 'removed', owner: { kind: 'app', id: 'api' }, type: 'build', runtime: 'docker', label: 'Docker', inputs: [], availability: { available: false }, root: { id: 'root', kind: 'composite', label: 'Build api', children: [{ id: 'build', kind: 'command', label: 'Build image' }] } } } });
+    expect(store.run()?.steps.map((step) => step.label)).toEqual(['Build api', 'Build image']);
+  });
+
   test('tracks lifecycle, output, and automatic focus', async () => {
     const store = createActionRunStore();
     store.handleEvent('action.started', { run });
@@ -18,6 +24,42 @@ describe('action run store', () => {
     expect(store.run()!.steps[0].commands[0].stdout).toBe('hello');
     store.handleEvent('action.step.failed', { runId: 'r1', stepId: 'two', error: 'bad' });
     expect(store.focusedStepId()).toBe('two');
+  });
+  test('propagates failure onto a still-active command when the owning step fails without its own command.failed event', async () => {
+    const store = createActionRunStore();
+    store.handleEvent('action.started', { run });
+    store.handleEvent('action.command.started', { runId: 'r1', stepId: 'one', commandId: 'compose', command: 'podman-compose up -d' });
+    store.handleEvent('action.command.completed', { runId: 'r1', stepId: 'one', commandId: 'compose', exitCode: 0 });
+    store.handleEvent('action.step.output', { runId: 'r1', stepId: 'one', commandId: 'diag', output: 'readiness postgres: inspect error\n', stream: 'stdout' });
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    store.handleEvent('action.step.failed', { runId: 'r1', stepId: 'one', error: 'dependency failed readiness' });
+    const step = store.run()!.steps.find((s) => s.id === 'one')!;
+    const composeCommand = step.commands.find((c) => c.id === 'compose')!;
+    const diagnosticCommand = step.commands.find((c) => c.id === 'diag')!;
+    expect(composeCommand.status).toBe('completed');
+    expect(diagnosticCommand.status).toBe('failed');
+    expect(diagnosticCommand.error).toBe('dependency failed readiness');
+  });
+  test('adds one step per dynamically reported backend command', () => {
+    const store = createActionRunStore();
+    store.handleEvent('action.started', { run: { ...run, action: 'git.pull', steps: [] } });
+    store.handleEvent('action.step.started', { runId: 'r1', stepId: 'ref', label: 'Get ref' });
+    store.handleEvent('action.command.started', { runId: 'r1', stepId: 'ref', commandId: 'ref-command-0', command: 'git rev-parse HEAD' });
+    store.handleEvent('action.step.started', { runId: 'r1', stepId: 'fetch', label: 'Fetch' });
+    store.handleEvent('action.command.started', { runId: 'r1', stepId: 'fetch', commandId: 'fetch-command-0', command: 'git fetch origin' });
+    expect(store.run()!.steps.map((step) => [step.label, step.commands.length])).toEqual([['Get ref', 1], ['Fetch', 1]]);
+    expect(store.visibleNodes().filter((node) => node.kind !== 'loadOlder').map((node) => node.kind)).toEqual(['action', 'step', 'step']);
+  });
+  test('retains command exit code and failure output metadata', async () => {
+    const store = createActionRunStore();
+    store.handleEvent('action.started', { run });
+    store.handleEvent('action.command.started', { runId: 'r1', stepId: 'one', commandId: 'cmd', command: 'git pull' });
+    store.handleEvent('action.command.output', { runId: 'r1', stepId: 'one', commandId: 'cmd', stream: 'stderr', output: 'rejected' });
+    store.handleEvent('action.command.failed', { runId: 'r1', stepId: 'one', commandId: 'cmd', error: 'rejected', exitCode: 1 });
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const command = store.run()!.steps[0].commands.find((item) => item.id === 'cmd')!;
+    expect(command.exitCode).toBe(1);
+    expect(command.stderr).toBe('rejected');
   });
   test('failed step focus and final status', () => {
     const store = createActionRunStore();
@@ -81,8 +123,8 @@ describe('action run store', () => {
     expect(store.runs().find((item) => item.id === 'second')!.steps[0].status).toBe('pending');
     expect(store.visibleNodes().filter((node) => node.kind === 'action').map((node) => node.key)).toEqual(['action:first', 'action:second']);
   });
-  test('renders build, test, and stop as one action without a substep', () => {
-    for (const action of ['build', 'test', 'stop'] as const) {
+  test('renders every structurally single-step action without a redundant substep', () => {
+    for (const action of ['build', 'test', 'stop', 'git.fetch', 'kubernetes.cluster.create'] as const) {
       const store = createActionRunStore();
       store.handleEvent('action.started', { run: { ...run, action, profile: 'default', steps: [{ id: action, label: `${action} app`, status: 'active', commands: [] }] } });
       expect(store.visibleNodes().filter((node) => node.kind !== 'loadOlder').map((node) => node.kind)).toEqual(['action']);
@@ -103,15 +145,25 @@ describe('action run store', () => {
     store.toggleStep('dep');
     expect(store.visibleNodes().filter((node) => node.kind !== 'loadOlder').map((node) => node.kind === 'action' ? node.run.id : node.step.id)).toEqual(['r1', 'dep', 'other']);
   });
-  test('collapses successful action only when another action is focused', () => {
+  test('collapses successful action and composite steps on completion', () => {
     const store = createActionRunStore();
-    store.handleEvent('action.started', { run });
+    store.handleEvent('action.started', { run: {
+      ...run,
+      steps: [
+        { id: 'root', label: 'Root', status: 'pending', commands: [] },
+        { id: 'child', label: 'Child', status: 'pending', parentId: 'root', commands: [] },
+      ],
+    } });
+    // Composite step (root has child 'child') should collapse on completion
+    store.handleEvent('action.step.completed', { runId: 'r1', stepId: 'root' });
+    expect(store.run()!.steps.find((s) => s.id === 'root')!.collapsed).toBe(true);
+    // Leaf step (child has no children) should NOT collapse on completion
+    store.handleEvent('action.step.completed', { runId: 'r1', stepId: 'child' });
+    expect(store.run()!.steps.find((s) => s.id === 'child')!.collapsed).not.toBe(true);
+    // Action should always collapse on completion
     store.handleEvent('action.completed', { runId: 'r1', status: 'completed' });
-    expect(store.run()!.collapsed).not.toBe(true);
+    expect(store.run()!.collapsed).toBe(true);
     expect(store.run()!.steps.every((step) => step.status === 'completed')).toBe(true);
-    store.handleEvent('action.started', { run: { ...run, id: 'r2' } });
-    store.handleEvent('action.completed', { runId: 'r1', status: 'completed' });
-    expect(store.runs().find((item) => item.id === 'r1')!.collapsed).toBe(true);
   });
   test('failure expands only ancestors leading to failed leaf', () => {
     const store = createActionRunStore();

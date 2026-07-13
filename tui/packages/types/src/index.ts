@@ -1,5 +1,7 @@
 // Type definitions for DevEnv TUI
 export * from './action-run';
+export * from './action-labels';
+export * from './action-definition';
 
 // Provider types
 export type ProviderType = "github" | "gitlab";

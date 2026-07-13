@@ -106,11 +106,15 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "apps", "definitions", "go-rest-postgres.json"):                      `{"ident":"go-rest-postgres","displayName":"Go REST Postgres","repositoryPath":"https://github.com/pauljamescleary/go-rest-postgres.git","containerBaseName":"go-rest-postgres","sourceType":"git","gitMode":"BRANCH"}` + "\n",
 		filepath.Join(c, "apps", "definitions", "bhvr-site.json"):                             `{"ident":"bhvr-site","displayName":"Bun TypeScript App","repositoryPath":"https://github.com/stevedylandev/bhvr-site.git","containerBaseName":"bhvr-site","sourceType":"git","gitMode":"BRANCH"}` + "\n",
 		filepath.Join(c, "apps", "definitions", "event-worker.json"):                          `{"ident":"event-worker","displayName":"Event Worker","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","containerBaseName":"event-worker","sourceType":"git","gitMode":"BRANCH"}` + "\n",
+		filepath.Join(c, "apps", "definitions", "runtime-dependency-check.json"):              runtimeDependencyCheckAppDefinition,
 		filepath.Join(c, "libraries", "definitions", "bun-lib-starter.json"):                  `{"ident":"bun-lib-starter","displayName":"Bun Library Starter","repositoryPath":"https://github.com/wobsoriano/bun-lib-starter.git","containerBaseName":"bun-lib-starter","sourceType":"git","gitMode":"BRANCH"}` + "\n",
 		filepath.Join(c, "infrastructure", "definitions", "postgres.json"):                    `{"ident":"postgres","displayName":"Postgres","containerBaseName":"example-postgres"}` + "\n",
 		filepath.Join(c, "infrastructure", "definitions", "redis.json"):                       `{"ident":"redis","displayName":"Redis","containerBaseName":"example-redis"}` + "\n",
 		filepath.Join(c, "infrastructure", "definitions", "mailpit.json"):                     `{"ident":"mailpit","displayName":"Mailpit","containerBaseName":"example-mailpit"}` + "\n",
 		filepath.Join(c, "infrastructure", "definitions", "script-clock.json"):                `{"ident":"script-clock","displayName":"Script Clock","type":"script","shellPath":"` + filepath.Join(c, "infrastructure", "scripts", "script-clock.sh") + `","cwd":"` + c + `","args":["--interval","2"],"env":{"DEVENV_EXAMPLE":"true"}}` + "\n",
+		filepath.Join(c, "infrastructure", "definitions", "runtime-check-powershell.json"):    runtimeCheckPowerShellDefinition,
+		filepath.Join(c, "infrastructure", "definitions", "runtime-check-k8s-docker.json"):    runtimeCheckKubernetesDockerDefinition,
+		filepath.Join(c, "infrastructure", "definitions", "runtime-check-k8s-podman.json"):    runtimeCheckKubernetesPodmanDefinition,
 		filepath.Join(c, "infrastructure", "definitions", "postgres-k8s.json"):                `{"ident":"postgres-k8s","displayName":"Postgres (Kubernetes)","type":"kubernetes","kubernetes":{"profile":"local","chartPath":"` + filepath.Join(c, "infrastructure", "k8s", "postgres") + `","release":"postgres-local","namespace":"infra","values":["` + filepath.Join(c, "infrastructure", "k8s", "postgres", "values.yaml") + `"],"wait":true,"timeout":"5m"}}` + "\n",
 		filepath.Join(c, "apps", "compose", "go-rest-postgres-compose.yml"):                   goCompose,
 		filepath.Join(c, "apps", "compose", "bhvr-site-compose.yml"):                          bunCompose,
@@ -121,6 +125,7 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "infrastructure", "compose", "redis-compose.yml"):                    redisCompose,
 		filepath.Join(c, "infrastructure", "compose", "mailpit-compose.yml"):                  mailpitCompose,
 		filepath.Join(c, "infrastructure", "scripts", "script-clock.sh"):                      scriptClockShellScript,
+		filepath.Join(c, "infrastructure", "scripts", "runtime-check-powershell.ps1"):         runtimeCheckPowerShellScript,
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "devenv.k8s.json"):                       bunKubernetesConfig,
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "values.yaml"):                           bunKubernetesValues,
 		filepath.Join(c, "apps", "k8s", "bhvr-site", "chart", "Chart.yaml"):                   bunKubernetesChart,
@@ -143,6 +148,8 @@ func (g Generator) files() map[string]string {
 		filepath.Join(c, "apps", "run", "bhvr-site-dev.ps1"):                                  bunRunPowerShellScript,
 		filepath.Join(c, "apps", "run", "event-worker-dev.sh"):                                eventWorkerRunShellScript,
 		filepath.Join(c, "apps", "run", "event-worker-dev.ps1"):                               eventWorkerRunPowerShellScript,
+		filepath.Join(c, "apps", "run", "runtime-dependency-check-docker-k8s-powershell.sh"):  runtimeCheckDockerScript,
+		filepath.Join(c, "apps", "run", "runtime-dependency-check-podman-k8s-shell.sh"):       runtimeCheckPodmanScript,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-build.Dockerfile"):                 bunLibBuildDockerfile,
 		filepath.Join(c, "apps", "build", "bun-lib-starter-test.Dockerfile"):                  bunLibTestDockerfile,
 		filepath.Join(s, "hello.sh"):                                                          helloShellScript,
@@ -242,6 +249,50 @@ while true; do
   date '+script-clock %Y-%m-%dT%H:%M:%S%z'
   sleep "$interval"
 done
+`
+
+const runtimeDependencyCheckAppDefinition = `{"ident":"runtime-dependency-check","displayName":"Runtime Dependency Check","repositoryPath":"https://github.com/friendsfriend/devenv.git","containerBaseName":"runtime-dependency-check","sourceType":"git","gitMode":"BRANCH"}
+`
+
+const runtimeCheckPowerShellDefinition = `{"ident":"runtime-check-powershell","displayName":"Runtime Check PowerShell","type":"script","powerShellPath":"$CONFIG/infrastructure/scripts/runtime-check-powershell.ps1","defaultRunner":"powershell","cwd":"$CONFIG"}
+`
+
+const runtimeCheckKubernetesDockerDefinition = `{"ident":"runtime-check-k8s-docker","displayName":"Runtime Check Kubernetes (Docker)","type":"kubernetes","kubernetes":{"profile":"local","provider":"docker","cluster":"runtime-check-docker","context":"kind-runtime-check-docker","chartPath":"$CONFIG/infrastructure/k8s/postgres","release":"runtime-check-postgres-docker","namespace":"runtime-check-docker","values":["$CONFIG/infrastructure/k8s/postgres/values.yaml"],"wait":true,"timeout":"5m"}}
+`
+
+const runtimeCheckKubernetesPodmanDefinition = `{"ident":"runtime-check-k8s-podman","displayName":"Runtime Check Kubernetes (Podman)","type":"kubernetes","kubernetes":{"profile":"local","provider":"podman","cluster":"runtime-check-podman","context":"kind-runtime-check-podman","chartPath":"$CONFIG/infrastructure/k8s/postgres","release":"runtime-check-postgres-podman","namespace":"runtime-check-podman","values":["$CONFIG/infrastructure/k8s/postgres/values.yaml"],"wait":true,"timeout":"5m"}}
+`
+
+const runtimeCheckPowerShellScript = `$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+Write-Output "Runtime Check PowerShell dependency started"
+while ($true) { Start-Sleep -Seconds 60 }
+`
+
+const runtimeCheckDockerScript = `#!/usr/bin/env sh
+# devenv:name=Check Docker, Kubernetes, and PowerShell dependencies
+# devenv:mode=logged
+# devenv:requires=[{"infra":"runtime-check-powershell","runtime":"powershell","profile":"default","lifecycle":"shared"},{"infra":"postgres","runtime":"docker","profile":"default","provider":"docker","lifecycle":"shared"},{"infra":"runtime-check-k8s-docker","runtime":"kubernetes","profile":"local","provider":"docker","lifecycle":"shared"}]
+set -eu
+
+fail() { printf 'Dependency check failed: %s\n' "$1" >&2; exit 1; }
+pgrep -f 'runtime-check-powershell.ps1' >/dev/null || fail 'PowerShell dependency is not running'
+docker inspect --format '{{.State.Running}}' example-postgres 2>/dev/null | grep -qx true || fail 'Docker Postgres is not running'
+kubectl --context kind-runtime-check-docker --namespace runtime-check-docker wait --for=condition=ready pod -l app.kubernetes.io/instance=runtime-check-postgres-docker --timeout=5s >/dev/null || fail 'Docker Kubernetes dependency is not ready'
+printf '\n  ____  _   _  ____ ____ _____ ____ ____\n / ___|| | | |/ ___/ ___| ____/ ___/ ___|\n \\___ \\| | | | |  | |   |  _| \\___ \\___ \\\n  ___) | |_| | |__| |___| |___ ___) |__) |\n |____/ \\___/ \\____\\____|_____|____/____/\n\n Docker + Kubernetes + PowerShell dependencies are ready.\n'
+`
+
+const runtimeCheckPodmanScript = `#!/usr/bin/env sh
+# devenv:name=Check Podman, Kubernetes, and shell dependencies
+# devenv:mode=logged
+# devenv:requires=[{"infra":"script-clock","runtime":"shell","profile":"default","lifecycle":"shared"},{"infra":"redis","runtime":"docker","profile":"default","provider":"podman","lifecycle":"shared"},{"infra":"runtime-check-k8s-podman","runtime":"kubernetes","profile":"local","provider":"podman","lifecycle":"shared"}]
+set -eu
+
+fail() { printf 'Dependency check failed: %s\n' "$1" >&2; exit 1; }
+pgrep -f 'script-clock.sh' >/dev/null || fail 'Shell dependency is not running'
+podman inspect --format '{{.State.Running}}' example-redis 2>/dev/null | grep -qx true || fail 'Podman Redis is not running'
+kubectl --context kind-runtime-check-podman --namespace runtime-check-podman wait --for=condition=ready pod -l app.kubernetes.io/instance=runtime-check-postgres-podman --timeout=5s >/dev/null || fail 'Podman Kubernetes dependency is not ready'
+printf '\n  ____  _   _  ____ ____ _____ ____ ____\n / ___|| | | |/ ___/ ___| ____/ ___/ ___|\n \\___ \\| | | | |  | |   |  _| \\___ \\___ \\\n  ___) | |_| | |__| |___| |___ ___) |__) |\n |____/ \\___/ \\____\\____|_____|____/____/\n\n Podman + Kubernetes + shell dependencies are ready.\n'
 `
 
 const helloShellScript = `#!/usr/bin/env bash

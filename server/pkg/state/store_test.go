@@ -524,6 +524,37 @@ func TestScriptArgsHistoryTrim(t *testing.T) {
 	}
 }
 
+func TestDependencyLeasePersistence(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lease := DependencyLease{TargetID: "dependency/redis/docker/local", OwnerRunID: "run-1", OwnerApp: "api", Lifecycle: "owned", UpdatedAt: "now"}
+	if err := store.SetDependencyLease(lease); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	leases, err := store.GetDependencyLeases()
+	if err != nil || len(leases) != 1 || leases[0].OwnerRunID != "run-1" {
+		t.Fatalf("leases=%#v err=%v", leases, err)
+	}
+	if err := store.DeleteDependencyLease(lease.TargetID, lease.OwnerRunID); err != nil {
+		t.Fatal(err)
+	}
+	leases, err = store.GetDependencyLeases()
+	if err != nil || len(leases) != 0 {
+		t.Fatalf("leases after delete=%#v err=%v", leases, err)
+	}
+}
+
 func TestCloseBehavior(t *testing.T) {
 	dir := t.TempDir()
 	s, err := Open(dir)

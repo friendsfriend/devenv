@@ -75,7 +75,7 @@ export function registerWorkflowKeymapLayers(
 		{ viewMode: 'discussionsView', command: 'discussions.handle', title: 'Discussions', handler: run(handleDiscussionsKeys) },
 		{ viewMode: 'testResults', command: 'test-results.handle', title: 'Test results', handler: run(handleTestResultsKeys) },
 		{ viewMode: 'jobs', command: 'jobs.handle', title: 'Jobs', handler: run(handleJobsKeys) },
-		{ viewMode: 'actions', command: 'actions.handle', title: 'Actions', handler: (event: KeyEvent) => handleActionsKeys(withSequence(event), deps.stores.actionRunStore, deps.stores.appStore) },
+		{ viewMode: 'actions', command: 'actions.handle', title: 'Actions', handler: (event: KeyEvent) => handleActionsKeys(withSequence(event), deps.stores.actionRunStore, deps.stores.appStore, undefined, deps.stores.uiStore) },
 	] as const;
 
 	const disposers = layers.map(({ viewMode, command, title, handler }) => keymap.registerLayer({

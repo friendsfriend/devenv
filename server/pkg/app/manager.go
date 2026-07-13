@@ -86,6 +86,9 @@ type InfraService struct {
 // KubernetesInfra describes a Helm-backed Kubernetes infrastructure service.
 type KubernetesInfra struct {
 	Profile   string   `json:"profile,omitempty"`
+	Provider  string   `json:"provider,omitempty"`
+	Cluster   string   `json:"cluster,omitempty"`
+	Context   string   `json:"context,omitempty"`
 	ChartPath string   `json:"chartPath,omitempty"`
 	Release   string   `json:"release,omitempty"`
 	Namespace string   `json:"namespace,omitempty"`
@@ -767,6 +770,7 @@ func (am *appManager) loadInfraServicesFromDirectory() ([]InfraService, error) {
 		if svc.Ident == "" {
 			svc.Ident = strings.TrimSuffix(entry.Name(), ".json")
 		}
+		expandInfraConfigPaths(&svc, am.configDir)
 		if err := normalizeInfraService(&svc); err != nil {
 			return nil, fmt.Errorf("invalid infra service file %s: %w", entry.Name(), err)
 		}
@@ -774,6 +778,24 @@ func (am *appManager) loadInfraServicesFromDirectory() ([]InfraService, error) {
 	}
 
 	return infraServices, nil
+}
+
+func expandInfraConfigPaths(svc *InfraService, configDir string) {
+	expand := func(value string) string {
+		value = strings.ReplaceAll(value, "${CONFIG}", configDir)
+		return strings.ReplaceAll(value, "$CONFIG", configDir)
+	}
+	svc.ShellPath = expand(svc.ShellPath)
+	svc.PowerShellPath = expand(svc.PowerShellPath)
+	svc.Cwd = expand(svc.Cwd)
+	svc.LogPath = expand(svc.LogPath)
+	if svc.Kubernetes == nil {
+		return
+	}
+	svc.Kubernetes.ChartPath = expand(svc.Kubernetes.ChartPath)
+	for i := range svc.Kubernetes.Values {
+		svc.Kubernetes.Values[i] = expand(svc.Kubernetes.Values[i])
+	}
 }
 
 func normalizeInfraService(svc *InfraService) error {

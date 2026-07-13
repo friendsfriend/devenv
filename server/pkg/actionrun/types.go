@@ -1,6 +1,10 @@
 package actionrun
 
-import "time"
+import (
+	"time"
+
+	"github.com/friendsfriend/devenv/pkg/actiondef"
+)
 
 type Status string
 
@@ -20,34 +24,42 @@ type Command struct {
 	StartedAt  *time.Time `json:"startedAt,omitempty"`
 	FinishedAt *time.Time `json:"finishedAt,omitempty"`
 	Error      string     `json:"error,omitempty"`
+	ExitCode   *int       `json:"exitCode,omitempty"`
 }
 
 type Step struct {
-	ID         string     `json:"id"`
-	Label      string     `json:"label"`
-	Status     Status     `json:"status"`
-	ParentID   string     `json:"parentId,omitempty"`
-	Depth      int        `json:"depth,omitempty"`
-	Collapsed  bool       `json:"collapsed,omitempty"`
-	Commands   []Command  `json:"commands"`
-	StartedAt  *time.Time `json:"startedAt,omitempty"`
-	FinishedAt *time.Time `json:"finishedAt,omitempty"`
-	Error      string     `json:"error,omitempty"`
+	ID              string                     `json:"id"`
+	Label           string                     `json:"label"`
+	Status          Status                     `json:"status"`
+	ParentID        string                     `json:"parentId,omitempty"`
+	Depth           int                        `json:"depth,omitempty"`
+	Collapsed       bool                       `json:"collapsed,omitempty"`
+	Commands        []Command                  `json:"commands"`
+	StartedAt       *time.Time                 `json:"startedAt,omitempty"`
+	FinishedAt      *time.Time                 `json:"finishedAt,omitempty"`
+	Error           string                     `json:"error,omitempty"`
+	DefinitionID    actiondef.StepDefinitionID `json:"definitionId,omitempty"`
+	ExecutionKey    actiondef.ExecutionKey     `json:"executionKey,omitempty"`
+	Outcome         actiondef.StepOutcome      `json:"outcome,omitempty"`
+	CanonicalID     actiondef.StepDefinitionID `json:"canonicalId,omitempty"`
+	SharedReference bool                       `json:"sharedReference,omitempty"`
 }
 
 type Run struct {
-	ID          string                 `json:"id"`
-	Title       string                 `json:"title"`
-	AppIdent    string                 `json:"appIdent,omitempty"`
-	Action      string                 `json:"action,omitempty"`
-	Kind        string                 `json:"kind,omitempty"`
-	Profile     string                 `json:"profile,omitempty"`
-	TargetLabel string                 `json:"targetLabel,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
-	Status      Status                 `json:"status"`
-	Steps       []Step                 `json:"steps"`
-	StartedAt   *time.Time             `json:"startedAt,omitempty"`
-	FinishedAt  *time.Time             `json:"finishedAt,omitempty"`
+	ID                 string                 `json:"id"`
+	Title              string                 `json:"title"`
+	AppIdent           string                 `json:"appIdent,omitempty"`
+	Action             string                 `json:"action,omitempty"`
+	Kind               string                 `json:"kind,omitempty"`
+	Profile            string                 `json:"profile,omitempty"`
+	TargetLabel        string                 `json:"targetLabel,omitempty"`
+	Metadata           map[string]interface{} `json:"metadata,omitempty"`
+	Status             Status                 `json:"status"`
+	Steps              []Step                 `json:"steps"`
+	StartedAt          *time.Time             `json:"startedAt,omitempty"`
+	FinishedAt         *time.Time             `json:"finishedAt,omitempty"`
+	RegistryVersion    uint64                 `json:"registryVersion,omitempty"`
+	DefinitionSnapshot *actiondef.Action      `json:"definitionSnapshot,omitempty"`
 }
 
 type StartedEvent struct {

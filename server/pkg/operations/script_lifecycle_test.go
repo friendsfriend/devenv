@@ -30,6 +30,26 @@ func writeScript(t *testing.T, dir, name, body string) string {
 	return path
 }
 
+func TestExpandScriptInfraConfigPaths(t *testing.T) {
+	infra := expandScriptInfraConfigPaths(app.InfraService{
+		Cwd: "$CONFIG", ShellPath: "$CONFIG/scripts/clock.sh", PowerShellPath: "${CONFIG}/scripts/clock.ps1", Args: []string{"--config=$CONFIG/config.json"},
+	}, "/tmp/devenv")
+	if infra.Cwd != "/tmp/devenv" || infra.ShellPath != "/tmp/devenv/scripts/clock.sh" || infra.PowerShellPath != "/tmp/devenv/scripts/clock.ps1" || infra.Args[0] != "--config=/tmp/devenv/config.json" {
+		t.Fatalf("expanded infra = %#v", infra)
+	}
+}
+
+func TestActionOutputWriterForwardsProcessStreams(t *testing.T) {
+	var got string
+	writer := actionOutputWriter{stream: "stderr", output: func(stream, chunk string) { got = stream + ":" + chunk }}
+	if _, err := writer.Write([]byte("script output")); err != nil {
+		t.Fatal(err)
+	}
+	if got != "stderr:script output" {
+		t.Fatalf("output = %q", got)
+	}
+}
+
 func TestResolveScriptRunner(t *testing.T) {
 	shellScript := "svc.sh"
 	psScript := "svc.ps1"

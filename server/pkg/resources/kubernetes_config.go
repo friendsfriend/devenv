@@ -13,6 +13,9 @@ const KubernetesConfigFileName = "devenv.k8s.json"
 // KubernetesRunTargetConfig describes one Helm-backed app run target.
 type KubernetesRunTargetConfig struct {
 	Profile   string                        `json:"profile,omitempty"`
+	Provider  ContainerProvider             `json:"provider,omitempty"`
+	Cluster   string                        `json:"cluster,omitempty"`
+	Context   string                        `json:"context,omitempty"`
 	Name      string                        `json:"name,omitempty"`
 	Chart     KubernetesHelmChartConfig     `json:"chart"`
 	Release   string                        `json:"release,omitempty"`
@@ -23,6 +26,8 @@ type KubernetesRunTargetConfig struct {
 	Wait      KubernetesWaitConfig          `json:"wait,omitempty"`
 	Ports     []KubernetesPortForwardConfig `json:"ports,omitempty"`
 	Requires  []DependencyRef               `json:"requires,omitempty"`
+	Exports   []EndpointExport              `json:"exports,omitempty"`
+	Bindings  []EndpointBinding             `json:"bindings,omitempty"`
 }
 
 // KubernetesHelmChartConfig describes Helm chart location and values.
@@ -73,6 +78,9 @@ type KubernetesPortForwardConfig struct {
 // KubernetesInfrastructureServiceConfig describes one Helm-backed infra target.
 type KubernetesInfrastructureServiceConfig struct {
 	Ident     string                        `json:"ident,omitempty"`
+	Provider  ContainerProvider             `json:"provider,omitempty"`
+	Cluster   string                        `json:"cluster,omitempty"`
+	Context   string                        `json:"context,omitempty"`
 	Profile   string                        `json:"profile,omitempty"`
 	Chart     KubernetesHelmChartConfig     `json:"chart"`
 	Release   string                        `json:"release,omitempty"`
@@ -81,6 +89,8 @@ type KubernetesInfrastructureServiceConfig struct {
 	Secrets   []KubernetesSecretConfig      `json:"secrets,omitempty"`
 	Wait      KubernetesWaitConfig          `json:"wait,omitempty"`
 	Ports     []KubernetesPortForwardConfig `json:"ports,omitempty"`
+	Exports   []EndpointExport              `json:"exports,omitempty"`
+	Bindings  []EndpointBinding             `json:"bindings,omitempty"`
 }
 
 type KubernetesConfig struct {
@@ -99,12 +109,30 @@ func LoadKubernetesConfig(path, appDir, configDir string) (KubernetesConfig, err
 	}
 	baseDir := filepath.Dir(path)
 	for i := range cfg.Targets {
+		applyKubernetesIdentity(&cfg.Targets[i].Provider, &cfg.Targets[i].Cluster, &cfg.Targets[i].Context, cfg.Targets[i].Profile)
 		expandRunTargetPaths(&cfg.Targets[i], appDir, configDir, baseDir)
 	}
 	for i := range cfg.Infrastructure {
+		applyKubernetesIdentity(&cfg.Infrastructure[i].Provider, &cfg.Infrastructure[i].Cluster, &cfg.Infrastructure[i].Context, cfg.Infrastructure[i].Profile)
 		expandInfraPaths(&cfg.Infrastructure[i], appDir, configDir, baseDir)
 	}
 	return cfg, nil
+}
+
+func applyKubernetesIdentity(provider *ContainerProvider, cluster, context *string, profile string) {
+	if *provider == "" {
+		*provider = ContainerProviderDocker
+	}
+	if *cluster == "" {
+		name := "devenv"
+		if profile != "" && profile != "local" {
+			name += "-" + profile
+		}
+		*cluster = name
+	}
+	if *context == "" {
+		*context = "kind-" + *cluster
+	}
 }
 
 func expandRunTargetPaths(target *KubernetesRunTargetConfig, appDir, configDir, baseDir string) {

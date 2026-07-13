@@ -59,6 +59,7 @@ export interface TableSortRule {
 export type StartupPhase =
 	| "connecting"
 	| "server-ready"
+	| "loading-action-registry"
 	| "loading-applications"
 	| "loading-infrastructure"
 	| "loading-scripts"

@@ -21,11 +21,15 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		"apps/definitions/go-rest-postgres.json",
 		"apps/definitions/bhvr-site.json",
 		"apps/definitions/event-worker.json",
+		"apps/definitions/runtime-dependency-check.json",
 		"libraries/definitions/bun-lib-starter.json",
 		"infrastructure/definitions/postgres.json",
 		"infrastructure/definitions/redis.json",
 		"infrastructure/definitions/mailpit.json",
 		"infrastructure/definitions/script-clock.json",
+		"infrastructure/definitions/runtime-check-powershell.json",
+		"infrastructure/definitions/runtime-check-k8s-docker.json",
+		"infrastructure/definitions/runtime-check-k8s-podman.json",
 		"infrastructure/definitions/postgres-k8s.json",
 		"apps/compose/go-rest-postgres-compose.yml",
 		"apps/compose/bhvr-site-compose.yml",
@@ -36,6 +40,7 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		"infrastructure/compose/redis-compose.yml",
 		"infrastructure/compose/mailpit-compose.yml",
 		"infrastructure/scripts/script-clock.sh",
+		"infrastructure/scripts/runtime-check-powershell.ps1",
 		"apps/k8s/bhvr-site/devenv.k8s.json",
 		"apps/k8s/bhvr-site/values.yaml",
 		"apps/k8s/bhvr-site/chart/Chart.yaml",
@@ -58,6 +63,8 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		"apps/run/bhvr-site-dev.ps1",
 		"apps/run/event-worker-dev.sh",
 		"apps/run/event-worker-dev.ps1",
+		"apps/run/runtime-dependency-check-docker-k8s-powershell.sh",
+		"apps/run/runtime-dependency-check-podman-k8s-shell.sh",
 		"apps/build/bun-lib-starter-build.Dockerfile",
 		"apps/build/bun-lib-starter-test.Dockerfile",
 	}
@@ -70,6 +77,8 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 		filepath.Join(configDir, "apps", "run", "bhvr-site-dev.sh"),
 		filepath.Join(configDir, "apps", "run", "event-worker-dev.sh"),
 		filepath.Join(configDir, "infrastructure", "scripts", "script-clock.sh"),
+		filepath.Join(configDir, "apps", "run", "runtime-dependency-check-docker-k8s-powershell.sh"),
+		filepath.Join(configDir, "apps", "run", "runtime-dependency-check-podman-k8s-shell.sh"),
 	} {
 		info, err := os.Stat(executable)
 		if err != nil {
@@ -89,6 +98,21 @@ func TestGenerateCreatesExampleConfig(t *testing.T) {
 			t.Fatalf("bhvr-site complex deps missing %s:\n%s", want, bhvrRun)
 		}
 	}
+	for file, requires := range map[string][]string{
+		"runtime-dependency-check-docker-k8s-powershell.sh": {`"infra":"runtime-check-powershell"`, `"provider":"docker"`, `"infra":"runtime-check-k8s-docker"`, "Docker + Kubernetes + PowerShell dependencies are ready."},
+		"runtime-dependency-check-podman-k8s-shell.sh":      {`"infra":"script-clock"`, `"provider":"podman"`, `"infra":"runtime-check-k8s-podman"`, "Podman + Kubernetes + shell dependencies are ready."},
+	} {
+		content, err := os.ReadFile(filepath.Join(configDir, "apps", "run", file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, want := range requires {
+			if !strings.Contains(string(content), want) {
+				t.Fatalf("%s missing %s:\n%s", file, want, content)
+			}
+		}
+	}
+
 	bunBuildDockerfile, err := os.ReadFile(filepath.Join(configDir, "apps", "build", "bhvr-site-build.Dockerfile"))
 	if err != nil {
 		t.Fatal(err)

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/friendsfriend/devenv/pkg/logging"
@@ -40,6 +41,43 @@ func (e *Executor) RunCommandSilent(command string, args []string, envVars []str
 	return err, string(out)
 }
 
+// RunCommandSilentForAction captures a normally silent command in the active action for appIdent.
+func (e *Executor) RunCommandSilentForAction(appIdent, command string, args []string, envVars []string, workingDir string) (error, string) {
+	return e.RunCommandSilentForActionDisplay(appIdent, command, args, args, envVars, workingDir)
+}
+
+// ActionCallbacksForApp exposes active action callbacks to process lifecycles
+// that must start a long-running process without waiting for its exit.
+func (e *Executor) ActionCallbacksForApp(appIdent string) (stepID string, output func(string, string, string), command func(string, string, []string), done func(string, error), configured bool) {
+	e.actionMu.RLock()
+	ctx, configured := e.perApp[appIdent]
+	e.actionMu.RUnlock()
+	return ctx.stepID, ctx.output, ctx.command, ctx.done, configured
+}
+
+func (e *Executor) RunCommandSilentForActionDisplay(appIdent, command string, args, displayArgs []string, envVars []string, workingDir string) (error, string) {
+	e.actionMu.RLock()
+	ctx, ok := e.perApp[appIdent]
+	e.actionMu.RUnlock()
+	if !ok || ctx.output == nil {
+		return e.RunCommandSilent(command, args, envVars, workingDir)
+	}
+	if ctx.command != nil {
+		ctx.command(ctx.stepID, command, displayArgs)
+	}
+	cmd := exec.Command(command, args...)
+	cmd.Env = append(os.Environ(), envVars...)
+	cmd.Dir = workingDir
+	out, err := cmd.CombinedOutput()
+	if len(out) > 0 {
+		ctx.output(ctx.stepID, "stdout", string(out))
+	}
+	if ctx.done != nil {
+		ctx.done(ctx.stepID, err)
+	}
+	return err, string(out)
+}
+
 // RunCommandLive runs a command with live output to stdout/stderr.
 func (e *Executor) RunCommandLive(command string, args []string, envVars []string, workingDir string) error {
 	cmd := exec.Command(command, args...)
@@ -60,9 +98,22 @@ func (e *Executor) RunCommandLive(command string, args []string, envVars []strin
 	return nil
 }
 
+// RunCommandDetailed executes with normal logging while retaining stdout and stderr separately.
+func (e *Executor) RunCommandDetailed(appIdent, command string, args []string, envVars []string, workingDir string) (error, string, string) {
+	var stdout, stderr strings.Builder
+	err, _ := e.logger.RunCommandWithActionLoggingToFile(context.Background(), appIdent, command, args, envVars, workingDir, "", func(stream, chunk string) {
+		if stream == "stderr" {
+			stderr.WriteString(chunk)
+		} else {
+			stdout.WriteString(chunk)
+		}
+	})
+	return err, stdout.String(), stderr.String()
+}
+
 // RunCommandWithLogging runs a command with logging to the app logger.
 func (e *Executor) RunCommandWithLogging(appIdent, command string, args []string, envVars []string, workingDir string) (error, string) {
-	return e.logger.RunCommandWithLogging(appIdent, command, args, envVars, workingDir)
+	return e.RunCommandWithLoggingToFile(appIdent, command, args, envVars, workingDir, "")
 }
 
 func (e *Executor) RunCommandWithLoggingToFile(appIdent, command string, args []string, envVars []string, workingDir string, logPath string) (error, string) {
@@ -98,11 +149,15 @@ func (e *Executor) ConfigureAction(output func(string, string, string), command 
 func (e *Executor) ConfigureActionForApp(app string, output func(string, string, string), command func(string, string, []string), done func(string, error)) {
 	e.actionMu.Lock()
 	defer e.actionMu.Unlock()
-	if old := e.perApp[app].cancel; old != nil {
-		old()
+	previous := e.perApp[app]
+	if previous.cancel != nil {
+		previous.cancel()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	e.perApp[app] = actionContext{output: output, command: command, done: done, ctx: ctx, cancel: cancel}
+	// Callers bind an app's owning action step before configuring callbacks.
+	// Keep that association; dropping it causes nested commands (notably
+	// script infrastructure) to fall back to root action in event bridge.
+	e.perApp[app] = actionContext{stepID: previous.stepID, output: output, command: command, done: done, ctx: ctx, cancel: cancel}
 }
 func (e *Executor) SetActionStep(stepID string) {
 	e.actionMu.Lock()

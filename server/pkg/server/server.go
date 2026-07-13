@@ -7,31 +7,45 @@ import (
 	"log"
 	"net/http"
 	"os"
+	osExec "os/exec"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/friendsfriend/devenv/pkg/actionexec"
+	"github.com/friendsfriend/devenv/pkg/actionregistry"
 	"github.com/friendsfriend/devenv/pkg/actionrun"
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
+	"github.com/friendsfriend/devenv/pkg/runstatus"
 	"github.com/friendsfriend/devenv/pkg/services"
+	"github.com/friendsfriend/devenv/pkg/state"
 	"github.com/friendsfriend/devenv/pkg/status"
 )
 
 type Server struct {
-	port           int
-	services       services.Container
-	apps           []app.App
-	infraServices  []app.InfraService
-	listeners      map[chan Event]bool
-	listenerMu     sync.RWMutex
-	opStatus       map[string]*OperationStatus
-	opStatusMu     sync.RWMutex
-	statusEventMu  sync.Mutex
-	statusEventSig map[string]string
-	actionRuns     *actionrun.Registry
+	port                int
+	services            services.Container
+	apps                []app.App
+	infraServices       []app.InfraService
+	listeners           map[chan Event]bool
+	listenerMu          sync.RWMutex
+	opStatus            map[string]*OperationStatus
+	opStatusMu          sync.RWMutex
+	statusEventMu       sync.Mutex
+	statusEventSig      map[string]string
+	actionRuns          *actionrun.Registry
+	actionDefinitions   *actionregistry.Registry
+	actionRegistryError error
+	actionProcesses     *actionexec.MemoryProcessStore
+	actionCoordinator   *actionexec.Coordinator
+	toolAvailability    actionregistry.ToolSet
+	actionCancelMu      sync.Mutex
+	actionCancels       map[string]context.CancelFunc
+	leaseMu             sync.Mutex
+	dependencyLeases    []state.DependencyLease
 
 	// CR review sessions: token → session (created per review, cleaned up on stream close)
 	crSessions   map[string]*crReviewSession
@@ -92,12 +106,16 @@ type InfraServiceResponse struct {
 
 func NewServer(port int) *Server {
 	s := &Server{
-		port:           port,
-		listeners:      make(map[chan Event]bool),
-		opStatus:       make(map[string]*OperationStatus),
-		statusEventSig: make(map[string]string),
-		actionRuns:     actionrun.NewRegistry(),
-		crSessions:     make(map[string]*crReviewSession),
+		port:              port,
+		listeners:         make(map[chan Event]bool),
+		opStatus:          make(map[string]*OperationStatus),
+		statusEventSig:    make(map[string]string),
+		actionRuns:        actionrun.NewRegistry(),
+		actionDefinitions: actionregistry.New(),
+		actionProcesses:   actionexec.NewMemoryProcessStore(),
+		actionCoordinator: actionexec.NewCoordinator(nil),
+		actionCancels:     make(map[string]context.CancelFunc),
+		crSessions:        make(map[string]*crReviewSession),
 	}
 	return s
 }
@@ -114,6 +132,13 @@ func (s *Server) Start() error {
 	}
 	s.apps = s.services.AppManager().GetApps()
 	s.infraServices = s.services.AppManager().GetInfraServices()
+	if leases, err := s.services.StateStore().GetDependencyLeases(); err == nil {
+		s.dependencyLeases = leases
+	}
+	if err := s.rebuildActionDefinitions(); err != nil {
+		s.actionRegistryError = err
+		log.Printf("[WARN] Failed to compile action registry: %v", err)
+	}
 	s.services.BuildService().RecoverShellTmuxRuns(s.apps)
 	s.services.OperationsService().RecoverScriptInfrastructureRuns(s.infraServices)
 
@@ -136,6 +161,7 @@ func (s *Server) Start() error {
 	go s.startScriptHealthPoller()
 	go s.startKubernetesStatusWatchers()
 	go s.startKubernetesClusterPoller()
+	go s.startContainerPrunePoller()
 
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
@@ -162,6 +188,9 @@ func (s *Server) Start() error {
 		}
 	}
 
+	if s.actionProcesses != nil {
+		s.actionProcesses.KillAll()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return httpSrv.Shutdown(ctx)
@@ -291,6 +320,54 @@ func (s *Server) startScriptHealthPoller() {
 			s.broadcastAppStatus(s.infraServices[i].Ident)
 		}
 	}
+}
+
+func (s *Server) startContainerPrunePoller() {
+	// Periodically remove stopped containers, unused pods/networks, dangling
+	// images, and dangling build cache. Do not use --all: application images
+	// loaded into kind are tagged in Podman but have no Podman container, so
+	// Podman correctly considers them unused and --all would delete them.
+	// Runs once after a short startup delay, then every 24h.
+	const interval = 24 * time.Hour
+
+	log.Printf("[Prune] Container system prune poller active, interval=%v", interval)
+
+	// Initial run after 5s startup delay (don't slow boot)
+	time.Sleep(5 * time.Second)
+	s.runSystemPrune()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.runSystemPrune()
+	}
+}
+
+func (s *Server) runSystemPrune() {
+	log.Println("[Prune] Pruning container artifacts for all runtimes...")
+	for _, rt := range []string{"docker", "podman"} {
+		if err, _ := runPruneCommand(rt, "version"); err != nil {
+			// Runtime not installed, skip
+			continue
+		}
+		log.Printf("[Prune] Pruning %s...", rt)
+		if err, _ := runPruneCommand(rt, containerPruneArgs()...); err != nil {
+			log.Printf("[Prune] %s system prune failed: %v", rt, err)
+		}
+	}
+}
+
+func containerPruneArgs() []string {
+	return []string{"system", "prune", "--force", "--filter", "until=24h"}
+}
+
+func runPruneCommand(command string, args ...string) (error, string) {
+	cmd := osExec.Command(command, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s %s: %w", command, strings.Join(args, " "), err), string(output)
+	}
+	return nil, strings.TrimSpace(string(output))
 }
 
 func (s *Server) startGitPoller() {
@@ -643,25 +720,25 @@ func (s *Server) appStatusEventProperties(appIdent string, dockerInfo docker.Inf
 }
 
 func (s *Server) appRuntimeStatus(appIdent string, dockerInfo docker.Info) string {
-	if s.services != nil && s.services.BuildService() != nil {
-		switch s.services.BuildService().LastRunRuntime(appIdent) {
-		case "docker":
-			return dockerRuntimeStatus(dockerInfo)
-		case "kubernetes":
-			return s.services.BuildService().KubernetesRunStatus(appIdent)
-		case "shell", "powershell", "systemshell":
-			if s.services.BuildService().IsShellTmuxRunActive(appIdent) {
-				return "running"
-			}
-			return "stopped"
-		}
-		if targetApp := s.findAppByIdent(appIdent); targetApp != nil {
-			if status := s.services.BuildService().DiscoverKubernetesRunStatus(appIdent, targetApp.LocalDirectoryPath); !strings.HasPrefix(status, "stopped") {
-				return status
-			}
+	// Status is selected from all live runtime observations. A runtime name or
+	// last-run cache must never make a lower-health state hide a running target.
+	candidates := []runstatus.Candidate{{Source: "container", Status: dockerRuntimeStatus(dockerInfo)}}
+	if s.services == nil || s.services.BuildService() == nil {
+		return runstatus.Select(candidates)
+	}
+	if targetApp := s.findAppByIdent(appIdent); targetApp != nil {
+		candidates = append(candidates, runstatus.Candidate{
+			Source: "kubernetes",
+			Status: s.services.BuildService().DiscoverKubernetesRunStatus(appIdent, targetApp.LocalDirectoryPath),
+		})
+	}
+	switch s.services.BuildService().LastRunRuntime(appIdent) {
+	case "shell", "powershell", "systemshell":
+		if s.services.BuildService().IsShellTmuxRunActive(appIdent) {
+			candidates = append(candidates, runstatus.Candidate{Source: "shell", Status: "running"})
 		}
 	}
-	return dockerRuntimeStatus(dockerInfo)
+	return runstatus.Select(candidates)
 }
 
 func dockerRuntimeStatus(dockerInfo docker.Info) string {
@@ -831,6 +908,10 @@ func (s *Server) reloadAppConfig() {
 	}
 	s.apps = s.services.AppManager().GetApps()
 	s.infraServices = s.services.AppManager().GetInfraServices()
+	if err := s.rebuildActionDefinitions(); err != nil {
+		s.actionRegistryError = err
+		log.Printf("[WARN] Failed to compile action registry reload: %v", err)
+	}
 	s.services.BuildService().RecoverShellTmuxRuns(s.apps)
 	s.services.OperationsService().RecoverScriptInfrastructureRuns(s.infraServices)
 }

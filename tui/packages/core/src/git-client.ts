@@ -2,46 +2,31 @@ import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 import type { WorktreeInfo } from '@devenv/types';
 
+async function startGitAction(deps: ClientDeps, appIdent: string, action: string, inputs: Record<string, unknown> = {}): Promise<void> {
+  const actionId = `app/${appIdent}/action/${action}/git/default`;
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/action-runs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ actionId, inputs }) });
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
 /**
  * Perform git pull operation on an app's repository
  */
 export async function gitPull(deps: ClientDeps, appIdent: string): Promise<void> {
-  const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/git/pull?appIdent=${encodeURIComponent(appIdent)}`,
-    { method: 'POST' }
-  );
-
-  if (!response.ok) {
-    await handleFetchError(response, deps.onError);
-  }
+  await startGitAction(deps, appIdent, 'pull');
 }
 
 /**
  * Perform git push operation on an app's repository
  */
 export async function gitPush(deps: ClientDeps, appIdent: string): Promise<void> {
-  const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/git/push?appIdent=${encodeURIComponent(appIdent)}`,
-    { method: 'POST' }
-  );
-
-  if (!response.ok) {
-    await handleFetchError(response, deps.onError);
-  }
+  await startGitAction(deps, appIdent, 'push');
 }
 
 /**
  * Perform git fetch operation on an app's repository
  */
 export async function gitFetch(deps: ClientDeps, appIdent: string): Promise<void> {
-  const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/git/fetch?appIdent=${encodeURIComponent(appIdent)}`,
-    { method: 'POST' }
-  );
-
-  if (!response.ok) {
-    await handleFetchError(response, deps.onError);
-  }
+  await startGitAction(deps, appIdent, 'fetch');
 }
 
 /**
@@ -70,14 +55,7 @@ export async function getBranches(
  * Perform git checkout operation to switch branches
  */
 export async function gitCheckout(deps: ClientDeps, appIdent: string, branch: string): Promise<void> {
-  const response = await deps.fetchFn(
-    `${deps.baseUrl}/api/git/checkout?appIdent=${encodeURIComponent(appIdent)}&branch=${encodeURIComponent(branch)}`,
-    { method: 'POST' }
-  );
-
-  if (!response.ok) {
-    await handleFetchError(response, deps.onError);
-  }
+  await startGitAction(deps, appIdent, 'checkout', { branch });
 }
 
 /**

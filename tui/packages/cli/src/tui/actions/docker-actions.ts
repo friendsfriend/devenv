@@ -1,6 +1,5 @@
 import type { DevEnvClient } from '@devenv/core';
-import type { ActionTarget, App, AppAction, InfraService } from '@devenv/types';
-import { formatActionTargetLabel } from '@devenv/ui';
+import type { ActionDefinition, ActionTarget, App, AppAction, InfraService } from '@devenv/types';
 import type { AppStore } from '../stores/app-store';
 import type { UiStore } from '../stores/ui-store';
 
@@ -33,31 +32,16 @@ export function createDockerActions(
     ));
 
     try {
-      const isScriptInfra = 'type' in app && app.type === 'script';
-      const isKubernetesInfra = 'type' in app && app.type === 'kubernetes';
-      if (isScriptInfra && action === 'start') {
-        if (app.shellPath && app.powerShellPath && !app.defaultRunner && !runner) {
-          uiStore.setActionTargetPickerTargets([
-            { id: 'infra:runner:shell', action: 'run', runtime: 'shell', label: 'Shell', sourcePath: app.shellPath },
-            { id: 'infra:runner:powershell', action: 'run', runtime: 'powershell', label: 'PowerShell', sourcePath: app.powerShellPath },
-          ]);
-          uiStore.setActionTargetPickerSelectedIndex(0);
-          uiStore.setActionTargetPickerAppIdent(app.ident);
-          uiStore.setActionTargetPickerAction('run');
-          uiStore.setShowActionTargetPicker(true);
-          return;
-        }
-        await client.startInfraService(appIdent, runner);
-      } else if ((isScriptInfra || isKubernetesInfra) && action === 'stop') {
-        await client.stopInfraService(appIdent);
+      if ('type' in app && (action === 'start' || action === 'stop')) {
+        const definitions=(await client.getActionDefinitions(appIdent,'infrastructure')).actions.filter((definition)=>definition.type===action&&definition.availability.available);const selected=definitions.find((definition)=>runner&&definition.runtime===runner)??definitions[0];if(!selected)throw new Error(`No available ${action} action configured`);appStore.pushModal('actions');await client.startActionRun(selected.id);
       } else if (action === 'start') {
-        if ('type' in app) await client.startInfraService(appIdent);
-        else {
-          appStore.pushModal('actions');
-          const startResp = await client.startApp(appIdent, profile || '', targetId);
-          if (startResp.missingEnvVars && startResp.missingEnvVars.length > 0) {
-            uiStore.setNotification(`Missing env vars: ${startResp.missingEnvVars.join(', ')}`, 'warning');
-          }
+        {
+          const definitions=(await client.getActionDefinitions(appIdent)).actions.filter((definition)=>definition.type==='run'&&definition.availability.available);
+          const selected=definitions.find((definition)=>definition.id===targetId||definition.id.endsWith(`/${profile||'default'}`));
+          if(selected){appStore.pushModal('actions');await client.startActionRun(selected.id)}
+          else if(definitions.length===1){appStore.pushModal('actions');await client.startActionRun(definitions[0].id)}
+          else if(definitions.length>1){openActionTargetPicker(app as App,'run',definitions.map(definitionTarget))}
+          else throw new Error('No available run action configured');
         }
       } else if (action === 'stop') {
         if ('type' in app) {
@@ -65,13 +49,34 @@ export function createDockerActions(
           if (!containerID) throw new Error('No container identifier available for stop operation');
           await client.stopContainer(containerID, appIdent);
         } else {
-          const activeTargetId = 'runTargetInfo' in app ? app.runTargetInfo?.targetId : undefined;
-          await client.stopApp(appIdent, activeTargetId);
+          const definitions=(await client.getActionDefinitions(appIdent)).actions.filter((definition)=>definition.type==='stop'&&definition.availability.available);
+          const targetInfo = 'runTargetInfo' in app ? app.runTargetInfo : undefined;
+          const activeProfile = targetInfo?.profile;
+          const kubernetesRunning = /\b(?:running|starting)\b.*\bpods?\b/i.test(app.status || '');
+          const activeRuntime = kubernetesRunning ? 'kubernetes' : targetInfo?.runtime;
+          const byProfile = activeProfile ? definitions.filter((definition) => definition.id.endsWith('/' + activeProfile)) : definitions;
+          const selected = byProfile.find((definition) => definition.runtime === activeRuntime)
+            ?? definitions.find((definition) => definition.runtime === activeRuntime)
+            ?? byProfile.find((definition) => definition.runtime === 'docker')
+            ?? byProfile[0]
+            ?? definitions[0];
+          if (!selected) throw new Error('No available stop action configured');
+          appStore.pushModal('actions');
+          await client.startActionRun(selected.id);
         }
       } else {
-        const containerID = app.dockerInfo?.ContainerID || app.containerBaseName;
-        if (!containerID) throw new Error('No container identifier available for restart operation');
-        await client.restartContainer(containerID, appIdent);
+        if('type' in app) {
+          const containerID=app.dockerInfo?.ContainerID||app.containerBaseName;
+          if(!containerID) throw new Error('No container identifier available for restart operation');
+          await client.restartContainer(containerID,appIdent);
+        } else {
+          const definitions=(await client.getActionDefinitions(appIdent)).actions.filter(function(d) { return d.type === 'restart' && d.availability.available; });
+          // Prefer docker runtime when both are available.
+          const selected = definitions.find(function(d) { return d.runtime === 'docker'; }) ?? definitions[0];
+          if (!selected) throw new Error('No available restart action configured');
+          appStore.pushModal('actions');
+          await client.startActionRun(selected.id);
+        }
       }
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
@@ -141,6 +146,47 @@ export function createDockerActions(
     uiStore.setShowConfirmDialog(true);
   };
 
+  const definitionTarget = (definition: ActionDefinition): ActionTarget => ({
+    id: definition.id,
+    action: definition.type === 'start' ? 'run' : definition.type as AppAction,
+    runtime: definition.runtime as ActionTarget['runtime'],
+    label: definition.label,
+    profile: typeof definition.root.configuration?.profile === 'string' ? definition.root.configuration.profile : undefined,
+    sourcePath: '',
+  });
+
+  const openInfrastructureStartTargetPicker = async (infra: InfraService) => {
+    try {
+      const { actions } = await client.getActionDefinitions(infra.ident, 'infrastructure');
+      const targets = actions.filter((definition) => definition.type === 'start' && definition.availability.available).map(definitionTarget);
+      if (targets.length === 0) {
+        showError('No Target Configured', `No available start action is configured for ${infra.displayName}.`);
+        return;
+      }
+      if (targets.length === 1) {
+        await client.startActionRun(targets[0].id);
+        appStore.pushModal('actions');
+        return;
+      }
+      uiStore.setActionTargetPickerTargets(targets);
+      uiStore.setActionTargetPickerSelectedIndex(0);
+      uiStore.setActionTargetPickerAppIdent(infra.ident);
+      uiStore.setActionTargetPickerAction('run');
+      uiStore.setShowActionTargetPicker(true);
+    } catch (error) {
+      showError('Target Discovery Failed', error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const runSelectedInfrastructureTarget = async (_infra: InfraService, target: ActionTarget) => {
+    try {
+      appStore.pushModal('actions');
+      await client.startActionRun(target.id);
+    } catch (error) {
+      showError('Start Failed', error instanceof Error ? error.message : String(error));
+    }
+  };
+
   const runSelectedTarget = async (app: App, action: AppAction, target: ActionTarget) => {
     const appIdent = app.ident;
     appStore.setOperationInProgressForApp(appIdent);
@@ -148,10 +194,7 @@ export function createDockerActions(
     setActionStatus(appIdent, action, `${action.charAt(0).toUpperCase() + action.slice(1)}ing ${target.label}...`);
     try {
       appStore.pushModal('actions');
-      const targetLabel = formatActionTargetLabel(target);
-      if (action === 'build') await client.buildApp(appIdent, target.id, target.profile, targetLabel);
-      else if (action === 'test') await client.testApp(appIdent, target.id, target.profile, targetLabel);
-      else await client.runApp(appIdent, target.profile || '', target.id, targetLabel);
+      await client.startActionRun(target.id);
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
       showError(`${action.charAt(0).toUpperCase() + action.slice(1)} Failed`, `Failed to ${action} ${app.displayName}.\n\nError: ${errorMsg}`);
@@ -194,7 +237,9 @@ export function createDockerActions(
 
     uiStore.setActionTargetPickerLoading(true);
     try {
-      const targets = await client.getActionTargets(app.ident, action);
+      const result = await client.getActionDefinitions(app.ident);
+      const definitions = result.actions.filter((definition) => definition.type === action);
+      const targets = definitions.filter((definition) => definition.availability.available).map(definitionTarget);
       if (targets.length === 0) {
         showNoTargets(action, app);
         return;
@@ -206,7 +251,7 @@ export function createDockerActions(
       openActionTargetPicker(app, action, targets);
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : 'Unknown error';
-      showError('Target Discovery Failed', `Failed to load ${action} targets for ${app.displayName}.\n\nError: ${errorMsg}`);
+      showError('Action Discovery Failed', `Failed to load ${action} actions for ${app.displayName}.\n\nError: ${errorMsg}`);
     } finally {
       uiStore.setActionTargetPickerLoading(false);
     }
@@ -236,11 +281,18 @@ export function createDockerActions(
     }
   };
 
+  const runKubernetesClusterAction = async (type: string) => {
+    const definition = (await client.getActionDefinitions('local', 'kubernetes')).actions.find((action) => action.type === type && action.availability.available);
+    if (!definition) throw new Error(`No available Kubernetes ${type} action`);
+    appStore.pushModal('actions');
+    await client.startActionRun(definition.id);
+  };
+
   const createCluster = async () => {
     uiStore.setLoadingModalMessage('Creating Kubernetes cluster...');
     uiStore.setShowLoadingModal(true);
     try {
-      await client.createKubernetesCluster();
+      await runKubernetesClusterAction('create');
       await refreshKubernetesCluster();
     } catch (e) {
       showError('Kubernetes Create Failed', e instanceof Error ? e.message : 'Unknown error');
@@ -251,7 +303,7 @@ export function createDockerActions(
 
   const exportKubeconfig = async () => {
     try {
-      await client.exportKubernetesKubeconfig();
+      await runKubernetesClusterAction('export-kubeconfig');
       uiStore.setNotification('Kubeconfig exported for kind-devenv', 'info');
     } catch (e) {
       showError('Kubeconfig Export Failed', e instanceof Error ? e.message : 'Unknown error');
@@ -265,7 +317,7 @@ export function createDockerActions(
       uiStore.setLoadingModalMessage('Deleting Kubernetes cluster...');
       uiStore.setShowLoadingModal(true);
       try {
-        await client.deleteKubernetesCluster();
+        await runKubernetesClusterAction('delete');
         appStore.setKubernetesCPUHistory([]);
         appStore.setKubernetesMemoryHistory([]);
         await refreshKubernetesCluster();
@@ -285,8 +337,7 @@ export function createDockerActions(
       uiStore.setLoadingModalMessage('Recreating Kubernetes cluster...');
       uiStore.setShowLoadingModal(true);
       try {
-        await client.deleteKubernetesCluster();
-        await client.createKubernetesCluster();
+        await runKubernetesClusterAction('recreate');
         appStore.setKubernetesCPUHistory([]);
         appStore.setKubernetesMemoryHistory([]);
         await refreshKubernetesCluster();
@@ -303,7 +354,7 @@ export function createDockerActions(
     await performAppAction('test');
   };
 
-  return { cancelAction, requestDockerOperation, performDockerOperation, performBuild, performTest, performAppAction, runSelectedTarget, refreshKubernetesCluster, createCluster, exportKubeconfig, requestDeleteCluster, requestRecreateCluster };
+  return { cancelAction, requestDockerOperation, performDockerOperation, openInfrastructureStartTargetPicker, runSelectedInfrastructureTarget, performBuild, performTest, performAppAction, runSelectedTarget, refreshKubernetesCluster, createCluster, exportKubeconfig, requestDeleteCluster, requestRecreateCluster };
 }
 
 export type DockerActions = ReturnType<typeof createDockerActions>;

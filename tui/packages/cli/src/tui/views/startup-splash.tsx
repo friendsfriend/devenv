@@ -10,6 +10,7 @@ interface StartupSplashProps {
 const phaseLabels: Record<Exclude<StartupPhase, 'failed'>, string> = {
   connecting: 'Connecting to server',
   'server-ready': 'Server ready',
+  'loading-action-registry': 'Loading action definitions',
   'loading-applications': 'Loading applications',
   'loading-scripts': 'Loading scripts',
   'loading-providers': 'Loading providers',
@@ -20,6 +21,7 @@ const phaseLabels: Record<Exclude<StartupPhase, 'failed'>, string> = {
 const phaseOrder: Exclude<StartupPhase, 'failed'>[] = [
   'connecting',
   'server-ready',
+  'loading-action-registry',
   'loading-applications',
   'loading-scripts',
   'loading-providers',

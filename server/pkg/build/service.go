@@ -16,6 +16,7 @@ import (
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
 	"github.com/friendsfriend/devenv/pkg/resources"
+	"github.com/friendsfriend/devenv/pkg/runstatus"
 	"github.com/friendsfriend/devenv/pkg/state"
 	"github.com/friendsfriend/devenv/pkg/status"
 )
@@ -42,6 +43,11 @@ type actionBinding struct {
 
 type actionCommandRunner interface {
 	RunCommandWithActionLoggingToFile(ctx context.Context, appIdent, command string, args []string, envVars []string, workingDir, logPath string, output func(stream, chunk string)) (error, string)
+}
+
+type actionSilentRunner interface {
+	RunCommandSilentForAction(appIdent, command string, args []string, envVars []string, workingDir string) (error, string)
+	RunCommandSilentForActionDisplay(appIdent, command string, args, displayArgs []string, envVars []string, workingDir string) (error, string)
 }
 
 type commandRunner interface {
@@ -122,7 +128,7 @@ type Service interface {
 	ConfigureActionOutput(appIdent, runID, stepID string, output func(stepID, stream, chunk string))
 	ConfigureActionCommand(appIdent string, command func(stepID, command string, args []string))
 	ConfigureActionCommandDone(appIdent string, done func(stepID string, err error))
-	ConfigureActionStepEvent(appIdent string, event func(stepID, status, message string))
+	ConfigureActionStepEvent(appIdent string, event func(stepID, kind, status, message string))
 	SetActionStep(stepID string)
 	ClearActionOutput()
 	ComposeMissingEnvVars(appIdent, localDir, profile string) []string
@@ -159,7 +165,7 @@ type service struct {
 	actionOutput      func(stepID, stream, chunk string)
 	actionCommand     func(stepID, command string, args []string)
 	actionCommandDone func(stepID string, err error)
-	actionStepEvent   func(stepID, status, message string)
+	actionStepEvent   func(stepID, kind, status, message string)
 	actionAppIdent    string
 	actionBindings    map[string]actionBinding
 }
@@ -245,19 +251,19 @@ func (s *service) ConfigureActionCommandDone(appIdent string, done func(string, 
 	}
 }
 
-func (s *service) ConfigureActionStepEvent(appIdent string, event func(string, string, string)) {
+func (s *service) ConfigureActionStepEvent(appIdent string, event func(string, string, string, string)) {
 	s.actionMu.Lock()
 	defer s.actionMu.Unlock()
 	s.actionStepEvent = event
 	s.actionAppIdent = appIdent
 }
 
-func (s *service) emitActionStep(stepID, status, message string) {
+func (s *service) emitActionStep(stepID, kind, status, message string) {
 	s.actionMu.RLock()
 	event := s.actionStepEvent
 	s.actionMu.RUnlock()
 	if event != nil {
-		event(stepID, status, message)
+		event(stepID, kind, status, message)
 	}
 }
 
@@ -457,28 +463,42 @@ func (s *service) DiscoverKubernetesRunStatus(appIdent, localDir string) string 
 	if err != nil {
 		return "stopped"
 	}
+	candidates := []runstatus.Candidate{}
+	metadata := map[string]*resources.KubernetesTargetMetadata{}
 	for _, target := range targets {
 		if target.Runtime != resources.ActionRuntimeKubernetes || target.Kubernetes == nil {
 			continue
 		}
 		status := s.kubernetesTargetStatus(target.Kubernetes)
-		if !strings.HasPrefix(status, "stopped") {
-			s.setLastKubernetesTarget(appIdent, target.Kubernetes)
-			s.SetLastRunRuntime(appIdent, resources.ActionRuntimeKubernetes)
-			return status
+		candidates = append(candidates, runstatus.Candidate{Source: target.ID, Status: status})
+		metadata[target.ID] = target.Kubernetes
+	}
+	if len(candidates) == 0 {
+		return "stopped (0 pods)"
+	}
+	selected := runstatus.Select(candidates)
+	for _, candidate := range candidates {
+		if candidate.Status == selected {
+			s.setLastKubernetesTarget(appIdent, metadata[candidate.Source])
+			break
 		}
 	}
-	return "stopped (0 pods)"
+	return selected
 }
 
 func (s *service) kubernetesTargetStatus(target *resources.KubernetesTargetMetadata) string {
+	contextName := target.ContextName
+	if contextName == "" {
+		contextName = "kind-devenv"
+	}
 	cmd := "kubectl"
-	args := []string{"--context", "kind-devenv", "get", "pods", "--namespace", target.Namespace, "-l", "app.kubernetes.io/instance=" + target.Release, "--no-headers"}
+	args := []string{"--context", contextName, "get", "pods", "--namespace", target.Namespace, "-l", "app.kubernetes.io/instance=" + target.Release, "--no-headers"}
 	err, output := s.executor.RunCommandSilent(cmd, args, []string{}, "")
-	if err != nil || strings.TrimSpace(output) == "" {
+	output = strings.TrimSpace(output)
+	if err != nil || output == "" || strings.HasPrefix(strings.ToLower(output), "no resources found") {
 		return "stopped (0 pods)"
 	}
-	lines := strings.Split(strings.TrimSpace(output), "\n")
+	lines := strings.Split(output, "\n")
 	total, running, failed := 0, 0, 0
 	for _, line := range lines {
 		fields := strings.Fields(line)
@@ -523,6 +543,22 @@ func (s *service) BuildAppWithStatus(a *app.App) {
 func (s *service) BuildAppTargetWithStatus(a *app.App, targetID string) {
 	callback := s.statusMgr.StartOperation(a.Ident, status.OpBuild)
 	s.buildAppInternal(a, targetID, callback)
+}
+
+func (s *service) cleanupContainerArtifacts(appIdent string) {
+	// Docker has a distinct BuildKit cache; Podman's builder prune aliases
+	// image prune. Never use --all so current tagged application images survive.
+	s.runActionSilent(appIdent, "docker", []string{"builder", "prune", "--force"}, []string{}, "")
+	for _, cmd := range []string{"docker", "podman"} {
+		s.runActionSilent(appIdent, cmd, []string{"image", "prune", "--force"}, []string{}, "")
+		s.runActionSilent(appIdent, cmd, []string{"volume", "prune", "--force"}, []string{}, "")
+	}
+}
+
+func (s *service) removeImage(appIdent, imageName string) {
+	// Remove image from both Docker and Podman
+	s.runActionSilent(appIdent, "docker", []string{"rmi", "-f", imageName}, []string{}, "")
+	s.runActionSilent(appIdent, "podman", []string{"rmi", "-f", imageName}, []string{}, "")
 }
 
 func (s *service) TestAppWithStatus(a *app.App) {
@@ -602,7 +638,7 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 	}
 
 	statusCb("extracting artifacts...")
-	artifactsPath, err := s.readArtifactsLabel(imageName, logPath)
+	artifactsPath, err := s.readArtifactsLabel(a.Ident, imageName, logPath)
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return
@@ -619,6 +655,9 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 	if s.OnComplete != nil {
 		s.OnComplete(a.Ident)
 	}
+
+	// Step 1: Prune build cache and old images after every build
+	go s.cleanupContainerArtifacts(a.Ident)
 }
 
 func (s *service) dockerBuildCommandArgs(imageName, dockerfilePath, workingDir string) ([]string, []string) {
@@ -810,7 +849,7 @@ func (s *service) StopShellTmuxRun(appIdent string) error {
 	if !ok {
 		return fmt.Errorf("no active shell tmux run for %s", appIdent)
 	}
-	if err, _ := s.executor.RunCommandSilent("tmux", []string{"kill-window", "-t", state.WindowID}, []string{}, ""); err != nil {
+	if err, _ := s.runTmuxActionCommand(appIdent, []string{"kill-window", "-t", state.WindowID}, ""); err != nil {
 		return err
 	}
 	s.ClearRunTargetInfo(appIdent)
@@ -974,9 +1013,9 @@ func (s *service) runActionCommand(appIdent, command string, args []string, envV
 	return s.executor.RunCommandWithLoggingToFile(appIdent, command, args, envVars, workingDir, logPath)
 }
 
-func (s *service) readArtifactsLabel(imageName string, logPath string) (string, error) {
+func (s *service) readArtifactsLabel(appIdent, imageName string, logPath string) (string, error) {
 	args := []string{"inspect", "--format", "{{json .Config.Labels}}", imageName}
-	inspectErr, output := s.executor.RunCommandSilent(docker.RuntimeCommand(), args, []string{}, "")
+	inspectErr, output := s.runActionSilent(appIdent, docker.RuntimeCommand(), args, []string{}, "")
 	s.logSilentCommand(logPath, docker.RuntimeCommand(), args, []string{}, "", output, inspectErr)
 	if inspectErr != nil {
 		return "", fmt.Errorf("failed to inspect image %s: %w", imageName, inspectErr)
@@ -994,7 +1033,7 @@ func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath 
 	containerName := fmt.Sprintf("%s-extract", appIdent)
 
 	createArgs := []string{"create", "--name", containerName, imageName}
-	createErr, createOut := s.executor.RunCommandSilent(docker.RuntimeCommand(), createArgs, []string{}, "")
+	createErr, createOut := s.runActionSilent(appIdent, docker.RuntimeCommand(), createArgs, []string{}, "")
 	s.logSilentCommand(logPath, docker.RuntimeCommand(), createArgs, []string{}, "", createOut, createErr)
 	if createErr != nil {
 		return fmt.Errorf("failed to create extraction container: %w", createErr)
@@ -1002,7 +1041,7 @@ func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath 
 
 	defer func() {
 		rmArgs := []string{"rm", containerName}
-		rmErr, rmOut := s.executor.RunCommandSilent(docker.RuntimeCommand(), rmArgs, []string{}, "")
+		rmErr, rmOut := s.runActionSilent(appIdent, docker.RuntimeCommand(), rmArgs, []string{}, "")
 		s.logSilentCommand(logPath, docker.RuntimeCommand(), rmArgs, []string{}, "", rmOut, rmErr)
 	}()
 
@@ -1013,7 +1052,7 @@ func (s *service) extractArtifacts(appIdent, localDir, imageName, artifactsPath 
 
 	containerSrc := fmt.Sprintf("%s:%s", containerName, artifactsPath)
 	cpArgs := []string{"cp", containerSrc, destPath}
-	cpErr, cpOut := s.executor.RunCommandSilent(docker.RuntimeCommand(), cpArgs, []string{}, "")
+	cpErr, cpOut := s.runActionSilent(appIdent, docker.RuntimeCommand(), cpArgs, []string{}, "")
 	s.logSilentCommand(logPath, docker.RuntimeCommand(), cpArgs, []string{}, "", cpOut, cpErr)
 	if cpErr != nil {
 		return fmt.Errorf("failed to copy artifacts: %w", cpErr)
@@ -1072,6 +1111,10 @@ func (s *service) testAppInternal(a *app.App, targetID string, statusCb func(str
 	}
 
 	statusCb("tests passed")
+
+	// Step 1+3: Remove test image and prune build cache after test
+	go s.removeImage(a.Ident, testImageName)
+	go s.cleanupContainerArtifacts(a.Ident)
 }
 
 func (s *service) runAppInternal(a *app.App, profile string, targetID string, statusCb func(string)) {
@@ -1099,14 +1142,14 @@ func (s *service) runAppInternal(a *app.App, profile string, targetID string, st
 	}
 	s.SetRunTargetInfo(a.Ident, target)
 	s.SetActionStep(target.ID)
-	s.emitActionStep(target.ID, "started", "")
+	s.emitActionStep(target.ID, "", "started", "")
 	s.startRunTarget(a, target, logPath, statusCb)
 	if err := s.waitForRunTarget(a, target); err != nil {
-		s.emitActionStep(target.ID, "failed", err.Error())
+		s.emitActionStep(target.ID, "", "failed", err.Error())
 		return
 	}
 	s.appendDependencyLogs(a)
-	s.emitActionStep(target.ID, "completed", "")
+	s.emitActionStep(target.ID, "", "completed", "")
 }
 
 func (s *service) startRunTarget(a *app.App, target resources.ActionTarget, logPath string, statusCb func(string)) {
@@ -1170,8 +1213,16 @@ func (s *service) ResolveRunActionSteps(a *app.App, targetID, profile string) ([
 		planned[item.ID] = true
 	}
 	steps := make([]actionrun.Step, 0, len(plan))
+	visited := make(map[string]bool, len(plan))
 	var visit func(string, string, int) error
 	visit = func(id, parent string, depth int) error {
+		// A dependency may be reachable both directly and through another
+		// dependency. It executes once per action, so render one matching step
+		// instead of duplicate tree nodes with only one command history.
+		if visited[id] {
+			return nil
+		}
+		visited[id] = true
 		item, ok := registry.Target(id)
 		if !ok {
 			return nil
@@ -1254,7 +1305,7 @@ func (s *service) startRunDependencies(target resources.ActionTarget, logPath st
 		}
 		s.bindActionApp(dependencyIdent, item.ID)
 		s.SetActionStep(item.ID)
-		s.emitActionStep(item.ID, "started", "")
+		s.emitActionStep(item.ID, "", "started", "")
 		statusCb("starting dependency " + item.ID + "...")
 		if item.Kind == resources.TargetKindInfra {
 			infra, ok := s.findInfra(item.Infra)
@@ -1276,14 +1327,19 @@ func (s *service) startRunDependencies(target resources.ActionTarget, logPath st
 			} else {
 				s.infraStarter.StartInfrastructureServiceWithStatus(infra)
 			}
-			if err := s.waitForDependency(infra.GetContainerBaseName()); err != nil {
-				s.emitActionStep(item.ID, "failed", err.Error())
-				err := fmt.Errorf("dependency %q failed readiness: %w", item.ID, err)
-				s.finishDependency(lease, err)
-				return err
+			// Script infrastructure is process/tmux-backed, not container-backed.
+			// Its launch result is the readiness signal; probing a fabricated
+			// container name marks a successfully started script as failed.
+			if infra.Type != app.InfraServiceTypeScript {
+				if err := s.waitForDependency(infra.GetContainerBaseName()); err != nil {
+					s.emitActionStep(item.ID, "", "failed", err.Error())
+					err := fmt.Errorf("dependency %q failed readiness: %w", item.ID, err)
+					s.finishDependency(lease, err)
+					return err
+				}
+				s.appendDependencyLogs(infra)
 			}
-			s.appendDependencyLogs(infra)
-			s.emitActionStep(item.ID, "completed", "")
+			s.emitActionStep(item.ID, "", "completed", "")
 			s.finishDependency(lease, nil)
 			continue
 		}
@@ -1306,13 +1362,13 @@ func (s *service) startRunDependencies(target resources.ActionTarget, logPath st
 		s.bindActionApp(depApp.Ident, item.ID)
 		s.startRunTarget(&depApp, depTarget, logPath, statusCb)
 		if err := s.waitForRunTarget(&depApp, depTarget); err != nil {
-			s.emitActionStep(item.ID, "failed", err.Error())
+			s.emitActionStep(item.ID, "", "failed", err.Error())
 			wrapped := fmt.Errorf("dependency %q failed readiness: %w", item.ID, err)
 			s.finishDependency(lease, wrapped)
 			return wrapped
 		}
 		s.appendDependencyLogs(&depApp)
-		s.emitActionStep(item.ID, "completed", "")
+		s.emitActionStep(item.ID, "", "completed", "")
 		s.finishDependency(lease, nil)
 	}
 	return nil
@@ -1324,6 +1380,15 @@ func (s *service) emitActionDiagnostic(stream, message string) {
 	s.actionMu.RUnlock()
 	if output != nil {
 		output(stepID, stream, fmt.Sprintf("[%s] %s\n", time.Now().Format("15:04:05"), message))
+	}
+}
+
+func (s *service) emitActionOutput(stream, chunk string) {
+	s.actionMu.RLock()
+	output, stepID := s.actionOutput, s.actionStepID
+	s.actionMu.RUnlock()
+	if output != nil && chunk != "" {
+		output(stepID, stream, chunk)
 	}
 }
 
@@ -1380,16 +1445,25 @@ func (s *service) buildTargetRegistry() (resources.TargetRegistry, error) {
 			return resources.TargetRegistry{}, err
 		}
 		for _, target := range targets {
-			items = append(items, resources.RegistryTarget{ID: target.ID, Kind: resources.TargetKindAppRun, App: a.Ident, Runtime: target.Runtime, Profile: target.Profile, Requires: target.Requires, Running: s.isRunTargetActive(a.Ident, target.ID)})
+			provider := target.Provider
+			if provider == "" && (target.Runtime == resources.ActionRuntimeDocker || target.Runtime == resources.ActionRuntimeKubernetes) {
+				provider = resources.ContainerProviderDocker
+			}
+			items = append(items, resources.RegistryTarget{ID: target.ID, Kind: resources.TargetKindAppRun, App: a.Ident, Runtime: target.Runtime, Profile: target.Profile, Provider: provider, Requires: target.Requires, Running: s.isRunTargetActive(a.Ident, target.ID)})
 		}
 	}
 	for _, infra := range s.appRegistry.GetInfraServices() {
 		id := resources.InfraTargetID(infra.Ident)
+		runtime := resources.ActionRuntimeDocker
+		provider := resources.ContainerProviderDocker
+		profile := "default"
 		if infra.Type == app.InfraServiceTypeKubernetes && infra.Kubernetes != nil {
-			id = resources.InfraRuntimeTargetID(infra.Ident, app.InfraServiceTypeKubernetes, infra.Kubernetes.Profile)
-			items = append(items, resources.RegistryTarget{ID: resources.InfraTargetID(infra.Ident), Kind: resources.TargetKindInfra, Infra: infra.Ident, Running: infra.Status == app.InfraStatusRunning})
+			runtime = resources.ActionRuntimeKubernetes
+			provider = resources.ContainerProviderDocker
+			profile = infra.Kubernetes.Profile
+			id = resources.InfraRuntimeTargetID(infra.Ident, string(runtime), profile)
 		}
-		items = append(items, resources.RegistryTarget{ID: id, Kind: resources.TargetKindInfra, Infra: infra.Ident, Running: infra.Status == app.InfraStatusRunning})
+		items = append(items, resources.RegistryTarget{ID: id, Kind: resources.TargetKindInfra, Infra: infra.Ident, Runtime: runtime, Profile: profile, Provider: provider, Running: infra.Status == app.InfraStatusRunning})
 	}
 	return resources.NewTargetRegistry(items), nil
 }

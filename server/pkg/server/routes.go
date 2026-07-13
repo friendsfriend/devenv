@@ -16,8 +16,6 @@ func (s *Server) routes() []routeSpec {
 	return []routeSpec{
 		{Domain: "app", Method: http.MethodGet, Path: "/api/apps", Handler: s.handleGetApps},
 		{Domain: "app", Method: http.MethodGet, Path: "/api/infra-services", Handler: s.handleGetInfraServices},
-		{Domain: "app", Method: http.MethodPost, Path: "/api/infra-services/{ident}/start", Handler: s.handleInfraServiceStart},
-		{Domain: "app", Method: http.MethodPost, Path: "/api/infra-services/{ident}/stop", Handler: s.handleInfraServiceStop},
 		{Domain: "app", Method: http.MethodGet, Path: "/api/infra-services/{ident}/logs", Handler: s.handleInfraServiceLogs},
 		{Domain: "app", Method: http.MethodGet, Path: "/api/status", Handler: s.handleGetStatus},
 		{Domain: "app", Method: http.MethodGet, Path: "/api/apps/{ident}/docker", Handler: s.handleGetDockerInfo},
@@ -26,7 +24,10 @@ func (s *Server) routes() []routeSpec {
 		{Domain: "app", Method: http.MethodPost, Path: "/api/example-config", Handler: s.handleCreateExampleConfig},
 		{Domain: "app", Method: http.MethodDelete, Path: "/api/apps/{ident}/delete", Handler: s.handleDeleteApp},
 		{Domain: "app", Method: http.MethodGet, Path: "/api/apps/{ident}/profiles", Handler: s.handleGetProfiles},
-		{Domain: "app", Method: http.MethodGet, Path: "/api/apps/{ident}/actions/{action}/targets", Handler: s.handleGetActionTargets},
+		{Domain: "actions", Method: http.MethodGet, Path: "/api/apps/{ident}/actions", Handler: s.handleListActionDefinitions},
+		{Domain: "actions", Method: http.MethodGet, Path: "/api/action-definition", Handler: s.handleGetActionDefinition},
+		{Domain: "actions", Method: http.MethodGet, Path: "/api/action-registry/status", Handler: s.handleActionRegistryStatus},
+		{Domain: "actions", Method: http.MethodPost, Path: "/api/action-runs", Handler: s.handleStartActionRun},
 
 		{Domain: "docker", Method: http.MethodPost, Path: "/api/docker/start", Handler: s.handleDockerStart},
 		{Domain: "docker", Method: http.MethodPost, Path: "/api/docker/stop", Handler: s.handleDockerStop},
@@ -37,24 +38,11 @@ func (s *Server) routes() []routeSpec {
 
 		{Domain: "kubernetes", Method: http.MethodGet, Path: "/api/kubernetes/logs", Handler: s.handleKubernetesLogs},
 		{Domain: "kubernetes", Method: http.MethodGet, Path: "/api/kubernetes/cluster", Handler: s.handleKubernetesClusterStatus},
-		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/create", Handler: s.handleKubernetesClusterCreate},
-		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/delete", Handler: s.handleKubernetesClusterDelete},
-		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/recreate", Handler: s.handleKubernetesClusterRecreate},
-		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/export-kubeconfig", Handler: s.handleKubernetesClusterExport},
 		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/refresh", Handler: s.handleKubernetesClusterRefresh},
 
-		{Domain: "git", Method: http.MethodPost, Path: "/api/git/pull", Handler: s.handleGitPull},
-		{Domain: "git", Method: http.MethodPost, Path: "/api/git/push", Handler: s.handleGitPush},
-		{Domain: "git", Method: http.MethodPost, Path: "/api/git/fetch", Handler: s.handleGitFetch},
 		{Domain: "git", Method: http.MethodGet, Path: "/api/git/branches", Handler: s.handleGitBranches},
-		{Domain: "git", Method: http.MethodPost, Path: "/api/git/checkout", Handler: s.handleGitCheckout},
 		{Domain: "git", Method: http.MethodGet, Path: "/api/git/worktrees", Handler: s.handleWorktrees},
 
-		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/start", Handler: s.handleStart},
-		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/build", Handler: s.handleBuild},
-		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/test", Handler: s.handleTest},
-		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/run", Handler: s.handleRun},
-		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/stop", Handler: s.handleStopApp},
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/cancel", Handler: s.handleCancelAction},
 		{Domain: "actions", Method: http.MethodGet, Path: "/api/actions/history", Handler: s.handleActionHistory},
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/events", Handler: s.handleReportedActionEvent},
@@ -141,7 +129,7 @@ func (s *Server) routes() []routeSpec {
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
 	for _, route := range s.routes() {
-		mux.HandleFunc(route.Path, s.withRecordedAction(route.Handler))
+		mux.HandleFunc(route.Path, route.Handler)
 	}
 }
 

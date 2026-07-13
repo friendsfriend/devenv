@@ -1,4 +1,8 @@
 import type { KeyEvent } from '@opentui/core';
+import { formatProfileLabel } from '@devenv/ui';
+import { actionTreeCopyText } from '../views/action-run-copy';
+import { copyText } from './global-keys';
+import type { UiStore } from '../stores';
 import type { ActionRunStore } from '../stores/action-run-store';
 import type { AppStore } from '../stores/app-store';
 import type { DockerActions } from '../actions';
@@ -7,9 +11,16 @@ import { isDownKey, isUpKey } from './nav-keys';
 const shiftedDown = (event: KeyEvent) => event.name === 'J' || event.sequence === 'J' || (event.name === 'j' && event.shift);
 const shiftedUp = (event: KeyEvent) => event.name === 'K' || event.sequence === 'K' || (event.name === 'k' && event.shift);
 
-export function handleActionsKeys(event: KeyEvent, store: ActionRunStore, appStore: AppStore, dockerActions?: Pick<DockerActions, 'cancelAction'>): boolean {
+export function handleActionsKeys(event: KeyEvent, store: ActionRunStore, appStore: AppStore, dockerActions?: Pick<DockerActions, 'cancelAction'>, uiStore?: Pick<UiStore, 'setNotification'>, copy = (text: string) => uiStore ? copyText(text, uiStore) : Promise.resolve(false)): boolean {
   if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc' || event.sequence === '\x1b' || event.name === 'L' || event.sequence === 'L') { appStore.popModal('actions'); return true; }
   if (event.name === 'c' && store.run()?.status === 'active') { const appIdent = store.run()?.appIdent; if (appIdent) void dockerActions?.cancelAction(appIdent); store.cancelSelected(); return true; }
+  if (store.focusedPanel() === 0 && (event.name === 'y' || event.sequence === 'y')) {
+    const node = store.selectedNode();
+    if (node && node.kind !== 'loadOlder') {
+      void copy(actionTreeCopyText(node, formatProfileLabel));
+    }
+    return true;
+  }
   if (event.name === 'enter' || event.name === 'return') {
     const node = store.selectedNode();
     if (node?.kind === 'loadOlder') void store.loadOlderHistory();
@@ -29,6 +40,9 @@ export function handleActionsKeys(event: KeyEvent, store: ActionRunStore, appSto
     const index = currentIndex < 0 ? 0 : currentIndex;
     const next = isDownKey(event) ? Math.min(nodes.length - 1, index + 1) : Math.max(0, index - 1);
     store.focusTreeNode(nodes[next]);
+    // Tree rows are one terminal line each. Keep keyboard-selected rows
+    // reachable instead of letting focus move into clipped content.
+    store.treeScrollBoxRef?.scrollTo(next);
     return true;
   }
   if (store.focusedPanel() === 1) {

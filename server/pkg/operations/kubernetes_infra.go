@@ -34,11 +34,11 @@ func (s *service) startKubernetesInfrastructureService(infra app.InfraService, l
 		callback("Error: " + err.Error())
 		return err
 	}
-	if err := s.ensureKubernetesInfraCluster(runner, logPath, callback); err != nil {
+	if err := s.ensureKubernetesInfraCluster(infra.Ident, runner, logPath, callback); err != nil {
 		return err
 	}
 	statusCmd := runner.HelmCommandFor("status", infra.Kubernetes.Release, "--namespace", infra.Kubernetes.Namespace)
-	statusErr, statusOut := s.executor.RunCommandSilent(statusCmd.Name, statusCmd.Args, statusCmd.Env, "")
+	statusErr, statusOut := s.executor.RunCommandSilentForAction(infra.Ident, statusCmd.Name, statusCmd.Args, statusCmd.Env, "")
 	appendCommandLog(logPath, statusCmd.Name, statusCmd.Args, statusCmd.Env, "", statusOut, statusErr)
 	if statusErr == nil {
 		if strings.HasPrefix(s.KubernetesInfrastructureStatus(infra), app.InfraStatusRunning) {
@@ -134,34 +134,34 @@ func quoteCommand(command string, args []string) string {
 	return strings.Join(parts, " ")
 }
 
-func (s *service) ensureKubernetesInfraCluster(runner k8s.Runner, logPath string, callback func(string)) error {
+func (s *service) ensureKubernetesInfraCluster(appIdent string, runner k8s.Runner, logPath string, callback func(string)) error {
 	callback("checking kind cluster...")
 	get := runner.KindGetClustersCommand()
-	getErr, getOut := s.executor.RunCommandSilent(get.Name, get.Args, get.Env, "")
+	getErr, getOut := s.executor.RunCommandSilentForAction(appIdent, get.Name, get.Args, get.Env, "")
 	appendCommandLog(logPath, get.Name, get.Args, get.Env, "", getOut, getErr)
 	if getErr == nil {
 		for _, line := range strings.Split(getOut, "\n") {
 			if strings.TrimSpace(line) == k8s.DefaultClusterName {
-				return s.exportKubernetesInfraKubeconfig(runner, logPath)
+				return s.exportKubernetesInfraKubeconfig(appIdent, runner, logPath)
 			}
 		}
 	}
 	callback("creating kind cluster...")
 	create := runner.KindCreateClusterCommand()
-	createErr, createOut := s.executor.RunCommandWithLoggingToFile("kubernetes", create.Name, create.Args, create.Env, "", logPath)
+	createErr, createOut := s.executor.RunCommandWithLoggingToFile(appIdent, create.Name, create.Args, create.Env, "", logPath)
 	if createErr != nil {
 		if strings.Contains(createOut, "already exist") || strings.Contains(createOut, "already exists") {
-			return s.exportKubernetesInfraKubeconfig(runner, logPath)
+			return s.exportKubernetesInfraKubeconfig(appIdent, runner, logPath)
 		}
 		callback("Error: " + createErr.Error())
 		return createErr
 	}
-	return s.exportKubernetesInfraKubeconfig(runner, logPath)
+	return s.exportKubernetesInfraKubeconfig(appIdent, runner, logPath)
 }
 
-func (s *service) exportKubernetesInfraKubeconfig(runner k8s.Runner, logPath string) error {
+func (s *service) exportKubernetesInfraKubeconfig(appIdent string, runner k8s.Runner, logPath string) error {
 	cmd := runner.KindExportKubeconfigCommand()
-	err, output := s.executor.RunCommandSilent(cmd.Name, cmd.Args, cmd.Env, "")
+	err, output := s.executor.RunCommandSilentForAction(appIdent, cmd.Name, cmd.Args, cmd.Env, "")
 	appendCommandLog(logPath, cmd.Name, cmd.Args, cmd.Env, "", output, err)
 	return err
 }

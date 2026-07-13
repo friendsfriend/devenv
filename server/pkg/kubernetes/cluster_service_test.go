@@ -68,6 +68,23 @@ func TestClusterServiceStatusSuppressesKnownKindPodmanListBugWhenMissing(t *test
 	}
 }
 
+func TestClusterServiceCreateObservesLifecycleCommands(t *testing.T) {
+	fake := &fakeCommandRunner{outputs: map[string][]byte{"kind get clusters": []byte("devenv\n"), "kind export kubeconfig --name devenv": []byte("exported\\n")}}
+	var observed []CommandObservation
+	r := NewRunner(docker.Runtime{Name: "docker", Command: "docker"})
+	r.LookPath = func(name string) (string, error) { return "/bin/" + name, nil }
+	svc := ClusterService{Runner: r, Exec: fake, Observe: func(observation CommandObservation) { observed = append(observed, observation) }}
+	if err := svc.Create(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(observed) != 2 || observed[0].Command.Args[0] != "get" || observed[1].Command.Args[0] != "export" {
+		t.Fatalf("observed = %#v", observed)
+	}
+	if observed[0].Output != "devenv\n" || observed[0].Err != nil {
+		t.Fatalf("check observation = %#v", observed[0])
+	}
+}
+
 func TestClusterServiceCreateReusesExistingAndExports(t *testing.T) {
 	fake := &fakeCommandRunner{outputs: map[string][]byte{"kind get clusters": []byte("devenv\n")}}
 	r := NewRunner(docker.Runtime{Name: "docker", Command: "docker"})

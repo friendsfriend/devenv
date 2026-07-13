@@ -32,7 +32,9 @@ func (s *Server) handleDockerStart(w http.ResponseWriter, r *http.Request) {
 		statusCallback = s.services.StatusManager().StartOperation(appIdent, status.OpStart)
 	}
 
-	err := s.services.DockerClient().StartContainer(containerID)
+	err := s.runDockerContainerAction(appIdent, containerID, "start", func() error {
+		return s.services.DockerClient().StartContainer(containerID)
+	})
 	if err != nil {
 		log.Printf("[ERROR] Failed to start container %s: %v", containerID, err)
 		if statusCallback != nil {
@@ -98,7 +100,9 @@ func (s *Server) handleDockerStop(w http.ResponseWriter, r *http.Request) {
 		statusCallback = s.services.StatusManager().StartOperation(appIdent, status.OpStop)
 	}
 
-	err := s.services.DockerClient().StopContainer(containerID)
+	err := s.runDockerContainerAction(appIdent, containerID, "stop", func() error {
+		return s.services.DockerClient().StopContainer(containerID)
+	})
 	if err != nil {
 		log.Printf("[ERROR] Failed to stop container %s: %v", containerID, err)
 		if statusCallback != nil {
@@ -161,7 +165,9 @@ func (s *Server) handleDockerRestart(w http.ResponseWriter, r *http.Request) {
 		statusCallback = s.services.StatusManager().StartOperation(appIdent, status.OpStop)
 	}
 
-	err := s.services.DockerClient().RestartContainer(containerID)
+	err := s.runDockerContainerAction(appIdent, containerID, "restart", func() error {
+		return s.services.DockerClient().RestartContainer(containerID)
+	})
 	if err != nil {
 		log.Printf("[ERROR] Failed to restart container %s: %v", containerID, err)
 		if statusCallback != nil {

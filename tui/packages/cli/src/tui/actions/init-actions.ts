@@ -3,6 +3,49 @@ import type { AppStore } from '../stores';
 import type { AppActions } from './app-actions';
 import { detectOptionalUtilities } from '../startup-utility-detection';
 
+async function waitForActionRegistry(
+  client: ReturnType<typeof import('@devenv/core').createClient>,
+  appStore: AppStore,
+  showError: (title: string, message: string) => void,
+): Promise<boolean> {
+  let retries = 30;
+  let delay = 500;
+  while (retries > 0) {
+    try {
+      const status = await (client as any).getActionRegistryStatus();
+      if (status.available) {
+        getLogger().write('INFO', `Action registry ready: ${status.actionsCount} actions (version ${status.version})`);
+        return true;
+      }
+      if (status.error) {
+        appStore.setStartupState({
+          phase: 'failed',
+          message: 'Action registry compilation failed',
+          error: `Registry error: ${status.error}\n\nCheck server logs at $DEVENV_HOME/logs/server.log`,
+        });
+        showError('Registry Compilation Failed', status.error);
+        return false;
+      }
+    } catch (e) {
+      // Server may not have the endpoint yet; retry
+    }
+    retries--;
+    if (retries > 0) {
+      appStore.setStartupState({
+        phase: 'loading-action-registry',
+        message: `Waiting for action definitions... (${30 - retries}/30)`,
+        error: null,
+      });
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay = Math.min(delay * 1.5, 2000);
+    }
+  }
+  const msg = 'Action registry did not become available after 30 retries. Check server logs.';
+  appStore.setStartupState({ phase: 'failed', message: 'Registry timeout', error: msg });
+  showError('Registry Timeout', msg);
+  return false;
+}
+
 interface InitDeps {
   client: ReturnType<typeof import('@devenv/core').createClient>;
   appStore: AppStore;
@@ -72,6 +115,16 @@ export async function initializeApp(deps: InitDeps): Promise<void> {
       message: 'DevEnv server is ready.',
       error: null,
     });
+
+    // Wait for action registry to compile successfully
+    appStore.setStartupState({
+      phase: 'loading-action-registry',
+      message: 'Waiting for action definitions...',
+      error: null,
+    });
+    const actionRegistryOk = await waitForActionRegistry(client, appStore, showError);
+    if (!actionRegistryOk) return;
+
     const serverProcess = (global as any).__devenvServerProcess;
     if (serverProcess) {
       getLogger().write('DEBUG', `[APP] Server process status before apps fetch - killed: ${serverProcess.killed}, exitCode: ${serverProcess.exitCode}`);

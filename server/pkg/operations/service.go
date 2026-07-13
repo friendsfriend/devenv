@@ -16,6 +16,7 @@ import (
 // Service manages container lifecycle operations for applications.
 type Service interface {
 	StartInfrastructureServiceWithStatus(infra app.InfraService)
+	StopInfrastructureServiceWithStatus(infra app.InfraService)
 	StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error
 	StartKubernetesInfrastructureServiceWithStatus(infra app.InfraService) error
 	StartKubernetesInfrastructureServiceWithLog(infra app.InfraService, logPath string) error
@@ -33,7 +34,7 @@ type Service interface {
 	ConfigureActionOutput(appIdent, runID, stepID string, output func(stepID, stream, chunk string))
 	ConfigureActionCommand(appIdent string, command func(stepID, command string, args []string))
 	ConfigureActionCommandDone(appIdent string, done func(stepID string, err error))
-	ConfigureActionStepEvent(appIdent string, event func(stepID, status, message string))
+	ConfigureActionStepEvent(appIdent string, event func(stepID, kind, status, message string))
 	SetActionStep(stepID string)
 	ClearActionOutput()
 }
@@ -106,7 +107,7 @@ func (s *service) ConfigureActionCommandDone(appIdent string, done func(string, 
 	s.executor.ConfigureActionForApp(appIdent, binding.output, binding.command, done)
 }
 
-func (s *service) ConfigureActionStepEvent(string, func(string, string, string)) {}
+func (s *service) ConfigureActionStepEvent(string, func(string, string, string, string)) {}
 
 func (s *service) SetActionStep(stepID string) {
 	s.actionMu.Lock()
@@ -135,6 +136,26 @@ func (s *service) newComposeArgs() []string {
 		args = append(args, "--env-file", s.envFilePath)
 	}
 	return args
+}
+
+func (s *service) StopInfrastructureServiceWithStatus(infra app.InfraService) {
+	callback := s.statusMgr.StartOperation(infra.Ident, status.OpStop)
+	callback("stopping...")
+	logPath := ""
+
+	composeFilePath, err := s.resourceMgr.ResolveInfrastructureComposeFile(infra.Ident)
+	if err != nil {
+		callback("Error: " + err.Error())
+		return
+	}
+
+	composeArgs := s.newComposeArgs()
+	composeArgs = append(composeArgs, "-f", composeFilePath, "down", "--remove-orphans", "--volumes")
+
+	_, _ = s.executor.RunCommandWithLoggingToFile(infra.Ident, docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
+
+	s.dockerClient.InvalidateContainerCache()
+	callback("stopped")
 }
 
 func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
@@ -171,6 +192,21 @@ func (s *service) StartInfrastructureServiceWithStatus(infra app.InfraService) {
 	}
 }
 
+func expandScriptInfraConfigPaths(infra app.InfraService, configDir string) app.InfraService {
+	expand := func(value string) string {
+		value = strings.ReplaceAll(value, "${CONFIG}", configDir)
+		return strings.ReplaceAll(value, "$CONFIG", configDir)
+	}
+	infra.Cwd = expand(infra.Cwd)
+	infra.ShellPath = expand(infra.ShellPath)
+	infra.PowerShellPath = expand(infra.PowerShellPath)
+	infra.Args = append([]string(nil), infra.Args...)
+	for i := range infra.Args {
+		infra.Args[i] = expand(infra.Args[i])
+	}
+	return infra
+}
+
 func (s *service) KillAndRemoveAllContainersForAppWithStatus(a *app.App) {
 	callback := s.statusMgr.StartOperation(a.Ident, status.OpStop)
 	s.killAndRemoveContainersForAppInternal(a, callback)
@@ -181,7 +217,7 @@ func (s *service) killAndRemoveContainersForAppInternal(a *app.App, statusCb fun
 	logPath := ""
 
 	composeArgs := s.newComposeArgs()
-	composeArgs = append(composeArgs, "down", "--remove-orphans")
+	composeArgs = append(composeArgs, "down", "--remove-orphans", "--volumes")
 
 	err, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
 	if err != nil {
@@ -208,7 +244,7 @@ func (s *service) killAllRunningContainersInternal(apps []app.App, statusCb func
 	logPath := ""
 
 	composeArgs := s.newComposeArgs()
-	composeArgs = append(composeArgs, "down", "--remove-orphans")
+	composeArgs = append(composeArgs, "down", "--remove-orphans", "--volumes")
 
 	err, _ := s.executor.RunCommandWithLoggingToFile("all-apps", docker.ComposeCommand(), composeArgs, []string{}, "", logPath)
 	if err != nil {
@@ -222,6 +258,10 @@ func (s *service) killAllRunningContainersInternal(apps []app.App, statusCb func
 }
 
 func (s *service) StartScriptInfrastructureServiceWithStatus(infra app.InfraService, runner string) error {
+	// Script infrastructure config is allowed to use $CONFIG as a portable
+	// reference to DevEnv's config root. exec/tmux do not expand arguments, so
+	// resolve it before choosing runner or setting working directory.
+	infra = expandScriptInfraConfigPaths(infra, s.resourceMgr.ConfigDir())
 	if infra.Type != app.InfraServiceTypeScript {
 		return fmt.Errorf("infra service %s is not a script service", infra.Ident)
 	}
@@ -229,7 +269,7 @@ func (s *service) StartScriptInfrastructureServiceWithStatus(infra app.InfraServ
 	if existing, ok := s.scriptRuns[infra.Ident]; ok {
 		if existing.mode == "tmux" {
 			s.scriptMu.Unlock()
-			if err, _ := s.executor.RunCommandSilent("tmux", []string{"display-message", "-p", "-t", existing.paneID, "#{window_id}"}, []string{}, ""); err == nil {
+			if err, _ := s.executor.RunCommandSilentForAction(infra.Ident, "tmux", []string{"display-message", "-p", "-t", existing.paneID, "#{window_id}"}, []string{}, ""); err == nil {
 				return nil
 			}
 			s.scriptMu.Lock()
@@ -266,7 +306,7 @@ func (s *service) StartScriptInfrastructureServiceWithStatus(infra app.InfraServ
 		windowName := fmt.Sprintf("devenv - infra - %s", infra.Ident)
 		cmdArgs := []string{"new-window", "-P", "-F", "#{window_id}:#{pane_pid}", "-n", windowName, "-c", infra.Cwd, command}
 		cmdArgs = append(cmdArgs, args...)
-		if err, output := s.executor.RunCommandSilent("tmux", cmdArgs, scriptEnv(infra.Env), infra.Cwd); err == nil {
+		if err, output := s.executor.RunCommandSilentForAction(infra.Ident, "tmux", cmdArgs, scriptEnv(infra.Env), infra.Cwd); err == nil {
 			windowID, panePID := parseTmuxWindowAndPID(output)
 			if windowID != "" {
 				s.scriptMu.Lock()
@@ -282,7 +322,32 @@ func (s *service) StartScriptInfrastructureServiceWithStatus(infra app.InfraServ
 		statusCb("tmux window unavailable; running logged")
 	}
 
-	cmd, exitCh, err := startLoggedProcess(infra, command, args, logPath)
+	s.actionMu.Lock()
+	binding := s.actionBindings[infra.Ident]
+	s.actionMu.Unlock()
+	// Dependency starts configure action callbacks on shared Executor through
+	// BuildService.bindActionApp, not on OperationsService itself. Script
+	// processes launch directly (they cannot wait for their long-running
+	// command), so inherit executor callbacks here to retain command/output/
+	// exit metadata for their owning action step.
+	// Prefer per-app executor context: BuildService binds dependencies there
+	// with their dependency step ID. OperationsService-local callbacks can be
+	// stale from a prior standalone action and would otherwise parent this
+	// script command under the root action instead of script-clock.
+	if stepID, output, commandCallback, doneCallback, configured := s.executor.ActionCallbacksForApp(infra.Ident); configured {
+		binding.step, binding.output, binding.command, binding.done = stepID, output, commandCallback, doneCallback
+	}
+	if binding.command != nil {
+		binding.command(binding.step, command, args)
+	}
+	cmd, exitCh, err := startLoggedProcess(infra, command, args, logPath, func(stream, chunk string) {
+		if binding.output != nil {
+			binding.output(binding.step, stream, chunk)
+		}
+	})
+	if binding.done != nil {
+		binding.done(binding.step, err)
+	}
 	if err != nil {
 		statusCb("Error: " + err.Error())
 		return err
@@ -332,7 +397,7 @@ func (s *service) StopScriptInfrastructureServiceWithStatus(ident string) error 
 	}
 	var err error
 	if st.mode == "tmux" {
-		err, _ = s.executor.RunCommandSilent("tmux", []string{"kill-window", "-t", st.paneID}, []string{}, "")
+		err, _ = s.executor.RunCommandSilentForAction(ident, "tmux", []string{"kill-window", "-t", st.paneID}, []string{}, "")
 	} else {
 		err = killProcessGroup(st.cmd)
 	}

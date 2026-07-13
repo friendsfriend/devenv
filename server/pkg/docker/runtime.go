@@ -30,7 +30,18 @@ func RuntimeName() string {
 }
 
 func ComposeCommand() string {
-	if selectedRuntime.Name == "podman" {
+	return ComposeCommandForRuntime(selectedRuntime.Name)
+}
+
+func RuntimeCommandForRuntime(name string) string {
+	if name == "podman" {
+		return "podman"
+	}
+	return "docker"
+}
+
+func ComposeCommandForRuntime(name string) string {
+	if name == "podman" {
 		return "podman-compose"
 	}
 	return "docker-compose"

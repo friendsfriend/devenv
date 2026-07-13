@@ -1,4 +1,6 @@
 import type {
+	ActionDefinition,
+	ActionDefinitionList,
 	App,
 	AppStatus,
 	ContainerStats,
@@ -16,13 +18,15 @@ import type {
 import type { ClientDeps, FetchFunction } from "./client-types";
 import { getPiSessions } from "./agent-client";
 import {
+	getActionDefinition,
+	getActionDefinitions,
+	getActionRegistryStatus,
 	getApps,
 	getDockerInfo,
 	getGitInfo,
 	getInfraServices,
-	startInfraService,
-	stopInfraService,
 	getInfraServiceLogs,
+	startActionRun,
 	getProfiles,
 	getStatus,
 	createApp,
@@ -155,6 +159,22 @@ export class DevEnvClient {
 		);
 	}
 
+	startActionRun(actionId: string, inputs: Record<string, unknown> = {}): Promise<void> {
+		return startActionRun(this.deps, actionId, inputs);
+	}
+
+	getActionDefinitions(ident: string, kind = "app"): Promise<ActionDefinitionList> {
+		return getActionDefinitions(this.deps, ident, kind);
+	}
+
+	getActionDefinition(id: string): Promise<ActionDefinition> {
+		return getActionDefinition(this.deps, id);
+	}
+
+	getActionRegistryStatus(): Promise<import("./apps-client").ActionRegistryStatus> {
+		return getActionRegistryStatus(this.deps);
+	}
+
 	getApps(): Promise<App[]> {
 		return getApps(this.deps);
 	}
@@ -205,12 +225,6 @@ export class DevEnvClient {
 	}
 	getInfraServices(): Promise<InfraService[]> {
 		return getInfraServices(this.deps);
-	}
-	startInfraService(ident: string, runner?: string): Promise<void> {
-		return startInfraService(this.deps, ident, runner);
-	}
-	stopInfraService(ident: string): Promise<void> {
-		return stopInfraService(this.deps, ident);
 	}
 	getInfraServiceLogs(ident: string): Promise<string> {
 		return getInfraServiceLogs(this.deps, ident);

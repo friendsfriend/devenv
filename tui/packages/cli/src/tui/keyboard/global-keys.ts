@@ -76,7 +76,7 @@ const getConsoleText = (renderer: KeyboardContext['renderer']): string => {
   }
 };
 
-const copyText = async (text: string, uiStore: KeyboardStores['uiStore']): Promise<boolean> => {
+export const copyText = async (text: string, uiStore: Pick<KeyboardStores['uiStore'], 'setNotification'>): Promise<boolean> => {
   if (!text) return false;
   writeOsc52(text);
   const { copyToClipboard } = await import('@devenv/core');
@@ -288,8 +288,8 @@ export async function handleGlobalKeys(
         uiStore.setShowActionTargetPicker(false);
         const ident = uiStore.actionTargetPickerAppIdent();
         const infra = ident ? appStore.infraServices().find(s => s.ident === ident) : undefined;
-        if (infra && target.id.startsWith('infra:runner:')) {
-          void dockerActions.performDockerOperation('start', infra, undefined, undefined, target.runtime as 'shell' | 'powershell');
+        if (infra) {
+          void dockerActions.runSelectedInfrastructureTarget(infra, target);
         } else {
           const app = ident ? appStore.apps().find(a => a.ident === ident) : undefined;
           if (app) void dockerActions.runSelectedTarget(app, uiStore.actionTargetPickerAction(), target);

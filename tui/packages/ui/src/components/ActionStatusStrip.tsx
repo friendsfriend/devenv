@@ -1,8 +1,10 @@
 /** @jsxImportSource @opentui/solid */
 import { For, Show } from 'solid-js';
 import type { ActionRun, ActionRunStatus } from '@devenv/types';
+import { actionRunDisplayLabel } from '@devenv/types';
 import { uiColors } from '../colors';
 import { HighlightedText, type Highlight } from './Highlight';
+import { formatProfileLabel } from './ProfilePickerView';
 
 export interface ActionStatusStripProps {
   runs: ActionRun[];
@@ -39,7 +41,7 @@ const statusHighlight = (status: ActionRunStatus): Highlight => {
 };
 
 const timestamp = (run: ActionRun): number => Date.parse(run.finishedAt ?? run.startedAt ?? '') || 0;
-const label = (run: ActionRun): string => run.title.trim() || [run.action, run.targetLabel ?? run.appIdent].filter(Boolean).join(' ');
+const label = (run: ActionRun): string => actionRunDisplayLabel(run, formatProfileLabel);
 
 export function actionStatusSegments(runs: ActionRun[], width: number): ActionStatusSegment[] {
   if (width <= 0) return [];

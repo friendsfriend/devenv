@@ -18,7 +18,7 @@ import (
 	_ "modernc.org/sqlite" // pure-Go SQLite driver
 )
 
-const schemaVersion = 5
+const schemaVersion = 6
 
 // AppState holds the mutable runtime state for a single application.
 type AppState struct {
@@ -45,6 +45,14 @@ type AppRunTargetInfo struct {
 	SourcePath string
 	StartedAt  string
 	Display    string
+}
+
+type DependencyLease struct {
+	TargetID   string
+	OwnerRunID string
+	OwnerApp   string
+	Lifecycle  string
+	UpdatedAt  string
 }
 
 // Store provides read/write access to the runtime state database.
@@ -77,6 +85,9 @@ type Store interface {
 
 	// ClearAppRunTargetInfo clears persisted run target info for an app.
 	ClearAppRunTargetInfo(ident string) error
+	GetDependencyLeases() ([]DependencyLease, error)
+	SetDependencyLease(lease DependencyLease) error
+	DeleteDependencyLease(targetID, ownerRunID string) error
 
 	// GetScriptArgsHistory returns newest-first script argument entries for a script path.
 	GetScriptArgsHistory(relativePath string, limit int) ([]map[string]string, error)
@@ -184,6 +195,12 @@ func (s *sqliteStore) migrate() error {
 		}
 		current = 5
 	}
+	if current < 6 {
+		if err := s.applyV6(); err != nil {
+			return err
+		}
+		current = 6
+	}
 
 	if _, err := s.db.Exec(`
 		INSERT INTO schema_meta (key, value) VALUES ('version', ?)
@@ -246,6 +263,14 @@ func (s *sqliteStore) applyV3() error {
 }
 
 // applyV4 adds persisted app run target metadata.
+func (s *sqliteStore) applyV6() error {
+	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS dependency_leases (target_id TEXT NOT NULL, owner_run_id TEXT NOT NULL, owner_app TEXT NOT NULL, lifecycle TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(target_id, owner_run_id))`)
+	if err != nil {
+		return fmt.Errorf("creating dependency_leases table: %w", err)
+	}
+	return nil
+}
+
 func (s *sqliteStore) applyV5() error {
 	_, err := s.db.Exec(`
 		CREATE TABLE IF NOT EXISTS action_events (
@@ -610,6 +635,37 @@ func (s *sqliteStore) GetActionEvents(limit int) ([]string, error) {
 		return nil, fmt.Errorf("state: iterate action events: %w", err)
 	}
 	return events, nil
+}
+
+func (s *sqliteStore) GetDependencyLeases() ([]DependencyLease, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rows, err := s.db.Query(`SELECT target_id, owner_run_id, owner_app, lifecycle, updated_at FROM dependency_leases`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var leases []DependencyLease
+	for rows.Next() {
+		var l DependencyLease
+		if err := rows.Scan(&l.TargetID, &l.OwnerRunID, &l.OwnerApp, &l.Lifecycle, &l.UpdatedAt); err != nil {
+			return nil, err
+		}
+		leases = append(leases, l)
+	}
+	return leases, rows.Err()
+}
+func (s *sqliteStore) SetDependencyLease(lease DependencyLease) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.Exec(`INSERT INTO dependency_leases(target_id,owner_run_id,owner_app,lifecycle,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(target_id, owner_run_id) DO UPDATE SET owner_app=excluded.owner_app, lifecycle=excluded.lifecycle, updated_at=excluded.updated_at`, lease.TargetID, lease.OwnerRunID, lease.OwnerApp, lease.Lifecycle, lease.UpdatedAt)
+	return err
+}
+func (s *sqliteStore) DeleteDependencyLease(targetID, ownerRunID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, err := s.db.Exec(`DELETE FROM dependency_leases WHERE target_id=? AND owner_run_id=?`, targetID, ownerRunID)
+	return err
 }
 
 func (s *sqliteStore) Close() error {

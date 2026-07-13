@@ -1,3 +1,5 @@
+import type { ActionDefinition } from './action-definition';
+
 export type ActionRunStatus = 'pending' | 'active' | 'completed' | 'failed' | 'canceled';
 
 export interface ActionCommand {
@@ -11,6 +13,7 @@ export interface ActionCommand {
   startedAt?: string;
   finishedAt?: string;
   error?: string;
+  exitCode?: number;
 }
 
 export interface ActionStep {
@@ -24,7 +27,14 @@ export interface ActionStep {
   startedAt?: string;
   finishedAt?: string;
   error?: string;
+  definitionId?: string;
+  executionKey?: string;
+  outcome?: ActionStepOutcome;
+  canonicalId?: string;
+  sharedReference?: boolean;
 }
+
+export type ActionStepOutcome = 'executed' | 'already-running' | 'skipped' | 'failed';
 
 export interface ActionRun {
   id: string;
@@ -40,6 +50,8 @@ export interface ActionRun {
   startedAt?: string;
   finishedAt?: string;
   collapsed?: boolean;
+  registryVersion?: number;
+  definitionSnapshot?: ActionDefinition;
 }
 
 export type ActionEventProperties =

@@ -586,7 +586,14 @@ export async function handleTableKeys(
 			}
 			// Start selected item.
 			if (appList.length > 0) {
-				const app = getSelectedApp();
+				// getSelectedApp intentionally excludes rowKind:"infra". Resolve
+				// infrastructure from its own registry, or `s` silently exits before
+				// invoking the start operation.
+				const selectedRow = appList[appStore.selectedIndex()];
+				const infra = selectedRow?.rowKind === "infra"
+					? appStore.infraServices().find((svc) => svc.ident === selectedRow.ident)
+					: undefined;
+				const app = infra ?? getSelectedApp();
 				if (!app) break;
 				if (app.operationStatus?.status === "active") {
 					appStore.pushModal('actions');
@@ -601,8 +608,8 @@ export async function handleTableKeys(
 					appStore.pushModal('actions');
 					break;
 				}
-				if (appStore.activeTab() === "infrastructure") {
-					void dockerActions.performDockerOperation("start", app as any);
+				if (infra) {
+					dockerActions.openInfrastructureStartTargetPicker(infra);
 				} else {
 					void dockerActions.performAppAction("run");
 				}

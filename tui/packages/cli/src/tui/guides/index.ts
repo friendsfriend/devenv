@@ -45,6 +45,13 @@ export const guides: Guide[] = [
     import: () => import("./choosing-runtime.md", { with: { type: "text" } }).then((m) => m.default),
   },
   {
+    key: "combining-runtimes",
+    title: "Combining Runtimes",
+    description: "Connect Docker, Podman, shell, scripts, and Kubernetes safely",
+    category: "Runtimes",
+    import: () => import("./combining-runtimes.md", { with: { type: "text" } }).then((m) => m.default),
+  },
+  {
     key: "effective-docker-builds",
     title: "Effective Docker Builds",
     description: "Write fast Dockerfiles for Docker and Podman build targets",

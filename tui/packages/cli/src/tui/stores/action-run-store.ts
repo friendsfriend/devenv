@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js';
+import { createEffect, createSignal } from 'solid-js';
 import type { ActionCommand, ActionRun, ActionStep, ActionRunStatus } from '@devenv/types';
 
 export type ActionTreeNode =
@@ -16,7 +16,21 @@ export function createActionRunStore() {
   const [hasOlderHistory, setHasOlderHistory] = createSignal(true);
   let loadOlderHistoryHandler: (() => Promise<void>) | undefined;
   const [userMovedFocus, setUserMovedFocus] = createSignal(false);
+
+  // Auto-select last run when runs change and nothing focused.
+  createEffect(() => {
+    const all = runs();
+    if (all.length > 0 && !selectedRunId()) {
+      const last = all[all.length - 1];
+      setSelectedRunId(last.id);
+      setFocusedNode('action');
+      setFocusedStepId(null);
+      setFocusedStepKey(null);
+      setFocusedPanel(0);
+    }
+  });
   let logScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
+  let treeScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
   const pendingOutput = new Map<string, { runId: string; commandId: string; stdout: string; stderr: string }>();
   let outputFlushTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -78,7 +92,7 @@ export function createActionRunStore() {
     return selected ? entriesForRun(selected).map(({ step, key }) => ({ step, key })) : [];
   };
   const orderedSteps = () => orderedEntries().map((entry) => entry.step);
-  const isSingleNodeAction = (action: ActionRun) => action.action === 'build' || action.action === 'test' || action.action === 'stop';
+  const isSingleNodeAction = (action: ActionRun) => action.steps.length <= 1;
   const visibleNodes = (): ActionTreeNode[] => {
     const nodes = runs().flatMap((action): ActionTreeNode[] => {
       const showsSteps = !isSingleNodeAction(action);
@@ -111,6 +125,16 @@ export function createActionRunStore() {
     if (node.kind === 'action') selectRun(node.run.id);
     else if (node.kind === 'step') focusStep(node.step.id, node.key, node.run.id);
     else { setFocusedNode('loadOlder'); setFocusedStepId(null); setFocusedStepKey(null); setUserMovedFocus(true); }
+  };
+  const selectLastIfNone = () => {
+    if (selectedRunId()) return;
+    const last = runs().at(-1);
+    if (!last) return;
+    setSelectedRunId(last.id);
+    setFocusedNode('action');
+    setFocusedStepId(null);
+    setFocusedStepKey(null);
+    setFocusedPanel(0);
   };
   const configureHistoryLoader = (loader: () => Promise<void>) => { loadOlderHistoryHandler = loader; setHasOlderHistory(true); };
   const loadOlderHistory = async () => { if (!loadOlderHistoryHandler || !hasOlderHistory()) return; await loadOlderHistoryHandler(); setHasOlderHistory(false); };
@@ -152,11 +176,22 @@ export function createActionRunStore() {
     return revealFailure ? expandFailurePath(next, id) : next;
   });
   const normalizeStep = (step: ActionStep & { command?: string; output?: string }): ActionStep => ({ ...step, commands: step.commands ?? (step.command ? [{ id: `${step.id}-command-0`, command: step.command, status: step.status, stdout: step.output ?? '', stderr: '' }] : []) });
+  const snapshotSteps = (run: ActionRun): ActionStep[] => {
+    if (!run.definitionSnapshot) return [];
+    const steps: ActionStep[] = [];
+    const visit = (step: typeof run.definitionSnapshot.root, parentId?: string, depth = 0) => {
+      steps.push({ id: step.id, definitionId: step.id, executionKey: step.executionKey, label: step.label, parentId, depth, status: 'pending', commands: [] });
+      for (const child of step.children ?? []) visit(child, step.id, depth + 1);
+    };
+    visit(run.definitionSnapshot.root);
+    return steps;
+  };
 
   const handleEvent = (type: string, properties: Record<string, unknown>) => {
     if (type === 'action.started') {
       const incoming = properties.run as ActionRun;
-      const normalized = { ...incoming, startedAt: incoming.startedAt ?? new Date().toISOString(), steps: incoming.steps.map(normalizeStep) };
+      const sourceSteps = (incoming.steps?.length ?? 0) > 0 ? incoming.steps : snapshotSteps(incoming);
+      const normalized = { ...incoming, startedAt: incoming.startedAt ?? new Date().toISOString(), steps: sourceSteps.map(normalizeStep) };
       const failedStep = deepestFailedStep(normalized);
       const next = failedStep ? expandFailurePath(normalized, failedStep.id) : normalized;
       setRuns((current) => [...current.filter((candidate) => candidate.id !== next.id), next]);
@@ -172,25 +207,51 @@ export function createActionRunStore() {
     const current = runs().find((candidate) => candidate.id === runId);
     if (!current) return;
     const stepId = String(properties.stepId ?? '');
-    const step = current.steps.find((candidate) => candidate.id === stepId);
+    let step = current.steps.find((candidate) => candidate.id === stepId);
     const commandId = String(properties.commandId ?? step?.commands.at(-1)?.id ?? `${stepId}-command-0`);
-    if (type === 'action.step.started') { updateStep(runId, stepId, (s) => ({ ...s, status: 'active' })); autoFocus(runId, stepId); }
+    if (type === 'action.step.started') {
+      if (!step) {
+        step = { id: stepId, parentId: properties.parentId ? String(properties.parentId) : undefined, label: String(properties.label ?? properties.command ?? stepId), status: 'pending', commands: [] };
+        setRunById(runId, (action) => ({ ...action, steps: [...action.steps, step!] }));
+      }
+      updateStep(runId, stepId, (s) => ({ ...s, status: 'active' })); autoFocus(runId, stepId);
+    } else if (type === 'action.step.reference') {
+      if (!step) {
+        step = { id: stepId, parentId: properties.parentId ? String(properties.parentId) : undefined, label: String(properties.label ?? stepId), status: 'pending', sharedReference: true, commands: [] };
+        setRunById(runId, (action) => ({ ...action, steps: [...action.steps, step!] }));
+      } else {
+        updateStep(runId, stepId, (s) => ({ ...s, sharedReference: true }));
+      }
+    }
     else if (type === 'action.command.started') {
       const command: ActionCommand = { id: commandId, command: String(properties.command ?? ''), status: 'active', stdout: '', stderr: '' };
-      updateStep(runId, stepId, (s) => ({ ...s, status: 'active', commands: [...s.commands, command] })); autoFocus(runId, stepId);
+      updateStep(runId, stepId, (s) => ({ ...s, status: s.status === 'completed' || s.status === 'failed' ? s.status : 'active', commands: [...s.commands, command] })); autoFocus(runId, stepId);
     } else if (type === 'action.step.output' || type === 'action.command.output') {
-      if (!step?.commands.some((command) => command.id === commandId)) updateStep(runId, stepId, (s) => ({ ...s, status: 'active', commands: [...s.commands, { id: commandId, command: String(properties.command ?? ''), status: 'active', stdout: '', stderr: '' }] }));
+      if (!step?.commands.some((command) => command.id === commandId)) updateStep(runId, stepId, (s) => ({ ...s, status: s.status === 'completed' || s.status === 'failed' ? s.status : 'active', commands: [...s.commands, { id: commandId, command: String(properties.command ?? ''), status: 'active', stdout: '', stderr: '' }] }));
       queueOutput(runId, commandId, properties.stream === 'stderr' ? 'stderr' : 'stdout', String(properties.output ?? ''));
     } else if (type === 'action.command.completed') updateStep(runId, stepId, (s) => {
-      const commands = s.commands.map((command) => command.id === commandId ? { ...command, status: 'completed' as const } : command);
+      const commands = s.commands.map((command) => command.id === commandId ? { ...command, status: 'completed' as const, exitCode: typeof properties.exitCode === 'number' ? properties.exitCode : command.exitCode } : command);
       return { ...s, commands, status: commands.every((command) => command.status === 'completed') ? 'completed' : s.status };
     });
     else if (type === 'action.command.failed') {
-      updateStep(runId, stepId, (s) => ({ ...s, status: 'failed', error: String(properties.error ?? ''), commands: s.commands.map((command) => command.id === commandId ? { ...command, status: 'failed', error: String(properties.error ?? '') } : command) }), true);
+      updateStep(runId, stepId, (s) => ({ ...s, status: 'failed', error: String(properties.error ?? ''), commands: s.commands.map((command) => command.id === commandId ? { ...command, status: 'failed', error: String(properties.error ?? ''), exitCode: typeof properties.exitCode === 'number' ? properties.exitCode : command.exitCode } : command) }), true);
       setSelectedRunId(runId); setFocusedNode(isSingleNodeAction(current) ? 'action' : 'step'); setFocusedStepId(isSingleNodeAction(current) ? null : stepId); setFocusedStepKey(isSingleNodeAction(current) ? null : stepKey(runId, stepId));
-    } else if (type === 'action.step.completed') updateStep(runId, stepId, (s) => ({ ...s, status: 'completed' }));
+    } else if (type === 'action.step.completed') {
+      const hasChildren = current.steps.some((s) => s.parentId === stepId);
+      updateStep(runId, stepId, (s) => ({ ...s, status: 'completed', collapsed: hasChildren ? true : s.collapsed }));
+    }
     else if (type === 'action.step.failed') {
-      updateStep(runId, stepId, (s) => ({ ...s, status: 'failed', error: String(properties.error ?? '') }), true);
+      const errorText = String(properties.error ?? '');
+      updateStep(runId, stepId, (s) => ({
+        ...s,
+        status: 'failed',
+        error: errorText,
+        // A step can fail while it still has an unresolved/active command
+        // (e.g. a readiness poll after its own start command already
+        // completed). Surface the failure on that command too so the log
+        // panel shows why the step failed instead of stale success output.
+        commands: s.commands.map((command) => command.status === 'active' ? { ...command, status: 'failed' as const, error: command.error || errorText } : command),
+      }), true);
       setSelectedRunId(runId); setFocusedNode(isSingleNodeAction(current) ? 'action' : 'step'); setFocusedStepId(isSingleNodeAction(current) ? null : stepId); setFocusedStepKey(isSingleNodeAction(current) ? null : stepKey(runId, stepId));
     } else if (type === 'action.completed') setRunById(runId, (action) => {
       const status = properties.status as ActionRunStatus;
@@ -198,7 +259,7 @@ export function createActionRunStore() {
         ...action,
         status,
         finishedAt: action.finishedAt ?? new Date().toISOString(),
-        collapsed: status === 'completed' && selectedRunId() !== runId ? true : action.collapsed,
+        collapsed: status === 'completed' ? true : action.collapsed,
         steps: action.steps.map((item) => {
           if (status === 'completed' && item.status !== 'failed' && item.status !== 'canceled') return { ...item, status: 'completed' as const };
           if (status === 'failed' && item.status === 'active') return { ...item, status: 'failed' as const };
@@ -213,6 +274,6 @@ export function createActionRunStore() {
   const cancelSelected = () => { const id = selectedRunId(); if (id) setRunById(id, (action) => ({ ...action, status: 'canceled', collapsed: true })); };
   const toggleStep = (id: string) => { const runId = selectedRunId(); if (runId) setRunById(runId, (action) => ({ ...action, steps: action.steps.map((step) => step.id === id ? { ...step, collapsed: !step.collapsed } : step) })); };
   const toggleRunCollapsed = (id: string) => setRunById(id, (action) => ({ ...action, collapsed: !action.collapsed }));
-  return { run, runs, selectedRunId, focusedNode, focusedTreeKey, selectedNode, visibleNodes, hasOlderHistory, configureHistoryLoader, loadOlderHistory, cancelSelected, toggleStep, toggleRunCollapsed, selectRun, focusTreeNode, orderedSteps, orderedEntries, focusedStepId, focusedStepKey, focusedPanel, setFocusedPanel, userMovedFocus, focusStep, handleEvent, get logScrollBoxRef() { return logScrollBoxRef; }, set logScrollBoxRef(value) { logScrollBoxRef = value; } };
+  return { run, runs, selectedRunId, focusedNode, focusedTreeKey, selectedNode, visibleNodes, hasOlderHistory, configureHistoryLoader, loadOlderHistory, cancelSelected, toggleStep, toggleRunCollapsed, selectRun, focusTreeNode, orderedSteps, orderedEntries, focusedStepId, focusedStepKey, focusedPanel, setFocusedPanel, userMovedFocus, focusStep, handleEvent, selectLastIfNone, get logScrollBoxRef() { return logScrollBoxRef; }, set logScrollBoxRef(value) { logScrollBoxRef = value; }, get treeScrollBoxRef() { return treeScrollBoxRef; }, set treeScrollBoxRef(value) { treeScrollBoxRef = value; } };
 }
 export type ActionRunStore = ReturnType<typeof createActionRunStore>;

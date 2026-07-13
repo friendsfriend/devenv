@@ -3,6 +3,7 @@ import { createTestKeymap } from '@opentui/keymap/testing';
 import { setupDevenvKeymap } from './keymap-setup';
 import { applyKeymapRuntimeSnapshot } from './keymap-runtime';
 import { registerTableKeymapLayer } from './table-keymap-layer';
+import { handleTableKeys } from './table-keys';
 import type { KeyboardActions, KeyboardContext, KeyboardStores } from './types';
 
 const signalStore = (overrides: Record<string, unknown> = {}) => new Proxy(overrides, {
@@ -66,6 +67,22 @@ describe('table keymap layer', () => {
 		} finally {
 			cleanup();
 		}
+	});
+
+	test('s starts selected infrastructure service even though getSelectedApp excludes infra rows', async () => {
+		const infra = { ident: 'postgres', displayName: 'Postgres', type: 'docker', operationStatus: undefined };
+		const stores = makeStores({
+			activeTab: () => 'infrastructure',
+			tableFilteredApps: () => [{ rowKind: 'infra', ident: 'postgres' }],
+			infraServices: () => [infra],
+			selectedIndex: () => 0,
+			operationInProgressForApp: () => null,
+			apps: () => [],
+		});
+		let started: unknown;
+		const keyboardActions = actions({ dockerActions: signalStore({ openInfrastructureStartTargetPicker: (service: unknown) => { started = ['picker', service]; } }) as never });
+		await handleTableKeys({ name: 's', sequence: 's' }, stores, keyboardActions, ctx());
+		expect(started).toEqual(['picker', infra]);
 	});
 
 	test('uppercase L opens action history without starting action', () => {

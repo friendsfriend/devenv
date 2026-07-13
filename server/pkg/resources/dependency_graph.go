@@ -13,15 +13,41 @@ const (
 	TargetKindInfra  TargetKind = "infra"
 )
 
+type TargetIdentity struct {
+	Kind     TargetKind
+	App      string
+	Infra    string
+	Runtime  ActionRuntime
+	Profile  string
+	Provider ContainerProvider
+}
+
+func (i TargetIdentity) String() string {
+	owner := i.App
+	if i.Kind == TargetKindInfra {
+		owner = i.Infra
+	}
+	parts := []string{string(i.Kind), owner, string(i.Runtime), i.Profile}
+	if i.Provider != "" {
+		parts = append(parts, string(i.Provider))
+	}
+	return strings.Join(parts, "/")
+}
+
 type RegistryTarget struct {
 	ID       string
 	Kind     TargetKind
 	App      string
 	Runtime  ActionRuntime
 	Profile  string
+	Provider ContainerProvider
 	Infra    string
 	Requires []DependencyRef
 	Running  bool
+}
+
+func (t RegistryTarget) Identity() TargetIdentity {
+	return TargetIdentity{Kind: t.Kind, App: t.App, Infra: t.Infra, Runtime: t.Runtime, Profile: t.Profile, Provider: t.Provider}
 }
 
 type TargetRegistry struct {
@@ -37,7 +63,15 @@ func NewTargetRegistry(targets []RegistryTarget) TargetRegistry {
 }
 
 func AppRunTargetID(appIdent string, runtime ActionRuntime, profile string) string {
-	return actionTargetID(appIdent, AppActionRun, runtime, profile)
+	return AppRuntimeTargetID(appIdent, runtime, profile, "")
+}
+
+func AppRuntimeTargetID(appIdent string, runtime ActionRuntime, profile string, provider ContainerProvider) string {
+	id := actionTargetID(appIdent, AppActionRun, runtime, profile)
+	if provider == "" {
+		return id
+	}
+	return id + "/" + string(provider)
 }
 
 func InfraTargetID(infraIdent string) string {
@@ -45,15 +79,23 @@ func InfraTargetID(infraIdent string) string {
 }
 
 func InfraRuntimeTargetID(infraIdent, runtime, profile string) string {
+	return InfraRuntimeProviderTargetID(infraIdent, runtime, profile, "")
+}
+
+func InfraRuntimeProviderTargetID(infraIdent, runtime, profile string, provider ContainerProvider) string {
 	if strings.TrimSpace(runtime) == "" || strings.TrimSpace(profile) == "" {
 		return InfraTargetID(infraIdent)
 	}
-	return fmt.Sprintf("infra/%s/%s/%s", infraIdent, runtime, profile)
+	id := fmt.Sprintf("infra/%s/%s/%s", infraIdent, runtime, profile)
+	if provider == "" {
+		return id
+	}
+	return id + "/" + string(provider)
 }
 
 func (r TargetRegistry) ResolveRef(ref DependencyRef) (string, error) {
 	if strings.TrimSpace(ref.Infra) != "" {
-		id := InfraRuntimeTargetID(ref.Infra, ref.Runtime, ref.Profile)
+		id := InfraRuntimeProviderTargetID(ref.Infra, ref.Runtime, ref.Profile, ref.Provider)
 		if _, ok := r.targets[id]; !ok {
 			if ref.Runtime != "" || ref.Profile != "" {
 				return "", fmt.Errorf("unknown infrastructure target %q runtime %q profile %q", ref.Infra, ref.Runtime, ref.Profile)
@@ -71,7 +113,7 @@ func (r TargetRegistry) ResolveRef(ref DependencyRef) (string, error) {
 	if strings.TrimSpace(ref.Profile) == "" {
 		return "", fmt.Errorf("app dependency %q requires profile", ref.App)
 	}
-	id := AppRunTargetID(ref.App, ActionRuntime(ref.Runtime), ref.Profile)
+	id := AppRuntimeTargetID(ref.App, ActionRuntime(ref.Runtime), ref.Profile, ref.Provider)
 	if _, ok := r.targets[id]; !ok {
 		return "", fmt.Errorf("unknown app run target %q runtime %q profile %q", ref.App, ref.Runtime, ref.Profile)
 	}
@@ -146,9 +188,9 @@ func (r TargetRegistry) ResolveStartPlan(rootID string) ([]RegistryTarget, error
 
 func refKey(ref DependencyRef) string {
 	if ref.Infra != "" {
-		return InfraRuntimeTargetID(ref.Infra, ref.Runtime, ref.Profile)
+		return InfraRuntimeProviderTargetID(ref.Infra, ref.Runtime, ref.Profile, ref.Provider)
 	}
-	return AppRunTargetID(ref.App, ActionRuntime(ref.Runtime), ref.Profile)
+	return AppRuntimeTargetID(ref.App, ActionRuntime(ref.Runtime), ref.Profile, ref.Provider)
 }
 
 func appendCycle(stack []string, id string) []string {

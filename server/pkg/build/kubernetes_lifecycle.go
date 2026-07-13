@@ -9,11 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/friendsfriend/devenv/pkg/actionrun"
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
 	k8s "github.com/friendsfriend/devenv/pkg/kubernetes"
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
+
+func kubernetesClusterStepID(appIdent, phase string) string {
+	return "kubernetes:cluster:" + appIdent + ":" + phase
+}
 
 func (s *service) runKubernetesTarget(a *app.App, target resources.ActionTarget, logPath string, statusCb func(string)) {
 	if target.Kubernetes == nil {
@@ -96,38 +101,69 @@ func (s *service) StopKubernetesRun(a app.App, target resources.ActionTarget) er
 }
 
 func (s *service) ensureKubernetesCluster(a *app.App, runner k8s.Runner, logPath string, statusCb func(string)) bool {
+	checkID := kubernetesClusterStepID(a.Ident, "check")
+	createID := kubernetesClusterStepID(a.Ident, "create")
+	exportID := kubernetesClusterStepID(a.Ident, "export")
+	s.SetActionStep(checkID)
+	s.emitActionStep(checkID, string(actionrun.StepKindKubernetesClusterCheck), "started", "")
 	statusCb("checking kind cluster...")
 	get := runner.KindGetClustersCommand()
-	err, output := s.executor.RunCommandSilent(get.Name, get.Args, get.Env, a.LocalDirectoryPath)
-	s.logSilentCommand(logPath, get.Name, get.Args, get.Env, a.LocalDirectoryPath, output, err)
+	err, output := s.runKubernetesActionCommand(a, get, logPath)
 	if err == nil {
 		for _, line := range strings.Split(output, "\n") {
 			if strings.TrimSpace(line) == k8s.DefaultClusterName {
 				statusCb("using existing kind cluster")
-				s.refreshKindKubeconfig(a, runner, logPath)
+				s.emitActionStep(checkID, "", "completed", "")
+				if !s.refreshKindKubeconfig(a, runner, logPath, exportID) {
+					return false
+				}
 				return true
 			}
 		}
 	}
+	s.emitActionStep(checkID, "", "completed", "cluster missing")
+	s.SetActionStep(createID)
+	s.emitActionStep(createID, string(actionrun.StepKindKubernetesClusterCreate), "started", "")
 	statusCb("creating kind cluster...")
 	create := runner.KindCreateClusterCommand()
-	if runErr, output := s.executor.RunCommandWithLoggingToFile(a.Ident, create.Name, create.Args, create.Env, a.LocalDirectoryPath, logPath); runErr != nil {
+	if runErr, output := s.runKubernetesActionCommand(a, create, logPath); runErr != nil {
 		if strings.Contains(output, "already exist") || strings.Contains(output, "already exists") {
 			statusCb("using existing kind cluster")
-			s.refreshKindKubeconfig(a, runner, logPath)
-			return true
+		} else {
+			s.emitActionStep(createID, "", "failed", runErr.Error())
+			statusCb("Error: " + runErr.Error())
+			return false
 		}
-		statusCb("Error: " + runErr.Error())
+	}
+	s.emitActionStep(createID, "", "completed", "")
+	if !s.refreshKindKubeconfig(a, runner, logPath, exportID) {
 		return false
 	}
-	s.refreshKindKubeconfig(a, runner, logPath)
 	return true
 }
 
-func (s *service) refreshKindKubeconfig(a *app.App, runner k8s.Runner, logPath string) {
+func (s *service) runActionSilent(appIdent, command string, args, env []string, workingDir string) (error, string) {
+	if runner, ok := s.executor.(actionSilentRunner); ok {
+		return runner.RunCommandSilentForAction(appIdent, command, args, env, workingDir)
+	}
+	return s.executor.RunCommandSilent(command, args, env, workingDir)
+}
+
+func (s *service) runKubernetesActionCommand(a *app.App, cmd k8s.Command, logPath string) (error, string) {
+	return s.executor.RunCommandWithLoggingToFile(a.Ident, cmd.Name, cmd.Args, cmd.Env, a.LocalDirectoryPath, logPath)
+}
+
+func (s *service) refreshKindKubeconfig(a *app.App, runner k8s.Runner, logPath, stepID string) bool {
+	s.SetActionStep(stepID)
+	s.emitActionStep(stepID, string(actionrun.StepKindKubernetesClusterExport), "started", "")
 	cmd := runner.KindExportKubeconfigCommand()
-	err, output := s.executor.RunCommandSilent(cmd.Name, cmd.Args, cmd.Env, a.LocalDirectoryPath)
-	s.logSilentCommand(logPath, cmd.Name, cmd.Args, cmd.Env, a.LocalDirectoryPath, output, err)
+	err, _ := s.runKubernetesActionCommand(a, cmd, logPath)
+	if err != nil {
+		s.emitActionStep(stepID, "", "failed", err.Error())
+		return false
+	}
+	s.emitActionStep(stepID, "", "completed", "")
+	return true
 }
 
 func (s *service) applyKubernetesSecrets(a *app.App, target resources.ActionTarget, runner k8s.Runner, logPath string, statusCb func(string)) bool {
@@ -155,20 +191,36 @@ func (s *service) applyKubernetesSecrets(a *app.App, target resources.ActionTarg
 	for _, plan := range plans {
 		statusCb(fmt.Sprintf("creating Kubernetes Secret %s with keys %s...", plan.Name, strings.Join(plan.Keys, ",")))
 		deleteCmd := runner.KubectlCommandFor("delete", "secret", plan.Name, "--namespace", plan.Namespace, "--ignore-not-found")
-		deleteErr, deleteOut := s.executor.RunCommandSilent(deleteCmd.Name, deleteCmd.Args, deleteCmd.Env, a.LocalDirectoryPath)
+		secretStepID := fmt.Sprintf("kubernetes:secret:%s:delete", plan.Name)
+		s.SetActionStep(secretStepID)
+		s.emitActionStep(secretStepID, actionrun.EncodeStepKind(actionrun.StepKindKubernetesSecretDelete, plan.Name), "started", "")
+		deleteErr, deleteOut := s.runActionSilent(a.Ident, deleteCmd.Name, deleteCmd.Args, deleteCmd.Env, a.LocalDirectoryPath)
 		s.logSilentCommand(logPath, deleteCmd.Name, deleteCmd.Args, deleteCmd.Env, a.LocalDirectoryPath, deleteOut, deleteErr)
 		if deleteErr != nil {
+			s.emitActionStep(secretStepID, "", "failed", deleteErr.Error())
 			statusCb("Error: " + deleteErr.Error())
 			return false
 		}
 		createCmd := plan.Command
 		createCmd.Args = secretCreateArgs(plan)
-		createErr, createOut := s.executor.RunCommandSilent(createCmd.Name, createCmd.Args, createCmd.Env, a.LocalDirectoryPath)
+		s.emitActionStep(secretStepID, "", "completed", "")
+		secretStepID = fmt.Sprintf("kubernetes:secret:%s:create", plan.Name)
+		s.SetActionStep(secretStepID)
+		s.emitActionStep(secretStepID, actionrun.EncodeStepKind(actionrun.StepKindKubernetesSecretCreate, plan.Name), "started", "")
+		var createErr error
+		var createOut string
+		if actionRunner, ok := s.executor.(actionSilentRunner); ok {
+			createErr, createOut = actionRunner.RunCommandSilentForActionDisplay(a.Ident, createCmd.Name, createCmd.Args, k8s.RedactSecretCommand(plan).Args, createCmd.Env, a.LocalDirectoryPath)
+		} else {
+			createErr, createOut = s.executor.RunCommandSilent(createCmd.Name, createCmd.Args, createCmd.Env, a.LocalDirectoryPath)
+		}
 		s.logSilentCommand(logPath, createCmd.Name, k8s.RedactSecretCommand(plan).Args, createCmd.Env, a.LocalDirectoryPath, createOut, createErr)
 		if createErr != nil {
+			s.emitActionStep(secretStepID, "", "failed", createErr.Error())
 			statusCb("Error: " + createErr.Error())
 			return false
 		}
+		s.emitActionStep(secretStepID, "", "completed", "")
 	}
 	return true
 }
@@ -199,10 +251,24 @@ func (s *service) startKubernetesPortForwards(appIdent string, target resources.
 	s.stopKubernetesPortForwards(appIdent)
 	for _, port := range target.Kubernetes.Ports {
 		cmdSpec := k8s.PortForwardCommand(runner, target.Kubernetes.Namespace, port)
+		stepID := fmt.Sprintf("kubernetes:port-forward:%s", port.Name)
+		s.SetActionStep(stepID)
+		s.emitActionStep(stepID, actionrun.EncodeStepKind(actionrun.StepKindKubernetesPortForward, port.Name), "started", "")
+		s.actionMu.RLock()
+		binding := s.actionBindings[appIdent]
+		s.actionMu.RUnlock()
+		if binding.command != nil {
+			binding.command(stepID, cmdSpec.Name, cmdSpec.Args)
+		}
 		cmd := exec.Command(cmdSpec.Name, cmdSpec.Args...)
 		cmd.Env = append(cmd.Env, cmdSpec.Env...)
-		if err := cmd.Start(); err != nil {
-			statusCb("Port-forward failed: " + err.Error())
+		startErr := cmd.Start()
+		if binding.done != nil {
+			binding.done(stepID, startErr)
+		}
+		if startErr != nil {
+			s.emitActionStep(stepID, "", "failed", startErr.Error())
+			statusCb("Port-forward failed: " + startErr.Error())
 			continue
 		}
 		s.portForwardMu.Lock()
@@ -211,6 +277,7 @@ func (s *service) startKubernetesPortForwards(appIdent string, target resources.
 		}
 		s.portForwards[appIdent] = append(s.portForwards[appIdent], cmd)
 		s.portForwardMu.Unlock()
+		s.emitActionStep(stepID, "", "completed", "")
 		statusCb(fmt.Sprintf("port-forward %s localhost:%d -> %s:%d", port.Name, port.LocalPort, port.Resource, port.RemotePort))
 	}
 }
@@ -252,6 +319,12 @@ func (s *service) ClearKubernetesRuntimeState() {
 }
 
 func (s *service) logSilentCommand(_ string, command string, args []string, _ []string, _ string, output string, err error) {
+	// RunCommandSilentForAction already publishes start/output/completion. The
+	// legacy bridge below exists only for non-action-aware executors; emitting
+	// both creates duplicate action steps for inspect/create/cp/rm commands.
+	if _, ok := s.executor.(actionSilentRunner); ok {
+		return
+	}
 	s.actionMu.RLock()
 	binding := s.actionBindings[s.actionAppIdent]
 	s.actionMu.RUnlock()

@@ -82,17 +82,17 @@ The system SHALL stop Docker-compatible app run targets using the selected or ac
 - **THEN** the system SHALL leave dependencies running
 
 ### Requirement: Execute shell build and test targets
-The system SHALL execute shell build and test targets by running their configured `.sh` file with the app checkout directory as the working directory and app-scoped logging enabled.
+The system SHALL execute shell build and test targets by running configured script with app checkout directory as working directory and action command/output capture enabled.
 
 #### Scenario: Shell build target selected
-- **WHEN** the user selects the shell build target for `my-app`
-- **THEN** the system SHALL run `apps/build/my-app-build.sh` with `my-app`'s local checkout as the working directory
-- **THEN** the system SHALL write command output to the app operation logs
+- **WHEN** user selects shell build target for `my-app`
+- **THEN** system runs `apps/build/my-app-build.sh` in app checkout
+- **AND** action retains command, stdout, stderr, and exit status
 
 #### Scenario: Shell test target fails
-- **WHEN** `apps/build/my-app-test.sh` exits with a non-zero status
-- **THEN** the system SHALL mark the test operation as failed
-- **THEN** the system SHALL surface the failure in operation status and logs
+- **WHEN** `apps/build/my-app-test.sh` exits non-zero
+- **THEN** test action is failed
+- **AND** action modal surfaces command output and failure
 
 ### Requirement: Discover shell run profiles from script files
 The system SHALL discover shell run profiles from files named `apps/run/<app-ident>-<profile>.sh`.
@@ -217,16 +217,15 @@ The system SHALL include parsed run dependencies in normalized action target dat
 - **THEN** the picker SHALL show both targets with labels that distinguish runtime
 
 ### Requirement: Execute PowerShell run targets
-The system SHALL execute PowerShell run targets by running their configured `.ps1` file with the app checkout directory as the working directory and app-scoped logging/status enabled.
+The system SHALL execute PowerShell run targets with app checkout as working directory and action command/output capture enabled.
 
 #### Scenario: PowerShell run target selected
-- **WHEN** the user selects PowerShell run profile `dev` for `my-app`
-- **THEN** the system SHALL run `apps/run/my-app-dev.ps1` using PowerShell
-- **THEN** the working directory SHALL be `my-app`'s local checkout
+- **WHEN** user selects PowerShell run profile `dev`
+- **THEN** action retains PowerShell command, output, and exit status
 
 #### Scenario: PowerShell runtime unavailable
-- **WHEN** the user selects a PowerShell run target and PowerShell is not available
-- **THEN** the operation SHALL fail with a clear user-visible error
+- **WHEN** PowerShell is unavailable
+- **THEN** action fails with clear error
 
 ### Requirement: Discover Kubernetes run targets
 The system SHALL discover Kubernetes app run targets from Helm chart configuration and include them in normalized action target responses alongside Docker, shell, PowerShell, and systemshell targets.
@@ -245,17 +244,17 @@ The system SHALL discover Kubernetes app run targets from Helm chart configurati
 - **THEN** the system SHALL expose each target as a separate normalized run target with a distinct profile
 
 ### Requirement: Execute Kubernetes run targets through Kubernetes runtime
-The system SHALL route selected Kubernetes run targets to the Kubernetes runtime executor instead of Docker Compose or shell execution paths.
+The system SHALL route Kubernetes targets through managed Kubernetes lifecycle and report all user-facing execution through actions.
 
 #### Scenario: Kubernetes run target selected
-- **WHEN** the user selects a Kubernetes run target for `my-app`
-- **THEN** the backend SHALL execute the target using the managed kind and Helm lifecycle
-- **THEN** the operation SHALL report progress through normal app operation status and logs
+- **WHEN** user selects Kubernetes run target
+- **THEN** backend executes managed kind/Helm lifecycle
+- **AND** commands, output, and status are retained in action
 
 #### Scenario: Stop Kubernetes run target
-- **WHEN** the user stops an app whose active run target is Kubernetes
-- **THEN** the backend SHALL uninstall that app's Helm release and stop tracked port forwards for that app
-- **THEN** the backend SHALL NOT invoke Docker Compose down or shell tmux termination for that target
+- **WHEN** user stops active Kubernetes target
+- **THEN** backend uninstalls release and stops port forwards
+- **AND** stop action retains command/output details
 
 ### Requirement: Provide picker-style target display metadata for executed run targets
 The system SHALL provide enough metadata from executed app run targets to reproduce the same user-facing target text used by the target picker.

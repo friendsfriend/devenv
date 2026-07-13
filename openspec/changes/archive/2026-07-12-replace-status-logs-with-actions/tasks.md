@@ -56,3 +56,14 @@
 - [x] 8.1 Run full TUI and server test suites and Go vet
 - [x] 8.2 Test compact strip and modal in terminal MCP at narrow and wide sizes
 - [x] 8.3 Check pi-lens issues and resolve relevant findings
+
+## 9. Action Detail Remediation
+
+- [x] 9.1 Capture real Git backend commands, stdout, stderr, exit status, and errors instead of HTTP request placeholders
+- [x] 9.2 Split multi-command Git operations into semantic action steps, including fetch, reset, pull, checkout, branch, and worktree work
+- [x] 9.3 Capture real Kubernetes cluster lifecycle commands and split multi-command operations into semantic steps
+- [x] 9.4 Add Kubernetes cluster existence/creation dependency steps to every Kubernetes app-start action
+- [x] 9.5 Render every single-step action as one action row without a redundant step row
+- [x] 9.6 Audit other HTTP-wrapped operations and replace request placeholders with backend command/step instrumentation
+- [x] 9.7 Add command/output/exit-code, multi-step, dependency, and single-row regression tests
+- [x] 9.8 Run full verification, terminal MCP checks, and pi-lens check again

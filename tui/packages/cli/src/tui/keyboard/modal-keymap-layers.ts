@@ -44,10 +44,10 @@ export function registerModalKeymapLayers(
 	const runTable = (event: KeyEvent) => handleTableKeys(event, deps.stores, deps.actions, deps.ctx);
 	const runActions = async (event: KeyEvent) => {
 		if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc') {
-			return handleActionsKeys(event, deps.stores.actionRunStore, deps.stores.appStore, deps.actions.dockerActions);
+			return handleActionsKeys(event, deps.stores.actionRunStore, deps.stores.appStore, deps.actions.dockerActions, deps.stores.uiStore);
 		}
 		if (await runGlobalModal(event)) return true;
-		return handleActionsKeys(event, deps.stores.actionRunStore, deps.stores.appStore, deps.actions.dockerActions);
+		return handleActionsKeys(event, deps.stores.actionRunStore, deps.stores.appStore, deps.actions.dockerActions, deps.stores.uiStore);
 	};
 
 	const modalLayers = [

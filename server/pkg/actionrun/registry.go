@@ -66,6 +66,68 @@ func (r *Registry) ActiveForApp(appIdent string) []Run {
 	return out
 }
 func (r *Registry) Cancel(id string) { r.Complete(id, Status("canceled")) }
+
+// HasStep reports whether run id already has a step with the given ID, so
+// dynamic step creation stays idempotent instead of duplicating pre-declared
+// steps (dependency/target steps already carry their own label and parent).
+func (r *Registry) HasStep(id, stepID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run, ok := r.runs[id]
+	if !ok {
+		return false
+	}
+	for _, step := range run.Steps {
+		if step.ID == stepID {
+			return true
+		}
+	}
+	return false
+}
+
+// AddStep appends a dynamically discovered step. It is a no-op if a step
+// with the same ID already exists so callers can call it unconditionally
+// without risking duplicate/mislabeled entries for pre-declared steps.
+func (r *Registry) AddStep(id string, step Step) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if run, ok := r.runs[id]; ok {
+		for _, existing := range run.Steps {
+			if existing.ID == step.ID {
+				return
+			}
+		}
+		run.Steps = append(run.Steps, step)
+		r.runs[id] = run
+	}
+}
+func (r *Registry) UpdateRun(runID string, update func(*Run)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run, ok := r.runs[runID]
+	if !ok {
+		return
+	}
+	update(&run)
+	r.runs[runID] = run
+}
+
+func (r *Registry) UpdateStep(runID, stepID string, update func(*Step)) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	run, ok := r.runs[runID]
+	if !ok {
+		return
+	}
+	for i := range run.Steps {
+		if run.Steps[i].ID == stepID {
+			update(&run.Steps[i])
+			r.runs[runID] = run
+			return
+		}
+	}
+}
+
 func (r *Registry) Complete(id string, status Status) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

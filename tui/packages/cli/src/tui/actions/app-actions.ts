@@ -1,12 +1,25 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus } from '@devenv/types';
+import type { ActionDefinition, ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus } from '@devenv/types';
 import { buildDependencyTree } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
 import type { ActionRunStore } from '../stores/action-run-store';
 import type { AppDetailStore } from '../stores/app-detail-store';
 import type { UiStore } from '../stores/ui-store';
 import { exitApp } from '../exit';
+
+function actionDefinitionTarget(definition: ActionDefinition): ActionTarget {
+	const execute = definition.root.children?.[0];
+	return {
+		id: definition.id,
+		action: definition.type as ActionTarget['action'],
+		runtime: definition.runtime as ActionTarget['runtime'],
+		label: definition.label,
+		profile: typeof execute?.configuration?.profile === 'string' ? execute.configuration.profile : undefined,
+		sourcePath: '',
+		requires: Array.isArray(execute?.configuration?.requires) ? execute.configuration.requires as ActionTarget['requires'] : undefined,
+	};
+}
 
 function normalizeNodeStatus(raw: string | undefined): 'running' | 'stopped' | 'failed' | 'unknown' {
 	if (!raw) return 'unknown';
@@ -21,6 +34,7 @@ let appDetailAbortController: AbortController | null = null;
 
 export function handleActionStarted(appStore: Pick<AppStore, 'pushModal'>, actionRunStore: ActionRunStore, properties: Record<string, unknown>) {
   actionRunStore.handleEvent('action.started', properties);
+  actionRunStore.selectLastIfNone();
   appStore.pushModal('actions');
 }
 
@@ -47,6 +61,7 @@ export function createAppActions(
             branch: status.branch || app.branch,
             gitStatus: status.gitStatus,
             operationStatus: status.operationStatus,
+            status: status.status ?? app.status,
           };
           if (status.activeWorktree) updated.activeWorktree = status.activeWorktree;
           else delete updated.activeWorktree;
@@ -68,7 +83,11 @@ export function createAppActions(
       if (actionRunStore && !actionHistoryHydrated) {
         const replay = (history: Awaited<ReturnType<typeof client.getActionHistory>>) => {
           for (const event of history) {
-            if (event.type.startsWith('action.')) actionRunStore.handleEvent(event.type, event.properties as Record<string, unknown>);
+            try {
+              if (event.type.startsWith('action.')) actionRunStore.handleEvent(event.type, event.properties as Record<string, unknown>);
+            } catch (inner) {
+              getLogger().write('ERROR', 'Failed to replay action event: ' + (inner instanceof Error ? inner.message : String(inner)));
+            }
           }
         };
         replay(await client.getActionHistory());
@@ -79,13 +98,39 @@ export function createAppActions(
       getLogger().write('INFO', 'Starting SSE subscription...');
       for await (const event of client.subscribeToEvents(signal)) {
         if (event.type.startsWith('action.')) {
-          if (event.type === 'action.started') handleActionStarted(appStore, actionRunStore!, event.properties as Record<string, unknown>);
-          else actionRunStore?.handleEvent(event.type, event.properties as Record<string, unknown>);
+          try {
+            if (event.type === 'action.started') {
+              handleActionStarted(appStore, actionRunStore!, event.properties as Record<string, unknown>);
+            } else {
+              actionRunStore?.handleEvent(event.type, event.properties as Record<string, unknown>);
+              // Clear stale operation status when an action finishes
+              if (event.type === 'action.completed' && actionRunStore) {
+                const props = event.properties as Record<string, unknown>;
+                const runId = String(props.runId ?? '');
+                if (runId) {
+                  const run = actionRunStore.runs().find((candidate) => candidate.id === runId);
+                  if (run?.appIdent) {
+                    appStore.setApps(appStore.apps().map((a) =>
+                      a.ident === run.appIdent ? { ...a, operationStatus: undefined } : a,
+                    ));
+                  }
+                }
+              }
+            }
+          } catch (inner) {
+            getLogger().write('ERROR', 'Failed to process action event: ' + (inner instanceof Error ? inner.message : String(inner)));
+          }
           continue;
         }
 
         if (event.type === 'connection.established') {
           appStore.setLiveUpdatesActive(true);
+          continue;
+        }
+
+        if (event.type === 'server.notification') {
+          const props = event.properties as { message: string; type?: string };
+          uiStore.setNotification(props.message, (props.type as any) ?? 'warning');
           continue;
         }
 
@@ -342,7 +387,7 @@ export function createAppActions(
     if (kind !== 'infra' && kind !== 'library') {
       appDetailStore.setActionTargetsLoading(true);
       try {
-        let targets = await client.getActionTargets(app.ident, 'run');
+        let targets = (await client.getActionDefinitions(app.ident)).actions.filter((definition) => definition.type === 'run').map(actionDefinitionTarget);
         // Filter to only the active run target's dependencies
         const runInfo = (app as any).runTargetInfo;
         if (runInfo) {
@@ -501,7 +546,7 @@ export function createAppActions(
     const infraStatusMap = new Map(allInfra.map((s) => [s.ident, s.status || s.dockerInfo?.Status || 'unknown']));
 
     try {
-      const childTargets = await client.getActionTargets(found.name, 'run');
+      const childTargets = (await client.getActionDefinitions(found.name)).actions.filter((definition) => definition.type === 'run').map(actionDefinitionTarget);
       const requires = childTargets.flatMap((t) => t.requires ?? []);
       const children: any[] = [];
       for (const ref of requires) {

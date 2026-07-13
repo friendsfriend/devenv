@@ -1,9 +1,24 @@
 package resources
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
+
+func TestTargetIdentityIncludesProvider(t *testing.T) {
+	identity := RegistryTarget{Kind: TargetKindAppRun, App: "api", Runtime: ActionRuntimeDocker, Profile: "dev", Provider: ContainerProviderPodman}.Identity()
+	if got, want := identity.String(), "app-run/api/docker/dev/podman"; got != want {
+		t.Fatalf("identity=%q want=%q", got, want)
+	}
+	var ref DependencyRef
+	if err := json.Unmarshal([]byte(`{"infra":"redis","runtime":"docker","profile":"local","provider":"podman"}`), &ref); err != nil {
+		t.Fatal(err)
+	}
+	if ref.Provider != ContainerProviderPodman {
+		t.Fatalf("provider=%q", ref.Provider)
+	}
+}
 
 func TestTargetRegistryResolveStartPlan(t *testing.T) {
 	t.Parallel()
@@ -41,6 +56,34 @@ func TestTargetRegistryResolveStartPlan(t *testing.T) {
 		want := []string{InfraTargetID("postgres"), backendID, workerID, frontendID}
 		if strings.Join(ids, ",") != strings.Join(want, ",") {
 			t.Fatalf("plan = %#v, want %#v", ids, want)
+		}
+	})
+
+	t.Run("provider-qualified dependency", func(t *testing.T) {
+		t.Parallel()
+		apiID := AppRuntimeTargetID("api", ActionRuntimeDocker, "dev", ContainerProviderPodman)
+		redisID := InfraRuntimeProviderTargetID("redis", "docker", "local", ContainerProviderPodman)
+		registry := NewTargetRegistry([]RegistryTarget{
+			{ID: redisID, Kind: TargetKindInfra, Infra: "redis", Runtime: ActionRuntimeDocker, Profile: "local", Provider: ContainerProviderPodman},
+			{ID: apiID, Kind: TargetKindAppRun, App: "api", Runtime: ActionRuntimeDocker, Profile: "dev", Provider: ContainerProviderPodman, Requires: []DependencyRef{{Infra: "redis", Runtime: "docker", Profile: "local", Provider: ContainerProviderPodman}}},
+		})
+		plan, err := registry.ResolveStartPlan(apiID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(plan) != 2 || plan[0].ID != redisID || plan[1].ID != apiID {
+			t.Fatalf("plan=%#v", plan)
+		}
+	})
+
+	t.Run("ambiguous provider requires selector", func(t *testing.T) {
+		t.Parallel()
+		registry := NewTargetRegistry([]RegistryTarget{
+			{ID: InfraRuntimeProviderTargetID("redis", "docker", "local", ContainerProviderDocker), Kind: TargetKindInfra, Infra: "redis", Runtime: ActionRuntimeDocker, Profile: "local", Provider: ContainerProviderDocker},
+			{ID: InfraRuntimeProviderTargetID("redis", "docker", "local", ContainerProviderPodman), Kind: TargetKindInfra, Infra: "redis", Runtime: ActionRuntimeDocker, Profile: "local", Provider: ContainerProviderPodman},
+		})
+		if _, err := registry.ResolveRef(DependencyRef{Infra: "redis", Runtime: "docker", Profile: "local"}); err == nil || !strings.Contains(err.Error(), "unknown infrastructure target") {
+			t.Fatalf("err=%v", err)
 		}
 	})
 
