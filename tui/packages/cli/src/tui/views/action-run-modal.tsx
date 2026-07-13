@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createMemo } from 'solid-js';
+import { For, Show, createEffect, createMemo, onCleanup, onMount } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { GenericModal, PanelBox, ScrollableContent, uiColors, highlightColor, formatProfileLabel } from '@devenv/ui';
 import { actionRunDisplayLabel } from '@devenv/types';
@@ -22,6 +22,9 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
   const icon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? (props.spinner ?? '⟳') : '○';
   const statusColor = (status: string) => status === 'completed' ? highlightColor('positive') : status === 'failed' || status === 'canceled' ? highlightColor('negative') : status === 'active' ? highlightColor('primary') : highlightColor('secondary');
   const runLabel = (run: NonNullable<ReturnType<ActionRunStore['run']>>) => actionRunDisplayLabel(run, formatProfileLabel);
+
+  onMount(() => props.store.openModal());
+  onCleanup(() => props.store.closeModal());
 
   // Collect descendant command groups to show in the log panel.
   const logSteps = createMemo(() => {

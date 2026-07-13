@@ -113,6 +113,20 @@ describe('action run store', () => {
     expect(store.hasOlderHistory()).toBe(false);
     expect(store.visibleNodes().some((node) => node.kind === 'loadOlder')).toBe(false);
   });
+  test('hides finished actions on reopen until history is loaded', async () => {
+    const store = createActionRunStore();
+    store.handleEvent('action.started', { run: { ...run, id: 'old', status: 'completed' } });
+    store.handleEvent('action.started', { run: { ...run, id: 'current' } });
+    store.openModal();
+    expect(store.visibleNodes().filter((node) => node.kind === 'action').map((node) => node.run.id)).toEqual(['current']);
+    store.handleEvent('action.completed', { runId: 'current', status: 'completed' });
+    expect(store.visibleNodes().filter((node) => node.kind === 'action').map((node) => node.run.id)).toEqual(['current']);
+    store.closeModal();
+    store.openModal();
+    expect(store.visibleNodes().filter((node) => node.kind === 'action')).toEqual([]);
+    await store.loadOlderHistory();
+    expect(store.visibleNodes().filter((node) => node.kind === 'action').map((node) => node.run.id)).toEqual(['old', 'current']);
+  });
   test('isolates repeated actions by unique run id', () => {
     const store = createActionRunStore();
     store.handleEvent('action.started', { run: { ...run, id: 'first' } });

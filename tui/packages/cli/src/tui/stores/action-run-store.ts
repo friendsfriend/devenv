@@ -14,6 +14,9 @@ export function createActionRunStore() {
   const [focusedPanel, setFocusedPanel] = createSignal<0 | 1>(0);
   const [focusedNode, setFocusedNode] = createSignal<'action' | 'step' | 'loadOlder'>('action');
   const [hasOlderHistory, setHasOlderHistory] = createSignal(true);
+  const [modalOpen, setModalOpen] = createSignal(false);
+  const [showHistory, setShowHistory] = createSignal(false);
+  const [runsVisibleWhenOpened, setRunsVisibleWhenOpened] = createSignal<Set<string>>(new Set());
   let loadOlderHistoryHandler: (() => Promise<void>) | undefined;
   const [userMovedFocus, setUserMovedFocus] = createSignal(false);
 
@@ -94,7 +97,10 @@ export function createActionRunStore() {
   const orderedSteps = () => orderedEntries().map((entry) => entry.step);
   const isSingleNodeAction = (action: ActionRun) => action.steps.length <= 1;
   const visibleNodes = (): ActionTreeNode[] => {
-    const nodes = runs().flatMap((action): ActionTreeNode[] => {
+    const visibleRuns = modalOpen() && !showHistory()
+      ? runs().filter((action) => action.status === 'active' || action.status === 'pending' || runsVisibleWhenOpened().has(action.id))
+      : runs();
+    const nodes = visibleRuns.flatMap((action): ActionTreeNode[] => {
       const showsSteps = !isSingleNodeAction(action);
       const actionNode: ActionTreeNode = { key: actionKey(action.id), kind: 'action', run: action, depth: 0, hasChildren: showsSteps && action.steps.length > 0 };
       if (action.collapsed || !showsSteps) return [actionNode];
@@ -136,8 +142,20 @@ export function createActionRunStore() {
     setFocusedStepKey(null);
     setFocusedPanel(0);
   };
+  const openModal = () => {
+    setModalOpen(true);
+    setShowHistory(false);
+    setRunsVisibleWhenOpened(new Set(runs().filter((action) => action.status === 'active' || action.status === 'pending').map((action) => action.id)));
+    setHasOlderHistory(true);
+  };
+  const closeModal = () => setModalOpen(false);
   const configureHistoryLoader = (loader: () => Promise<void>) => { loadOlderHistoryHandler = loader; setHasOlderHistory(true); };
-  const loadOlderHistory = async () => { if (!loadOlderHistoryHandler || !hasOlderHistory()) return; await loadOlderHistoryHandler(); setHasOlderHistory(false); };
+  const loadOlderHistory = async () => {
+    if (!hasOlderHistory()) return;
+    setShowHistory(true);
+    if (loadOlderHistoryHandler) await loadOlderHistoryHandler();
+    setHasOlderHistory(false);
+  };
   const autoFocus = (runId: string, id: string) => {
     if (userMovedFocus()) return;
     setSelectedRunId(runId);
@@ -195,6 +213,7 @@ export function createActionRunStore() {
       const failedStep = deepestFailedStep(normalized);
       const next = failedStep ? expandFailurePath(normalized, failedStep.id) : normalized;
       setRuns((current) => [...current.filter((candidate) => candidate.id !== next.id), next]);
+      if (modalOpen()) setRunsVisibleWhenOpened((current) => new Set(current).add(next.id));
       setSelectedRunId(next.id);
       setFocusedNode(failedStep ? 'step' : 'action');
       setFocusedStepId(failedStep?.id ?? null);
@@ -274,6 +293,6 @@ export function createActionRunStore() {
   const cancelSelected = () => { const id = selectedRunId(); if (id) setRunById(id, (action) => ({ ...action, status: 'canceled', collapsed: true })); };
   const toggleStep = (id: string) => { const runId = selectedRunId(); if (runId) setRunById(runId, (action) => ({ ...action, steps: action.steps.map((step) => step.id === id ? { ...step, collapsed: !step.collapsed } : step) })); };
   const toggleRunCollapsed = (id: string) => setRunById(id, (action) => ({ ...action, collapsed: !action.collapsed }));
-  return { run, runs, selectedRunId, focusedNode, focusedTreeKey, selectedNode, visibleNodes, hasOlderHistory, configureHistoryLoader, loadOlderHistory, cancelSelected, toggleStep, toggleRunCollapsed, selectRun, focusTreeNode, orderedSteps, orderedEntries, focusedStepId, focusedStepKey, focusedPanel, setFocusedPanel, userMovedFocus, focusStep, handleEvent, selectLastIfNone, get logScrollBoxRef() { return logScrollBoxRef; }, set logScrollBoxRef(value) { logScrollBoxRef = value; }, get treeScrollBoxRef() { return treeScrollBoxRef; }, set treeScrollBoxRef(value) { treeScrollBoxRef = value; } };
+  return { run, runs, selectedRunId, focusedNode, focusedTreeKey, selectedNode, visibleNodes, hasOlderHistory, openModal, closeModal, configureHistoryLoader, loadOlderHistory, cancelSelected, toggleStep, toggleRunCollapsed, selectRun, focusTreeNode, orderedSteps, orderedEntries, focusedStepId, focusedStepKey, focusedPanel, setFocusedPanel, userMovedFocus, focusStep, handleEvent, selectLastIfNone, get logScrollBoxRef() { return logScrollBoxRef; }, set logScrollBoxRef(value) { logScrollBoxRef = value; }, get treeScrollBoxRef() { return treeScrollBoxRef; }, set treeScrollBoxRef(value) { treeScrollBoxRef = value; } };
 }
 export type ActionRunStore = ReturnType<typeof createActionRunStore>;
