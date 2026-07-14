@@ -415,14 +415,17 @@ export async function handleTableKeys(
 
 	switch (key) {
 		case "/":
+			if (appStore.activeTab() === "ui-test") break;
 			appStore.setTableSearchMode(true);
 			appStore.setTableSearchQuery("");
 			appStore.setSelectedIndex(0);
 			break;
 		case "F":
+			if (appStore.activeTab() === "ui-test") break;
 			appStore.setShowTableFilterModal(true);
 			break;
 		case "O":
+			if (appStore.activeTab() === "ui-test") break;
 			appStore.setShowTableSortModal(true);
 			break;
 		case "T": {
@@ -459,26 +462,12 @@ export async function handleTableKeys(
 			break;
 		case "tab":
 		case "\t":
-			if (isReverseTabKey(event)) {
-				// Reverse cycle through tabs
-				appStore.setActiveTab((tab) => {
-					if (tab === "applications") return "kubernetes";
-					if (tab === "infrastructure") return "applications";
-					if (tab === "libraries") return "infrastructure";
-					if (tab === "scripts") return "libraries";
-					if (tab === "kubernetes") return "scripts";
-					return "applications";
-				});
-			} else {
-				// Forward cycle through tabs
-				appStore.setActiveTab((tab) => {
-					if (tab === "applications") return "infrastructure";
-					if (tab === "infrastructure") return "libraries";
-					if (tab === "libraries") return "scripts";
-					if (tab === "scripts") return "kubernetes";
-					return "applications";
-				});
-			}
+			appStore.setActiveTab((tab) => {
+				const tabs = appStore.tableTabs().map((item) => item.id);
+				const current = Math.max(0, tabs.indexOf(tab));
+				const offset = isReverseTabKey(event) ? -1 : 1;
+				return tabs[(current + offset + tabs.length) % tabs.length] ?? "applications";
+			});
 			appStore.setSelectedIndex(0); // Reset selection when switching tabs
 			appStore.setTableSearchQuery("");
 			appStore.setTableSearchMode(false);

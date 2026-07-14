@@ -13,6 +13,7 @@ import { RunningText } from './RunningText';
 import { DetailSection } from './DetailSection';
 import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
 import { highlightForIndex } from './Highlight';
+import { AnimatedStatusText } from './AnimatedStatusText';
 
 type RefItem =
 	| { type: "cr"; data: ChangeRequest }
@@ -30,8 +31,6 @@ interface IssueDetailViewProps {
 	referencedIssuesLoading?: boolean;
 	referencedIssuesError?: string;
 	references?: RefItem[];
-	spinnerFrames?: string[];
-	spinnerFrame?: () => number;
 	onDetailScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
 	onCommentsScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
 	runningTextEnabled?: boolean;
@@ -178,11 +177,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 				<Show when={props.linkedChangeRequestsLoading || props.referencedIssuesLoading}>
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-						<text fg={uiColors.primary}>
-							{props.spinnerFrames && props.spinnerFrame !== undefined
-								? props.spinnerFrames[props.spinnerFrame()]
-								: "●"}
-						</text>
+						<AnimatedStatusText text="Loading references…" intent="load" backgroundColor={uiColors.bgMantle} />
 					</box>
 				</Show>
 
@@ -270,11 +265,7 @@ export function IssueDetailView(props: IssueDetailViewProps) {
 
 				<Show when={props.issueCommentsLoading}>
 					<box style={{ paddingLeft: 1, paddingRight: 1, flexShrink: 0 }}>
-						<text fg={uiColors.primary}>
-							{props.spinnerFrames && props.spinnerFrame !== undefined
-								? props.spinnerFrames[props.spinnerFrame()]
-								: "●"}
-						</text>
+						<AnimatedStatusText text="Loading comments…" intent="load" backgroundColor={uiColors.bgMantle} />
 					</box>
 				</Show>
 

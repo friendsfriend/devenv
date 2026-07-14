@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { createDockerActions } from './docker-actions';
+import { createDockerActions, operationProgressLabel } from './docker-actions';
+
+test('operation progress labels use correct doubled consonants', () => {
+  expect(['start', 'stop', 'restart', 'build', 'test', 'run'].map((action) => operationProgressLabel(action as Parameters<typeof operationProgressLabel>[0]))).toEqual([
+    'Starting', 'Stopping', 'Restarting', 'Building', 'Testing', 'Running',
+  ]);
+});
 
 function createStores(app: any, kubernetesClusterStatus?: { provider: string }) {
   let apps = [app];

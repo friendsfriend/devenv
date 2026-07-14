@@ -8,6 +8,7 @@ import { CenteredState } from "./CenteredState";
 import { ScrollableList, LAYOUT_CHROME_LINES } from "./ScrollableList";
 import { SearchHeader } from "./SearchHeader";
 import { WorkItemCard } from "./WorkItemCard";
+import { statusAnimationIntentForOperation, statusAnimationIntentForText } from './AnimatedStatusText';
 import { FilterStatusBar } from './FilterStatusBar';
 import { formatStatus, getGitStatusStyle, getStatusStyle } from "../statusUtils";
 
@@ -50,8 +51,6 @@ export interface TableProps<T = string> {
 	 *  When provided, `reservedLines` is ignored and the list height is computed from this value
 	 *  minus the Table's own chrome. */
 	availableLines?: number;
-	spinnerFrames?: string[];
-	spinnerFrame?: () => number;
 	filterSummary?: string;
 	sortSummary?: string;
 	runningTextEnabled?: boolean;
@@ -106,9 +105,6 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 
 	const appStatus = (app: TableRow) => {
 		if (app.operationStatus?.status && app.operationStatus.message) {
-			if (app.operationStatus.status === "active" && props.spinnerFrames && props.spinnerFrame) {
-				return `${props.spinnerFrames[props.spinnerFrame()]} ${app.operationStatus.message}`;
-			}
 			return app.operationStatus.message;
 		}
 		if (app.rowKind === "script" && app.nodeType === "folder") return "folder";
@@ -136,6 +132,18 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 			app.rowKind === "app" && app.branch ? `branch ${app.branch}` : undefined,
 		].filter(Boolean).join(" • ");
 		return details ? ` • ${details}` : "";
+	};
+
+	const appStatusAnimation = (app: TableRow) => {
+		const operation = app.operationStatus;
+		if (operation && (operation.status === 'active' || operation.status === 'pending')) {
+			return statusAnimationIntentForOperation(operation.operation);
+		}
+		const status = (app.status || app.dockerInfo?.Status || '').toLowerCase();
+		if (/starting|stopping|building|checking|pulling|pushing|cloning|pending|waiting|preparing/.test(status)) {
+			return statusAnimationIntentForText(status);
+		}
+		return undefined;
 	};
 
 	const appStatusHighlight = (app: TableRow) => {
@@ -315,6 +323,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 						// Libraries are dev-dependencies — no container status,
 						// but git status / branch info is still relevant.
 						const isLib = app.rowKind === "app" && app.appType !== "APP";
+						const hideIdleLibraryStatus = isLib && !app.operationStatus;
 						return (
 							<WorkItemCard
 								marker={appMarker(app)}
@@ -322,9 +331,11 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 								prefixColor={uiColors.primary}
 								title={app.displayName}
 								titleQuery={props.searchQuery}
-								statusText={isLib ? '' : appStatus(app)}
+								statusText={hideIdleLibraryStatus ? '' : appStatus(app)}
 								statusColor={appStatusColor(app)}
-								statusBadgeHighlight={isLib ? undefined : appStatusHighlight(app)}
+								statusBadgeHighlight={hideIdleLibraryStatus ? undefined : appStatusHighlight(app)}
+								statusAnimationIntent={hideIdleLibraryStatus ? undefined : appStatusAnimation(app)}
+								statusTransitionKey={`${app.rowKind}:${app.ident}:status`}
 								statusSuffixText={appStatusSuffix(app)}
 								statusSuffixColor={gitStatus(app) === '✓' ? uiColors.textMuted : (gitStatus(app) === 'x' || gitStatus(app) === '...' || gitStatus(app) === 'error') ? uiColors.error : getGitStatusStyle(gitStatus(app)).color}
 								metadata={appMetadata(app)}

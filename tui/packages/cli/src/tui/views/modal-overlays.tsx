@@ -31,6 +31,7 @@ import {
 	HelpView,
 	ThemePickerView,
 	ProvidersView,
+	AnimatedStatusText,
 	themeNames,
 	uiColors,
 } from '@devenv/ui';
@@ -54,7 +55,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 	return (
 		<>
 			<Show when={appStore.activeModal() === "actions"}>
-				<ActionRunModal store={props.stores.actionRunStore} onClose={() => appStore.popModal("actions")} spinner={props.spinnerFrames[appStore.spinnerFrame()] ?? props.spinnerFrames[0]} />
+				<ActionRunModal store={props.stores.actionRunStore} onClose={() => appStore.popModal("actions")} />
 			</Show>
 			<Show when={appStore.viewMode() === "providers"}>
 				<ProvidersView
@@ -537,12 +538,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 							gap: 1,
 						}}
 					>
-						<text fg={uiColors.primary}>
-							{props.spinnerFrames[appStore.spinnerFrame()]}
-						</text>
-						<text fg={uiColors.textPrimary}>
-							{uiStore.loadingModalMessage()}
-						</text>
+						<AnimatedStatusText text={uiStore.loadingModalMessage()} intent="load" backgroundColor={uiColors.bgBase} />
 					</box>
 				</box>
 			</Show>

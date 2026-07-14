@@ -1,11 +1,20 @@
 import { describe, expect, test } from 'bun:test';
-import { SHUTDOWN_PHASE_ORDER, createAppStore, getShutdownPhaseStatus, type ShutdownState } from './app-store';
+import { SHUTDOWN_PHASE_ORDER, createAppStore, getShutdownPhaseStatus, uiTestTabEnabled, type ShutdownState } from './app-store';
 
 const state = (phase: ShutdownState['phase'], failedPhase?: ShutdownState['failedPhase']): ShutdownState => ({
   phase,
   message: phase,
   error: phase === 'failed' ? 'boom' : null,
   failedPhase,
+});
+
+describe('UI test tab', () => {
+  test('is only present for exact DEVENV_UI_TEST=true', () => {
+    expect(uiTestTabEnabled({ DEVENV_UI_TEST: 'true' })).toBe(true);
+    expect(uiTestTabEnabled({ DEVENV_UI_TEST: '1' })).toBe(false);
+    expect(createAppStore({ DEVENV_UI_TEST: 'true' }).tableTabs().at(-1)?.id).toBe('ui-test');
+    expect(createAppStore({}).tableTabs().some((tab) => tab.id === 'ui-test')).toBe(false);
+  });
 });
 
 describe('shutdown phase status', () => {

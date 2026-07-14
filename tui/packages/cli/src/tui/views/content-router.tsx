@@ -20,6 +20,7 @@ import {
 	LAYOUT_CHROME_LINES,
 	ContentStack,
 	KubernetesClusterView,
+	ProgressAnimationDemo,
 } from '@devenv/ui';
 import { getGuide, guides as allGuides } from "../guides";
 import type { ContentRouterProps } from "./types";
@@ -374,8 +375,6 @@ export function ContentRouter(props: ContentRouterProps) {
 												referencedIssuesLoading={issueStore.referencedIssuesLoading()}
 												referencedIssuesError={issueStore.referencedIssuesError()}
 												references={issueStore.references()}
-												spinnerFrames={props.spinnerFrames}
-												spinnerFrame={appStore.spinnerFrame}
 												activePanelIndex={issueStore.issueDetailPanelIndex()}
 												onDetailScrollBoxReady={(scrollBox) => {
 													issueStore.issueDetailScrollBoxRef = scrollBox;
@@ -532,7 +531,10 @@ export function ContentRouter(props: ContentRouterProps) {
 									</box>
 									</Show>
 									<Show
-										when={appStore.activeTab() === "kubernetes"}
+										when={appStore.activeTab() === "ui-test"}
+										fallback={
+											<Show
+												when={appStore.activeTab() === "kubernetes"}
 										fallback={
 											<Show
 												when={appStore.activeTab() === "scripts"}
@@ -549,8 +551,6 @@ export function ContentRouter(props: ContentRouterProps) {
 																availableLines={availableTableLines}
 																searchMode={appStore.tableSearchMode()}
 																searchQuery={appStore.tableSearchQuery()}
-																spinnerFrames={props.spinnerFrames}
-																spinnerFrame={appStore.spinnerFrame}
 																filterSummary={tableFilterSummary()}
 																sortSummary={tableSortSummary()}
 																runningTextEnabled={props.runningTextEnabled}
@@ -567,8 +567,6 @@ export function ContentRouter(props: ContentRouterProps) {
 															availableLines={availableTableLines}
 															searchMode={appStore.tableSearchMode()}
 															searchQuery={appStore.tableSearchQuery()}
-															spinnerFrames={props.spinnerFrames}
-															spinnerFrame={appStore.spinnerFrame}
 															filterSummary={tableFilterSummary()}
 															sortSummary={tableSortSummary()}
 															runningTextEnabled={props.runningTextEnabled}
@@ -586,8 +584,6 @@ export function ContentRouter(props: ContentRouterProps) {
 													availableLines={availableTableLines}
 													searchMode={appStore.tableSearchMode()}
 													searchQuery={appStore.tableSearchQuery()}
-													spinnerFrames={props.spinnerFrames}
-													spinnerFrame={appStore.spinnerFrame}
 													filterSummary={tableFilterSummary()}
 													sortSummary={tableSortSummary()}
 													runningTextEnabled={props.runningTextEnabled}
@@ -608,6 +604,12 @@ export function ContentRouter(props: ContentRouterProps) {
 											onPodsScrollBoxReady={(ref) => { appStore.kubernetesScrollBoxRefs[2] = ref; }}
 											onWorkloadsScrollBoxReady={(ref) => { appStore.kubernetesScrollBoxRefs[3] = ref; }}
 										/>
+											</Show>
+										}
+									>
+										<box style={{ width: "100%", flexGrow: 1, minHeight: 0, flexDirection: "column", overflow: "hidden" }}>
+											<ProgressAnimationDemo />
+										</box>
 									</Show>
 								</box>,
 							]}
@@ -615,10 +617,10 @@ export function ContentRouter(props: ContentRouterProps) {
 				</Show>
 			)}
 			<Show when={appStore.loading()}>
-				<StartupSplash appStore={appStore} spinnerFrames={props.spinnerFrames} spinnerFrame={appStore.spinnerFrame} />
+				<StartupSplash appStore={appStore} />
 			</Show>
 			<Show when={appStore.isShuttingDown() || appStore.shutdownState().phase !== "idle"}>
-				<ShutdownSplash appStore={appStore} spinnerFrames={props.spinnerFrames} spinnerFrame={appStore.spinnerFrame} />
+				<ShutdownSplash appStore={appStore} />
 			</Show>
 		</>
 	);

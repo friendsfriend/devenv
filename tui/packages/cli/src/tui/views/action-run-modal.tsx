@@ -1,6 +1,7 @@
 import { For, Show, createEffect, createMemo, onCleanup, onMount } from 'solid-js';
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
-import { GenericModal, PanelBox, ScrollableContent, uiColors, highlightColor, formatProfileLabel } from '@devenv/ui';
+import { Badge, GenericModal, PanelBox, ScrollableContent, uiColors, highlightColor, formatProfileLabel, statusAnimationIntentForText, statusAnimationModel, type Highlight } from '@devenv/ui';
 import { actionRunDisplayLabel } from '@devenv/types';
 import type { ActionRunStore, ActionTreeNode } from '../stores/action-run-store';
 
@@ -24,9 +25,12 @@ export function actionNodeStep(node: ActionTreeNode | null | undefined) {
   return steps.find((step) => !step.parentId && /^Start application: /.test(step.label)) ?? steps[0];
 }
 
-export function ActionRunModal(props: { store: ActionRunStore; onClose: () => void; spinner?: string }) {
-  const icon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? (props.spinner ?? '⟳') : '○';
-  const statusColor = (status: string) => status === 'completed' ? highlightColor('positive') : status === 'failed' || status === 'canceled' ? highlightColor('negative') : status === 'active' ? highlightColor('primary') : highlightColor('secondary');
+export function ActionRunModal(props: { store: ActionRunStore; onClose: () => void }) {
+  const icon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? '' : '○';
+  const statusHighlight = (status: string): Highlight => status === 'completed' ? 'positive' : status === 'failed' || status === 'canceled' ? 'negative' : status === 'active' ? 'primary' : 'secondary';
+  const statusColor = (status: string) => highlightColor(statusHighlight(status));
+  const statusAnimation = (status: string, label: string) => status === 'active' ? statusAnimationModel(statusAnimationIntentForText(label)) : undefined;
+  const transitionHighlight = (status: string, label: string) => statusAnimation(status, label)?.tone ?? statusAnimation(status, label)?.highlights?.[0] ?? statusHighlight(status);
   const runLabel = (run: NonNullable<ReturnType<ActionRunStore['run']>>) => actionRunDisplayLabel(run, formatProfileLabel);
   const helpText = () => actionModalHelpText(props.store.focusedPanel());
 
@@ -93,11 +97,21 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
                   const suffix = node.step.outcome === 'already-running' ? ' (already running)' : node.step.sharedReference ? ' (shared)' : '';
                   return `${prefix}${node.step.label}${suffix}`;
                 };
+                const rowLabel = () => node.kind === 'loadOlder' ? `+ ${label()}` : `${icon(status()) || ' '} ${label()}`;
+                const animation = () => statusAnimation(status(), label());
                 return <box id={'action-node-' + node.key} onMouseUp={() => { props.store.focusTreeNode(node); props.store.setFocusedPanel(0); }} backgroundColor={activeSelection() ? uiColors.bgSurface0 : undefined} style={{ width: '100%', height: 1, flexDirection: 'row' }}>
                   <box backgroundColor={activeSelection() ? highlightColor('highlight') : undefined} style={{ width: 1, height: '100%', flexShrink: 0 }} />
                   <box style={{ flexGrow: 1, flexDirection: 'row', paddingRight: 1, minWidth: 0 }}>
-                    <text fg={statusColor(status())}>{node.kind === 'loadOlder' ? '  + ' : `${'  '.repeat(node.depth)}${node.hasChildren ? (collapsed() ? '▸' : '▾') : ' '} ${icon(status())} `}</text>
-                    <text fg={uiColors.textPrimary} attributes={activeSelection() ? TextAttributes.BOLD : undefined}>{label()}</text>
+                    <text fg={statusColor(status())}>{node.kind === 'loadOlder' ? '  ' : `${'  '.repeat(node.depth)}${node.hasChildren ? (collapsed() ? '▸' : '▾') : ' '} `}</text>
+                    <Badge
+                      text={rowLabel()}
+                      appearance="text"
+                      highlight={transitionHighlight(status(), label())}
+                      animatedTone={animation()?.tone}
+                      animatedHighlights={animation()?.highlights}
+                      attributes={activeSelection() ? TextAttributes.BOLD : 0}
+                      transitionKey={`action-tree:${node.key}`}
+                    />
                   </box>
                 </box>;
               }}</For>
@@ -111,7 +125,18 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
                 <box style={{ flexDirection: 'column', paddingLeft: 1, paddingRight: 1 }}>
                   <For each={logSteps()}>{(step, i) => <box style={{ flexDirection: 'column' }}>
                     <Show when={i() > 0}><box style={{ height: 1 }} /></Show>
-                    <text fg={statusColor(step.status)}>{step.outcome === 'already-running' ? `  ○ ${step.label} (already running)` : `  ${icon(step.status)} ${step.label}`}</text>
+                    <box style={{ flexDirection: 'row' }}>
+                      <text>  </text>
+                      <Badge
+                        text={step.outcome === 'already-running' ? `○ ${step.label} (already running)` : `${icon(step.status) || ' '} ${step.label}`}
+                        appearance="text"
+                        highlight={transitionHighlight(step.status, step.label)}
+                        animatedTone={statusAnimation(step.status, step.label)?.tone}
+                        animatedHighlights={statusAnimation(step.status, step.label)?.highlights}
+                        attributes={0}
+                        transitionKey={`action-log-step:${step.id}`}
+                      />
+                    </box>
                     <For each={step.commands}>{(command) => <box style={{ flexDirection: 'column' }}>
                       <text fg={uiColors.textPrimary}>{`$ ${command.command}`}</text>
                       <For each={command.stdout.replace(/\s+$/, '').split('\n').filter(Boolean)}>{(line) => <text>{line}</text>}</For>

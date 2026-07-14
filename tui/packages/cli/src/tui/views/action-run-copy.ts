@@ -2,7 +2,7 @@ import { actionRunDisplayLabel } from '@devenv/types';
 import type { ActionCommand, ActionRun, ActionStep } from '@devenv/types';
 import type { ActionTreeNode } from '../stores/action-run-store';
 
-const statusIcon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? '⟳' : '○';
+const statusIcon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? '…' : '○';
 const isHiddenRoot = (step: ActionStep) => !step.parentId && /^Start application: /.test(step.label);
 
 function commandLog(command: ActionCommand): string {

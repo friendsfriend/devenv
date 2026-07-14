@@ -1,10 +1,9 @@
 /** @jsxImportSource @opentui/solid */
 import { Show } from 'solid-js';
-import 'opentui-spinner/solid';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { useRenderer } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
-import { createFrames, createColors } from '../spinner';
+import { AnimatedStatusText } from './AnimatedStatusText';
 import { getMarkdownSyntaxStyle } from '../markdownSyntax';
 import { ScrollableContent } from './ScrollableContent';
 
@@ -16,9 +15,6 @@ export interface CrAiReviewOverlayProps {
   onDismiss: () => void;
   onScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
 }
-
-const knightRiderFrames = createFrames({ color: uiColors.primary, style: 'blocks', width: 6, inactiveFactor: 0.6, minAlpha: 0.3 });
-const knightRiderColor = createColors({ color: uiColors.primary, style: 'blocks', width: 6, inactiveFactor: 0.6, minAlpha: 0.3 });
 
 export function CrAiReviewOverlay(props: CrAiReviewOverlayProps) {
   const renderer = useRenderer();
@@ -61,13 +57,9 @@ export function CrAiReviewOverlay(props: CrAiReviewOverlayProps) {
         </box>
       </box>
 
-      {/* Loading spinner */}
       <Show when={(props.loading || props.streaming) && props.summary === null}>
-        <box flexDirection="row" marginTop={1} height={1} alignItems="center" gap={1}>
-          <spinner frames={knightRiderFrames} color={knightRiderColor} interval={40} />
-          <text fg={uiColors.textSecondary}>
-            {props.loading ? ` Spawning agent in worktree…` : ' Reviewing…'}
-          </text>
+        <box flexDirection="row" marginTop={1} height={1} alignItems="center">
+          <AnimatedStatusText text={props.loading ? 'Spawning agent in worktree…' : 'Reviewing…'} intent="ai" backgroundColor={uiColors.bgCrust} />
         </box>
       </Show>
 
@@ -103,9 +95,8 @@ export function CrAiReviewOverlay(props: CrAiReviewOverlayProps) {
         </ScrollableContent>
 
         <Show when={props.loading || props.streaming}>
-          <box flexDirection="row" marginTop={1} height={1} alignItems="center" gap={1}>
-            <spinner frames={knightRiderFrames} color={knightRiderColor} interval={40} />
-            <text fg={uiColors.textSecondary}> Agent working…</text>
+          <box flexDirection="row" marginTop={1} height={1} alignItems="center">
+            <AnimatedStatusText text="Agent working…" intent="ai" backgroundColor={uiColors.bgCrust} />
           </box>
         </Show>
 

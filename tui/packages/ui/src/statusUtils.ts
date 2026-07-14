@@ -25,10 +25,10 @@ export function getStatusStyle(status: string): StatusStyle {
   // Status mapping with colors and icons (matches Go implementation)
   const statusMap: Record<string, StatusStyle> = {
     // GitLab pipeline/job statuses
-    'created': { color: uiColors.warning, icon: '⏳' },
-    'waiting_for_resource': { color: uiColors.warning, icon: '⏳' },
+    'created': { color: uiColors.warning, icon: '' },
+    'waiting_for_resource': { color: uiColors.warning, icon: '' },
     'preparing': { color: uiColors.warning, icon: '⚙️' },
-    'pending': { color: uiColors.warning, icon: '⏳' },
+    'pending': { color: uiColors.warning, icon: '' },
     'running': { color: uiColors.success, icon: '▶' },
     'success': { color: uiColors.success, icon: '✓' },
     'failed': { color: uiColors.error, icon: '✗' },
@@ -37,7 +37,7 @@ export function getStatusStyle(status: string): StatusStyle {
     'skipped': { color: uiColors.textMuted, icon: '⊘' },
     'manual': { color: uiColors.warning, icon: '🔧' },
     'scheduled': { color: uiColors.warning, icon: '⏰' },
-    'blocked': { color: uiColors.warning, icon: '⏳' },
+    'blocked': { color: uiColors.warning, icon: '' },
     
     // Docker/App statuses
     'up': { color: uiColors.success, icon: '▶' },
@@ -45,12 +45,12 @@ export function getStatusStyle(status: string): StatusStyle {
     'completed': { color: uiColors.success, icon: '✓' },
     'building...': { color: uiColors.warning, icon: '⚙️' },
     'build successful': { color: uiColors.success, icon: '✓' },
-    'starting...': { color: uiColors.warning, icon: '⏳' },
+    'starting...': { color: uiColors.warning, icon: '' },
     'start successful': { color: uiColors.success, icon: '✓' },
-    'checking out...': { color: uiColors.warning, icon: '⏳' },
-    'pulling...': { color: uiColors.warning, icon: '⏳' },
-    'pushing...': { color: uiColors.warning, icon: '⏳' },
-    'cloning...': { color: uiColors.warning, icon: '⏳' },
+    'checking out...': { color: uiColors.warning, icon: '' },
+    'pulling...': { color: uiColors.warning, icon: '' },
+    'pushing...': { color: uiColors.warning, icon: '' },
+    'cloning...': { color: uiColors.warning, icon: '' },
     'stopping': { color: uiColors.error, icon: '⏹' },
     'stopped': { color: uiColors.textMuted, icon: '⏹' },
     'exited': { color: uiColors.textMuted, icon: '⏹' },
@@ -75,7 +75,7 @@ export function getStatusStyle(status: string): StatusStyle {
 export function formatStatus(status: string): string {
   const trimmedStatus = status?.trim() || '...';
   const style = getStatusStyle(trimmedStatus);
-  return `${style.icon} ${trimmedStatus}`;
+  return style.icon ? `${style.icon} ${trimmedStatus}` : trimmedStatus;
 }
 
 /**

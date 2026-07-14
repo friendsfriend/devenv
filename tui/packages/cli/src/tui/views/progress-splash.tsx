@@ -1,6 +1,7 @@
-import { For } from 'solid-js';
+import { For, Show } from 'solid-js';
+/** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
-import { uiColors, Badge, HighlightedText, GenericModal } from '@devenv/ui';
+import { uiColors, AnimatedStatusText, Badge, HighlightedText, GenericModal, statusAnimationIntentForText } from '@devenv/ui';
 
 export type ProgressSplashStepStatus = 'done' | 'current' | 'pending' | 'failed';
 
@@ -19,19 +20,11 @@ interface ProgressSplashProps<Phase extends string> {
   failureMessage: string;
   failureHint: string;
   failureDetail?: string;
-  spinnerFrames?: string[];
-  spinnerFrame?: () => number;
 }
 
 export function ProgressSplash<Phase extends string>(props: ProgressSplashProps<Phase>) {
-  const spinner = () => {
-    if (!props.spinnerFrames || !props.spinnerFrame) return '~';
-    return props.spinnerFrames[props.spinnerFrame() % props.spinnerFrames.length];
-  };
-
   const statusIcon = (status: ProgressSplashStepStatus) => {
     if (status === 'done') return <text fg={uiColors.success}>✓ </text>;
-    if (status === 'current') return <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>{spinner()} </text>;
     if (status === 'failed') return <text fg={uiColors.error} attributes={TextAttributes.BOLD}>✗ </text>;
     return <text fg={uiColors.textMuted}>  </text>;
   };
@@ -53,10 +46,14 @@ export function ProgressSplash<Phase extends string>(props: ProgressSplashProps<
       const status = () => props.statusForStep(step.phase);
       return <box style={{ height: 1, flexDirection: 'row', flexShrink: 0, paddingLeft: 1 }}>{[
         statusIcon(status()),
-        <HighlightedText
-          text={step.label}
-          highlight={status() === 'done' ? 'positive' : status() === 'current' ? 'primary' : status() === 'failed' ? 'negative' : 'secondary'}
-        />,
+        <Show when={status() === 'current'} fallback={
+          <HighlightedText
+            text={step.label}
+            highlight={status() === 'done' ? 'positive' : status() === 'failed' ? 'negative' : 'secondary'}
+          />
+        }>
+          <AnimatedStatusText text={step.label} intent={statusAnimationIntentForText(step.label)} backgroundColor={uiColors.bgMantle} />
+        </Show>,
       ]}</box>;
     }}</For>,
   ]}</box>;

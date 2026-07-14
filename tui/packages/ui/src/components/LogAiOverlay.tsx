@@ -1,9 +1,9 @@
 /** @jsxImportSource @opentui/solid */
-import { Show, createSignal, onMount, onCleanup } from 'solid-js';
+import { Show } from 'solid-js';
 import { ScrollBoxRenderable, TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
-import { createFrames } from '../spinner';
+import { AnimatedStatusText } from './AnimatedStatusText';
 import { getMarkdownSyntaxStyle } from '../markdownSyntax';
 import { ScrollableContent } from './ScrollableContent';
 
@@ -19,20 +19,8 @@ export interface LogAiOverlayProps {
   onScrollBoxReady?: (scrollBox: ScrollBoxRenderable) => void;
 }
 
-const knightRiderFrames = createFrames({ color: uiColors.primary, style: 'blocks', width: 6, inactiveFactor: 0.6, minAlpha: 0.3 });
-const SPINNER_INTERVAL = 40;
-
-
 export function LogAiOverlay(props: LogAiOverlayProps) {
   const dimensions = useTerminalDimensions();
-  const [frameIndex, setFrameIndex] = createSignal(0);
-
-  onMount(() => {
-    const id = setInterval(() => {
-      setFrameIndex((prev) => (prev + 1) % knightRiderFrames.length);
-    }, SPINNER_INTERVAL);
-    onCleanup(() => clearInterval(id));
-  });
 
   const overlayWidth = () => Math.floor(dimensions().width * 0.88);
 
@@ -91,11 +79,8 @@ export function LogAiOverlay(props: LogAiOverlayProps) {
       </Show>
 
       <Show when={(props.loading || props.streaming) && !props.promptMode && props.summary === null}>
-        <box flexDirection="row" marginTop={1} height={1} alignItems="center" gap={1}>
-          <text fg={uiColors.primary}>{knightRiderFrames[frameIndex()]}</text>
-          <text fg={uiColors.textSecondary}>
-            {props.loading ? ` Analyzing…` : ' Generating…'}
-          </text>
+        <box flexDirection="row" marginTop={1} height={1} alignItems="center">
+          <AnimatedStatusText text={props.loading ? 'Analyzing…' : 'Generating…'} intent="ai" backgroundColor={uiColors.bgCrust} />
         </box>
       </Show>
 
@@ -128,9 +113,8 @@ export function LogAiOverlay(props: LogAiOverlayProps) {
           />
         </ScrollableContent>
         <Show when={props.loading || props.streaming}>
-          <box flexDirection="row" marginTop={1} height={1} alignItems="center" gap={1}>
-            <text fg={uiColors.primary}>{knightRiderFrames[frameIndex()]}</text>
-            <text fg={uiColors.textSecondary}> Generating…</text>
+          <box flexDirection="row" marginTop={1} height={1} alignItems="center">
+            <AnimatedStatusText text="Generating…" intent="ai" backgroundColor={uiColors.bgCrust} />
           </box>
         </Show>
         <box flexShrink={0} flexDirection="row" alignItems="center" marginTop={1} marginBottom={1} height={1}>

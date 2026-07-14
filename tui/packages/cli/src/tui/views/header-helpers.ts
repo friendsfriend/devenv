@@ -8,7 +8,8 @@ export type TabType =
 	| "infrastructure"
 	| "libraries"
 	| "scripts"
-	| "kubernetes";
+	| "kubernetes"
+	| "ui-test";
 
 export const getTabName = (tab: TabType): string => {
 	switch (tab) {
@@ -22,12 +23,14 @@ export const getTabName = (tab: TabType): string => {
 			return "Tasks";
 		case "kubernetes":
 			return "Kubernetes";
+		case "ui-test":
+			return "UI Test";
 	}
 };
 
 function hasRunningAppInTab(tab: TabType, appStore: AppStore): boolean {
 	const allApps = appStore.apps();
-	if (tab === "scripts") return false;
+	if (tab === "scripts" || tab === "ui-test") return false;
 	if (tab === "kubernetes") return appStore.kubernetesClusterStatus()?.state === "running";
 
 	const appsInTab: (App | InfraService)[] =

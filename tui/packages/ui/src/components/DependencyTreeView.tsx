@@ -3,6 +3,7 @@ import { TextAttributes } from '@opentui/core';
 import { Show, For, createMemo, type JSX } from 'solid-js';
 import { uiColors } from '../colors';
 import { highlightColor, type Highlight } from './Highlight';
+import { AnimatedStatusText } from './AnimatedStatusText';
 import type { ActionTarget, DependencyRef } from '@devenv/types';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -235,9 +236,8 @@ export function DependencyTreeView(props: DependencyTreeViewProps) {
                     <text fg={uiColors.warning}> ⚠ cycle</text>
                   </Show>
 
-                  {/* Loading spinner */}
                   <Show when={row.node.loading}>
-                    <text fg={uiColors.primary}> ⏳</text>
+                    <text> </text><AnimatedStatusText text="loading" intent="load" backgroundColor={uiColors.bgMantle} />
                   </Show>
 
                   {/* Status badge */}

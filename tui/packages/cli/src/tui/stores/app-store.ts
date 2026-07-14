@@ -46,7 +46,8 @@ export type TabType =
 	| "infrastructure"
 	| "libraries"
 	| "scripts"
-	| "kubernetes";
+	| "kubernetes"
+	| "ui-test";
 
 type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
 type TableSortDirection = "asc" | "desc" | "none";
@@ -224,7 +225,11 @@ function sortApps(items: TableRow[], rules: TableSortRule[]): TableRow[] {
 		.map(({ app }) => app);
 }
 
-export function createAppStore() {
+export function uiTestTabEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+	return env.DEVENV_UI_TEST === "true";
+}
+
+export function createAppStore(env: NodeJS.ProcessEnv = process.env) {
 	const [apps, setApps] = createSignal<App[]>([]);
 	const [infraServices, setInfraServices] = createSignal<InfraService[]>([]);
 	const [kubernetesClusterStatus, setKubernetesClusterStatus] = createSignal<KubernetesClusterStatus | null>(null);
@@ -296,6 +301,7 @@ export function createAppStore() {
 			return next;
 		});
 	};
+	const showUiTestTab = uiTestTabEnabled(env);
 	const [activeTab, setActiveTab] = createSignal<TabType>("applications");
 	const [selectedIndex, setSelectedIndex] = createSignal(0);
 	const [liveUpdatesActive, setLiveUpdatesActive] = createSignal(false);
@@ -315,7 +321,7 @@ export function createAppStore() {
 	const [tableFilterValueIndex, setTableFilterValueIndex] = createSignal(0);
 	const [tableFilterFocusedPane, setTableFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
 	const [tableFiltersByTab, setTableFiltersByTab] = createSignal<Record<TabType, Record<string, string[]>>>(
-		{ applications: {}, infrastructure: {}, libraries: {}, scripts: {}, kubernetes: {} },
+		{ applications: {}, infrastructure: {}, libraries: {}, scripts: {}, kubernetes: {}, "ui-test": {} },
 	);
 	const [showTableSortModal, setShowTableSortModal] = createSignal(false);
 	const [tableSortSelectedIndex, setTableSortSelectedIndex] = createSignal(0);
@@ -336,13 +342,13 @@ export function createAppStore() {
 		libraries: appSortRules(),
 		scripts: scriptSortRules(),
 		kubernetes: appSortRules(),
+		"ui-test": appSortRules(),
 	});
 	const [operationInProgressForApp, setOperationInProgressForApp] =
 		createSignal<string | null>(null);
 	const hasActiveOperation = createMemo(() =>
 		apps().some((app) => app.operationStatus?.status === "active"),
 	);
-	const [spinnerFrame, setSpinnerFrame] = createSignal(0);
 	const [startupState, setStartupState] = createSignal<StartupState>({
 		phase: "connecting",
 		message: "Connecting to DevEnv server...",
@@ -438,7 +444,7 @@ export function createAppStore() {
 		if (tab === "applications") return allApps.filter((app) => app.appType === "APP").map((app) => ({ ...app, rowKind: "app" as const }));
 		if (tab === "libraries") return allApps.filter((app) => app.appType === "LIB").map((app) => ({ ...app, rowKind: "app" as const }));
 		if (tab === "scripts") return scriptRows();
-		if (tab === "kubernetes") return [];
+		if (tab === "kubernetes" || tab === "ui-test") return [];
 		if (tab === "infrastructure") {
 			return infraServices().map((svc): TableRow => ({
 				rowKind: "infra",
@@ -523,6 +529,7 @@ export function createAppStore() {
 			},
 			{ id: "scripts", label: "Tasks", count: scriptVisibleRows().length },
 			{ id: "kubernetes", label: "Kubernetes", count: kubernetesClusterStatus()?.exists ? 1 : 0 },
+			...(showUiTestTab ? [{ id: "ui-test" as const, label: "UI Test" }] : []),
 		];
 	});
 
@@ -623,8 +630,6 @@ export function createAppStore() {
 		operationInProgressForApp,
 		setOperationInProgressForApp,
 		hasActiveOperation,
-		spinnerFrame,
-		setSpinnerFrame,
 		scriptsTree,
 		setScriptsTree,
 		firstStepsDismissed,

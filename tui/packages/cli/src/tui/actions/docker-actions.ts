@@ -3,6 +3,17 @@ import type { ActionDefinition, ActionTarget, App, AppAction, InfraService } fro
 import type { AppStore } from '../stores/app-store';
 import type { UiStore } from '../stores/ui-store';
 
+export function operationProgressLabel(action: AppAction | 'start' | 'stop' | 'restart'): string {
+  switch (action) {
+    case 'start': return 'Starting';
+    case 'stop': return 'Stopping';
+    case 'restart': return 'Restarting';
+    case 'build': return 'Building';
+    case 'test': return 'Testing';
+    case 'run': return 'Running';
+  }
+}
+
 export function createDockerActions(
   appStore: AppStore,
   uiStore: UiStore,
@@ -22,12 +33,12 @@ export function createDockerActions(
     appStore.setError(null);
     appStore.setApps(appStore.apps().map((a) =>
       a.ident === appIdent
-        ? { ...a, operationStatus: { operation: action as 'start' | 'stop', status: 'active', message: `${action.charAt(0).toUpperCase() + action.slice(1)}ing...` } }
+        ? { ...a, operationStatus: { operation: action as 'start' | 'stop', status: 'active', message: `${operationProgressLabel(action)}...` } }
         : a,
     ));
     appStore.setInfraServices((prev) => prev.map((svc) =>
       svc.ident === appIdent
-        ? { ...svc, operationStatus: { operation: action as 'start' | 'stop', status: 'active', message: `${action.charAt(0).toUpperCase() + action.slice(1)}ing...` } }
+        ? { ...svc, operationStatus: { operation: action as 'start' | 'stop', status: 'active', message: `${operationProgressLabel(action)}...` } }
         : svc,
     ));
 
@@ -191,7 +202,7 @@ export function createDockerActions(
     const appIdent = app.ident;
     appStore.setOperationInProgressForApp(appIdent);
     appStore.setError(null);
-    setActionStatus(appIdent, action, `${action.charAt(0).toUpperCase() + action.slice(1)}ing ${target.label}...`);
+    setActionStatus(appIdent, action, `${operationProgressLabel(action)} ${target.label}...`);
     try {
       appStore.pushModal('actions');
       await client.startActionRun(target.id);

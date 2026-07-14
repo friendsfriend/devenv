@@ -74,6 +74,13 @@ export { DetailSection } from "./components/DetailSection";
 export type { DetailSectionProps } from "./components/DetailSection";
 export { HighlightedText, highlightColor, highlightForIndex } from "./components/Highlight";
 export type { Highlight, HighlightedTextProps } from "./components/Highlight";
+export { InlineProgressAnimation, DEFAULT_INLINE_PROGRESS_HIGHLIGHTS } from "./components/InlineProgressAnimation";
+export type { InlineProgressAnimationProps, InlineProgressHighlights } from "./components/InlineProgressAnimation";
+export { AnimatedStatusText, statusAnimationIntentForOperation, statusAnimationIntentForText, statusAnimationModel } from "./components/AnimatedStatusText";
+export type { AnimatedStatusTextProps, StatusAnimationIntent, StatusAnimationModel } from "./components/AnimatedStatusText";
+export { TextTransitionAnimation } from "./components/TextTransitionAnimation";
+export type { TextTransitionAnimationProps } from "./components/TextTransitionAnimation";
+export { ProgressAnimationDemo, PROGRESS_ANIMATION_DEMO_LINES } from "./components/ProgressAnimationDemo";
 export { FilterStatusBar } from "./components/FilterStatusBar";
 export type { FilterStatusBarProps } from "./components/FilterStatusBar";
 export { Badge } from "./components/Badge";
@@ -175,15 +182,6 @@ export {
 	LAYOUT_CHROME_LINES,
 } from "./components/ScrollableList";
 export type { ScrollableListProps } from "./components/ScrollableList";
-
-// Export Knight Rider spinner utilities
-export {
-	createFrames,
-	createColors,
-	deriveTrailColors,
-	deriveInactiveColor,
-} from "./spinner";
-export type { KnightRiderOptions, KnightRiderStyle } from "./spinner";
 
 // Export ANSI escape sequence utilities
 export { ansiToStyledText, stripAnsi } from "./ansiToStyledText";

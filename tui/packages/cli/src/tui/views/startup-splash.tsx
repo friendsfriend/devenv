@@ -1,10 +1,9 @@
+/** @jsxImportSource @opentui/solid */
 import type { AppStore, StartupPhase } from '../stores';
 import { ProgressSplash, type ProgressSplashStepStatus } from './progress-splash';
 
 interface StartupSplashProps {
   appStore: AppStore;
-  spinnerFrames?: string[];
-  spinnerFrame?: () => number;
 }
 
 const phaseLabels: Record<Exclude<StartupPhase, 'failed'>, string> = {
@@ -54,8 +53,6 @@ export function StartupSplash(props: StartupSplashProps) {
       failureDetail={state().error || state().message}
       failureHint="Quit and restart to retry."
       failureMessage="Inspect server logs at $DEVENV_HOME/logs/server.log or ~/devenv/logs/server.log."
-      spinnerFrames={props.spinnerFrames}
-      spinnerFrame={props.spinnerFrame}
     />
   );
 }

@@ -9,7 +9,6 @@ import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui';
 import { KeymapProvider, useKeymap } from '@opentui/keymap/solid';
 import { abortExitSignal, destroyExitRenderer, exitApp, getExitSignal, registerGracefulShutdownHandler, setExitRenderer } from "./exit";
 import { onMount, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js';
-import "opentui-spinner/solid";
 import { APP_VERSION } from "../version";
 import { createClient, registerFatalCleanup } from '@devenv/core';
 import type { App } from '@devenv/types';
@@ -19,9 +18,7 @@ import {
 	Layout,
 	getSelectableRows,
 	setGlobalSelectionMouseUpHandler,
-	uiColors,
 } from '@devenv/ui';
-import { createFrames } from "./spinner";
 import {
 	createAppStore,
 	createIssueStore,
@@ -175,38 +172,6 @@ function TUIApp(props: TUIAppProps) {
 
 	// --- Effects ---
 	setupLogEffects(logStore, client);
-
-	const spinnerFrames = createFrames({
-		color: uiColors.primary,
-		style: "blocks",
-		width: 6,
-		inactiveFactor: 0.6,
-		minAlpha: 0.3,
-	});
-
-	const hasActiveSpinner = () =>
-		appStore.loading() ||
-		appStore.startupState().phase !== "complete" ||
-		appStore.exampleConfigLoading() ||
-		!!appStore.operationInProgressForApp() ||
-		appStore.isShuttingDown() ||
-		appStore.hasActiveOperation() ||
-		changeRequestStore.crLoading() ||
-		changeRequestStore.crChangesLoading() ||
-		changeRequestStore.crTestLoading() ||
-		changeRequestStore.crJobsForDetailLoading() ||
-		changeRequestStore.crDiscussionsLoading() ||
-		changeRequestStore.jobsLoading() ||
-		changeRequestStore.crAiLoading() ||
-		logStore.logAiLoading() ||
-		logStore.logAiStreaming();
-
-	const spinnerInterval = setInterval(() => {
-		if (hasActiveSpinner()) {
-			appStore.setSpinnerFrame((prev) => (prev + 1) % spinnerFrames.length);
-		}
-	}, 80);
-	onCleanup(() => clearInterval(spinnerInterval));
 
 	createEffect(() => {
 		if (!uiStore.runningTextEnabled()) return;
@@ -423,7 +388,6 @@ function TUIApp(props: TUIAppProps) {
 						actions={viewActions}
 						columns={columns}
 						scriptColumns={scriptColumns}
-						spinnerFrames={spinnerFrames}
 						dimensions={dimensions()}
 						runningTextEnabled={uiStore.runningTextEnabled()}
 						runningTextOffset={uiStore.runningTextOffset()}
@@ -432,7 +396,7 @@ function TUIApp(props: TUIAppProps) {
 				}
 				footer={
 					<StatusBar
-						left={`${getTabName(appStore.activeTab())}: ${appStore.filteredApps().length}`}
+						left={appStore.activeTab() === "ui-test" ? "UI Test" : `${getTabName(appStore.activeTab())}: ${appStore.filteredApps().length}`}
 						center={
 							appStore.viewMode() === "providers"
 								? "Providers"
@@ -463,7 +427,6 @@ function TUIApp(props: TUIAppProps) {
 			<ModalOverlays
 				stores={viewStores}
 				actions={viewActions}
-				spinnerFrames={spinnerFrames}
 				dimensions={dimensions()}
 			/>
 		</box>

@@ -55,18 +55,16 @@ export interface ContentRouterProps {
 	actions: ViewActions;
 	columns: TableColumn[];
 	scriptColumns: TableColumn[];
-	spinnerFrames: string[];
 	dimensions: { width: number; height: number };
 	runningTextEnabled?: boolean;
 	runningTextOffset?: number;
 	getTabBorderColor: (
-		tab: "applications" | "infrastructure" | "libraries" | "scripts" | "kubernetes",
+		tab: "applications" | "infrastructure" | "libraries" | "scripts" | "kubernetes" | "ui-test",
 	) => string;
 }
 
 export interface ModalOverlaysProps {
 	stores: ViewStores;
 	actions: ViewActions;
-	spinnerFrames: string[];
 	dimensions: { width: number; height: number };
 }
