@@ -106,19 +106,9 @@ export function createAppActions(
               handleActionStarted(appStore, actionRunStore!, event.properties as Record<string, unknown>);
             } else {
               actionRunStore?.handleEvent(event.type, event.properties as Record<string, unknown>);
-              // Clear stale operation status when an action finishes
-              if (event.type === 'action.completed' && actionRunStore) {
-                const props = event.properties as Record<string, unknown>;
-                const runId = String(props.runId ?? '');
-                if (runId) {
-                  const run = actionRunStore.runs().find((candidate) => candidate.id === runId);
-                  if (run?.appIdent) {
-                    appStore.setApps(appStore.apps().map((a) =>
-                      a.ident === run.appIdent ? { ...a, operationStatus: undefined } : a,
-                    ));
-                  }
-                }
-              }
+              // Keep the in-progress label until runtime status and operation status
+              // can be replaced atomically. Clearing first exposes stale "Running" state.
+              if (event.type === 'action.completed') void fetchStatus();
             }
           } catch (inner) {
             getLogger().write('ERROR', 'Failed to process action event: ' + (inner instanceof Error ? inner.message : String(inner)));
