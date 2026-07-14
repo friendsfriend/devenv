@@ -1,3 +1,4 @@
+import { batch } from 'solid-js';
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
 import type { ActionDefinition, ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus } from '@devenv/types';
@@ -81,17 +82,19 @@ export function createAppActions(
   const subscribeToUpdates = async (signal?: AbortSignal) => {
     try {
       if (actionRunStore && !actionHistoryHydrated) {
-        const replay = (history: Awaited<ReturnType<typeof client.getActionHistory>>) => {
+        const replay = (history: Awaited<ReturnType<typeof client.getActionHistory>>) => batch(() => {
           for (const event of history) {
             try {
-              if (event.type.startsWith('action.')) actionRunStore.handleEvent(event.type, event.properties as Record<string, unknown>);
+              if (event.type.startsWith('action.')) actionRunStore.handleEvent(event.type, event.properties as Record<string, unknown>, 'history');
             } catch (inner) {
               getLogger().write('ERROR', 'Failed to replay action event: ' + (inner instanceof Error ? inner.message : String(inner)));
             }
           }
-        };
+          actionRunStore.selectLastIfNone();
+        });
         replay(await client.getActionHistory());
-        actionRunStore.configureHistoryLoader(async () => replay(await client.getActionHistory(true)));
+        actionRunStore.configureHistoryLoader(async () => replay(await client.getActionHistory('older')));
+        actionRunStore.configureLogsLoader(async (runId, stepId) => replay(await client.getActionLogs(runId, stepId)));
         actionHistoryHydrated = true;
       }
       appStore.setLiveUpdatesActive(true);

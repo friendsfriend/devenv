@@ -118,15 +118,19 @@ func TestCompileKubernetesClusterActionsUsesOneCommandPerStep(t *testing.T) {
 	}
 	// Docker variant is the first 5, podman variant is the second 5
 	create := actions[1]
-	want := []string{"Check cluster", "Create cluster", "Export kubeconfig"}
+	want := []string{"Create cluster", "Export kubeconfig"}
 	for i, label := range want {
 		if create.RootStep.ChildSteps[i].DisplayLabel != label || create.RootStep.ChildSteps[i].StepType != "command" {
 			t.Fatalf("step %d=%#v", i, create.RootStep.ChildSteps[i])
 		}
 	}
+	exportArgs, ok := create.RootStep.ChildSteps[1].Configuration["args"].([]string)
+	if !ok || !slices.Contains(exportArgs, "--kubeconfig") {
+		t.Fatalf("export kubeconfig args=%#v", create.RootStep.ChildSteps[1].Configuration["args"])
+	}
 	// Podman variant should have KIND_EXPERIMENTAL_PROVIDER=podman env
 	podmanCreate := actions[6]
-	if podmanCreate.RootStep.ChildSteps[1].Configuration["env"] == nil {
-		t.Fatalf("podman create cluster step missing podman env: %#v", podmanCreate.RootStep.ChildSteps[1].Configuration)
+	if podmanCreate.RootStep.ChildSteps[0].Configuration["env"] == nil {
+		t.Fatalf("podman create cluster step missing podman env: %#v", podmanCreate.RootStep.ChildSteps[0].Configuration)
 	}
 }

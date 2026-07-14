@@ -321,7 +321,7 @@ func compileDependencySteps(actionID actiondef.ActionID, refs []resources.Depend
 				}
 				next[identity] = true
 				step.ChildSteps = append(step.ChildSteps, compileDependencySteps(actiondef.ActionID(semanticID), target.Requires, resolver, next, composeCmd, runtimeCmd, checkoutDir)...)
-				step.ChildSteps = append(step.ChildSteps, dependencyExecutionSteps(semanticID, appIdent, target, composeCmd, runtimeCmd, checkoutDir)...)
+				step.ChildSteps = append(step.ChildSteps, dependencyExecutionSteps(semanticID, appIdent, target, composeCmd, runtimeCmd, checkoutDir, ref.Provider)...)
 			}
 		}
 		if len(step.ChildSteps) == 0 && ref.Lifecycle != "external" {
@@ -477,7 +477,7 @@ func kubernetesSteps(id actiondef.ActionID, target resources.ActionTarget, runti
 	return steps
 }
 
-func dependencyExecutionSteps(parent actiondef.StepDefinitionID, appIdent string, target resources.ActionTarget, composeCmd, runtimeCmd, checkoutDir string) []actiondef.Step {
+func dependencyExecutionSteps(parent actiondef.StepDefinitionID, appIdent string, target resources.ActionTarget, composeCmd, runtimeCmd, checkoutDir string, provider resources.ContainerProvider) []actiondef.Step {
 	id := actiondef.ActionID(parent)
 	label := "Start application: " + appIdent
 	dir := target.WorkingDir
@@ -491,10 +491,10 @@ func dependencyExecutionSteps(parent actiondef.StepDefinitionID, appIdent string
 	case resources.ActionRuntimeDocker:
 		selectedCompose := composeCmd
 		selectedRuntime := runtimeCmd
-		if target.Provider == resources.ContainerProviderPodman {
+		if provider == resources.ContainerProviderPodman {
 			selectedCompose = docker.ComposeCommandForRuntime("podman")
 			selectedRuntime = docker.RuntimeCommandForRuntime("podman")
-		} else if target.Provider == resources.ContainerProviderDocker {
+		} else if provider == resources.ContainerProviderDocker {
 			selectedCompose = docker.ComposeCommandForRuntime("docker")
 			selectedRuntime = docker.RuntimeCommandForRuntime("docker")
 		}
@@ -538,7 +538,8 @@ func dockerBuildSteps(id actiondef.ActionID, appIdent string, target resources.A
 	prepare := step("prepare-build-context", "Prepare build context", actiondef.StepKindCommand)
 	prepare.Configuration = map[string]any{"command": "sh", "args": []string{"-c", fmt.Sprintf("ls -1A %s/ > %s 2>/dev/null; cp -r %s/. . 2>/dev/null; true", templatesDir, templateMarker, templatesDir)}, "dir": dir}
 	build := step("build-image", "Build image", actiondef.StepKindCommand)
-	build.Configuration = map[string]any{"command": runtimeCmd, "args": []string{"build", "-f", target.SourcePath, "-t", "devenv-" + appIdent, "."}, "dir": dir, "setValues": map[string]any{"image.ref": "devenv-" + appIdent}}
+	imageName := "devenv-" + appIdent + ":latest"
+	build.Configuration = map[string]any{"command": runtimeCmd, "args": []string{"build", "-f", target.SourcePath, "-t", imageName, "."}, "dir": dir, "setValues": map[string]any{"image.ref": imageName}}
 	build.OutputPorts = []actiondef.PortDefinition{imageRef}
 	// Clean up template files from checkout dir after build (always runs).
 	cleanupTemplates := step("cleanup-build-context", "Clean up build context", actiondef.StepKindCommand)

@@ -3,6 +3,7 @@ package actionexec
 import (
 	"context"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/friendsfriend/devenv/pkg/actiondef"
@@ -63,6 +64,17 @@ func (c *Coordinator) Acquire(ctx context.Context, key actiondef.ExecutionKey, c
 	c.executions[key] = exec
 	c.mu.Unlock()
 	return &Lease{state: LeaseOwner, execution: exec, coordinator: c, key: key, claims: sorted}, nil
+}
+
+func (c *Coordinator) ClearScope(scope string) {
+	prefix := scope + ":"
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for key := range c.executions {
+		if strings.HasPrefix(string(key), prefix) {
+			delete(c.executions, key)
+		}
+	}
 }
 
 type ClaimConflict struct {

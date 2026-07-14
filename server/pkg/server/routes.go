@@ -45,6 +45,7 @@ func (s *Server) routes() []routeSpec {
 
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/cancel", Handler: s.handleCancelAction},
 		{Domain: "actions", Method: http.MethodGet, Path: "/api/actions/history", Handler: s.handleActionHistory},
+		{Domain: "actions", Method: http.MethodGet, Path: "/api/actions/logs", Handler: s.handleActionLogs},
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/events", Handler: s.handleReportedActionEvent},
 		{Domain: "actions", Method: http.MethodGet, Path: "/api/actions/shell-script", Handler: s.handleShellActionScript},
 

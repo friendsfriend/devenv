@@ -15,6 +15,7 @@ func TestFormatRunTargetDisplay(t *testing.T) {
 	}{
 		{"tmux shell", resources.ActionTarget{Runtime: resources.ActionRuntimeShell, LaunchMode: resources.LaunchModeTmux, Label: "bun build", Profile: "default"}, "[tmux] bun build (default)"},
 		{"docker default", resources.ActionTarget{Runtime: resources.ActionRuntimeDocker, Label: "default"}, "[docker] default (default)"},
+		{"podman compose", resources.ActionTarget{Runtime: resources.ActionRuntimeDocker, Provider: resources.ContainerProviderPodman, Label: "default"}, "[podman] default (default)"},
 		{"powershell", resources.ActionTarget{Runtime: resources.ActionRuntimePowerShell, Label: "dev", Profile: "local"}, "[powershell] dev (local)"},
 		{"systemshell", resources.ActionTarget{Runtime: resources.ActionRuntimeSystemShell, Label: "dev", Profile: "sys"}, "[systemshell] dev (sys)"},
 		{"kubernetes", resources.ActionTarget{Runtime: resources.ActionRuntimeKubernetes, Label: "chart", Profile: "kind"}, "[kubernetes] chart (kind)"},
@@ -25,6 +26,15 @@ func TestFormatRunTargetDisplay(t *testing.T) {
 				t.Fatalf("FormatRunTargetDisplay() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestRunTargetInfoUsesContainerProviderRuntime(t *testing.T) {
+	svc := &service{runTargetInfo: map[string]RunTargetInfo{}}
+	svc.SetRunTargetInfo("api", resources.ActionTarget{ID: "app/api/run/podman/default", Runtime: resources.ActionRuntimeDocker, Provider: resources.ContainerProviderPodman, Label: "default"})
+	info, ok := svc.RunTargetInfo("api")
+	if !ok || info.Runtime != "podman" || info.Display != "[podman] default (default)" {
+		t.Fatalf("run target info = %#v, ok %v", info, ok)
 	}
 }
 

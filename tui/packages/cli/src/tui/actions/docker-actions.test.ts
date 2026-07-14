@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { createDockerActions } from './docker-actions';
 
-function createStores(app: any) {
+function createStores(app: any, kubernetesClusterStatus?: { provider: string }) {
   let apps = [app];
   let operationInProgressForApp: string | null = null;
   const appStore = {
@@ -15,6 +15,7 @@ function createStores(app: any) {
     setApps: (next: any[] | ((prev: any[]) => any[])) => { apps = typeof next === 'function' ? next(apps) : next; },
     infraServices: () => [],
     setInfraServices: () => {},
+    kubernetesClusterStatus: () => kubernetesClusterStatus,
   };
   const uiStore = {
     setNotification: () => {},
@@ -23,6 +24,8 @@ function createStores(app: any) {
     setActionTargetPickerAppIdent: () => {},
     setActionTargetPickerAction: () => {},
     setShowActionTargetPicker: () => {},
+    setLoadingModalMessage: () => {},
+    setShowLoadingModal: () => {},
   };
   return { appStore, uiStore };
 }
@@ -71,6 +74,24 @@ describe('docker actions', () => {
     expect(shown).toBe(true);
   });
 
+  test('Kubernetes cluster actions use cluster provider', async () => {
+    const { appStore, uiStore } = createStores({ ident: 'web' });
+    const calls: string[] = [];
+    const client = {
+      getActionDefinitions: async () => ({ version: 1, actions: [
+        { id: 'kubernetes/local/action/create/docker/default', type: 'create', runtime: 'docker', availability: { available: true } },
+        { id: 'kubernetes/local/action/create/podman/default', type: 'create', runtime: 'podman', availability: { available: true } },
+      ] }),
+      startActionRun: async (id: string) => { calls.push(id); },
+      getKubernetesClusterStatus: async () => ({ exists: true, provider: 'podman' }),
+    };
+    const actions = createDockerActions(appStore as any, uiStore as any, client as any, () => {});
+
+    await actions.createCluster();
+
+    expect(calls).toEqual(['kubernetes/local/action/create/podman/default']);
+  });
+
   test('app stop starts matching backend stop action', async () => {
     const app = {
       ident: 'web',
@@ -88,6 +109,28 @@ describe('docker actions', () => {
     await actions.performDockerOperation('stop', app as any);
 
     expect(calls).toEqual(['app/web/action/stop/docker/redis']);
+  });
+
+  test('app stop uses Podman lifecycle for a Podman run target', async () => {
+    const app = {
+      ident: 'web',
+      displayName: 'Web',
+      runTargetInfo: { targetId: 'app/web/run/podman/with-redis', runtime: 'podman', profile: 'with-redis' },
+    };
+    const { appStore, uiStore } = createStores(app);
+    const calls: string[] = [];
+    const client = {
+      getActionDefinitions: async () => ({ version: 1, actions: [
+        { id: 'app/web/action/stop/docker/with-redis', type: 'stop', runtime: 'docker', label: 'Stop (docker)', availability: { available: true }, root: {} },
+        { id: 'app/web/action/stop/podman/with-redis', type: 'stop', runtime: 'podman', label: 'Stop (podman)', availability: { available: true }, root: {} },
+      ] }),
+      startActionRun: async (id: string) => { calls.push(id); },
+    };
+    const actions = createDockerActions(appStore as any, uiStore as any, client as any, () => {});
+
+    await actions.performDockerOperation('stop', app as any);
+
+    expect(calls).toEqual(['app/web/action/stop/podman/with-redis']);
   });
 
   test('app stop chooses Kubernetes lifecycle over stale Podman run target when pods run', async () => {

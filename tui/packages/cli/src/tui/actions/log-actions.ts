@@ -80,10 +80,6 @@ export function createLogActions(
   const getSelectedApp = () => appStore.filteredApps()[appStore.selectedIndex()];
 
   const loadContainerLogs = async () => {
-    if (appStore.operationInProgressForApp()) {
-      showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
-      return;
-    }
     const app = getSelectedApp();
     if (!app) return;
     if ('type' in app && app.type === 'script') {

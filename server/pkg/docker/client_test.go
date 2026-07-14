@@ -31,6 +31,7 @@ func TestContainerNameMatchesDockerAndPodmanComposeNames(t *testing.T) {
 		{name: "/devenv-postgres-1", ident: "postgres", base: "postgres"},
 		{name: "/devenv_postgres_1", ident: "postgres", base: "postgres"},
 		{name: "devenv_mailpit_1", ident: "mailpit", base: "mailpit"},
+		{name: "compose_bhvr-site_1", ident: "bhvr-site", base: ""},
 	}
 	for _, tc := range cases {
 		if !ContainerNameMatches(tc.name, tc.ident, tc.base) {

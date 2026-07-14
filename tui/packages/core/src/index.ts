@@ -65,7 +65,7 @@ import {
 	streamContainerStats,
 	testApp,
 } from "./docker-client";
-import { getActionHistory, health, reportActionEvent, subscribeToEvents } from "./events-client";
+import { getActionHistory, getActionLogs, health, reportActionEvent, subscribeToEvents } from "./events-client";
 import { createExampleConfig } from "./example-config-client";
 import {
 	getBranches,
@@ -739,8 +739,11 @@ export class DevEnvClient {
 	reportActionEvent(type: string, properties: Record<string, unknown>): Promise<void> {
 		return reportActionEvent(this.deps, type, properties);
 	}
-	getActionHistory(loadAll?: boolean, limit?: number): Promise<ServerEvent[]> {
-		return getActionHistory(this.deps, loadAll, limit);
+	getActionHistory(scope?: import('./events-client').ActionHistoryScope, limit?: number): Promise<ServerEvent[]> {
+		return getActionHistory(this.deps, scope, limit);
+	}
+	getActionLogs(runId: string, stepId?: string): Promise<ServerEvent[]> {
+		return getActionLogs(this.deps, runId, stepId);
 	}
 	subscribeToEvents(signal?: AbortSignal): AsyncGenerator<ServerEvent> {
 		return subscribeToEvents(this.deps, signal);

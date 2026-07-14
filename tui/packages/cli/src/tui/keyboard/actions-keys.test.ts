@@ -21,6 +21,23 @@ test('Shift+J/K switches action panels and j/k uses focused panel', () => {
   expect(store.focusedStepId()).toBe('a');
 });
 
+test('g/G and n/p navigate action rows', () => {
+  const store = createActionRunStore();
+  for (const id of ['first', 'second', 'third']) {
+    store.handleEvent('action.started', { run: { id, title: id, status: 'completed', steps: [] } });
+  }
+  const appStore = { popModal: () => undefined } as any;
+
+  handleActionsKeys({ name: 'p' } as any, store, appStore);
+  expect(store.selectedRunId()).toBe('second');
+  handleActionsKeys({ name: 'n' } as any, store, appStore);
+  expect(store.selectedRunId()).toBe('third');
+  handleActionsKeys({ name: 'g' } as any, store, appStore);
+  expect(store.selectedRunId()).toBe('first');
+  handleActionsKeys({ name: 'G', shift: true } as any, store, appStore);
+  expect(store.selectedRunId()).toBe('third');
+});
+
 test('y copies focused tree node with all descendant log content', () => {
   const store = createActionRunStore();
   store.handleEvent('action.started', { run: {

@@ -550,6 +550,9 @@ export async function handleTableKeys(
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)
 				logActions.loadContainerLogs();
 			break;
+		case "L":
+			appStore.pushModal('actions');
+			break;
 		case "m":
 			// Show CR detail for current branch (lowercase m)
 			if (appStore.activeTab() !== "scripts" && appList.length > 0)

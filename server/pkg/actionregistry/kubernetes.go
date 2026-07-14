@@ -1,6 +1,8 @@
 package actionregistry
 
 import (
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/friendsfriend/devenv/pkg/actiondef"
@@ -21,12 +23,20 @@ type kubernetesClusterSpec struct {
 	commands      [][]string
 }
 
+func exportKubeconfigCommand() []string {
+	args := []string{"kind", "export", "kubeconfig", "--name", "devenv"}
+	if home, err := os.UserHomeDir(); err == nil {
+		args = append(args, "--kubeconfig", filepath.Join(home, ".kube", "config"))
+	}
+	return args
+}
+
 var clusterSpecs = []kubernetesClusterSpec{
 	{"status", "Check cluster", [][]string{{"kind", "get", "kubeconfig", "--name", "devenv"}}},
-	{"create", "Create cluster", [][]string{{"kind", "get", "kubeconfig", "--name", "devenv"}, {"kind", "create", "cluster", "--name", "devenv"}, {"kind", "export", "kubeconfig", "--name", "devenv"}}},
+	{"create", "Create cluster", [][]string{{"kind", "create", "cluster", "--name", "devenv"}, exportKubeconfigCommand()}},
 	{"delete", "Delete cluster", [][]string{{"kind", "delete", "cluster", "--name", "devenv"}}},
-	{"recreate", "Recreate cluster", [][]string{{"kind", "delete", "cluster", "--name", "devenv"}, {"kind", "create", "cluster", "--name", "devenv"}, {"kind", "export", "kubeconfig", "--name", "devenv"}}},
-	{"export-kubeconfig", "Export kubeconfig", [][]string{{"kind", "export", "kubeconfig", "--name", "devenv"}}},
+	{"recreate", "Recreate cluster", [][]string{{"kind", "delete", "cluster", "--name", "devenv"}, {"kind", "create", "cluster", "--name", "devenv"}, exportKubeconfigCommand()}},
+	{"export-kubeconfig", "Export kubeconfig", [][]string{exportKubeconfigCommand()}},
 }
 
 func compileKubernetesClusterActions(tools ToolSet) []actiondef.Action {

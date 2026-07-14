@@ -55,7 +55,7 @@ Custom kind config, node sizing, registry mirrors, and cluster resource setup ar
 
 Typical flow:
 
-1. Build the app normally with the DevEnv build target. This creates the local app image, for example `bhvr-site:latest` or `localhost/bhvr-site:latest` with Podman.
+1. Build the app normally with the DevEnv build target. This creates the local app image, for example `devenv-bhvr-site:latest` or `localhost/devenv-bhvr-site:latest` with Podman.
 2. Run the Kubernetes target. DevEnv ensures kind exists, starts dependencies, loads the existing image into kind, uninstalls the previous app release, and installs the Helm chart.
 3. Press `9` to open `k9s --context kind-devenv`.
 

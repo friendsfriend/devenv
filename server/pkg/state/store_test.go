@@ -390,6 +390,75 @@ func TestActionEventHistoryPersistsAndRetainsOrder(t *testing.T) {
 	}
 }
 
+func TestActionLogMigrationMovesLegacyOutputEvents(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlite := store.(*sqliteStore)
+	legacy := `{"type":"action.step.output","properties":{"runId":"run-1","stepId":"build","commandId":"command","stream":"stdout","output":"legacy"}}`
+	if _, err := sqlite.db.Exec(`INSERT INTO action_events (event_json) VALUES (?)`, legacy); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := sqlite.db.Exec(`UPDATE schema_meta SET value = '6' WHERE key = 'version'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	store, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	logs, err := store.GetActionLogEvents("run-1", "build", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 1 || logs[0] != legacy {
+		t.Fatalf("logs = %v", logs)
+	}
+	history, err := store.GetActionEvents(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 0 {
+		t.Fatalf("history = %v", history)
+	}
+}
+
+func TestActionLogsAreStoredIndependentlyByRunAndStep(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	if err := store.AddActionEvent(`{"type":"action.started"}`, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddActionLogEvent("run-1", "build", `{"type":"action.step.output","properties":{"output":"build"}}`, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.AddActionLogEvent("run-1", "test", `{"type":"action.step.output","properties":{"output":"test"}}`, 10); err != nil {
+		t.Fatal(err)
+	}
+	history, err := store.GetActionEvents(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history) != 1 || history[0] != `{"type":"action.started"}` {
+		t.Fatalf("history = %v", history)
+	}
+	logs, err := store.GetActionLogEvents("run-1", "build", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(logs) != 1 || logs[0] != `{"type":"action.step.output","properties":{"output":"build"}}` {
+		t.Fatalf("logs = %v", logs)
+	}
+}
+
 func TestActionEventHistoryFiltersRecentWindow(t *testing.T) {
 	store, err := Open(t.TempDir())
 	if err != nil {
@@ -412,6 +481,30 @@ func TestActionEventHistoryFiltersRecentWindow(t *testing.T) {
 	}
 	if len(events) != 1 || events[0] != `{"type":"recent"}` {
 		t.Fatalf("recent events = %v", events)
+	}
+}
+
+func TestActionEventHistoryFiltersTimeRange(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	for _, event := range []string{`{"type":"old"}`, `{"type":"recent"}`} {
+		if err := store.AddActionEvent(event, 10); err != nil {
+			t.Fatal(err)
+		}
+	}
+	sqlite := store.(*sqliteStore)
+	if _, err := sqlite.db.Exec(`UPDATE action_events SET created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-20 minutes') WHERE id = (SELECT MIN(id) FROM action_events)`); err != nil {
+		t.Fatal(err)
+	}
+	events, err := store.GetActionEventsBetween(10, time.Now().Add(-24*time.Hour), time.Now().Add(-10*time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(events) != 1 || events[0] != `{"type":"old"}` {
+		t.Fatalf("older events = %v", events)
 	}
 }
 

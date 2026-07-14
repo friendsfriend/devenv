@@ -398,7 +398,7 @@ const goCompose = `x-devenv:
   requires: [{"infra":"postgres"},{"infra":"script-clock"}]
 services:
   go-rest-postgres:
-    image: go-rest-postgres:latest
+    image: devenv-go-rest-postgres:latest
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/example?sslmode=disable
     ports: ["8080:8080"]
@@ -411,13 +411,13 @@ networks:
 
 const bunCompose = `services:
   bhvr-site:
-    image: bhvr-site:latest
+    image: devenv-bhvr-site:latest
     ports: ["3000:3000"]
 `
 
 const bunDebugCompose = `services:
   bhvr-site:
-    image: bhvr-site:latest
+    image: devenv-bhvr-site:latest
     command: bun --inspect run dev
     ports: ["3000:3000", "6499:6499"]
 `
@@ -426,7 +426,7 @@ const bunRedisCompose = `x-devenv:
   requires: [{"app":"go-rest-postgres","runtime":"docker","profile":"default"},{"infra":"redis"},{"infra":"script-clock"}]
 services:
   bhvr-site:
-    image: bhvr-site:latest
+    image: devenv-bhvr-site:latest
     environment:
       REDIS_URL: redis://bhvr-redis:6379
     ports: ["3000:3000"]

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import type { ActionRun } from '@devenv/types';
-import { actionNodeStep } from './action-run-modal';
+import { actionModalHelpText, actionNodeStep } from './action-run-modal';
 
 const gitPull: ActionRun = {
   id: 'pull-1',
@@ -16,6 +16,13 @@ const gitPull: ActionRun = {
 };
 
 describe('action run modal', () => {
+  test('shows only focused panel bindings', () => {
+    expect(actionModalHelpText(0).map((entry) => entry.key)).toContain('n/p');
+    expect(actionModalHelpText(0).map((entry) => entry.key)).not.toContain('d/u');
+    expect(actionModalHelpText(1).map((entry) => entry.key)).toContain('d/u');
+    expect(actionModalHelpText(1).map((entry) => entry.key)).not.toContain('n/p');
+  });
+
   test('shows command details when structurally single-step action row is selected', () => {
     const step = actionNodeStep({ key: 'action:pull-1', kind: 'action', run: gitPull, depth: 0, hasChildren: false });
     expect(step?.commands[0]).toMatchObject({ command: 'git fetch origin', stdout: 'updated\n', exitCode: 0 });

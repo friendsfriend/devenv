@@ -77,6 +77,12 @@ func (s *Server) handleStartActionRun(w http.ResponseWriter, r *http.Request) {
 		respondErrorMessage(w, err.Error(), http.StatusConflict)
 		return
 	}
+	if prepared, err := s.prepareInfrastructureDockerAction(definition); err != nil {
+		respondErrorMessage(w, err.Error(), http.StatusConflict)
+		return
+	} else {
+		definition = prepared
+	}
 	allowed := map[string]bool{}
 	for _, input := range definition.InputDefinitions {
 		allowed[string(input.Key)] = true
@@ -93,7 +99,7 @@ func (s *Server) handleStartActionRun(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if definition.ActionRuntime == "git" || definition.ActionRuntime == "podman" || (definition.ActionRuntime == "docker" && (definition.Resource.Kind == "app" || definition.Resource.Kind == "kubernetes")) || definition.ActionRuntime == "tmux" || definition.ActionRuntime == "shell" || strings.HasPrefix(string(definition.ActionRuntime), "command-") || definition.ActionRuntime == "systemshell" || definition.ActionRuntime == "powershell" || definition.ActionRuntime == "kubernetes" || definition.ActionRuntime == "kind" {
+	if definition.ActionRuntime == "git" || definition.ActionRuntime == "podman" || (definition.ActionRuntime == "docker" && (definition.Resource.Kind == "app" || definition.Resource.Kind == "infrastructure" || definition.Resource.Kind == "kubernetes")) || definition.ActionRuntime == "tmux" || definition.ActionRuntime == "shell" || strings.HasPrefix(string(definition.ActionRuntime), "command-") || definition.ActionRuntime == "systemshell" || definition.ActionRuntime == "powershell" || definition.ActionRuntime == "kubernetes" || definition.ActionRuntime == "kind" {
 		runID, err := s.startEngineDefinition(definition, request.Inputs)
 		if err != nil {
 			respondErrorMessage(w, err.Error(), http.StatusConflict)
@@ -107,6 +113,45 @@ func (s *Server) handleStartActionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, map[string]any{"success": true, "actionId": definition.ActionID, "registryVersion": s.actionDefinitions.Snapshot().Version}, http.StatusAccepted)
+}
+
+func (s *Server) prepareInfrastructureDockerAction(definition actiondef.Action) (actiondef.Action, error) {
+	if definition.Resource.Kind != "infrastructure" || definition.ActionRuntime != "docker" {
+		return definition, nil
+	}
+	service := s.findInfraServiceByIdent(definition.Resource.ID)
+	if service == nil {
+		return definition, fmt.Errorf("infrastructure %s not found", definition.Resource.ID)
+	}
+	composeFile, err := s.services.ResourcesManager().ResolveInfrastructureComposeFile(service.Ident)
+	if err != nil {
+		return definition, err
+	}
+	args := []string{"-p", "devenv"}
+	if envFile, ok := s.services.ResourcesManager().EnvFilePath(); ok {
+		args = append(args, "--env-file", envFile)
+	}
+	args = append(args, "-f", composeFile)
+	if definition.ActionType == "start" {
+		args = append(args, "up", "-d")
+	} else if definition.ActionType == "stop" {
+		args = append(args, "down", "--remove-orphans", "--volumes")
+	} else {
+		return definition, nil
+	}
+	children := make([]actiondef.Step, len(definition.RootStep.ChildSteps))
+	copy(children, definition.RootStep.ChildSteps)
+	for index, step := range children {
+		if step.StepType != actiondef.StepKindOperation || !strings.HasPrefix(step.DisplayLabel, "Start ") && !strings.HasPrefix(step.DisplayLabel, "Terminate ") {
+			continue
+		}
+		step.StepType = actiondef.StepKindCommand
+		step.Handler = "docker"
+		step.Configuration = map[string]any{"command": docker.ComposeCommand(), "args": append([]string(nil), args...)}
+		children[index] = step
+	}
+	definition.RootStep.ChildSteps = children
+	return definition, nil
 }
 
 type engineEventSink struct {
@@ -218,6 +263,7 @@ func (s *Server) startEngineDefinition(definition actiondef.Action, rawInputs ma
 		if status == actionrun.StatusCompleted {
 			s.recordCompletedRunTarget(definition)
 			if definition.ActionType == "run" {
+				s.broadcastAppStatus(definition.Resource.ID)
 				s.leaseDependencies(definition, runID)
 			}
 			if definition.ActionType == "stop" {
@@ -251,7 +297,13 @@ func (s *Server) recordCompletedRunTarget(definition actiondef.Action) {
 		if targetProfile == "" {
 			targetProfile = "default"
 		}
-		if string(target.Runtime) != string(definition.ActionRuntime) || targetProfile != profile {
+		if targetProfile != profile {
+			continue
+		}
+		if target.Runtime == resources.ActionRuntimeDocker && definition.ActionRuntime == "podman" {
+			target.Provider = resources.ContainerProviderPodman
+			target.ID = string(definition.ActionID)
+		} else if string(target.Runtime) != string(definition.ActionRuntime) {
 			continue
 		}
 		s.services.BuildService().SetRunTargetInfo(definition.Resource.ID, target)

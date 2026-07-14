@@ -400,7 +400,7 @@ func TestBuildAppDockerUsesBuildKitAndCache(t *testing.T) {
 		t.Fatalf("expected docker build command, got %#v", runner.commands)
 	}
 	args := strings.Join(buildCmd.args, " ")
-	if !strings.Contains(args, "--cache-from test-app:latest") {
+	if !strings.Contains(args, "--cache-from devenv-test-app:latest") {
 		t.Fatalf("expected docker build cache-from args, got %#v", buildCmd.args)
 	}
 	if !strings.Contains(args, "--build-arg BUILDKIT_INLINE_CACHE=1") {

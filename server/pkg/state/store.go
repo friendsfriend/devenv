@@ -18,7 +18,7 @@ import (
 	_ "modernc.org/sqlite" // pure-Go SQLite driver
 )
 
-const schemaVersion = 6
+const schemaVersion = 7
 
 // AppState holds the mutable runtime state for a single application.
 type AppState struct {
@@ -103,6 +103,15 @@ type Store interface {
 
 	// GetActionEventsSince returns serialized action events created at or after since.
 	GetActionEventsSince(limit int, since time.Time) ([]string, error)
+
+	// GetActionEventsBetween returns serialized action events created in [since, before).
+	GetActionEventsBetween(limit int, since, before time.Time) ([]string, error)
+
+	// AddActionLogEvent appends output for an action step and trims oldest logs.
+	AddActionLogEvent(runID, stepID, eventJSON string, maxEntries int) error
+
+	// GetActionLogEvents returns serialized output events for one action or step, oldest first.
+	GetActionLogEvents(runID, stepID string, limit int) ([]string, error)
 
 	// Close releases database resources.
 	Close() error
@@ -201,6 +210,12 @@ func (s *sqliteStore) migrate() error {
 		}
 		current = 6
 	}
+	if current < 7 {
+		if err := s.applyV7(); err != nil {
+			return err
+		}
+		current = 7
+	}
 
 	if _, err := s.db.Exec(`
 		INSERT INTO schema_meta (key, value) VALUES ('version', ?)
@@ -263,6 +278,61 @@ func (s *sqliteStore) applyV3() error {
 }
 
 // applyV4 adds persisted app run target metadata.
+func (s *sqliteStore) applyV7() error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin action log migration: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec(`
+		CREATE TABLE IF NOT EXISTS action_log_events (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			run_id TEXT NOT NULL,
+			step_id TEXT NOT NULL,
+			event_json TEXT NOT NULL,
+			created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		);
+		CREATE INDEX IF NOT EXISTS idx_action_log_events_run_step_id ON action_log_events(run_id, step_id, id);
+	`); err != nil {
+		return fmt.Errorf("creating action_log_events table: %w", err)
+	}
+	rows, err := tx.Query(`SELECT id, event_json, created_at FROM action_events ORDER BY id`)
+	if err != nil {
+		return fmt.Errorf("reading action events for log migration: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int64
+		var payload, createdAt string
+		if err := rows.Scan(&id, &payload, &createdAt); err != nil {
+			return fmt.Errorf("scanning action event for log migration: %w", err)
+		}
+		var event struct {
+			Type       string `json:"type"`
+			Properties struct {
+				RunID  string `json:"runId"`
+				StepID string `json:"stepId"`
+			} `json:"properties"`
+		}
+		if json.Unmarshal([]byte(payload), &event) != nil || (event.Type != "action.command.output" && event.Type != "action.step.output") || event.Properties.RunID == "" || event.Properties.StepID == "" {
+			continue
+		}
+		if _, err := tx.Exec(`INSERT INTO action_log_events (run_id, step_id, event_json, created_at) VALUES (?, ?, ?, ?)`, event.Properties.RunID, event.Properties.StepID, payload, createdAt); err != nil {
+			return fmt.Errorf("migrating action log event: %w", err)
+		}
+		if _, err := tx.Exec(`DELETE FROM action_events WHERE id = ?`, id); err != nil {
+			return fmt.Errorf("removing migrated action log event: %w", err)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterating action events for log migration: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit action log migration: %w", err)
+	}
+	return nil
+}
+
 func (s *sqliteStore) applyV6() error {
 	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS dependency_leases (target_id TEXT NOT NULL, owner_run_id TEXT NOT NULL, owner_app TEXT NOT NULL, lifecycle TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(target_id, owner_run_id))`)
 	if err != nil {
@@ -581,7 +651,73 @@ func (s *sqliteStore) AddActionEvent(eventJSON string, maxEntries int) error {
 	return nil
 }
 
+func (s *sqliteStore) AddActionLogEvent(runID, stepID, eventJSON string, maxEntries int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if maxEntries <= 0 {
+		maxEntries = 50000
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return fmt.Errorf("state: begin action log event tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.Exec(`INSERT INTO action_log_events (run_id, step_id, event_json) VALUES (?, ?, ?)`, runID, stepID, eventJSON); err != nil {
+		return fmt.Errorf("state: insert action log event: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM action_log_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')`); err != nil {
+		return fmt.Errorf("state: expire action log events: %w", err)
+	}
+	if _, err := tx.Exec(`DELETE FROM action_log_events WHERE id NOT IN (SELECT id FROM action_log_events ORDER BY id DESC LIMIT ?)`, maxEntries); err != nil {
+		return fmt.Errorf("state: trim action log events: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("state: commit action log event: %w", err)
+	}
+	return nil
+}
+
+func (s *sqliteStore) GetActionLogEvents(runID, stepID string, limit int) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if limit <= 0 || limit > 50000 {
+		limit = 50000
+	}
+	if _, err := s.db.Exec(`DELETE FROM action_log_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')`); err != nil {
+		return nil, fmt.Errorf("state: expire action log events: %w", err)
+	}
+	query, args := `SELECT event_json FROM (SELECT id, event_json FROM action_log_events WHERE run_id = ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC`, []any{runID, limit}
+	if stepID != "" {
+		query, args = `SELECT event_json FROM (SELECT id, event_json FROM action_log_events WHERE run_id = ? AND step_id = ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC`, []any{runID, stepID, limit}
+	}
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("state: query action log events: %w", err)
+	}
+	defer rows.Close()
+	var events []string
+	for rows.Next() {
+		var event string
+		if err := rows.Scan(&event); err != nil {
+			return nil, fmt.Errorf("state: scan action log event: %w", err)
+		}
+		events = append(events, event)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("state: iterate action log events: %w", err)
+	}
+	return events, nil
+}
+
 func (s *sqliteStore) GetActionEventsSince(limit int, since time.Time) ([]string, error) {
+	return s.getActionEvents(limit, since, time.Time{})
+}
+
+func (s *sqliteStore) GetActionEventsBetween(limit int, since, before time.Time) ([]string, error) {
+	return s.getActionEvents(limit, since, before)
+}
+
+func (s *sqliteStore) getActionEvents(limit int, since, before time.Time) ([]string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if limit <= 0 || limit > 50000 {
@@ -590,7 +726,15 @@ func (s *sqliteStore) GetActionEventsSince(limit int, since time.Time) ([]string
 	if _, err := s.db.Exec(`DELETE FROM action_events WHERE created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-24 hours')`); err != nil {
 		return nil, fmt.Errorf("state: expire action events: %w", err)
 	}
-	rows, err := s.db.Query(`SELECT event_json FROM (SELECT id, event_json FROM action_events WHERE created_at >= ? ORDER BY id DESC LIMIT ?) ORDER BY id ASC`, since.UTC().Format("2006-01-02T15:04:05.000Z"), limit)
+	query := `SELECT event_json FROM (SELECT id, event_json FROM action_events WHERE created_at >= ?`
+	args := []any{since.UTC().Format("2006-01-02T15:04:05.000Z")}
+	if !before.IsZero() {
+		query += ` AND created_at < ?`
+		args = append(args, before.UTC().Format("2006-01-02T15:04:05.000Z"))
+	}
+	query += ` ORDER BY id DESC LIMIT ?) ORDER BY id ASC`
+	args = append(args, limit)
+	rows, err := s.db.Query(query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("state: query action events since: %w", err)
 	}

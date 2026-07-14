@@ -11,12 +11,24 @@ export async function reportActionEvent(deps: ClientDeps, type: string, properti
   if (!response.ok) await handleFetchError(response, deps.onError);
 }
 
-export async function getActionHistory(deps: ClientDeps, loadAll = false, limit = 50000): Promise<ServerEvent[]> {
-  const scope = loadAll ? 'all' : 'recent';
+export type ActionHistoryScope = 'recent' | 'older' | 'all';
+
+export async function getActionHistory(deps: ClientDeps, scope: ActionHistoryScope = 'recent', limit = 50000): Promise<ServerEvent[]> {
   const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/history?scope=${scope}&limit=${limit}`);
   if (!response.ok) {
     await handleFetchError(response, deps.onError);
     throw new Error(`Failed to load action history: ${response.statusText}`);
+  }
+  return response.json() as Promise<ServerEvent[]>;
+}
+
+export async function getActionLogs(deps: ClientDeps, runId: string, stepId?: string): Promise<ServerEvent[]> {
+  const params = new URLSearchParams({ runId });
+  if (stepId) params.set('stepId', stepId);
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/logs?${params}`);
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+    throw new Error(`Failed to load action logs: ${response.statusText}`);
   }
   return response.json() as Promise<ServerEvent[]>;
 }

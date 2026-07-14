@@ -17,7 +17,11 @@ type ComposeReadinessProbe struct {
 func (p ComposeReadinessProbe) Wait(ctx context.Context) error {
 	return poll(ctx, p.Interval, func() error {
 		args := append([]string{}, p.Args...)
-		args = append(args, "ps", "--all", "--format", "{{.State}}")
+		args = append(args, "ps")
+		if !strings.HasPrefix(p.Name, "podman-compose") {
+			args = append(args, "--all")
+		}
+		args = append(args, "--format", "{{.State}}")
 		result := p.Runner.Run(ctx, CommandSpec{Name: p.Name, Args: args}, nil)
 		if result.Err != nil {
 			return result.Err

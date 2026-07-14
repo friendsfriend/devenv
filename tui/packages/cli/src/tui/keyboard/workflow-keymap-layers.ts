@@ -31,13 +31,15 @@ const COMMON_WORKFLOW_KEYS = [
 	'ctrl+d', 'ctrl+u', 'ctrl+j', 'ctrl+k', 'ctrl+n', 'ctrl+p', 'ctrl+r', 'ctrl+enter',
 ] as const;
 
-const PANEL_SCROLL_KEYS = ['j', 'k', 'up', 'down', 'd', 'u', 'ctrl+d', 'ctrl+u', 'g', 'G'] as const;
+const PANEL_SCROLL_KEYS = ['j', 'k', 'up', 'down'] as const;
+const PANEL_HALF_PAGE_KEYS = ['d', 'u', 'ctrl+d', 'ctrl+u'] as const;
+const PANEL_EDGE_KEYS = ['g', 'G'] as const;
 
 const bindAll = (command: string, context: string) =>
 	COMMON_WORKFLOW_KEYS.map((key) => ({ key, cmd: command, context, category: 'Workflow', discoverable: false }));
 
-const bindPanel = (command: string, context: string) =>
-	PANEL_SCROLL_KEYS.map((key) => ({ key, cmd: command, context, category: 'Panel', discoverable: false }));
+const bindPanel = (keys: readonly string[], command: string, context: string, footer?: string) =>
+	keys.map((key) => ({ key, cmd: command, context, category: 'Panel', footer, discoverable: Boolean(footer) }));
 
 function withSequence(event: KeyEvent): KeyEvent & { sequence?: string } {
 	return Object.assign(event, {
@@ -91,15 +93,27 @@ export function registerWorkflowKeymapLayers(
 	const panelLayers = [
 		{ viewMode: 'appDetail', focusedPanel: 'appDetail:0', command: 'app-detail.panel.summary', title: 'App summary panel', handler: runAppDetail },
 		{ viewMode: 'appDetail', focusedPanel: 'appDetail:1', command: 'app-detail.panel.commands', title: 'App commands panel', handler: runAppDetail },
-		{ viewMode: 'appDetail', focusedPanel: 'appDetail:2', command: 'app-detail.panel.dependencies', title: 'App dependency panel', handler: runAppDetail },
+		{ viewMode: 'appDetail', focusedPanel: 'appDetail:2', command: 'app-detail.panel.dependencies', title: 'App dependency panel', scrollTitle: 'Navigate dependencies', handler: runAppDetail, extra: { key: 'enter', title: 'Expand/collapse dependency' } },
 		{ viewMode: 'issueDetail', focusedPanel: 'issueDetail:0', command: 'issue-detail.panel.body', title: 'Issue body panel', handler: run(handleIssueDetailKeys) },
-		{ viewMode: 'issueDetail', focusedPanel: 'issueDetail:1', command: 'issue-detail.panel.comments', title: 'Issue comments panel', handler: run(handleIssueDetailKeys) },
+		{ viewMode: 'issueDetail', focusedPanel: 'issueDetail:1', command: 'issue-detail.panel.references', title: 'Issue references panel', handler: run(handleIssueDetailKeys), extra: { key: 'o', title: 'Open references' } },
+		{ viewMode: 'issueDetail', focusedPanel: 'issueDetail:2', command: 'issue-detail.panel.comments', title: 'Issue comments panel', handler: run(handleIssueDetailKeys) },
 		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:0', command: 'cr-detail.panel.summary', title: 'CR summary panel', handler: run(handleCrDetailKeys) },
 		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:1', command: 'cr-detail.panel.description', title: 'CR description panel', handler: run(handleCrDetailKeys) },
-		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:2', command: 'cr-detail.panel.checks', title: 'CR checks panel', handler: run(handleCrDetailKeys) },
+		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:2', command: 'cr-detail.panel.files', title: 'CR changed files panel', handler: run(handleCrDetailKeys), extra: { key: 'o', title: 'Open changed files' } },
+		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:3', command: 'cr-detail.panel.jobs', title: 'CR pipeline jobs panel', handler: run(handleCrDetailKeys), extra: { key: 'o', title: 'Open jobs' } },
+		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:4', command: 'cr-detail.panel.issues', title: 'CR linked issues panel', handler: run(handleCrDetailKeys), extra: { key: 'o', title: 'Open linked issues' } },
+		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:5', command: 'cr-detail.panel.discussions', title: 'CR discussions panel', handler: run(handleCrDetailKeys), extra: { key: 'o', title: 'Open discussions' } },
+		{ viewMode: 'changeRequestDetail', focusedPanel: 'changeRequestDetail:6', command: 'cr-detail.panel.tests', title: 'CR test results panel', handler: run(handleCrDetailKeys), extra: { key: 'o', title: 'Open test results' } },
 	] as const;
 
-	for (const { viewMode, focusedPanel, command, title, handler } of panelLayers) {
+	for (const layer of panelLayers) {
+		const { viewMode, focusedPanel, command, title, handler } = layer;
+		const scrollTitle = ('scrollTitle' in layer ? layer.scrollTitle : undefined) ?? 'Scroll focused panel';
+		const extra = 'extra' in layer ? layer.extra : undefined;
+		const switchCommand = `${command}.switch-panel`;
+		const halfPageCommand = `${command}.half-page`;
+		const edgeCommand = `${command}.edge`;
+		const extraCommand = extra && `${command}.${extra.key}`;
 		disposers.push(keymap.registerLayer({
 			name: title,
 			priority: WORKFLOW_PRIORITY + 20,
@@ -107,8 +121,21 @@ export function registerWorkflowKeymapLayers(
 			activeModal: 'none',
 			appViewMode: viewMode,
 			focusedPanel,
-			commands: [{ name: command, context: viewMode, category: 'Panel', title: 'Scroll focused panel', desc: `${title} focused panel controls.`, footer: 'j/k', discoverable: true, run: ({ event }) => handler(event) }],
-			bindings: bindPanel(command, viewMode),
+			commands: [
+				{ name: command, context: viewMode, category: 'Panel', title: scrollTitle, desc: `${title} focused panel controls.`, footer: 'j/k', discoverable: true, run: ({ event }) => handler(event) },
+				{ name: halfPageCommand, context: viewMode, category: 'Panel', title: 'Half page', desc: `Scroll ${title} by half a page.`, footer: 'd/u', discoverable: true, run: ({ event }) => handler(event) },
+				{ name: edgeCommand, context: viewMode, category: 'Panel', title: 'Top/bottom', desc: `Scroll ${title} to top or bottom.`, footer: 'g/G', discoverable: true, run: ({ event }) => handler(event) },
+				{ name: switchCommand, context: viewMode, category: 'Navigation', title: 'Switch panel', desc: 'Move focus to adjacent panel.', footer: 'J/K', discoverable: true, run: ({ event }) => handler(event) },
+				...(extra && extraCommand ? [{ name: extraCommand, context: viewMode, category: 'Panel', title: extra.title, desc: `${extra.title} from focused panel.`, footer: extra.key === 'enter' ? 'Enter' : extra.key, discoverable: true, run: ({ event }: { event: KeyEvent }) => handler(event) }] : []),
+			],
+			bindings: [
+				...bindPanel(PANEL_SCROLL_KEYS, command, viewMode, 'j/k'),
+				...bindPanel(PANEL_HALF_PAGE_KEYS, halfPageCommand, viewMode, 'd/u'),
+				...bindPanel(PANEL_EDGE_KEYS, edgeCommand, viewMode, 'g/G'),
+				{ key: 'J', cmd: switchCommand, context: viewMode, category: 'Navigation', footer: 'J/K', discoverable: true },
+				{ key: 'K', cmd: switchCommand, context: viewMode, category: 'Navigation', footer: 'J/K', discoverable: true },
+				...(extra && extraCommand ? [{ key: extra.key, cmd: extraCommand, context: viewMode, category: 'Panel', footer: extra.key === 'enter' ? 'Enter' : extra.key, discoverable: true }] : []),
+			],
 		}));
 	}
 

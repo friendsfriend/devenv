@@ -115,9 +115,10 @@ export function applyKeymapRuntimeSnapshot(keymap: DevenvKeymap, snapshot: Keyma
 	keymap.setData('worktree.active', snapshot.worktreeManagerActive);
 }
 
-export function syncKeymapRuntimeState(keymap: DevenvKeymap, stores: Accessor<KeyboardStores> | KeyboardStores): void {
+export function syncKeymapRuntimeState(keymap: DevenvKeymap, stores: Accessor<KeyboardStores> | KeyboardStores, afterSync?: () => void): void {
 	createEffect(() => {
 		const currentStores = typeof stores === 'function' ? stores() : stores;
 		applyKeymapRuntimeSnapshot(keymap, getKeymapRuntimeSnapshot(currentStores));
+		afterSync?.();
 	});
 }

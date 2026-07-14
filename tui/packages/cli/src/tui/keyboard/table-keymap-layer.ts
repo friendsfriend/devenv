@@ -22,7 +22,9 @@ const TABLE_KEYS = [
 const KUBERNETES_KEYS = [
 	'r', 'R', 's', 'S', 'x', 'X', 'l', 'd', 'p', 'P', 'b', 'B', 'm', 'M', 'o', 'e', '9', 'return', 'enter',
 ] as const;
-const KUBERNETES_PANEL_KEYS = ['j', 'k', 'up', 'down', 'd', 'u', 'ctrl+d', 'ctrl+u', 'g', 'G'] as const;
+const KUBERNETES_PANEL_SCROLL_KEYS = ['j', 'k', 'up', 'down'] as const;
+const KUBERNETES_PANEL_HALF_PAGE_KEYS = ['d', 'u', 'ctrl+d', 'ctrl+u'] as const;
+const KUBERNETES_PANEL_EDGE_KEYS = ['g', 'G'] as const;
 
 const bind = (keys: readonly string[], command: string, category: string) =>
 	keys.map((key) => ({ key, cmd: command, context: 'table', category, discoverable: false }));
@@ -52,7 +54,6 @@ export function registerTableKeymapLayer(
 				{ name: 'actions.toggle', context: 'table', category: 'Actions', title: 'Action history', desc: 'Toggle action history without starting an action.', footer: 'L', discoverable: true, run: () => { deps.stores.appStore.pushModal('actions'); return true; } },
 			],
 			bindings: [
-				{ key: 'L', cmd: 'actions.toggle', context: 'table', category: 'Actions', footer: 'L', discoverable: true },
 				...bind(TABLE_KEYS.filter((key) => key !== '/' && key !== 'F' && key !== 'O' && key !== 'L' && key !== 'shift+tab'), 'table.handle', 'Table'),
 				{ key: 'shift+tab', cmd: 'table.tab.previous', context: 'table', category: 'Navigation', footer: 'Shift+Tab', discoverable: true },
 				{ key: '/', cmd: 'table.search.open', context: 'table', category: 'List controls', footer: '/', discoverable: true },
@@ -60,17 +61,30 @@ export function registerTableKeymapLayer(
 				{ key: 'O', cmd: 'table.sort.open', context: 'table', category: 'List controls', footer: 'O', discoverable: true },
 			],
 		}),
-		...Array.from({ length: 4 }, (_, index) => keymap.registerLayer({
-			name: `Kubernetes Panel ${index + 1}`,
-			priority: KUBERNETES_PRIORITY + 20,
-			shutdown: false,
-			activeModal: 'none',
-			appViewMode: 'table',
-			activeTab: 'kubernetes',
-			focusedPanel: `kubernetes:${index}`,
-			commands: [{ name: `kubernetes.panel.${index}.scroll`, context: 'kubernetes', category: 'Panel', title: 'Scroll focused Kubernetes panel', desc: 'Scroll the focused Kubernetes panel.', footer: 'j/k', discoverable: true, run: ({ event }) => runTable(event) }],
-			bindings: bind(KUBERNETES_PANEL_KEYS, `kubernetes.panel.${index}.scroll`, 'Panel'),
-		})),
+		...Array.from({ length: 4 }, (_, index) => {
+			const scrollCommand = `kubernetes.panel.${index}.scroll`;
+			const halfPageCommand = `kubernetes.panel.${index}.half-page`;
+			const edgeCommand = `kubernetes.panel.${index}.edge`;
+			return keymap.registerLayer({
+				name: `Kubernetes Panel ${index + 1}`,
+				priority: KUBERNETES_PRIORITY + 20,
+				shutdown: false,
+				activeModal: 'none',
+				appViewMode: 'table',
+				activeTab: 'kubernetes',
+				focusedPanel: `kubernetes:${index}`,
+				commands: [
+					{ name: scrollCommand, context: 'kubernetes', category: 'Panel', title: 'Scroll focused Kubernetes panel', desc: 'Scroll the focused Kubernetes panel.', footer: 'j/k', discoverable: true, run: ({ event }) => runTable(event) },
+					{ name: halfPageCommand, context: 'kubernetes', category: 'Panel', title: 'Half page', desc: 'Scroll focused Kubernetes panel by half a page.', footer: 'd/u', discoverable: true, run: ({ event }) => runTable(event) },
+					{ name: edgeCommand, context: 'kubernetes', category: 'Panel', title: 'Top/bottom', desc: 'Scroll focused Kubernetes panel to top or bottom.', footer: 'g/G', discoverable: true, run: ({ event }) => runTable(event) },
+				],
+				bindings: [
+					...bind(KUBERNETES_PANEL_SCROLL_KEYS, scrollCommand, 'Panel'),
+					...bind(KUBERNETES_PANEL_HALF_PAGE_KEYS, halfPageCommand, 'Panel'),
+					...bind(KUBERNETES_PANEL_EDGE_KEYS, edgeCommand, 'Panel'),
+				],
+			});
+		}),
 		keymap.registerLayer({
 			name: 'Kubernetes Tab',
 			priority: KUBERNETES_PRIORITY,

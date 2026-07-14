@@ -85,6 +85,8 @@ const RAW_KEYBINDS: KeybindDef[] = [
 	// ========== kubernetes ==========
 	{ keys: ["Shift+J", "Shift+K"], description: "Cycle panel focus in Kubernetes cluster view", footerDescription: "Panels", context: "kubernetes", category: "Navigation" },
 	{ keys: ["Shift+J", "Shift+K"], description: "Switch action steps/log panel", footerDescription: "Panels", context: "modal", category: "Navigation" },
+	{ keys: ["n", "p"], description: "Next/previous action", footerDescription: "Actions", context: "modal", category: "Navigation" },
+	{ keys: ["g", "G"], description: "First/last action", footerDescription: "Top/bottom", context: "modal", category: "Navigation" },
 	{ keys: ["s"], description: "Create/start managed kind cluster", footerDescription: "Start", context: "kubernetes", category: "Kubernetes" },
 	{ keys: ["S"], description: "Delete/stop managed kind cluster", footerDescription: "Delete", context: "kubernetes", category: "Kubernetes" },
 	{ keys: ["R"], description: "Recreate managed kind cluster", footerDescription: "Recreate", context: "kubernetes", category: "Kubernetes" },

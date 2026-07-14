@@ -10,6 +10,7 @@ import { ScrollableContent } from './ScrollableContent';
 import { RunningText } from './RunningText';
 import { DetailSection } from './DetailSection';
 import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
+import { HighlightedText } from './Highlight';
 import type {
 	Issue,
 	ChangeRequest,
@@ -154,7 +155,7 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 	const dimensions = useTerminalDimensions();
 	const cr = () => props.changeRequest;
 	const lineWidth = () => Math.max(1, Math.floor(dimensions().width * 0.6) - 4);
-	const linkedIssueTitleWidth = () => Math.max(1, lineWidth() - 8);
+	const linkedIssueTitleWidth = () => Math.max(1, Math.floor(dimensions().width * 0.4) - 20);
 	const statusHighlight = (status: string) => {
 		switch (status.toLowerCase()) {
 			case "success":
@@ -587,10 +588,16 @@ export function ChangeRequestDetailView(props: ChangeRequestDetailViewProps) {
 					<Show when={!props.linkedIssuesLoading && !props.linkedIssuesError && (props.linkedIssues?.length ?? 0) > 0}>
 						<For each={(props.linkedIssues ?? []).slice(0, 2)}>
 							{(iss) => (
-								<box style={{ height: 1, flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}>
-									<text fg={uiColors.primary}>#{iss.iid}</text>
-									<text fg={uiColors.textSecondary}>{iss.state === "opened" || iss.state === "open" ? " ○ " : " ◌ "}</text>
-									<RunningText text={iss.title} width={linkedIssueTitleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+								<box style={{ width: "100%", height: 1, flexDirection: "row", paddingLeft: 1, paddingRight: 1 }}>
+									<box style={{ width: 8, flexShrink: 0 }}>
+										<text fg={uiColors.primary}>{`#${iss.iid}`}</text>
+									</box>
+									<box style={{ width: 10, flexShrink: 0 }}>
+										<HighlightedText text={iss.state} highlight={iss.state === "opened" || iss.state === "open" ? "positive" : "secondary"} />
+									</box>
+									<box style={{ flexGrow: 1, minWidth: 0 }}>
+										<RunningText text={iss.title} width={linkedIssueTitleWidth()} fg={uiColors.textSecondary} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />
+									</box>
 								</box>
 							)}
 						</For>

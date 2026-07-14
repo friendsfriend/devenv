@@ -359,8 +359,12 @@ func (s *service) RunTargetInfo(appIdent string) (*RunTargetInfo, bool) {
 }
 
 func (s *service) SetRunTargetInfo(appIdent string, target resources.ActionTarget) {
+	runtime := string(target.Runtime)
+	if target.Runtime == resources.ActionRuntimeDocker && target.Provider != "" {
+		runtime = string(target.Provider)
+	}
 	info := RunTargetInfo{
-		Runtime:    string(target.Runtime),
+		Runtime:    runtime,
 		LaunchMode: string(target.LaunchMode),
 		Label:      target.Label,
 		Profile:    target.Profile,
@@ -418,6 +422,9 @@ func runTargetInfoFromState(info state.AppRunTargetInfo) RunTargetInfo {
 
 func FormatRunTargetDisplay(target resources.ActionTarget) string {
 	badge := string(target.Runtime)
+	if target.Runtime == resources.ActionRuntimeDocker && target.Provider != "" {
+		badge = string(target.Provider)
+	}
 	if target.Runtime == resources.ActionRuntimeShell && target.LaunchMode == resources.LaunchModeTmux {
 		badge = "tmux"
 	}
@@ -617,7 +624,7 @@ func (s *service) buildAppInternal(a *app.App, targetID string, statusCb func(st
 		}
 	}()
 
-	imageName := fmt.Sprintf("%s:latest", a.Ident)
+	imageName := fmt.Sprintf("devenv-%s:latest", a.Ident)
 
 	// Copy Dockerfile into build context so Docker Desktop can access it
 	// (Docker does not allow -f paths outside the build context on some drivers)
@@ -1086,7 +1093,7 @@ func (s *service) testAppInternal(a *app.App, targetID string, statusCb func(str
 
 	dockerFilePath := target.SourcePath
 
-	testImageName := fmt.Sprintf("%s-test:latest", a.Ident)
+	testImageName := fmt.Sprintf("devenv-%s-test:latest", a.Ident)
 
 	localDockerfilePath := filepath.Join(a.LocalDirectoryPath, ".devenv-test.Dockerfile")
 	if err := s.resourceMgr.CopyFile(dockerFilePath, localDockerfilePath); err != nil {

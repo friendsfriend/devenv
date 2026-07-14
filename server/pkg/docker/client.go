@@ -88,9 +88,10 @@ type InfraService interface {
 
 // dockerClient implements the Client interface
 type dockerClient struct {
-	cli   *client.Client
-	cache *containerCache
-	mutex sync.RWMutex
+	cli       *client.Client
+	cache     *containerCache
+	fallbacks []*dockerClient
+	mutex     sync.RWMutex
 }
 
 // containerCache for performance optimization
@@ -159,6 +160,29 @@ func NewClient(configuredRuntime string) (Client, error) {
 		return noopClient{}, nil
 	}
 
+	primary, err := newDockerClient(rt)
+	if err != nil {
+		return nil, err
+	}
+	for _, name := range []string{"docker", "podman"} {
+		if name == rt.Name {
+			continue
+		}
+		for _, candidate := range runtimeCandidates(name) {
+			if runtimePing(candidate) != nil {
+				continue
+			}
+			fallback, err := newDockerClient(candidate)
+			if err == nil {
+				primary.fallbacks = append(primary.fallbacks, fallback)
+			}
+			break
+		}
+	}
+	return primary, nil
+}
+
+func newDockerClient(rt Runtime) (*dockerClient, error) {
 	opts := []client.Opt{client.WithAPIVersionNegotiation()}
 	if rt.Host != "" {
 		opts = append(opts, client.WithHost(rt.Host))
@@ -169,13 +193,7 @@ func NewClient(configuredRuntime string) (Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create %s client: %w", rt.Name, err)
 	}
-
-	return &dockerClient{
-		cli: cli,
-		cache: &containerCache{
-			ttl: 30 * time.Second,
-		},
-	}, nil
+	return &dockerClient{cli: cli, cache: &containerCache{ttl: 30 * time.Second}}, nil
 }
 
 // getContainers returns cached containers if valid, otherwise fetches from Docker API
@@ -211,8 +229,34 @@ func (dc *dockerClient) refreshContainerCache() ([]container.Summary, error) {
 	return containers, nil
 }
 
+func (dc *dockerClient) allContainers() ([]container.Summary, error) {
+	containers, err := dc.getContainers()
+	if err != nil {
+		return nil, err
+	}
+	for _, fallback := range dc.fallbacks {
+		if more, err := fallback.getContainers(); err == nil {
+			containers = append(containers, more...)
+		}
+	}
+	return containers, nil
+}
+
+func (dc *dockerClient) refreshAllContainers() ([]container.Summary, error) {
+	containers, err := dc.refreshContainerCache()
+	if err != nil {
+		return nil, err
+	}
+	for _, fallback := range dc.fallbacks {
+		if more, err := fallback.refreshContainerCache(); err == nil {
+			containers = append(containers, more...)
+		}
+	}
+	return containers, nil
+}
+
 func (dc *dockerClient) RefreshCache() error {
-	_, err := dc.refreshContainerCache()
+	_, err := dc.refreshAllContainers()
 	return err
 }
 
@@ -226,6 +270,9 @@ func (dc *dockerClient) invalidateCache() {
 
 func (dc *dockerClient) InvalidateContainerCache() {
 	dc.invalidateCache()
+	for _, fallback := range dc.fallbacks {
+		fallback.invalidateCache()
+	}
 }
 
 func (dc *dockerClient) SubscribeToEvents(ctx context.Context) (<-chan ContainerEvent, <-chan error) {
@@ -277,7 +324,7 @@ func (dc *dockerClient) SubscribeToEvents(ctx context.Context) (<-chan Container
 }
 
 func (dc *dockerClient) GetInfo(app App) Info {
-	containers, err := dc.getContainers()
+	containers, err := dc.allContainers()
 	if err != nil {
 		return Info{Status: "error"}
 	}
@@ -298,7 +345,7 @@ func (dc *dockerClient) GetInfo(app App) Info {
 }
 
 func (dc *dockerClient) GetInfoForInfra(infraService InfraService) Info {
-	containers, err := dc.getContainers()
+	containers, err := dc.allContainers()
 	if err != nil {
 		return Info{Status: "error"}
 	}
@@ -319,7 +366,7 @@ func (dc *dockerClient) GetInfoForInfra(infraService InfraService) Info {
 }
 
 func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (map[string]Info, error) {
-	containers, err := dc.getContainers()
+	containers, err := dc.allContainers()
 	if err != nil {
 		// Return error status for all requested items, but don't propagate error
 		// This allows API to return partial data even when Docker is unavailable
@@ -376,7 +423,7 @@ func (dc *dockerClient) BatchGetInfo(apps []App, infraServices []InfraService) (
 func (dc *dockerClient) GetAllContainerIDsForApp(app App) []string {
 	// Action readiness must observe containers created by command that just ran,
 	// not status cache from before startup.
-	containers, err := dc.refreshContainerCache()
+	containers, err := dc.refreshAllContainers()
 	if err != nil {
 		return []string{}
 	}
@@ -400,7 +447,7 @@ func (dc *dockerClient) GetAllContainerIDsForApp(app App) []string {
 
 // getContainerInfo helper function to get container info by ID
 func (dc *dockerClient) getContainerInfo(containerID string) Info {
-	containers, err := dc.getContainers()
+	containers, err := dc.allContainers()
 	if err != nil {
 		return Info{Status: "error"}
 	}
@@ -478,7 +525,10 @@ func ContainerNameMatches(name, ident, containerBaseName string) bool {
 		if match == "" {
 			continue
 		}
-		if cleanName == match || baseName == match || normalizeContainerName(cleanName) == normalizeContainerName(match) || normalizeContainerName(baseName) == normalizeContainerName(match) {
+		normalizedMatch := normalizeContainerName(match)
+		normalizedName := normalizeContainerName(cleanName)
+		normalizedBase := normalizeContainerName(baseName)
+		if cleanName == match || baseName == match || normalizedName == normalizedMatch || normalizedBase == normalizedMatch || strings.HasSuffix(normalizedBase, "-"+normalizedMatch) {
 			return true
 		}
 	}

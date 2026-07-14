@@ -48,8 +48,7 @@ export interface TableProps<T = string> {
 
 	/** Optional: total lines available for this component before its own chrome (border, tabs, header).
 	 *  When provided, `reservedLines` is ignored and the list height is computed from this value
-	 *  minus the Table's own chrome.  Used when the Table shares the content area with other elements
-	 *  (e.g. ActionStatusStrip) so caller can communicate exact height budget. */
+	 *  minus the Table's own chrome. */
 	availableLines?: number;
 	spinnerFrames?: string[];
 	spinnerFrame?: () => number;

@@ -103,15 +103,33 @@ describe('action run store', () => {
     store.handleEvent('action.step.started', { runId: 'r1', stepId: 'two', command: 'two' });
     expect(store.focusedStepId()).toBe('one');
   });
-  test('loads older history once and removes loader node', async () => {
+  test('loads logs only for selected nodes', async () => {
+    const store = createActionRunStore();
+    const requests: Array<[string, string | undefined]> = [];
+    store.configureLogsLoader(async (runId, stepId) => { requests.push([runId, stepId]); });
+    store.handleEvent('action.started', { run });
+    store.focusStep('two');
+    await store.loadLogsForNode(store.selectedNode());
+    store.selectRun('r1');
+    await store.loadLogsForNode(store.selectedNode());
+    await store.loadLogsForNode(store.selectedNode());
+    expect(requests).toEqual([['r1', 'two'], ['r1', undefined]]);
+  });
+  test('loads older history once and restores action focus', async () => {
     const store = createActionRunStore();
     let loads = 0;
-    store.configureHistoryLoader(async () => { loads++; });
-    expect(store.visibleNodes()[0]?.kind).toBe('loadOlder');
-    await store.loadOlderHistory();
+    let release!: () => void;
+    store.handleEvent('action.started', { run });
+    store.configureHistoryLoader(async () => { loads++; await new Promise<void>((resolve) => { release = resolve; }); });
+    store.focusTreeNode(store.visibleNodes()[0]!);
+    const first = store.loadOlderHistory();
+    const second = store.loadOlderHistory();
     expect(loads).toBe(1);
+    release();
+    await Promise.all([first, second]);
     expect(store.hasOlderHistory()).toBe(false);
     expect(store.visibleNodes().some((node) => node.kind === 'loadOlder')).toBe(false);
+    expect(store.focusedTreeKey()).toBe('action:r1');
   });
   test('hides finished actions on reopen until history is loaded', async () => {
     const store = createActionRunStore();
@@ -126,6 +144,13 @@ describe('action run store', () => {
     expect(store.visibleNodes().filter((node) => node.kind === 'action')).toEqual([]);
     await store.loadOlderHistory();
     expect(store.visibleNodes().filter((node) => node.kind === 'action').map((node) => node.run.id)).toEqual(['old', 'current']);
+  });
+  test('history replay preserves current selection and chronological run order', () => {
+    const store = createActionRunStore();
+    store.handleEvent('action.started', { run: { ...run, id: 'recent', startedAt: '2026-01-02T00:00:00Z' } });
+    store.handleEvent('action.started', { run: { ...run, id: 'older', startedAt: '2026-01-01T00:00:00Z' } }, 'history');
+    expect(store.selectedRunId()).toBe('recent');
+    expect(store.runs().map((item) => item.id)).toEqual(['older', 'recent']);
   });
   test('isolates repeated actions by unique run id', () => {
     const store = createActionRunStore();
@@ -168,9 +193,12 @@ describe('action run store', () => {
         { id: 'child', label: 'Child', status: 'pending', parentId: 'root', commands: [] },
       ],
     } });
-    // Composite step (root has child 'child') should collapse on completion
+    store.focusStep('child');
+    // Composite step (root has child 'child') should collapse on completion and retain focus.
     store.handleEvent('action.step.completed', { runId: 'r1', stepId: 'root' });
     expect(store.run()!.steps.find((s) => s.id === 'root')!.collapsed).toBe(true);
+    expect(store.focusedStepId()).toBe('root');
+    expect(store.focusedTreeKey()).toBe('step:r1:root');
     // Leaf step (child has no children) should NOT collapse on completion
     store.handleEvent('action.step.completed', { runId: 'r1', stepId: 'child' });
     expect(store.run()!.steps.find((s) => s.id === 'child')!.collapsed).not.toBe(true);
@@ -178,6 +206,8 @@ describe('action run store', () => {
     store.handleEvent('action.completed', { runId: 'r1', status: 'completed' });
     expect(store.run()!.collapsed).toBe(true);
     expect(store.run()!.steps.every((step) => step.status === 'completed')).toBe(true);
+    expect(store.focusedNode()).toBe('action');
+    expect(store.focusedTreeKey()).toBe('action:r1');
   });
   test('failure expands only ancestors leading to failed leaf', () => {
     const store = createActionRunStore();

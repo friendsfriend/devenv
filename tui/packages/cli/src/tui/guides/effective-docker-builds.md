@@ -7,7 +7,7 @@ DevEnv build targets use your app Dockerfile with the configured container runti
 For Docker, DevEnv enables BuildKit and reuses the previous app image as cache:
 
 ```sh
-DOCKER_BUILDKIT=1 docker build --cache-from IDENT:latest --build-arg BUILDKIT_INLINE_CACHE=1 ...
+DOCKER_BUILDKIT=1 docker build --cache-from devenv-IDENT:latest --build-arg BUILDKIT_INLINE_CACHE=1 ...
 ```
 
 For Podman, DevEnv does not use BuildKit. It probes `podman build --help` and only adds supported cache flags such as `--layers` or `--cache-from`.

@@ -4,7 +4,6 @@ import {
 	RepositoryTable,
 	InfrastructureTable,
 	TaskTable,
-	ActionStatusStrip,
 	IssueView,
 	IssueDetailView,
 	ReferencesView,
@@ -40,14 +39,12 @@ export function ContentRouter(props: ContentRouterProps) {
 		void dockerActions.refreshKubernetesCluster();
 	});
 
-	// Table shares content area with one-row action strip.
-	// Include three 1-line gutters: header-tabs, table-strip, strip-footer.
-	const ACTION_STRIP_HEIGHT = 1;
-	const TABLE_VIEW_GUTTERS = 3;
+	// ContentStack adds one-line top and bottom gutters around table.
+	const TABLE_VIEW_GUTTERS = 2;
 	const TAB_BAR_LINES = 3;
 	const availableTableLines = Math.max(
 		1,
-		props.dimensions.height - LAYOUT_CHROME_LINES - ACTION_STRIP_HEIGHT - TABLE_VIEW_GUTTERS - TAB_BAR_LINES,
+		props.dimensions.height - LAYOUT_CHROME_LINES - TABLE_VIEW_GUTTERS - TAB_BAR_LINES,
 	);
 	const tableColumns = () =>
 		appStore.activeTab() === "scripts"
@@ -612,13 +609,6 @@ export function ContentRouter(props: ContentRouterProps) {
 											onWorkloadsScrollBoxReady={(ref) => { appStore.kubernetesScrollBoxRefs[3] = ref; }}
 										/>
 									</Show>
-								</box>,
-								<box style={{ flexShrink: 0, height: ACTION_STRIP_HEIGHT }}>
-									<ActionStatusStrip
-										runs={actionRunStore.runs()}
-										width={props.dimensions.width}
-										onActivate={() => appStore.pushModal("actions")}
-									/>
 								</box>,
 							]}
 						/>

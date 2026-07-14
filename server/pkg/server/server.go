@@ -554,7 +554,16 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 func (s *Server) BroadcastEvent(event Event) {
 	if strings.HasPrefix(event.Type, "action.") && s.services != nil {
 		if payload, err := json.Marshal(event); err == nil {
-			if err := s.services.StateStore().AddActionEvent(string(payload), 50000); err != nil {
+			if isActionOutputType(event.Type) {
+				properties, _ := event.Properties.(map[string]interface{})
+				runID, _ := properties["runId"].(string)
+				stepID, _ := properties["stepId"].(string)
+				if runID != "" && stepID != "" {
+					if err := s.services.StateStore().AddActionLogEvent(runID, stepID, string(payload), 50000); err != nil {
+						log.Printf("[WARN] Failed to persist action log event: %v", err)
+					}
+				}
+			} else if err := s.services.StateStore().AddActionEvent(string(payload), 50000); err != nil {
 				log.Printf("[WARN] Failed to persist action event: %v", err)
 			}
 		}

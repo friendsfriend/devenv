@@ -3,6 +3,7 @@ import { createTestKeymap } from '@opentui/keymap/testing';
 import { setupDevenvKeymap } from './keymap-setup';
 import { applyKeymapRuntimeSnapshot } from './keymap-runtime';
 import { registerTableKeymapLayer } from './table-keymap-layer';
+import { registerWorkflowKeymapLayers } from './workflow-keymap-layers';
 import type { KeyboardActions, KeyboardContext, KeyboardStores } from './types';
 
 const signalStore = (overrides: Record<string, unknown> = {}) => new Proxy(overrides, {
@@ -39,7 +40,26 @@ describe('panel-gated keymap layers', () => {
 				.map((binding) => binding.command)
 				.filter((command): command is string => typeof command === 'string');
 			expect(activeCommands).toContain('kubernetes.panel.2.scroll');
+			expect(activeCommands).toContain('kubernetes.panel.2.half-page');
+			expect(activeCommands).toContain('kubernetes.panel.2.edge');
 			expect(activeCommands).not.toContain('kubernetes.panel.1.scroll');
+		} finally { cleanup(); }
+	});
+
+	test('detail panel layer exposes only focused panel action', () => {
+		const { keymap, cleanup } = createTestKeymap({ defaultKeys: true });
+		try {
+			setupDevenvKeymap(keymap as never);
+			registerWorkflowKeymapLayers(keymap as never, { stores: stores(), actions: actions(), ctx: ctx() });
+			applyKeymapRuntimeSnapshot(keymap as never, {
+				viewMode: 'issueDetail', activeTab: 'apps', activeModal: 'none', textEntryActive: false, shutdownActive: false, focusedPanel: 'issueDetail:1', focusedList: 'table', worktreeManagerActive: false,
+			});
+			const activeCommands = keymap.getActiveKeys({ includeMetadata: true, includeBindings: true })
+				.flatMap((active) => active.bindings ?? [])
+				.map((binding) => binding.command)
+				.filter((command): command is string => typeof command === 'string');
+			expect(activeCommands).toContain('issue-detail.panel.references.o');
+			expect(activeCommands).not.toContain('issue-detail.panel.body.o');
 		} finally { cleanup(); }
 	});
 });

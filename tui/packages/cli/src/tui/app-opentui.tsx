@@ -8,7 +8,7 @@ import { createCliRenderer } from '@opentui/core';
 import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui';
 import { KeymapProvider, useKeymap } from '@opentui/keymap/solid';
 import { abortExitSignal, destroyExitRenderer, exitApp, getExitSignal, registerGracefulShutdownHandler, setExitRenderer } from "./exit";
-import { onMount, createEffect, on, onCleanup } from 'solid-js';
+import { onMount, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js';
 import "opentui-spinner/solid";
 import { APP_VERSION } from "../version";
 import { createClient, registerFatalCleanup } from '@devenv/core';
@@ -332,12 +332,28 @@ function TUIApp(props: TUIAppProps) {
 	const keymap = useKeymap();
 	helpActions.setKeymap(keymap);
 	onCleanup(() => helpActions.setKeymap(undefined));
-	syncKeymapRuntimeState(keymap, kbStores);
+	const [keymapVersion, setKeymapVersion] = createSignal(0);
+	syncKeymapRuntimeState(keymap, kbStores, () => setKeymapVersion((version) => version + 1));
+	const footerKeybinds = createMemo(() => {
+		keymapVersion();
+		// Keymap state is external to Solid. Read panel signals here so StatusBar
+		// rerenders when panel-specific keymap layers become active.
+		appStore.viewMode();
+		appStore.activeTab();
+		appStore.activeModal();
+		actionRunStore.focusedPanel();
+		appStore.kubernetesPanelIndex();
+		appDetailStore.appDetailPanelIndex();
+		issueStore.issueDetailPanelIndex();
+		changeRequestStore.crDetailPanelIndex();
+		return helpActions.getKeybinds();
+	});
 	onMount(() => {
 		const disposeGlobalLayers = registerGlobalKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
 		const disposeModalLayers = registerModalKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
 		const disposeTableLayer = registerTableKeymapLayer(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
 		const disposeWorkflowLayers = registerWorkflowKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
+		setKeymapVersion((version) => version + 1);
 		onCleanup(() => {
 			disposeWorkflowLayers();
 			disposeTableLayer();
@@ -437,7 +453,7 @@ function TUIApp(props: TUIAppProps) {
 								? `Selected: ${appStore.selectedIndex() + 1}/${appStore.filteredApps().length}`
 								: ""
 						}
-						keybinds={helpActions.getKeybinds()}
+						keybinds={footerKeybinds()}
 						runningTextEnabled={uiStore.runningTextEnabled()}
 						runningTextOffset={uiStore.runningTextOffset()}
 					/>

@@ -164,8 +164,8 @@ export function createDockerActions(
         return;
       }
       if (targets.length === 1) {
-        await client.startActionRun(targets[0].id);
         appStore.pushModal('actions');
+        await client.startActionRun(targets[0].id);
         return;
       }
       uiStore.setActionTargetPickerTargets(targets);
@@ -282,7 +282,12 @@ export function createDockerActions(
   };
 
   const runKubernetesClusterAction = async (type: string) => {
-    const definition = (await client.getActionDefinitions('local', 'kubernetes')).actions.find((action) => action.type === type && action.availability.available);
+    const definitions = (await client.getActionDefinitions('local', 'kubernetes')).actions.filter((action) => action.type === type && action.availability.available);
+    let provider = appStore.kubernetesClusterStatus()?.provider;
+    if (!provider) {
+      try { provider = (await client.getKubernetesClusterStatus()).provider; } catch { /* fall back to first available provider */ }
+    }
+    const definition = definitions.find((action) => action.runtime === provider) ?? definitions[0];
     if (!definition) throw new Error(`No available Kubernetes ${type} action`);
     appStore.pushModal('actions');
     await client.startActionRun(definition.id);

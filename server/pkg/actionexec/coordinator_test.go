@@ -33,6 +33,20 @@ func TestCoordinatorSharesConcurrentExecutionAndResult(t *testing.T) {
 	}
 }
 
+func TestCoordinatorRetriesCompletedFailure(t *testing.T) {
+	coordinator := NewCoordinator(nil)
+	first, err := coordinator.Acquire(context.Background(), "run:dep/db", nil)
+	if err != nil || !first.Owner() {
+		t.Fatalf("first=%#v err=%v", first, err)
+	}
+	first.Release(actiondef.StepResult{Outcome: actiondef.OutcomeFailed, Err: errors.New("pull failed")})
+	coordinator.ClearScope("run")
+	retry, err := coordinator.Acquire(context.Background(), "run:dep/db", nil)
+	if err != nil || !retry.Owner() {
+		t.Fatalf("retry=%#v err=%v", retry, err)
+	}
+}
+
 func TestCoordinatorAlreadyRunningHasNoOwner(t *testing.T) {
 	var checks atomic.Int32
 	coordinator := NewCoordinator(func(actiondef.ExecutionKey) bool { checks.Add(1); return true })

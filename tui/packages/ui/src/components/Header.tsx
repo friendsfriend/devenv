@@ -1,6 +1,6 @@
 /** @jsxImportSource @opentui/solid */
-import { TextAttributes } from '@opentui/core';
-import { useTerminalDimensions } from '@opentui/solid';
+import { FrameBufferRenderable, RGBA, TextAttributes } from '@opentui/core';
+import { extend, useTerminalDimensions, useTimeline } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
 import { highlightColor } from './Highlight';
 import { RunningText } from './RunningText';
@@ -19,9 +19,52 @@ export interface HeaderProps {
   runningTextOffset?: number;
 }
 
+declare module '@opentui/solid' {
+  interface OpenTUIComponents {
+    frame_buffer: typeof FrameBufferRenderable;
+  }
+}
+
+extend({ frame_buffer: FrameBufferRenderable });
+
 const LOGO_WIDTH = 6;
 const TITLE_WIDTH = 0;
 const RIGHT_WIDTH = 24;
+const UNDERLINE_DURATION = 1100;
+
+function GlowingHeaderUnderline() {
+  let canvas: FrameBufferRenderable | undefined;
+  const background = RGBA.fromHex(uiColors.bgMantle);
+  const glow = RGBA.fromHex(uiColors.primaryDim);
+  const core = RGBA.fromHex(uiColors.primary);
+  const state = { x: 0 };
+
+  const draw = (position: number) => {
+    if (!canvas) return;
+    const frame = canvas.frameBuffer;
+    frame.clear(background);
+    const center = Math.round(position);
+    for (let offset = -2; offset <= 2; offset++) {
+      const x = center + offset;
+      if (x < 0 || x >= LOGO_WIDTH) continue;
+      frame.setCell(x, 0, '▁', offset === 0 ? core : glow, background);
+    }
+    canvas.requestRender();
+  };
+
+  const timeline = useTimeline({ duration: UNDERLINE_DURATION, loop: true });
+  timeline.add(state, {
+    x: LOGO_WIDTH - 1,
+    duration: UNDERLINE_DURATION,
+    ease: 'linear',
+    onUpdate: (animation) => draw(animation.targets[0].x),
+  });
+
+  return <frame_buffer width={LOGO_WIDTH} height={1} ref={(element: FrameBufferRenderable) => {
+    canvas = element;
+    draw(state.x);
+  }} />;
+}
 
 const colorForSeverity = (severity: HeaderProps['severity']) => {
   if (severity === 'success') return highlightColor('positive');
@@ -71,7 +114,7 @@ export function Header(props: HeaderProps) {
       </box>
       <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
         <box style={{ width: LOGO_WIDTH }}>
-          <text fg={colors.peach} attributes={TextAttributes.BOLD}>ΞNV</text>
+          <GlowingHeaderUnderline />
         </box>
         <box style={{ width: middleWidth() }}>
           <RunningText text={secondaryDetail()} width={middleWidth()} fg={highlightColor('secondary')} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />

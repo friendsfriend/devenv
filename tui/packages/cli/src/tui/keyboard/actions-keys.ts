@@ -10,6 +10,8 @@ import { isDownKey, isUpKey } from './nav-keys';
 
 const shiftedDown = (event: KeyEvent) => event.name === 'J' || event.sequence === 'J' || (event.name === 'j' && event.shift);
 const shiftedUp = (event: KeyEvent) => event.name === 'K' || event.sequence === 'K' || (event.name === 'k' && event.shift);
+const isTopKey = (event: KeyEvent) => event.name === 'g' && !event.shift;
+const isBottomKey = (event: KeyEvent) => event.name === 'G' || (event.name === 'g' && event.shift);
 
 export function handleActionsKeys(event: KeyEvent, store: ActionRunStore, appStore: AppStore, dockerActions?: Pick<DockerActions, 'cancelAction'>, uiStore?: Pick<UiStore, 'setNotification'>, copy = (text: string) => uiStore ? copyText(text, uiStore) : Promise.resolve(false)): boolean {
   if (event.name === 'escape' || event.name === 'Escape' || event.name === 'esc' || event.sequence === '\x1b' || event.name === 'L' || event.sequence === 'L') { appStore.popModal('actions'); return true; }
@@ -33,6 +35,20 @@ export function handleActionsKeys(event: KeyEvent, store: ActionRunStore, appSto
   if (shiftedDown(event)) { store.setFocusedPanel(store.focusedPanel() === 0 ? 1 : 0); return true; }
   if (shiftedUp(event)) { store.setFocusedPanel(store.focusedPanel() === 1 ? 0 : 1); return true; }
   if (!store.run()) return false;
+  if (store.focusedPanel() === 0) {
+    const actions = store.visibleNodes().filter((node) => node.kind === 'action');
+    if (isTopKey(event) || isBottomKey(event)) {
+      const action = actions[isTopKey(event) ? 0 : actions.length - 1];
+      if (action) store.focusTreeNode(action);
+      return true;
+    }
+    if (event.name === 'n' || event.name === 'p') {
+      const index = actions.findIndex((node) => node.run.id === store.selectedRunId());
+      const next = event.name === 'n' ? Math.min(actions.length - 1, index + 1) : Math.max(0, index - 1);
+      if (actions[next]) store.focusTreeNode(actions[next]);
+      return true;
+    }
+  }
   if (store.focusedPanel() === 0 && (isDownKey(event) || isUpKey(event))) {
     const nodes = store.visibleNodes();
     if (nodes.length === 0) return true;

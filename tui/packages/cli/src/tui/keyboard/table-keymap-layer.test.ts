@@ -85,15 +85,19 @@ describe('table keymap layer', () => {
 		expect(started).toEqual(['picker', infra]);
 	});
 
-	test('uppercase L opens action history without starting action', () => {
+	test('l opens live logs and uppercase L opens action history', () => {
 		const { keymap, host, cleanup } = createTestKeymap({ defaultKeys: true });
 		let pushed = '';
-		const stores = makeStores({ pushModal: (name: string) => { pushed = name; } });
+		let openedLogs = 0;
+		const stores = makeStores({ pushModal: (name: string) => { pushed = name; }, tableFilteredApps: () => [{ ident: 'api' }] });
 		try {
 			setupDevenvKeymap(keymap as never);
 			setRuntime(keymap);
-			registerTableKeymapLayer(keymap as never, { stores, actions: actions(), ctx: ctx() });
-			host.press('L');
+			registerTableKeymapLayer(keymap as never, { stores, actions: actions({ logActions: signalStore({ loadContainerLogs: () => { openedLogs++; } }) as never }), ctx: ctx() });
+			host.press('l');
+			expect(openedLogs).toBe(1);
+			expect(pushed).toBe('');
+			host.press('l', { shift: true });
 			expect(pushed).toBe('actions');
 			expect(keymap.getCommandEntries().some((entry: any) => entry.command.name === 'actions.toggle')).toBe(true);
 		} finally {

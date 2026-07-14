@@ -37,6 +37,9 @@ type RunResult struct {
 }
 
 func (e *Engine) Run(ctx context.Context, runID actiondef.RunID, definition actiondef.Action, inputs map[actiondef.ValueKey]actiondef.Value) RunResult {
+	if coordinator, ok := e.Coordinator.(*Coordinator); ok {
+		defer coordinator.ClearScope(string(runID))
+	}
 	values := newValueStore(inputs)
 	runner := runner{ctx: ctx, runID: runID, handlers: e.Handlers, events: e.Events, values: values, coordinator: e.Coordinator, canonical: map[actiondef.ExecutionKey]actiondef.StepDefinitionID{}}
 	result := runner.execute(definition.Root())
@@ -61,7 +64,7 @@ func (r *runner) emit(event Event) {
 }
 func (r *runner) execute(step actiondef.StepDefinition) actiondef.StepResult {
 	if r.coordinator != nil && step.ExecutionKey() != "" {
-		lease, err := r.coordinator.Acquire(r.ctx, step.ExecutionKey(), stepClaims(step))
+		lease, err := r.coordinator.Acquire(r.ctx, actiondef.ExecutionKey(string(r.runID)+":"+string(step.ExecutionKey())), stepClaims(step))
 		if err != nil {
 			return actiondef.StepResult{Outcome: actiondef.OutcomeFailed, Err: err}
 		}

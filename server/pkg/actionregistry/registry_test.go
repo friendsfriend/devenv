@@ -116,6 +116,20 @@ func TestCompileDependencyUsesResolvedPodmanProvider(t *testing.T) {
 	}
 }
 
+func TestCompilePodmanActionUsesPodmanForImplicitComposeDependency(t *testing.T) {
+	target := resources.ActionTarget{ID: "api", Action: resources.AppActionRun, Runtime: resources.ActionRuntimeDocker, Requires: []resources.DependencyRef{{Infra: "redis"}}}
+	infra := resources.ActionTarget{ID: "infra/redis", Action: resources.AppActionRun, Runtime: resources.ActionRuntimeDocker, Provider: resources.ContainerProviderDocker, SourcePath: "/infra/redis-compose.yml"}
+	actions := CompileContainerTargets("api", target, func(resources.DependencyRef) (string, resources.ActionTarget, bool) { return "redis", infra, true }, "/repo")
+	podman := actions[1]
+	if podman.ActionRuntime != "podman" {
+		t.Fatalf("actions=%#v", actions)
+	}
+	start := podman.RootStep.ChildSteps[0].ChildSteps[0]
+	if start.Configuration["command"] != "podman-compose" {
+		t.Fatalf("dependency configuration=%#v", start.Configuration)
+	}
+}
+
 func TestTmuxUsesScriptDirectoryWhenCheckoutMissing(t *testing.T) {
 	target := resources.ActionTarget{Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "check", Label: "Check", SourcePath: "/config/apps/run/check.sh", Command: "sh", Args: []string{"/config/apps/run/check.sh"}}
 	action := compileTmuxAction("check", target, nil, "/missing-checkout")
@@ -151,6 +165,10 @@ func TestCompileDockerBuildCreatesTypedArtifactGraph(t *testing.T) {
 		if steps[i].DisplayLabel != label {
 			t.Fatalf("step %d=%#v", i, steps[i])
 		}
+	}
+	buildArgs, ok := steps[1].Configuration["args"].([]string)
+	if !ok || len(buildArgs) < 5 || buildArgs[4] != "devenv-api:latest" || steps[1].Configuration["setValues"].(map[string]any)["image.ref"] != "devenv-api:latest" {
+		t.Fatalf("build configuration=%#v", steps[1].Configuration)
 	}
 	// Clean up build context (index 2) runs always; Remove extractor (index 7) runs always.
 	if steps[2].OnFailure != actiondef.FailureAlwaysRun || steps[7].OnFailure != actiondef.FailureAlwaysRun || steps[5].OutputPorts[0].Key != "artifact.container.id" {

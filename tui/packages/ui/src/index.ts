@@ -12,8 +12,6 @@ export { LogAiOverlay } from "./components/LogAiOverlay";
 export type { LogAiOverlayProps } from "./components/LogAiOverlay";
 export { CrAiReviewOverlay } from "./components/CrAiReviewOverlay";
 export type { CrAiReviewOverlayProps } from "./components/CrAiReviewOverlay";
-export { ActionStatusStrip, actionStatusSegments } from "./components/ActionStatusStrip";
-export type { ActionStatusStripProps, ActionStatusSegment } from "./components/ActionStatusStrip";
 export { IssueView } from "./components/IssueView";
 export { IssueDetailView } from "./components/IssueDetailView";
 export { IssueScopeModal, ISSUE_SCOPE_OPTIONS } from "./components/IssueScopeModal";

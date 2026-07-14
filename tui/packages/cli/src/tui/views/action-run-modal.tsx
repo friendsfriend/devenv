@@ -4,6 +4,12 @@ import { GenericModal, PanelBox, ScrollableContent, uiColors, highlightColor, fo
 import { actionRunDisplayLabel } from '@devenv/types';
 import type { ActionRunStore, ActionTreeNode } from '../stores/action-run-store';
 
+export function actionModalHelpText(focusedPanel: 0 | 1) {
+  return focusedPanel === 0
+    ? [{ key: 'J/K', action: 'Panel' }, { key: 'j/k', action: 'Scroll/select' }, { key: 'n/p', action: 'Action' }, { key: 'Enter', action: 'Collapse' }, { key: 'y', action: 'Copy subtree' }, { key: 'g/G', action: 'Top/bottom' }, { key: 'Esc', action: 'Close' }]
+    : [{ key: 'J/K', action: 'Panel' }, { key: 'j/k', action: 'Scroll' }, { key: 'd/u', action: 'Half page' }, { key: 'g/G', action: 'Top/bottom' }, { key: 'Esc', action: 'Close' }];
+}
+
 export function actionNodeStep(node: ActionTreeNode | null | undefined) {
   if (node?.kind === 'step') return node.step;
   if (node?.kind !== 'action') return undefined;
@@ -22,8 +28,12 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
   const icon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? (props.spinner ?? '⟳') : '○';
   const statusColor = (status: string) => status === 'completed' ? highlightColor('positive') : status === 'failed' || status === 'canceled' ? highlightColor('negative') : status === 'active' ? highlightColor('primary') : highlightColor('secondary');
   const runLabel = (run: NonNullable<ReturnType<ActionRunStore['run']>>) => actionRunDisplayLabel(run, formatProfileLabel);
+  const helpText = () => actionModalHelpText(props.store.focusedPanel());
 
-  onMount(() => props.store.openModal());
+  onMount(() => {
+    props.store.openModal();
+    createEffect(() => { void props.store.loadLogsForNode(props.store.selectedNode()); });
+  });
   onCleanup(() => props.store.closeModal());
 
   // Collect descendant command groups to show in the log panel.
@@ -61,14 +71,12 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
   };
 
   createEffect(() => {
-    // Newest action is always last; scroll tree to bottom when focus
-    // changes (new action, step update, keyboard navigation).
-    void props.store.focusedTreeKey();
+    const key = props.store.focusedTreeKey();
     const ref = props.store.treeScrollBoxRef;
-    if (ref) ref.scrollTo(ref.scrollHeight);
+    if (key && ref) ref.scrollChildIntoView('action-node-' + key);
   });
 
-  return <GenericModal hideHeader title={props.store.run()?.title ?? 'Action'} helpText={[{ key: 'J/K', action: 'Panel' }, { key: 'j/k', action: 'Scroll/select' }, { key: 'Enter', action: 'Collapse' }, { key: 'y', action: 'Copy subtree' }, { key: 'd/u', action: 'Half page' }, { key: 'g/G', action: 'Top/bottom' }, { key: 'Esc', action: 'Close' }]} widthPercent={0.9} heightPercent={0.9} onBackdropClick={props.onClose}>
+  return <GenericModal hideHeader title={props.store.run()?.title ?? 'Action'} helpText={helpText()} widthPercent={0.9} heightPercent={0.9} onBackdropClick={props.onClose}>
     <box backgroundColor={uiColors.bgMantle} style={{ width: '100%', height: '100%', flexDirection: 'column', minHeight: 0 }}>
       <box backgroundColor={uiColors.bgBase} style={{ width: '100%', flexGrow: 1, flexDirection: 'row', minHeight: 0 }}>
         <box backgroundColor={uiColors.bgBase} style={{ width: '38%', height: '100%', flexDirection: 'column' }}>

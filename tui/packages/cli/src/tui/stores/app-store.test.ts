@@ -74,6 +74,15 @@ describe('view route stack', () => {
     expect(store.viewMode()).toBe('table');
   });
 
+  test('main table survives change request detail escape chain', () => {
+    const store = createAppStore();
+    store.pushView('changeRequests');
+    store.pushView('changeRequestDetail');
+    expect(store.popView()).toBe('changeRequests');
+    expect(store.popView()).toBe('table');
+    expect(store.viewStack().map((route) => route.mode)).toEqual(['table']);
+  });
+
   test('modal stack preserves overlay open order and active modal', () => {
     const store = createAppStore();
     store.syncModalStack(['diff']);
