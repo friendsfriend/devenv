@@ -7,10 +7,10 @@ import {
 import { createCliRenderer } from '@opentui/core';
 import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui';
 import { KeymapProvider, useKeymap } from '@opentui/keymap/solid';
-import { abortExitSignal, destroyExitRenderer, exitApp, getExitSignal, registerGracefulShutdownHandler, setExitRenderer } from "./exit";
+import { abortExitSignal, confirmExitApp, destroyExitRenderer, exitApp, getExitSignal, registerExitGuard, registerGracefulShutdownHandler, setExitRenderer } from "./exit";
 import { onMount, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js';
 import { APP_VERSION } from "../version";
-import { createClient, registerFatalCleanup } from '@devenv/core';
+import { createClient, getLogger, registerFatalCleanup } from '@devenv/core';
 import type { App } from '@devenv/types';
 import {
 	Header,
@@ -221,6 +221,34 @@ function TUIApp(props: TUIAppProps) {
 		await runWithTimeout(message, fn, timeoutMs);
 	};
 	onMount(() => {
+		const unregisterExitGuard = registerExitGuard(() => {
+			const activeRuns = actionRunStore.runs().filter((run) => run.status === 'active' || run.status === 'pending');
+			if (activeRuns.length === 0) return true;
+			if (uiStore.showConfirmDialog()) return false;
+
+			const targets = [...new Set(activeRuns.map((run) => run.appIdent).filter((ident): ident is string => Boolean(ident)))];
+			const details = activeRuns
+				.slice(0, 5)
+				.map((run) => `• ${run.title}${run.appIdent ? ` (${run.appIdent})` : ''}`)
+				.join('\n');
+			const more = activeRuns.length > 5 ? `\n• and ${activeRuns.length - 5} more` : '';
+			uiStore.setConfirmDialogTitle('Running actions');
+			uiStore.setConfirmDialogMessage(`These actions are still running:\n\n${details}${more}\n\nTerminate them and quit?`);
+			uiStore.setConfirmDialogAction(() => () => {
+				void (async () => {
+					await Promise.all(targets.map(async (ident) => {
+						try {
+							await client.cancelAction(ident);
+						} catch (error) {
+							getLogger().write('WARN', `Failed to cancel action for ${ident}: ${error instanceof Error ? error.message : String(error)}`);
+						}
+					}));
+					await confirmExitApp();
+				})();
+			});
+			uiStore.setShowConfirmDialog(true);
+			return false;
+		});
 		const unregister = registerGracefulShutdownHandler(async () => {
 			appStore.setIsShuttingDown(true);
 			try {
@@ -254,6 +282,7 @@ function TUIApp(props: TUIAppProps) {
 			}
 		});
 		onCleanup(unregister);
+		onCleanup(unregisterExitGuard);
 	});
 
 	// --- Columns ---
