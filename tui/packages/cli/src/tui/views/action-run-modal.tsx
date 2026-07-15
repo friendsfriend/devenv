@@ -11,6 +11,10 @@ export function actionModalHelpText(focusedPanel: 0 | 1) {
     : [{ key: 'J/K', action: 'Panel' }, { key: 'j/k', action: 'Scroll' }, { key: 'd/u', action: 'Half page' }, { key: 'g/G', action: 'Top/bottom' }, { key: 'Esc', action: 'Close' }];
 }
 
+export function actionNodeAnimationEnabled(node: ActionTreeNode, collapsed: boolean): boolean {
+  return node.kind !== 'loadOlder' && (!node.hasChildren || collapsed);
+}
+
 export function actionNodeStep(node: ActionTreeNode | null | undefined) {
   if (node?.kind === 'step') return node.step;
   if (node?.kind !== 'action') return undefined;
@@ -26,7 +30,7 @@ export function actionNodeStep(node: ActionTreeNode | null | undefined) {
 }
 
 export function ActionRunModal(props: { store: ActionRunStore; onClose: () => void }) {
-  const icon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? '' : '○';
+  const icon = (status: string) => status === 'completed' ? '✓' : status === 'failed' || status === 'canceled' ? '✗' : status === 'active' ? '…' : '○';
   const statusHighlight = (status: string): Highlight => status === 'completed' ? 'positive' : status === 'failed' || status === 'canceled' ? 'negative' : status === 'active' ? 'primary' : 'secondary';
   const statusColor = (status: string) => highlightColor(statusHighlight(status));
   const statusAnimation = (status: string, label: string) => status === 'active' ? statusAnimationModel(statusAnimationIntentForText(label)) : undefined;
@@ -90,6 +94,7 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
                 const activeSelection = () => node.key === props.store.focusedTreeKey() && props.store.focusedPanel() === 0;
                 const status = () => node.kind === 'action' ? node.run.status : node.kind === 'step' ? node.step.status : 'pending';
                 const collapsed = () => node.kind === 'action' ? node.run.collapsed : node.kind === 'step' ? node.step.collapsed : false;
+                const animationEnabled = () => actionNodeAnimationEnabled(node, collapsed() ?? false);
                 const label = () => {
                   if (node.kind === 'action') return runLabel(node.run);
                   if (node.kind !== 'step') return 'Load actions from last 24 hours';
@@ -98,7 +103,10 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
                   return `${prefix}${node.step.label}${suffix}`;
                 };
                 const rowLabel = () => node.kind === 'loadOlder' ? `+ ${label()}` : `${icon(status()) || ' '} ${label()}`;
-                const animation = () => statusAnimation(status(), label());
+                const animation = () => animationEnabled() ? statusAnimation(status(), label()) : undefined;
+                const nodeHighlight = () => node.kind === 'loadOlder'
+                  ? 'secondary' as const
+                  : animation()?.tone ?? animation()?.highlights?.[0] ?? statusHighlight(status());
                 return <box id={'action-node-' + node.key} onMouseUp={() => { props.store.focusTreeNode(node); props.store.setFocusedPanel(0); }} backgroundColor={activeSelection() ? uiColors.bgSurface0 : undefined} style={{ width: '100%', height: 1, flexDirection: 'row' }}>
                   <box backgroundColor={activeSelection() ? highlightColor('highlight') : undefined} style={{ width: 1, height: '100%', flexShrink: 0 }} />
                   <box style={{ flexGrow: 1, flexDirection: 'row', paddingRight: 1, minWidth: 0 }}>
@@ -106,10 +114,10 @@ export function ActionRunModal(props: { store: ActionRunStore; onClose: () => vo
                     <Badge
                       text={rowLabel()}
                       appearance="text"
-                      highlight={transitionHighlight(status(), label())}
+                      highlight={nodeHighlight()}
                       animatedTone={animation()?.tone}
                       animatedHighlights={animation()?.highlights}
-                      attributes={activeSelection() ? TextAttributes.BOLD : 0}
+                      attributes={status() === 'active' && animationEnabled() ? TextAttributes.BOLD : 0}
                       transitionKey={`action-tree:${node.key}`}
                     />
                   </box>
