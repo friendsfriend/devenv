@@ -100,7 +100,8 @@ export function createLogActions(
       }
       return;
     }
-    if (('type' in app && app.type === 'kubernetes') || (typeof app.status === 'string' && (app.status.includes('pods') || app.status.startsWith('running') && !app.dockerInfo?.ContainerID))) {
+    const legacyKubernetesStatus = typeof app.status === 'string' && /\b(?:running|starting)\b.*\bpods?\b/i.test(app.status);
+    if (('type' in app && app.type === 'kubernetes') || ((app.runtimeStatus?.detail?.includes('pods') || legacyKubernetesStatus) && !app.dockerInfo?.ContainerID)) {
       logStore.setLogs('');
       logStore.setLogTitle(`Kubernetes Logs: ${app.displayName} (live)`);
       logStore.setLogType('container');

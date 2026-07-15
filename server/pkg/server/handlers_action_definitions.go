@@ -245,7 +245,7 @@ func (s *Server) startEngineDefinition(definition actiondef.Action, rawInputs ma
 			if r := recover(); r != nil {
 				log.Printf("[ERROR] action %s panicked: %v", runID, r)
 				s.finishAction(runID, actionrun.StatusFailed)
-				s.BroadcastEvent(Event{Type: "action.completed", Properties: map[string]any{"runId": runID, "status": actionrun.StatusFailed, "error": fmt.Sprint(r)}, Timestamp: time.Now()})
+				s.BroadcastEvent(Event{Type: "action.completed", Properties: map[string]any{"runId": runID, "appIdent": definition.Resource.ID, "resourceKind": definition.Resource.Kind, "status": actionrun.StatusFailed, "error": fmt.Sprint(r)}, Timestamp: time.Now()})
 			}
 			s.actionCancelMu.Lock()
 			delete(s.actionCancels, runID)
@@ -262,15 +262,15 @@ func (s *Server) startEngineDefinition(definition actiondef.Action, rawInputs ma
 		s.finishAction(runID, status)
 		if status == actionrun.StatusCompleted {
 			s.recordCompletedRunTarget(definition)
+			s.broadcastAppStatus(definition.Resource.ID)
 			if definition.ActionType == "run" {
-				s.broadcastAppStatus(definition.Resource.ID)
 				s.leaseDependencies(definition, runID)
 			}
 			if definition.ActionType == "stop" {
 				s.releaseLeasesForOwner(definition.Resource.ID)
 			}
 		}
-		s.BroadcastEvent(Event{Type: "action.completed", Properties: map[string]any{"runId": runID, "status": status}, Timestamp: time.Now()})
+		s.BroadcastEvent(Event{Type: "action.completed", Properties: map[string]any{"runId": runID, "appIdent": definition.Resource.ID, "resourceKind": definition.Resource.Kind, "status": status}, Timestamp: time.Now()})
 	}()
 	return runID, nil
 }

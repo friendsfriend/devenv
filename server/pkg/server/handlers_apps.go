@@ -71,20 +71,10 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 
 	for _, svc := range infraServices {
 		var dockerInfo *docker.Info
-		statusValue := svc.Status
-		logPath := svc.LogPath
-		executionHandle := svc.ExecutionHandle
-		if svc.Type == "" || svc.Type == app.InfraServiceTypeDocker {
-			if info, exists := dockerInfoMap[svc.Ident]; exists {
-				dockerInfo = &info
-				statusValue = strings.ToLower(info.Status)
-			}
-		} else if svc.Type == app.InfraServiceTypeScript {
-			statusValue, logPath = s.services.OperationsService().ScriptInfrastructureStatus(svc.Ident)
-			executionHandle = s.services.OperationsService().ScriptInfrastructureExecutionHandle(svc.Ident)
-		} else if svc.Type == app.InfraServiceTypeKubernetes {
-			statusValue = s.services.OperationsService().KubernetesInfrastructureStatus(svc)
+		if info, exists := dockerInfoMap[svc.Ident]; exists {
+			dockerInfo = &info
 		}
+		snapshot := s.resolveInfrastructureStatus(svc, dockerInfo)
 
 		s.opStatusMu.RLock()
 		opStatus := s.opStatus[svc.Ident]
@@ -92,17 +82,20 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 
 		responses = append(responses, InfraServiceResponse{
 			Ident:             svc.Ident,
+			ResourceID:        svc.Ident,
+			ResourceKind:      "infrastructure",
 			DisplayName:       svc.DisplayName,
 			Type:              svc.Type,
 			ContainerBaseName: svc.GetContainerBaseName(),
-			DockerInfo:        dockerInfo,
-			Status:            statusValue,
-			LogPath:           logPath,
+			DockerInfo:        snapshot.dockerInfo,
+			RuntimeStatus:     &snapshot.runtimeStatus,
+			Status:            snapshot.runtimeStatus.String(),
+			LogPath:           snapshot.logPath,
 			ShellPath:         svc.ShellPath,
 			PowerShellPath:    svc.PowerShellPath,
 			DefaultRunner:     svc.DefaultRunner,
 			OperationStatus:   opStatus,
-			ExecutionHandle:   executionHandle,
+			ExecutionHandle:   snapshot.executionHandle,
 		})
 	}
 
@@ -123,7 +116,9 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 	appAdapters := make([]docker.App, 0, len(s.apps))
 	for idx := range s.apps {
-		appAdapters = append(appAdapters, &appAdapter{app: &s.apps[idx]})
+		if s.apps[idx].AppType == app.TypeAPP {
+			appAdapters = append(appAdapters, &appAdapter{app: &s.apps[idx]})
+		}
 	}
 
 	dockerInfoMap, err := dockerClient.BatchGetInfo(appAdapters, nil)
@@ -135,20 +130,32 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 	statuses := make([]AppStatusResponse, 0, len(s.apps))
 	for _, a := range s.apps {
-		dockerInfo := dockerInfoMap[a.Ident]
+		var dockerInfo *docker.Info
+		observedDocker := docker.Info{Status: "not found"}
+		if info, ok := dockerInfoMap[a.Ident]; ok {
+			dockerInfo = &info
+			observedDocker = info
+		}
 		gitStatus := gitRepo.GetStatus(&appAdapter{app: &a})
 		currentBranch := gitRepo.GetCurrentBranch(&appAdapter{app: &a})
 		opStatus := s.getOperationStatus(a.Ident)
 
-		appRunStatus := s.appRuntimeStatus(a.Ident, dockerInfo)
+		appRunStatus := s.appRuntimeStatus(a, observedDocker)
+		legacyStatus := ""
+		if appRunStatus != nil {
+			legacyStatus = appRunStatus.String()
+		}
 		resp := AppStatusResponse{
 			Ident:           a.Ident,
-			DockerInfo:      &dockerInfo,
+			ResourceID:      a.Ident,
+			ResourceKind:    appResourceKind(a),
+			DockerInfo:      dockerInfo,
 			GitStatus:       gitStatus,
 			Branch:          currentBranch,
 			ActiveWorktree:  a.ActiveWorktree,
 			OperationStatus: opStatus,
-			Status:          appRunStatus,
+			RuntimeStatus:   appRunStatus,
+			Status:          legacyStatus,
 		}
 		if s.services != nil && s.services.BuildService() != nil {
 			if info, ok := s.services.BuildService().RunTargetInfo(a.Ident); ok {

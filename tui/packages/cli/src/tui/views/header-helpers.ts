@@ -1,4 +1,4 @@
-import { uiColors } from '@devenv/ui';
+import { runtimeState, uiColors } from '@devenv/ui';
 import type { App, InfraService } from '@devenv/types';
 import type { AppStore, AppDetailStore, IssueStore, ChangeRequestStore } from "../stores";
 import type { HelpActions } from "../actions";
@@ -40,10 +40,7 @@ function hasRunningAppInTab(tab: TabType, appStore: AppStore): boolean {
 				? allApps.filter((app) => app.appType === "LIB")
 				: appStore.infraServices();
 
-	return appsInTab.some((app) => {
-		const status = (app.status ? app.status : app.dockerInfo?.Status)?.toLowerCase();
-		return status === "running" || status === "up";
-	});
+	return appsInTab.some((app) => runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status) === "running");
 }
 
 export function getTabBorderColor(tab: TabType, appStore: AppStore): string {

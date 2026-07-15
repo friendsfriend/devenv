@@ -211,9 +211,11 @@ func (sm *manager) StartOperation(appIdent string, operation OperationType) func
 		statusType := StatusActive
 
 		// Determine status type based on message content
+		lowerMessage := strings.ToLower(message)
 		if message == "completed" || message == "start successful" || message == "build successful" ||
-			strings.Contains(strings.ToLower(message), "completed") ||
-			strings.Contains(strings.ToLower(message), "successful") {
+			strings.Contains(lowerMessage, "completed") ||
+			strings.Contains(lowerMessage, "successful") ||
+			strings.Contains(lowerMessage, "stopped") {
 			statusType = StatusCompleted
 		} else if isErrorMessage(message) || strings.Contains(strings.ToLower(message), "failed") {
 			statusType = StatusFailed

@@ -1,8 +1,8 @@
 import { batch } from 'solid-js';
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { ActionDefinition, ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus } from '@devenv/types';
-import { buildDependencyTree } from '@devenv/ui';
+import type { ActionDefinition, ActionTarget, AppRunTargetInfo, DockerInfo, ExecutionHandle, OperationStatus, ResourceKind, RuntimeStatus } from '@devenv/types';
+import { buildDependencyTree, runtimeState } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
 import type { ActionRunStore } from '../stores/action-run-store';
 import type { AppDetailStore } from '../stores/app-detail-store';
@@ -58,12 +58,16 @@ export function createAppActions(
           if (!status) return app;
           const updated: typeof app = {
             ...app,
+            resourceId: status.resourceId ?? app.resourceId,
+            resourceKind: status.resourceKind ?? app.resourceKind,
             dockerInfo: status.dockerInfo,
             branch: status.branch || app.branch,
             gitStatus: status.gitStatus,
             operationStatus: status.operationStatus,
             status: status.status ?? app.status,
           };
+          if (status.runtimeStatus == null) delete updated.runtimeStatus;
+          else updated.runtimeStatus = status.runtimeStatus;
           if (status.activeWorktree) updated.activeWorktree = status.activeWorktree;
           else delete updated.activeWorktree;
           if ('runTargetInfo' in status) {
@@ -73,6 +77,10 @@ export function createAppActions(
           return updated;
         }),
       );
+      if (typeof client.getInfraServices === 'function') {
+        const services = await client.getInfraServices();
+        appStore.setInfraServices((previous) => previous.map((service) => services.find((next) => next.ident === service.ident) ?? service));
+      }
     } catch (e) {
       console.error('Failed to fetch status:', e);
     }
@@ -105,10 +113,21 @@ export function createAppActions(
             if (event.type === 'action.started') {
               handleActionStarted(appStore, actionRunStore!, event.properties as Record<string, unknown>);
             } else {
-              actionRunStore?.handleEvent(event.type, event.properties as Record<string, unknown>);
-              // Keep the in-progress label until runtime status and operation status
-              // can be replaced atomically. Clearing first exposes stale "Running" state.
-              if (event.type === 'action.completed') void fetchStatus();
+              const actionProperties = event.properties as Record<string, unknown>;
+              actionRunStore?.handleEvent(event.type, actionProperties);
+              // Refresh runtime and infra snapshots before clearing transient UI state.
+              // Infra actions do not use /api/status, so clear their optimistic overlay
+              // explicitly after the infra snapshot request completes.
+              if (event.type === 'action.completed') {
+                void fetchStatus().then(() => {
+                  if (actionProperties.resourceKind !== 'infrastructure' || typeof actionProperties.appIdent !== 'string') return;
+                  appStore.setInfraServices((previous) => previous.map((service) => {
+                    if (service.ident !== actionProperties.appIdent) return service;
+                    const { operationStatus: _operationStatus, ...rest } = service;
+                    return rest;
+                  }));
+                });
+              }
             }
           } catch (inner) {
             getLogger().write('ERROR', 'Failed to process action event: ' + (inner instanceof Error ? inner.message : String(inner)));
@@ -130,7 +149,10 @@ export function createAppActions(
         if (event.type === 'status.updated') {
           const props = event.properties as {
             ident: string;
-            dockerInfo?: DockerInfo;
+            resourceId?: string;
+            resourceKind?: ResourceKind;
+            dockerInfo?: DockerInfo | null;
+            runtimeStatus?: RuntimeStatus | null;
             branch?: string;
             gitStatus?: string;
             operationStatus?: OperationStatus | null;
@@ -140,12 +162,22 @@ export function createAppActions(
             runTargetInfo?: AppRunTargetInfo | null;
             executionHandle?: ExecutionHandle | null;
           };
-          const { ident, dockerInfo, branch, gitStatus, operationStatus, activeWorktree, status, logPath, runTargetInfo } = props;
+          const { ident, resourceId, resourceKind, dockerInfo, runtimeStatus, branch, gitStatus, operationStatus, activeWorktree, status, logPath, runTargetInfo } = props;
+          const targetsApps = resourceKind !== 'infrastructure';
+          const targetsInfra = resourceKind === 'infrastructure' || resourceKind === undefined;
           appStore.setLastUpdateTime(new Date());
-          appStore.setApps((prevApps) =>
+          if (targetsApps) appStore.setApps((prevApps) =>
             prevApps.map((app) => {
               if (app.ident !== ident) return app;
-              const updated: typeof app = { ...app, dockerInfo: dockerInfo ?? app.dockerInfo, branch: branch || app.branch };
+              const updated: typeof app = { ...app, resourceId: resourceId ?? app.resourceId, resourceKind: resourceKind ?? app.resourceKind, branch: branch || app.branch };
+              if ('dockerInfo' in props) {
+                if (dockerInfo == null) delete updated.dockerInfo;
+                else updated.dockerInfo = dockerInfo;
+              }
+              if ('runtimeStatus' in props) {
+                if (runtimeStatus == null) delete updated.runtimeStatus;
+                else updated.runtimeStatus = runtimeStatus;
+              }
               if ('status' in props) updated.status = status;
               if ('gitStatus' in props) updated.gitStatus = gitStatus;
               if ('activeWorktree' in props) {
@@ -163,11 +195,19 @@ export function createAppActions(
               return updated;
             }),
           );
-          appStore.setInfraServices((prev) =>
+          if (targetsInfra) appStore.setInfraServices((prev) =>
             prev.map((svc) => {
               if (svc.ident !== ident) return svc;
               const { executionHandle } = props;
-              const updated: typeof svc = { ...svc, dockerInfo: dockerInfo ?? svc.dockerInfo };
+              const updated: typeof svc = { ...svc, resourceId: resourceId ?? svc.resourceId, resourceKind: resourceKind ?? svc.resourceKind };
+              if ('dockerInfo' in props) {
+                if (dockerInfo == null) delete updated.dockerInfo;
+                else updated.dockerInfo = dockerInfo;
+              }
+              if ('runtimeStatus' in props) {
+                if (runtimeStatus == null) delete updated.runtimeStatus;
+                else updated.runtimeStatus = runtimeStatus;
+              }
               if ('status' in props) updated.status = status;
               if ('logPath' in props) updated.logPath = logPath;
               if ('executionHandle' in props) {
@@ -185,8 +225,12 @@ export function createAppActions(
 
         if (event.type === 'operation.status.changed') {
           const { appIdent, operation, status, message } = event.properties as unknown as OperationStatus & { appIdent: string };
+          const nextOperationStatus = { operation, status, message };
           appStore.setApps((prevApps) =>
-            prevApps.map((app) => (app.ident === appIdent ? { ...app, operationStatus: { operation, status, message } } : app)),
+            prevApps.map((app) => (app.ident === appIdent ? { ...app, operationStatus: nextOperationStatus } : app)),
+          );
+          appStore.setInfraServices((prev) =>
+            prev.map((svc) => (svc.ident === appIdent ? { ...svc, operationStatus: nextOperationStatus } : svc)),
           );
         }
 
@@ -395,8 +439,8 @@ export function createAppActions(
         // Build initial dependency tree
         const allApps = appStore.apps();
         const allInfra = appStore.infraServices();
-        const appStatusMap = new Map(allApps.map((a) => [a.ident, a.status || a.dockerInfo?.Status || 'unknown']));
-        const infraStatusMap = new Map(allInfra.map((s) => [s.ident, s.status || s.dockerInfo?.Status || 'unknown']));
+        const appStatusMap = new Map(allApps.map((a) => [a.ident, runtimeState(a.runtimeStatus, a.status || a.dockerInfo?.Status)]));
+        const infraStatusMap = new Map(allInfra.map((s) => [s.ident, runtimeState(s.runtimeStatus, s.status || s.dockerInfo?.Status)]));
         appDetailStore.setDependencyTreeNodes(buildDependencyTree(targets, appStatusMap, infraStatusMap));
         // Keep dependency tree selection ready, but do not steal initial panel focus.
         if (targets.length > 0) {
@@ -535,8 +579,8 @@ export function createAppActions(
 
     const allApps = appStore.apps();
     const allInfra = appStore.infraServices();
-    const appStatusMap = new Map(allApps.map((a) => [a.ident, a.status || a.dockerInfo?.Status || 'unknown']));
-    const infraStatusMap = new Map(allInfra.map((s) => [s.ident, s.status || s.dockerInfo?.Status || 'unknown']));
+    const appStatusMap = new Map(allApps.map((a) => [a.ident, runtimeState(a.runtimeStatus, a.status || a.dockerInfo?.Status)]));
+    const infraStatusMap = new Map(allInfra.map((s) => [s.ident, runtimeState(s.runtimeStatus, s.status || s.dockerInfo?.Status)]));
 
     try {
       const childTargets = (await client.getActionDefinitions(found.name)).actions.filter((definition) => definition.type === 'run').map(actionDefinitionTarget);

@@ -63,7 +63,9 @@ export function createDockerActions(
           const definitions=(await client.getActionDefinitions(appIdent)).actions.filter((definition)=>definition.type==='stop'&&definition.availability.available);
           const targetInfo = 'runTargetInfo' in app ? app.runTargetInfo : undefined;
           const activeProfile = targetInfo?.profile;
-          const kubernetesRunning = /\b(?:running|starting)\b.*\bpods?\b/i.test(app.status || '');
+          const kubernetesRunning = app.runtimeStatus
+            ? app.runtimeStatus.detail?.includes('pods') && (app.runtimeStatus.state === 'running' || app.runtimeStatus.state === 'starting')
+            : /\b(?:running|starting)\b.*\bpods?\b/i.test(app.status || '');
           const activeRuntime = kubernetesRunning ? 'kubernetes' : targetInfo?.runtime;
           const byProfile = activeProfile ? definitions.filter((definition) => definition.id.endsWith('/' + activeProfile)) : definitions;
           const selected = byProfile.find((definition) => definition.runtime === activeRuntime)

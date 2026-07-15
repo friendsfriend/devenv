@@ -10,6 +10,7 @@ import type {
 	ScriptVisibleRow,
 	TableRow,
 } from '@devenv/types';
+import { runtimeState } from '@devenv/ui';
 import type { TableTab } from '@devenv/ui';
 
 export type ViewMode =
@@ -171,10 +172,7 @@ function folderPaths(nodes: ScriptNode[]): string[] {
 }
 
 function appStatusRank(app: TableRow): number {
-	if (app.operationStatus?.status === "active") return 0;
-	const status = (app.status || app.dockerInfo?.Status || "").toLowerCase();
-	if (status.includes("up") || status.includes("running") || status.includes("healthy")) return 0;
-	return 1;
+	return runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status) === "running" ? 0 : 1;
 }
 
 function appGitRank(app: TableRow): number {
@@ -394,12 +392,7 @@ export function createAppStore(env: NodeJS.ProcessEnv = process.env) {
 	);
 
 	const appFilterValue = (app: TableRow, key: string) => {
-		if (key === "status") {
-			const status = (app.status || app.dockerInfo?.Status || "not found").toLowerCase();
-			if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "running";
-			if (status.includes("exit") || status.includes("stop")) return "exited";
-			return status;
-		}
+		if (key === "status") return runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status);
 		if (key === "git" && app.rowKind === "app") return appGitRank(app) === 0 ? "dirty" : app.gitStatus === "✓" ? "clean" : "unknown";
 		if (key === "provider" && app.rowKind === "app") return app.provider || app.sourceType || "unknown";
 		if (key === "interpreter" && app.rowKind === "script") return app.interpreter || (app.nodeType === "folder" ? "folder" : "unknown");
@@ -456,6 +449,7 @@ export function createAppStore(env: NodeJS.ProcessEnv = process.env) {
 				containerBaseName: svc.containerBaseName || svc.ident,
 				dockerInfo: svc.dockerInfo,
 				operationStatus: svc.operationStatus,
+				runtimeStatus: svc.runtimeStatus,
 				status: svc.status,
 				type: svc.type,
 				shellPath: svc.shellPath,

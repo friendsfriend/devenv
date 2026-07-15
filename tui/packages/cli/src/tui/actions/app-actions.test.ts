@@ -49,6 +49,33 @@ test('completed action keeps operation status until refreshed runtime snapshot a
   expect(appStore.apps()[0].operationStatus).toBeUndefined();
 });
 
+test('completed infrastructure action clears stale stopping overlay', async () => {
+  const appStore = createAppStore();
+  appStore.setInfraServices([{
+    ident: 'db', displayName: 'Database', type: 'docker', status: 'running',
+    operationStatus: { operation: 'stop', status: 'active', message: 'Stopping...' },
+  }]);
+  const actions = createAppActions(
+    appStore,
+    createAppDetailStore(),
+    {} as any,
+    {
+      getStatus: async () => [],
+      getInfraServices: async () => [{ ident: 'db', displayName: 'Database', type: 'docker', status: 'stopped' }],
+      subscribeToEvents: async function* () {
+        yield { type: 'action.completed', properties: { runId: 'r1', appIdent: 'db', resourceKind: 'infrastructure', status: 'completed' } };
+      },
+    } as any,
+    () => {},
+  );
+
+  await actions.subscribeToUpdates();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(appStore.infraServices()[0].status).toBe('stopped');
+  expect(appStore.infraServices()[0].operationStatus).toBeUndefined();
+});
+
 test('status snapshot preserves Kubernetes status over missing container status', async () => {
   const appStore = createAppStore();
   appStore.setApps([{

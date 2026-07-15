@@ -1,3 +1,4 @@
+import type { RuntimeState, RuntimeStatus } from '@devenv/types';
 import { uiColors } from './colors';
 import { highlightColor } from './components/Highlight';
 
@@ -76,6 +77,28 @@ export function formatStatus(status: string): string {
   const trimmedStatus = status?.trim() || '...';
   const style = getStatusStyle(trimmedStatus);
   return style.icon ? `${style.icon} ${trimmedStatus}` : trimmedStatus;
+}
+
+export function runtimeState(status?: RuntimeStatus, legacy?: string): RuntimeState {
+  if (status?.state) return status.state;
+  const value = (legacy ?? '').toLowerCase();
+  if (value.startsWith('running') || value.startsWith('healthy') || value.startsWith('up')) return 'running';
+  if (value.includes('starting') || value.includes('pending') || value.includes('restarting')) return 'starting';
+  if (value.includes('failed') || value.includes('error') || value.includes('crash')) return 'failed';
+  if (!value || value.startsWith('stopped') || value.startsWith('exited') || value.startsWith('not found') || value.startsWith('down')) return 'stopped';
+  return 'unknown';
+}
+
+export function runtimeStatusText(status?: RuntimeStatus): string {
+  if (!status) return '';
+  return status.detail ? `${status.state} (${status.detail})` : status.state;
+}
+
+export function formatRuntimeStatus(status?: RuntimeStatus, legacy?: string): string {
+  if (!status) return formatStatus(legacy || 'unknown');
+  const text = runtimeStatusText(status);
+  const style = getStatusStyle(status.state);
+  return style.icon ? `${style.icon} ${text}` : text;
 }
 
 /**

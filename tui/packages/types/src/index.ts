@@ -40,8 +40,19 @@ export interface AppRunTargetInfo {
 	display: string;
 }
 
+export type RuntimeState = "running" | "starting" | "failed" | "stopped" | "unknown";
+
+export interface RuntimeStatus {
+	state: RuntimeState;
+	detail?: string;
+}
+
+export type ResourceKind = "app" | "library" | "infrastructure";
+
 export interface App {
 	ident: string;
+	resourceId?: string;
+	resourceKind?: ResourceKind;
 	displayName: string;
 	localDirectoryPath: string;
 	repositoryPath: string;
@@ -56,6 +67,7 @@ export interface App {
 	gitStatus?: string;
 	operationStatus?: OperationStatus;
 	runTargetInfo?: AppRunTargetInfo;
+	runtimeStatus?: RuntimeStatus;
 	status?: "running" | "stopped" | "failed" | string;
 	// Transitional table fields. App rows do not populate these, but keeping them
 	// optional allows generic table/action helpers to inspect TableRow safely.
@@ -118,6 +130,7 @@ export interface TaskTableRow {
 	interpreter?: string | null;
 	scriptParameters?: ScriptParameter[];
 	status?: string;
+	runtimeStatus?: RuntimeStatus;
 	dockerInfo?: DockerInfo;
 	operationStatus?: OperationStatus;
 }
@@ -254,12 +267,15 @@ export interface ShellActionScriptResponse {
 
 export interface AppStatus {
 	ident: string;
+	resourceId?: string;
+	resourceKind?: ResourceKind;
 	dockerInfo?: DockerInfo;
 	gitStatus?: string;
 	branch?: string;
 	activeWorktree?: string;
-	operationStatus?: OperationStatus; // NEW: Current operation status
+	operationStatus?: OperationStatus;
 	runTargetInfo?: AppRunTargetInfo | null;
+	runtimeStatus?: RuntimeStatus | null;
 	status?: "running" | "stopped" | "failed" | string;
 	missingEnvVars?: string[];
 }
@@ -306,10 +322,13 @@ export interface ExecutionHandle {
 
 export interface InfraService {
 	ident: string;
+	resourceId?: string;
+	resourceKind?: ResourceKind;
 	displayName: string;
 	type?: InfraServiceType;
 	containerBaseName?: string;
 	dockerInfo?: DockerInfo;
+	runtimeStatus?: RuntimeStatus;
 	status?: InfraServiceStatus;
 	logPath?: string;
 	shellPath?: string;

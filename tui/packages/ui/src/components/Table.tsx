@@ -10,7 +10,7 @@ import { SearchHeader } from "./SearchHeader";
 import { WorkItemCard } from "./WorkItemCard";
 import { statusAnimationIntentForOperation, statusAnimationIntentForText } from './AnimatedStatusText';
 import { FilterStatusBar } from './FilterStatusBar';
-import { formatStatus, getGitStatusStyle, getStatusStyle } from "../statusUtils";
+import { formatRuntimeStatus, getGitStatusStyle, getStatusStyle, runtimeState } from "../statusUtils";
 
 export interface TableColumn {
 	key: string;
@@ -83,11 +83,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 	const activeTabLabel = () =>
 		props.tabs?.find((tab) => tab.id === props.activeTab)?.label ?? "Applications";
 
-	const isRunning = (app: TableRow) => {
-		if (app.operationStatus?.status === "active") return true;
-		const status = (app.status || app.dockerInfo?.Status || "").toLowerCase();
-		return status.includes("up") || status.includes("running") || status.includes("healthy");
-	};
+	const isRunning = (app: TableRow) => runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status) === "running";
 
 	const runningSummary = () => props.runningLabel ?? `${props.apps.filter(isRunning).length}/${props.apps.length} running`;
 
@@ -109,7 +105,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 		}
 		if (app.rowKind === "script" && app.nodeType === "folder") return "folder";
 		if (app.rowKind === "script") return app.scriptExecutable ? "executable task" : "task file";
-		return formatStatus(app.status || app.dockerInfo?.Status || "not found");
+		return formatRuntimeStatus(app.runtimeStatus, app.status || app.dockerInfo?.Status || "not found");
 	};
 
 	const gitStatus = (app: TableRow) => app.rowKind === "app" ? app.gitStatus?.trim() || "..." : "";
@@ -140,6 +136,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 			return statusAnimationIntentForOperation(operation.operation);
 		}
 		const status = (app.status || app.dockerInfo?.Status || '').toLowerCase();
+		if (app.runtimeStatus && (app.runtimeStatus.state === 'starting')) return 'load';
 		if (/starting|stopping|building|checking|pulling|pushing|cloning|pending|waiting|preparing/.test(status)) {
 			return statusAnimationIntentForText(status);
 		}
@@ -155,9 +152,10 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 				case "pending": return undefined;
 			}
 		}
-		const status = (app.status || app.dockerInfo?.Status || "not found").toLowerCase();
-		if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "positive" as const;
-		if (status.includes("failed") || status.includes("error")) return "negative" as const;
+		const state = runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status);
+		if (state === "running") return "positive" as const;
+		if (state === "failed") return "negative" as const;
+		if (state === "starting") return "warning" as const;
 		return undefined;
 	};
 
@@ -172,7 +170,7 @@ function WorkItemTable<T = string>(props: TableProps<T> & { emptyMessage?: strin
 			}
 		}
 		if (app.rowKind === "script") return uiColors.textSecondary;
-		return getStatusStyle(app.status || app.dockerInfo?.Status || "not found").color;
+		return getStatusStyle(app.runtimeStatus ? app.runtimeStatus.state : app.status || app.dockerInfo?.Status || "not found").color;
 	};
 
 	const appMetadata = (app: TableRow) => {
