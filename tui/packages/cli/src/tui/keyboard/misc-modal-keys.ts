@@ -20,62 +20,6 @@ export async function handleMiscModalKeys(
   const { appActions, providerActions, agentActions, utilActions } = actions;
   const { getSelectableRows, launchPi } = ctx;
 
-  // Status log modal keyboard handler
-  if (appStore.showStatusLogModal()) {
-    const statusLogScrollBox = appStore.statusLogModalScrollBoxRef;
-    if (isDownKey(event)) {
-      statusLogScrollBox?.scrollBy(1);
-      return true;
-    }
-    if (isUpKey(event)) {
-      statusLogScrollBox?.scrollBy(-1);
-      return true;
-    }
-    if (event.name === 'd' && event.ctrl) {
-      statusLogScrollBox?.scrollBy(Math.floor((statusLogScrollBox.viewport.height || 10) / 2));
-      return true;
-    }
-    if (event.name === 'u' && event.ctrl) {
-      statusLogScrollBox?.scrollBy(-Math.floor((statusLogScrollBox.viewport.height || 10) / 2));
-      return true;
-    }
-    if (appStore.statusLogSearchMode()) {
-      if (event.name === 'escape') {
-        appStore.setStatusLogSearchMode(false);
-        appStore.setStatusLogSearchQuery('');
-        return true;
-      }
-      if (event.name === 'return') {
-        appStore.setStatusLogSearchMode(false);
-        return true;
-      }
-      if (event.name === 'backspace') {
-        appStore.setStatusLogSearchQuery((q: string) => q.slice(0, -1));
-        return true;
-      }
-      const ch = event.sequence ?? event.name ?? '';
-      if (ch.length === 1 && ch >= ' ') {
-        appStore.setStatusLogSearchQuery((q: string) => q + ch);
-        return true;
-      }
-      return true;
-    }
-    if (event.name === '/' || event.sequence === '/') {
-      appStore.setStatusLogSearchMode(true);
-      appStore.setStatusLogSearchQuery('');
-      return true;
-    }
-    if (event.name === 'escape' || event.sequence === '\x1b' || event.name === 'q') {
-      if (appStore.statusLogSearchQuery()) {
-        appStore.setStatusLogSearchQuery('');
-      } else {
-        appStore.setStatusLogSearchMode(false);
-        appStore.setShowStatusLogModal(false);
-      }
-      return true;
-    }
-    return true;
-  }
 
   // Editor picker keyboard handler
   if (uiStore.showEditorPicker()) {

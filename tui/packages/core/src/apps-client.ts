@@ -1,5 +1,7 @@
 import type {
   App,
+  ActionDefinition,
+  ActionDefinitionList,
   AppStatus,
   CreateAppRequest,
   DockerInfo,
@@ -8,6 +10,40 @@ import type {
 } from '@devenv/types';
 import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
+
+export async function startActionRun(deps: ClientDeps, actionId: string, inputs: Record<string, unknown> = {}): Promise<void> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/action-runs`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ actionId, inputs }),
+  });
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
+export interface ActionRegistryStatus {
+  version: number;
+  actionsCount: number;
+  error: string;
+  available: boolean;
+}
+
+export async function getActionRegistryStatus(deps: ClientDeps): Promise<ActionRegistryStatus> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/action-registry/status`);
+  if (!response.ok) await handleFetchError(response, deps.onError);
+  return response.json();
+}
+
+export async function getActionDefinitions(deps: ClientDeps, ident: string, kind = 'app'): Promise<ActionDefinitionList> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/apps/${encodeURIComponent(ident)}/actions?kind=${encodeURIComponent(kind)}`);
+  if (!response.ok) await handleFetchError(response, deps.onError);
+  return response.json() as Promise<ActionDefinitionList>;
+}
+
+export async function getActionDefinition(deps: ClientDeps, id: string): Promise<ActionDefinition> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/action-definition?id=${encodeURIComponent(id)}`);
+  if (!response.ok) await handleFetchError(response, deps.onError);
+  return response.json() as Promise<ActionDefinition>;
+}
 
 /**
  * Fetch all applications
@@ -35,17 +71,6 @@ export async function getInfraServices(deps: ClientDeps): Promise<InfraService[]
 
   const data = (await response.json()) as { services: InfraService[] };
   return data.services;
-}
-
-export async function startInfraService(deps: ClientDeps, ident: string, runner?: string): Promise<void> {
-  const params = runner ? `?runner=${encodeURIComponent(runner)}` : '';
-  const response = await deps.fetchFn(`${deps.baseUrl}/api/infra-services/${encodeURIComponent(ident)}/start${params}`, { method: 'POST' });
-  if (!response.ok) await handleFetchError(response, deps.onError);
-}
-
-export async function stopInfraService(deps: ClientDeps, ident: string): Promise<void> {
-  const response = await deps.fetchFn(`${deps.baseUrl}/api/infra-services/${encodeURIComponent(ident)}/stop`, { method: 'POST' });
-  if (!response.ok) await handleFetchError(response, deps.onError);
 }
 
 export async function getInfraServiceLogs(deps: ClientDeps, ident: string): Promise<string> {

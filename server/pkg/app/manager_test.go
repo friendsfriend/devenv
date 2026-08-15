@@ -131,6 +131,14 @@ func TestAppJSONCompatibility(t *testing.T) {
 	}
 }
 
+func TestExpandInfraConfigPaths(t *testing.T) {
+	svc := InfraService{Kubernetes: &KubernetesInfra{ChartPath: "$CONFIG/chart", Values: []string{"${CONFIG}/values.yaml"}}}
+	expandInfraConfigPaths(&svc, "/tmp/config")
+	if svc.Kubernetes.ChartPath != "/tmp/config/chart" || svc.Kubernetes.Values[0] != "/tmp/config/values.yaml" {
+		t.Fatalf("kubernetes paths = %#v", svc.Kubernetes)
+	}
+}
+
 func TestInfraServiceJSONRoundTrip(t *testing.T) {
 	original := InfraService{
 		DisplayName:       "Postgres",

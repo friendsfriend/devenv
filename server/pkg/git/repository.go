@@ -95,8 +95,10 @@ type MultiAuthProvider interface {
 
 // gitRepository implements the Repository interface
 type gitRepository struct {
-	auth  AuthProvider
-	cache *repoCache
+	auth     AuthProvider
+	cache    *repoCache
+	recorder ActionRecorder
+	recordMu sync.RWMutex
 }
 
 // repoCache for performance optimization
@@ -119,12 +121,46 @@ type repoCache struct {
 const wtWorktreePathTemplate = `{{ repo_path }}/../{{ repo }}.{{ branch | sanitize }}`
 
 // runGitCommand runs a git command in dir, returning stdout, stderr, and any error.
+func (gr *gitRepository) SetActionRecorder(recorder ActionRecorder) {
+	gr.recordMu.Lock()
+	gr.recorder = recorder
+	gr.recordMu.Unlock()
+}
+
+func (gr *gitRepository) hasActionRecorder() bool {
+	gr.recordMu.RLock()
+	defer gr.recordMu.RUnlock()
+	return gr.recorder != nil
+}
+
+func (gr *gitRepository) record(step ActionStep) {
+	gr.recordMu.RLock()
+	recorder := gr.recorder
+	gr.recordMu.RUnlock()
+	if recorder != nil {
+		recorder(step)
+	}
+}
+
+func gitExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	return 1
+}
+
 func (gr *gitRepository) runGitCommand(dir string, args ...string) (string, string, error) {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err := cmd.Run()
+	label := strings.Join(args, " ")
+	gr.record(ActionStep{Label: label, Command: "git -C " + dir + " " + strings.Join(args, " "), Stdout: stdout.String(), Stderr: stderr.String(), ExitCode: gitExitCode(err), Err: err})
 	return stdout.String(), stderr.String(), err
 }
 
@@ -141,6 +177,7 @@ func (gr *gitRepository) runWtCommand(dir string, args ...string) (string, strin
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	err = cmd.Run()
+	gr.record(ActionStep{Label: strings.Join(args, " "), Command: wtBin + " -C " + dir + " " + strings.Join(args, " "), Stdout: stdout.String(), Stderr: stderr.String(), ExitCode: gitExitCode(err), Err: err})
 	return stdout.String(), stderr.String(), err
 }
 
@@ -610,6 +647,14 @@ func (gr *gitRepository) GetStatus(app App) string {
 }
 
 func (gr *gitRepository) Push(app App) error {
+	// Instrumented requests use native Git so action history contains real command results.
+	if gr.hasActionRecorder() {
+		path := app.GetLocalDirectoryPath()
+		gr.lockRepo(path)
+		defer gr.unlockRepo(path)
+		_, _, err := gr.runGitCommand(path, "push", "origin")
+		return err
+	}
 	// Lock this repository for the duration of the operation
 	path := app.GetLocalDirectoryPath()
 	gr.lockRepo(path)
@@ -644,6 +689,13 @@ func (gr *gitRepository) Push(app App) error {
 }
 
 func (gr *gitRepository) Fetch(app App) error {
+	if gr.hasActionRecorder() {
+		path := app.GetLocalDirectoryPath()
+		gr.lockRepo(path)
+		defer gr.unlockRepo(path)
+		_, _, err := gr.runGitCommand(path, "fetch", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*")
+		return err
+	}
 	// Lock this repository for the duration of the operation
 	path := app.GetLocalDirectoryPath()
 	gr.lockRepo(path)
@@ -677,6 +729,21 @@ func (gr *gitRepository) Fetch(app App) error {
 }
 
 func (gr *gitRepository) Pull(app App) error {
+	if gr.hasActionRecorder() {
+		path := app.GetLocalDirectoryPath()
+		gr.lockRepo(path)
+		defer gr.unlockRepo(path)
+		branchOut, _, err := gr.runGitCommand(path, "rev-parse", "--abbrev-ref", "HEAD")
+		if err != nil {
+			return err
+		}
+		branch := strings.TrimSpace(branchOut)
+		if _, _, err = gr.runGitCommand(path, "fetch", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+			return err
+		}
+		_, _, err = gr.runGitCommand(path, "reset", "--hard", "origin/"+branch)
+		return err
+	}
 	// Lock this repository for the duration of the operation
 	path := app.GetLocalDirectoryPath()
 	gr.lockRepo(path)
@@ -771,6 +838,36 @@ func (gr *gitRepository) GetLocalBranches(app App) ([]string, error) {
 }
 
 func (gr *gitRepository) Checkout(app App, branch string) error {
+	if gr.hasActionRecorder() {
+		path := app.GetLocalDirectoryPath()
+		gr.lockRepo(path)
+		defer gr.unlockRepo(path)
+		if _, err := os.Stat(filepath.Join(path, ".git")); os.IsNotExist(err) {
+			_, _, cloneErr := gr.runGitCommand(".", "clone", "--branch", branch, app.GetRepositoryPath(), path)
+			return cloneErr
+		}
+		if _, _, err := gr.runGitCommand(path, "status", "--porcelain"); err != nil {
+			return err
+		}
+		branchList, _, err := gr.runGitCommand(path, "branch", "--list", branch)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(branchList) == "" {
+			remoteList, _, remoteErr := gr.runGitCommand(path, "branch", "--remote", "--list", "origin/"+branch)
+			if remoteErr != nil {
+				return remoteErr
+			}
+			if strings.TrimSpace(remoteList) != "" {
+				_, _, createErr := gr.runGitCommand(path, "switch", "-c", branch, "--track", "origin/"+branch)
+				return createErr
+			}
+			_, _, createErr := gr.runGitCommand(path, "switch", "-c", branch)
+			return createErr
+		}
+		_, _, err = gr.runGitCommand(path, "switch", branch)
+		return err
+	}
 	// Lock this repository for the duration of the operation
 	path := app.GetLocalDirectoryPath()
 	gr.lockRepo(path)
@@ -876,6 +973,17 @@ func (gr *gitRepository) Checkout(app App, branch string) error {
 // It returns the actual branch that was checked out (which may differ from the
 // requested branch when the remote does not have it and the default is used).
 func (gr *gitRepository) cloneIntoPrimaryWorktree(app App, targetDir, branch string) (string, error) {
+	if gr.hasActionRecorder() {
+		if err := os.MkdirAll(filepath.Dir(targetDir), 0755); err != nil {
+			return "", fmt.Errorf("failed to create primary worktree directory: %w", err)
+		}
+		if _, _, err := gr.runGitCommand(".", "clone", "--branch", branch, app.GetRepositoryPath(), targetDir); err != nil {
+			if _, _, fallbackErr := gr.runGitCommand(".", "clone", app.GetRepositoryPath(), targetDir); fallbackErr != nil {
+				return "", fallbackErr
+			}
+		}
+		return gr.resolveHeadBranch(targetDir), nil
+	}
 	if err := os.MkdirAll(targetDir, 0755); err != nil {
 		return "", fmt.Errorf("failed to create primary worktree directory: %w", err)
 	}

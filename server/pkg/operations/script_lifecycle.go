@@ -3,6 +3,7 @@ package operations
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,7 +118,19 @@ func killProcessGroup(cmd *exec.Cmd) error {
 	return cmd.Process.Kill()
 }
 
-func startLoggedProcess(svc app.InfraService, command string, args []string, logPath string) (*exec.Cmd, chan error, error) {
+type actionOutputWriter struct {
+	stream string
+	output func(stream, chunk string)
+}
+
+func (w actionOutputWriter) Write(chunk []byte) (int, error) {
+	if w.output != nil && len(chunk) > 0 {
+		w.output(w.stream, string(chunk))
+	}
+	return len(chunk), nil
+}
+
+func startLoggedProcess(svc app.InfraService, command string, args []string, logPath string, output func(stream, chunk string)) (*exec.Cmd, chan error, error) {
 	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
 		return nil, nil, err
 	}
@@ -129,8 +142,8 @@ func startLoggedProcess(svc app.InfraService, command string, args []string, log
 	cmd := exec.Command(command, args...)
 	cmd.Dir = svc.Cwd
 	cmd.Env = scriptEnv(svc.Env)
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
+	cmd.Stdout = io.MultiWriter(logFile, actionOutputWriter{stream: "stdout", output: output})
+	cmd.Stderr = io.MultiWriter(logFile, actionOutputWriter{stream: "stderr", output: output})
 	setProcessGroup(cmd)
 	if err := cmd.Start(); err != nil {
 		_ = logFile.Close()

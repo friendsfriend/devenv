@@ -1,72 +1,18 @@
-# Finding Logs
+# Finding logs and action history
 
-DevEnv stores logs in structured files under the home directory.
+## Operational history
 
-## 1. Log directory structure
+Build, run, stop, test, infrastructure, Kubernetes, Git, worktree, and task operations appear in action history. Press uppercase `L` to open action modal. History is retained in DevEnv SQLite state for 24 hours.
 
-All logs live under `$DEVENV_HOME/logs/` (default `~/devenv/logs/`):
+Action modal is canonical source for executed commands, stdout, stderr, exit failures, nested steps, and errors. Compact strip shows status glyph and action label only.
 
-```
-~/devenv/logs/
-├── status.log              # Operation status log (structured)
-├── my-service.log          # Per-application command output logs
-├── postgres.log            # Per-infrastructure service logs
-└── shared-lib.log          # Per-library operation logs
-```
+## Remaining logs
 
-## 2. Status log format
+Runtime and diagnostic logs remain separate:
 
-The status log (`status.log`) records structured operation state changes. It is optimized for quick status history, not full command output.
+- Application/container logs: available with lowercase `l`
+- Kubernetes workload logs: available from Kubernetes view
+- Server diagnostics: process output or configured server log destination
+- Per-application runtime logs under `$DEVENV_HOME/logs/` where configured
 
-```
-2026-07-01 07:20:09|my-service|my-service|build|completed|building image...
-2026-07-01 07:20:09|my-service|my-service|build|failed|Error: exit status 125
-```
-
-Each entry includes timestamp, item ident, item name, operation, status, and message.
-
-## 3. Per-item logs
-
-Each application, library, and infrastructure service has its own log file:
-
-```
-~/devenv/logs/ITEM_IDENT.log
-```
-
-These logs contain command input and full stdout/stderr from Docker/Podman operations (build, test, start, stop), git operations (clone, pull, push), and script execution.
-
-Each command block includes:
-
-- full quoted command line
-- working directory
-- environment overrides
-- full output
-- final exit status
-
-## 4. Server log location
-
-The Go server also logs to the status log. When running in server mode, you can follow server logs at:
-
-```bash
-tail -f ~/devenv/logs/status.log
-```
-
-## 5. Viewing logs in the TUI
-
-- Press `l` to view container logs for the selected item
-- Press `o` to view operation logs for the selected item
-- Press `L` to toggle the status log maximized view
-
-See [Using the Log Viewer](using-log-viewer.md) for full keyboard shortcuts and features.
-
-## 6. Opening logs in your editor
-
-Press `e` while in the log viewer to open the current log file in `$EDITOR`.
-
-## 7. Log file locations reference
-
-| Log Type | Location |
-|---|---|
-| Status/operation log | `~/devenv/logs/status.log` |
-| Per-item logs | `~/devenv/logs/ITEM_IDENT.log` |
-| Server log | `~/devenv/logs/status.log` |
+Legacy `status.log` and temporary operation-log files are no longer created or read. Existing legacy files are inert and may be removed manually; DevEnv does not delete them during migration.

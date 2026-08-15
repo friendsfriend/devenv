@@ -1,6 +1,7 @@
 package build
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -9,8 +10,100 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
+	"github.com/friendsfriend/devenv/pkg/docker"
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
+
+type actionAwareSilentRunner struct{}
+
+func (actionAwareSilentRunner) RunCommandWithLogging(string, string, []string, []string, string) (error, string) {
+	return nil, ""
+}
+func (actionAwareSilentRunner) RunCommandWithLoggingToFile(string, string, []string, []string, string, string) (error, string) {
+	return nil, ""
+}
+func (actionAwareSilentRunner) RunCommandSilent(string, []string, []string, string) (error, string) {
+	return nil, ""
+}
+func (actionAwareSilentRunner) RunCommandSilentForAction(string, string, []string, []string, string) (error, string) {
+	return nil, ""
+}
+func (actionAwareSilentRunner) RunCommandSilentForActionDisplay(string, string, []string, []string, []string, string) (error, string) {
+	return nil, ""
+}
+
+func TestLogSilentCommandDoesNotRepublishActionAwareCommand(t *testing.T) {
+	calls := 0
+	svc := &service{
+		executor: actionAwareSilentRunner{},
+		actionBindings: map[string]actionBinding{"app": {
+			step:    "step",
+			command: func(string, string, []string) { calls++ },
+			output:  func(string, string, string) { calls++ },
+			done:    func(string, error) { calls++ },
+		}},
+		actionAppIdent: "app",
+	}
+	svc.logSilentCommand("", "podman", []string{"inspect"}, nil, "", "output", nil)
+	if calls != 0 {
+		t.Fatalf("action-aware silent command was republished %d times", calls)
+	}
+}
+
+type countingHealthWaiter struct {
+	calls        int
+	containerIDs []string
+	waitedFor    []string
+}
+
+func (w *countingHealthWaiter) WaitForHealthy(_ context.Context, container string, _ time.Duration) error {
+	w.calls++
+	w.waitedFor = append(w.waitedFor, container)
+	return nil
+}
+func (w *countingHealthWaiter) GetAllContainerIDsForApp(docker.App) []string { return w.containerIDs }
+func (w *countingHealthWaiter) GetContainerLogs(string) (string, error)      { return "", nil }
+
+func TestTmuxRunTargetSkipsContainerReadiness(t *testing.T) {
+	waiter := &countingHealthWaiter{}
+	svc := &service{healthWaiter: waiter}
+	target := resources.ActionTarget{Runtime: resources.ActionRuntimeShell, LaunchMode: resources.LaunchModeTmux}
+	if err := svc.waitForRunTarget(&app.App{}, target); err != nil {
+		t.Fatal(err)
+	}
+	if waiter.calls != 0 {
+		t.Fatalf("tmux target performed %d container health checks", waiter.calls)
+	}
+}
+
+func TestDockerRunTargetWaitsForResolvedProfileContainers(t *testing.T) {
+	waiter := &countingHealthWaiter{containerIDs: []string{"debug-api", "debug-worker"}}
+	svc := &service{healthWaiter: waiter}
+	target := resources.ActionTarget{Runtime: resources.ActionRuntimeDocker, Profile: "debug"}
+	if err := svc.waitForRunTarget(&app.App{Ident: "api"}, target); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(waiter.waitedFor, ",") != "debug-api,debug-worker" {
+		t.Fatalf("waited for %v", waiter.waitedFor)
+	}
+}
+
+func TestDependencyLeaseOnlyDeduplicatesConcurrentRuns(t *testing.T) {
+	svc := &service{}
+	first, owner := svc.acquireDependency("postgres")
+	if !owner {
+		t.Fatal("first acquisition must own lease")
+	}
+	svc.finishDependency(first, nil)
+	second, owner := svc.acquireDependency("postgres")
+	if !owner {
+		t.Fatal("completed lease must not suppress later action")
+	}
+	if second == first {
+		t.Fatal("later action must receive fresh lease")
+	}
+	svc.finishDependency(second, nil)
+}
 
 func TestBuildAppNoCheckout(t *testing.T) {
 	svc := &service{
@@ -108,14 +201,16 @@ func (f *fakeResourceMgr) CopyTemplatesDir(_ string) ([]string, error) {
 func (f *fakeResourceMgr) CopyFile(_, _ string) error { return nil }
 
 type fakeCommandRunner struct {
-	err       error
-	silentOut string
-	silentErr error
-	lastCmd   string
-	lastArgs  []string
-	lastEnv   []string
-	lastDir   string
-	commands  []recordedCommand
+	err           error
+	silentOut     string
+	silentOutputs []string
+	silentErr     error
+	silentErrors  []error
+	lastCmd       string
+	lastArgs      []string
+	lastEnv       []string
+	lastDir       string
+	commands      []recordedCommand
 }
 
 type recordedCommand struct {
@@ -144,14 +239,82 @@ func (f *fakeCommandRunner) RunCommandSilent(command string, args []string, envV
 	f.lastEnv = envVars
 	f.lastDir = workingDir
 	f.commands = append(f.commands, recordedCommand{command: command, args: append([]string(nil), args...), envVars: append([]string(nil), envVars...), dir: workingDir})
+	if len(f.silentErrors) > 0 {
+		err := f.silentErrors[0]
+		f.silentErrors = f.silentErrors[1:]
+		if err != nil {
+			return err, ""
+		}
+	}
 	if f.silentErr != nil {
 		return f.silentErr, ""
+	}
+	if len(f.silentOutputs) > 0 {
+		output := f.silentOutputs[0]
+		f.silentOutputs = f.silentOutputs[1:]
+		return nil, output
 	}
 	return nil, f.silentOut
 }
 
 func newServiceWithFakeResources(fake *fakeResourceMgr) *service {
 	return &service{resourceMgr: fake, executor: &fakeCommandRunner{silentOut: `{}`}}
+}
+
+func TestDiscoverKubernetesRunStatusPrefersRunningTarget(t *testing.T) {
+	resources := &fakeResourceMgr{targets: []resources.ActionTarget{
+		{ID: "k8s-failed", Action: resources.AppActionRun, Runtime: resources.ActionRuntimeKubernetes, Kubernetes: &resources.KubernetesTargetMetadata{Namespace: "apps", Release: "failed"}},
+		{ID: "k8s-running", Action: resources.AppActionRun, Runtime: resources.ActionRuntimeKubernetes, Kubernetes: &resources.KubernetesTargetMetadata{Namespace: "apps", Release: "running"}},
+	}}
+	runner := &fakeCommandRunner{silentOutputs: []string{
+		"failed-pod 0/1 Error 0 1m\n",
+		"running-pod 1/1 Running 0 1m\n",
+	}}
+	svc := &service{resourceMgr: resources, executor: runner}
+	if got := svc.DiscoverKubernetesRunStatus("api", "/repo"); got != "running (1/1 pods)" {
+		t.Fatalf("status=%q", got)
+	}
+}
+
+func TestKubernetesTargetStatusTreatsNoResourcesAsStopped(t *testing.T) {
+	svc := &service{executor: &fakeCommandRunner{silentOut: "No resources found in apps namespace.\n"}}
+	if got := svc.kubernetesTargetStatus(&resources.KubernetesTargetMetadata{Namespace: "apps", Release: "api"}); got != "stopped (0 pods)" {
+		t.Fatalf("status=%q", got)
+	}
+}
+
+func TestKubernetesTargetStatusUsesTargetContext(t *testing.T) {
+	runner := &fakeCommandRunner{silentOut: "api 1/1 Running 0 1m\n"}
+	svc := &service{executor: runner}
+	if got := svc.kubernetesTargetStatus(&resources.KubernetesTargetMetadata{ContextName: "kind-podman", Namespace: "apps", Release: "api"}); got != "running (1/1 pods)" {
+		t.Fatalf("status=%q", got)
+	}
+	if got := runner.commands[0].args[1]; got != "kind-podman" {
+		t.Fatalf("context=%q", got)
+	}
+}
+
+func TestExtractArtifactsCommandSequenceAndCleanupGolden(t *testing.T) {
+	copyFailure := errors.New("copy failed")
+	runner := &fakeCommandRunner{silentErrors: []error{nil, copyFailure, nil}}
+	svc := &service{executor: runner}
+	err := svc.extractArtifacts("api", t.TempDir(), "api-image", "dist/output", "")
+	if err == nil || !strings.Contains(err.Error(), "failed to copy artifacts") {
+		t.Fatalf("error = %v", err)
+	}
+	got := make([]string, 0, len(runner.commands))
+	for _, command := range runner.commands {
+		got = append(got, command.command+" "+strings.Join(command.args, " "))
+	}
+	want := []string{
+		docker.RuntimeCommand() + " create --name api-extract api-image",
+		docker.RuntimeCommand() + " cp api-extract:dist/output " + filepath.Join(filepath.Dir(runner.commands[1].args[1]), "output"),
+		docker.RuntimeCommand() + " rm api-extract",
+	}
+	// Destination contains the test temp path; compare stable command shapes and exact cleanup order.
+	if len(got) != 3 || got[0] != want[0] || !strings.HasPrefix(got[1], docker.RuntimeCommand()+" cp api-extract:dist/output ") || got[2] != want[2] {
+		t.Fatalf("artifact command sequence changed:\n got: %v\nwant shapes: %v", got, want)
+	}
 }
 
 func TestBuildAppCopyTemplates(t *testing.T) {
@@ -221,23 +384,28 @@ func TestBuildAppDockerUsesBuildKitAndCache(t *testing.T) {
 	runner := &fakeCommandRunner{silentOut: `{}`}
 	svc := &service{resourceMgr: &fakeResourceMgr{}, executor: runner}
 
+	var commands []recordedCommand
 	svc.buildAppInternal(&app.App{
 		Ident:              "test-app",
 		LocalDirectoryPath: appDir,
-	}, "", func(string) {})
+	}, "", func(status string) {
+		if status == "build successful" {
+			commands = append(commands, runner.commands...)
+		}
+	})
 
 	var buildCmd *recordedCommand
-	for i := range runner.commands {
-		if len(runner.commands[i].args) > 0 && runner.commands[i].args[0] == "build" {
-			buildCmd = &runner.commands[i]
+	for i := range commands {
+		if len(commands[i].args) > 0 && commands[i].args[0] == "build" {
+			buildCmd = &commands[i]
 			break
 		}
 	}
 	if buildCmd == nil {
-		t.Fatalf("expected docker build command, got %#v", runner.commands)
+		t.Fatalf("expected docker build command, got %#v", commands)
 	}
 	args := strings.Join(buildCmd.args, " ")
-	if !strings.Contains(args, "--cache-from test-app:latest") {
+	if !strings.Contains(args, "--cache-from devenv-test-app:latest") {
 		t.Fatalf("expected docker build cache-from args, got %#v", buildCmd.args)
 	}
 	if !strings.Contains(args, "--build-arg BUILDKIT_INLINE_CACHE=1") {
@@ -543,6 +711,54 @@ func (f *fakeInfraStarter) StartKubernetesInfrastructureServiceWithLog(infra app
 	return f.err
 }
 
+func TestResolveRunActionStepsDeduplicatesSharedDependencies(t *testing.T) {
+	appDir := t.TempDir()
+	frontendID := resources.AppRunTargetID("frontend", resources.ActionRuntimeShell, "dev")
+	backendID := resources.AppRunTargetID("backend", resources.ActionRuntimeShell, "dev")
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{
+		{ID: frontendID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", SourcePath: "/frontend.sh", Requires: []resources.DependencyRef{{App: "backend", Runtime: string(resources.ActionRuntimeShell), Profile: "dev"}, {Infra: "postgres"}}},
+		{ID: backendID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", SourcePath: "/backend.sh", Requires: []resources.DependencyRef{{Infra: "postgres"}}},
+	}}
+	svc := &service{resourceMgr: fake, appRegistry: fakeAppRegistry{apps: []app.App{{Ident: "frontend", LocalDirectoryPath: appDir}, {Ident: "backend", LocalDirectoryPath: appDir}}, infra: []app.InfraService{{Ident: "postgres"}}}}
+	steps, err := svc.ResolveRunActionSteps(&app.App{Ident: "frontend", LocalDirectoryPath: appDir}, frontendID, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	postgresID := resources.InfraTargetID("postgres")
+	count := 0
+	for _, step := range steps {
+		if step.ID == postgresID {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("postgres steps = %d, steps=%#v", count, steps)
+	}
+}
+
+func TestRunDependenciesDoNotProbeScriptInfrastructureAsContainer(t *testing.T) {
+	appDir := t.TempDir()
+	targetID := resources.AppRunTargetID("frontend", resources.ActionRuntimeShell, "dev")
+	fake := &fakeResourceMgr{targets: []resources.ActionTarget{{
+		ID: targetID, Action: resources.AppActionRun, Runtime: resources.ActionRuntimeShell, Profile: "dev", SourcePath: "/frontend.sh", Requires: []resources.DependencyRef{{Infra: "script-clock"}},
+	}}}
+	waiter := &countingHealthWaiter{}
+	infra := &fakeInfraStarter{}
+	svc := &service{
+		resourceMgr: fake, appRegistry: fakeAppRegistry{apps: []app.App{{Ident: "frontend", LocalDirectoryPath: appDir}}, infra: []app.InfraService{{Ident: "script-clock", Type: app.InfraServiceTypeScript}}},
+		infraStarter: infra, healthWaiter: waiter,
+	}
+	if err := svc.startRunDependencies(resources.ActionTarget{ID: targetID}, "", func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+	if len(infra.started) != 1 || infra.started[0] != "script-clock" {
+		t.Fatalf("started infra = %#v", infra.started)
+	}
+	if waiter.calls != 0 {
+		t.Fatalf("script infrastructure probed container readiness %d times", waiter.calls)
+	}
+}
+
 func TestRunAppStartsDependenciesBeforeRequestedTarget(t *testing.T) {
 	t.Setenv("TMUX", "")
 	frontendDir := t.TempDir()
@@ -589,28 +805,5 @@ func TestRunAppDependencyCyclePreventsStart(t *testing.T) {
 	}
 	if runner.lastCmd != "" {
 		t.Fatalf("runner called despite cycle: %s", runner.lastCmd)
-	}
-}
-
-func TestCleanupOperationLogsRemovesOldTempLogs(t *testing.T) {
-	dir := t.TempDir()
-	oldPath := filepath.Join(dir, "old.log")
-	newPath := filepath.Join(dir, "new.log")
-	if err := os.WriteFile(oldPath, []byte("old"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(newPath, []byte("new"), 0644); err != nil {
-		t.Fatal(err)
-	}
-	oldTime := time.Now().Add(-48 * time.Hour)
-	if err := os.Chtimes(oldPath, oldTime, oldTime); err != nil {
-		t.Fatal(err)
-	}
-	cleanupOperationLogs(dir, 24*time.Hour)
-	if _, err := os.Stat(oldPath); !os.IsNotExist(err) {
-		t.Fatalf("old log still exists or stat failed: %v", err)
-	}
-	if _, err := os.Stat(newPath); err != nil {
-		t.Fatalf("new log missing: %v", err)
 	}
 }

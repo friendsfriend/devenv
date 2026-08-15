@@ -8,7 +8,6 @@ import (
 	"time"
 
 	git "github.com/friendsfriend/devenv/pkg/git"
-	"github.com/friendsfriend/devenv/pkg/logging"
 )
 
 // handleGitPull performs a git pull operation on an app's repository
@@ -37,7 +36,9 @@ func (s *Server) handleGitPull(w http.ResponseWriter, r *http.Request) {
 	s.setOperationStatus(appIdent, "pull", "active", "Pulling...")
 
 	// Perform pull operation
-	err := s.services.GitRepository().Pull(appObj)
+	err := s.runGitAction(appIdent, fmt.Sprintf("Git pull %s", appIdent), "git.pull", appObj.GetBranch(), func() error {
+		return s.services.GitRepository().Pull(appObj)
+	})
 	if err != nil {
 		log.Printf("[ERROR] Git pull failed for %s: %v", appIdent, err)
 		// Set operation status to failed
@@ -107,7 +108,9 @@ func (s *Server) handleGitPush(w http.ResponseWriter, r *http.Request) {
 	s.setOperationStatus(appIdent, "push", "active", "Pushing...")
 
 	// Perform push operation
-	err := s.services.GitRepository().Push(appObj)
+	err := s.runGitAction(appIdent, fmt.Sprintf("Git push %s", appIdent), "git.push", appObj.GetBranch(), func() error {
+		return s.services.GitRepository().Push(appObj)
+	})
 	if err != nil {
 		log.Printf("[ERROR] Git push failed for %s: %v", appIdent, err)
 		// Set operation status to failed
@@ -177,7 +180,9 @@ func (s *Server) handleGitFetch(w http.ResponseWriter, r *http.Request) {
 	s.setOperationStatus(appIdent, "fetch", "active", "Fetching...")
 
 	// Perform fetch operation
-	err := s.services.GitRepository().Fetch(appObj)
+	err := s.runGitAction(appIdent, fmt.Sprintf("Git fetch %s", appIdent), "git.fetch", appObj.GetBranch(), func() error {
+		return s.services.GitRepository().Fetch(appObj)
+	})
 	if err != nil {
 		log.Printf("[ERROR] Git fetch failed for %s: %v", appIdent, err)
 		// Set operation status to failed
@@ -314,7 +319,9 @@ func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
 	s.setOperationStatus(appIdent, "checkout", "active", fmt.Sprintf("Checking out %s...", branch))
 
 	// Perform checkout operation
-	err := s.services.GitRepository().Checkout(appObj, branch)
+	err := s.runGitAction(appIdent, fmt.Sprintf("Git checkout %s", branch), "git.checkout", branch, func() error {
+		return s.services.GitRepository().Checkout(appObj, branch)
+	})
 	if err != nil {
 		log.Printf("[ERROR] Git checkout failed for %s to %s: %v", appIdent, branch, err)
 		s.setOperationStatus(appIdent, "checkout", "failed", fmt.Sprintf("Checkout failed: %v", err))
@@ -420,14 +427,13 @@ func (s *Server) handleRemoveWorktree(w http.ResponseWriter, r *http.Request) {
 		respondBadRequest(w, "cannot remove the active or primary worktree")
 		return
 	}
-	if err := s.services.GitRepository().RemoveWorktree(appObj, branch); err != nil {
+	if err := s.runGitAction(appIdent, fmt.Sprintf("Remove worktree %s", branch), "git.worktree.remove", branch, func() error {
+		return s.services.GitRepository().RemoveWorktree(appObj, branch)
+	}); err != nil {
 		respondInternalError(w, err)
 		return
 	}
 	log.Printf("[INFO] Removed worktree for app %s branch %s", appIdent, branch)
-	if logger := s.services.Logger(); logger != nil {
-		_ = logger.LogStatus(appIdent, appIdent, logging.OpCheckout, logging.StatusCompleted, "Removed worktree "+branch)
-	}
 	respondJSON(w, map[string]interface{}{"success": true}, http.StatusOK)
 }
 
@@ -450,7 +456,15 @@ func (s *Server) handleCreateWorktree(w http.ResponseWriter, r *http.Request) {
 		respondNotFound(w, "App not found")
 		return
 	}
-	if _, err := s.services.GitRepository().AddWorktree(appObj, req.Branch); err != nil {
+	if _, err := func() (string, error) {
+		var path string
+		err := s.runGitAction(req.AppIdent, fmt.Sprintf("Create worktree %s", req.Branch), "git.worktree.create", req.Branch, func() error {
+			var inner error
+			path, inner = s.services.GitRepository().AddWorktree(appObj, req.Branch)
+			return inner
+		})
+		return path, err
+	}(); err != nil {
 		log.Printf("[ERROR] Failed to add worktree for app %s branch %s: %v", req.AppIdent, req.Branch, err)
 		respondInternalError(w, err)
 		return
@@ -460,9 +474,6 @@ func (s *Server) handleCreateWorktree(w http.ResponseWriter, r *http.Request) {
 	}
 	s.reloadAppConfig()
 	log.Printf("[INFO] Created worktree for app %s branch %s", req.AppIdent, req.Branch)
-	if logger := s.services.Logger(); logger != nil {
-		_ = logger.LogStatus(req.AppIdent, req.AppIdent, logging.OpCheckout, logging.StatusCompleted, "Created worktree "+req.Branch)
-	}
 	s.broadcastAppStatusWithBranch(req.AppIdent, req.Branch)
 	respondJSON(w, map[string]interface{}{"success": true, "appIdent": req.AppIdent, "branch": req.Branch}, http.StatusCreated)
 }
@@ -494,9 +505,6 @@ func (s *Server) handleSwitchWorktree(w http.ResponseWriter, r *http.Request) {
 	}
 	s.reloadAppConfig()
 	log.Printf("[INFO] Switched active worktree for app %s to branch %s", req.AppIdent, req.Branch)
-	if logger := s.services.Logger(); logger != nil {
-		_ = logger.LogStatus(req.AppIdent, req.AppIdent, logging.OpCheckout, logging.StatusCompleted, "Switched worktree to "+req.Branch)
-	}
 	s.broadcastAppStatusWithBranch(req.AppIdent, req.Branch)
 	respondJSON(w, map[string]interface{}{"success": true, "appIdent": req.AppIdent, "branch": req.Branch}, http.StatusOK)
 }

@@ -8,9 +8,9 @@ import type {
 	KubernetesClusterStatus,
 	ScriptNode,
 	ScriptVisibleRow,
-	StatusLogEntry,
 	TableRow,
 } from '@devenv/types';
+import { runtimeState } from '@devenv/ui';
 import type { TableTab } from '@devenv/ui';
 
 export type ViewMode =
@@ -31,7 +31,8 @@ export type ViewMode =
 	| "issueTimeline"
 	| "issueScopePicker"
 	| "changeRequestLinkedIssues"
-	| "references";
+	| "references"
+	| "actions";
 
 export interface ViewRoute {
 	mode: ViewMode;
@@ -46,7 +47,8 @@ export type TabType =
 	| "infrastructure"
 	| "libraries"
 	| "scripts"
-	| "kubernetes";
+	| "kubernetes"
+	| "ui-test";
 
 type TableSortKey = "status" | "git" | "name" | "interpreter" | "path" | "params";
 type TableSortDirection = "asc" | "desc" | "none";
@@ -59,6 +61,7 @@ export interface TableSortRule {
 export type StartupPhase =
 	| "connecting"
 	| "server-ready"
+	| "loading-action-registry"
 	| "loading-applications"
 	| "loading-infrastructure"
 	| "loading-scripts"
@@ -169,10 +172,7 @@ function folderPaths(nodes: ScriptNode[]): string[] {
 }
 
 function appStatusRank(app: TableRow): number {
-	if (app.operationStatus?.status === "active") return 0;
-	const status = (app.status || app.dockerInfo?.Status || "").toLowerCase();
-	if (status.includes("up") || status.includes("running") || status.includes("healthy")) return 0;
-	return 1;
+	return runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status) === "running" ? 0 : 1;
 }
 
 function appGitRank(app: TableRow): number {
@@ -223,7 +223,11 @@ function sortApps(items: TableRow[], rules: TableSortRule[]): TableRow[] {
 		.map(({ app }) => app);
 }
 
-export function createAppStore() {
+export function uiTestTabEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+	return env.DEVENV_UI_TEST === "true";
+}
+
+export function createAppStore(env: NodeJS.ProcessEnv = process.env) {
 	const [apps, setApps] = createSignal<App[]>([]);
 	const [infraServices, setInfraServices] = createSignal<InfraService[]>([]);
 	const [kubernetesClusterStatus, setKubernetesClusterStatus] = createSignal<KubernetesClusterStatus | null>(null);
@@ -290,9 +294,12 @@ export function createAppStore() {
 			const kept = stack.filter((route) => openSet.has(route.name));
 			const known = new Set(kept.map((route) => route.name));
 			const added = openModals.filter((name) => !known.has(name)).map((name) => ({ name }));
-			return [...kept, ...added];
+			const next = [...kept, ...added];
+			if (next.length === stack.length && next.every((route, index) => route.name === stack[index]?.name)) return stack;
+			return next;
 		});
 	};
+	const showUiTestTab = uiTestTabEnabled(env);
 	const [activeTab, setActiveTab] = createSignal<TabType>("applications");
 	const [selectedIndex, setSelectedIndex] = createSignal(0);
 	const [liveUpdatesActive, setLiveUpdatesActive] = createSignal(false);
@@ -312,7 +319,7 @@ export function createAppStore() {
 	const [tableFilterValueIndex, setTableFilterValueIndex] = createSignal(0);
 	const [tableFilterFocusedPane, setTableFilterFocusedPane] = createSignal<"parameter" | "value">("parameter");
 	const [tableFiltersByTab, setTableFiltersByTab] = createSignal<Record<TabType, Record<string, string[]>>>(
-		{ applications: {}, infrastructure: {}, libraries: {}, scripts: {}, kubernetes: {} },
+		{ applications: {}, infrastructure: {}, libraries: {}, scripts: {}, kubernetes: {}, "ui-test": {} },
 	);
 	const [showTableSortModal, setShowTableSortModal] = createSignal(false);
 	const [tableSortSelectedIndex, setTableSortSelectedIndex] = createSignal(0);
@@ -333,21 +340,13 @@ export function createAppStore() {
 		libraries: appSortRules(),
 		scripts: scriptSortRules(),
 		kubernetes: appSortRules(),
+		"ui-test": appSortRules(),
 	});
-	const [statusLogEntries, setStatusLogEntries] = createSignal<
-		StatusLogEntry[]
-	>([]);
-	const [statusLogSearchMode, setStatusLogSearchMode] = createSignal(false);
-	const [statusLogSearchQuery, setStatusLogSearchQuery] = createSignal("");
-	const [showStatusLogModal, setShowStatusLogModal] = createSignal(false);
-	const [statusLogSelectedIndex, setStatusLogSelectedIndex] = createSignal(-1);
-	let statusLogModalScrollBoxRef: import('@opentui/core').ScrollBoxRenderable | undefined;
 	const [operationInProgressForApp, setOperationInProgressForApp] =
 		createSignal<string | null>(null);
 	const hasActiveOperation = createMemo(() =>
 		apps().some((app) => app.operationStatus?.status === "active"),
 	);
-	const [spinnerFrame, setSpinnerFrame] = createSignal(0);
 	const [startupState, setStartupState] = createSignal<StartupState>({
 		phase: "connecting",
 		message: "Connecting to DevEnv server...",
@@ -393,12 +392,7 @@ export function createAppStore() {
 	);
 
 	const appFilterValue = (app: TableRow, key: string) => {
-		if (key === "status") {
-			const status = (app.status || app.dockerInfo?.Status || "not found").toLowerCase();
-			if (status.includes("up") || status.includes("running") || status.includes("healthy")) return "running";
-			if (status.includes("exit") || status.includes("stop")) return "exited";
-			return status;
-		}
+		if (key === "status") return runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status);
 		if (key === "git" && app.rowKind === "app") return appGitRank(app) === 0 ? "dirty" : app.gitStatus === "✓" ? "clean" : "unknown";
 		if (key === "provider" && app.rowKind === "app") return app.provider || app.sourceType || "unknown";
 		if (key === "interpreter" && app.rowKind === "script") return app.interpreter || (app.nodeType === "folder" ? "folder" : "unknown");
@@ -443,7 +437,7 @@ export function createAppStore() {
 		if (tab === "applications") return allApps.filter((app) => app.appType === "APP").map((app) => ({ ...app, rowKind: "app" as const }));
 		if (tab === "libraries") return allApps.filter((app) => app.appType === "LIB").map((app) => ({ ...app, rowKind: "app" as const }));
 		if (tab === "scripts") return scriptRows();
-		if (tab === "kubernetes") return [];
+		if (tab === "kubernetes" || tab === "ui-test") return [];
 		if (tab === "infrastructure") {
 			return infraServices().map((svc): TableRow => ({
 				rowKind: "infra",
@@ -455,6 +449,7 @@ export function createAppStore() {
 				containerBaseName: svc.containerBaseName || svc.ident,
 				dockerInfo: svc.dockerInfo,
 				operationStatus: svc.operationStatus,
+				runtimeStatus: svc.runtimeStatus,
 				status: svc.status,
 				type: svc.type,
 				shellPath: svc.shellPath,
@@ -528,6 +523,7 @@ export function createAppStore() {
 			},
 			{ id: "scripts", label: "Tasks", count: scriptVisibleRows().length },
 			{ id: "kubernetes", label: "Kubernetes", count: kubernetesClusterStatus()?.exists ? 1 : 0 },
+			...(showUiTestTab ? [{ id: "ui-test" as const, label: "UI Test" }] : []),
 		];
 	});
 
@@ -625,27 +621,9 @@ export function createAppStore() {
 		setTableSortSelectedIndex,
 		tableSortRules,
 		setTableSortRules,
-		statusLogEntries,
-		setStatusLogEntries,
-		statusLogSearchMode,
-		setStatusLogSearchMode,
-		statusLogSearchQuery,
-		setStatusLogSearchQuery,
-		showStatusLogModal,
-		setShowStatusLogModal,
-		statusLogSelectedIndex,
-		setStatusLogSelectedIndex,
-		get statusLogModalScrollBoxRef() {
-			return statusLogModalScrollBoxRef;
-		},
-		set statusLogModalScrollBoxRef(value: import('@opentui/core').ScrollBoxRenderable | undefined) {
-			statusLogModalScrollBoxRef = value;
-		},
 		operationInProgressForApp,
 		setOperationInProgressForApp,
 		hasActiveOperation,
-		spinnerFrame,
-		setSpinnerFrame,
 		scriptsTree,
 		setScriptsTree,
 		firstStepsDismissed,

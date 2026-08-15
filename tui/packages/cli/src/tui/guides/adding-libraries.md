@@ -20,7 +20,7 @@ Libraries support:
 - Docker build (`B`) and test
 - Full Change Request workflow
 - CI/CD pipeline jobs, logs, test results
-- Operation logs
+- Action history
 
 Libraries do **not** support running containers or container logs since they are not deployed as services.
 
@@ -56,4 +56,4 @@ RUN go test ./... -v
 - Use `s`/`S`/`R` is not available (no container lifecycle)
 - Use `B` to build the library
 - Use `m`/`M` for Change Request workflow
-- Use `l` for operation logs
+- Use uppercase `L` for action history and lowercase `l` for runtime logs

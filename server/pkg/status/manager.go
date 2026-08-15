@@ -146,20 +146,6 @@ func (sm *manager) SetStatus(appIdent string, operation OperationType, statusTyp
 		delete(sm.timers, appIdent)
 	}
 
-	// Log status update to file if logger is available
-	if sm.logger != nil {
-		appName := appIdent
-		if sm.appManager != nil {
-			appName = sm.appManager.GetDisplayName(appIdent)
-		}
-		go func() {
-			// Convert status types to logging package format
-			logStatusType := sm.convertStatusType(statusType)
-			logOpType := sm.convertOperationType(operation)
-			sm.logger.LogStatus(appIdent, appName, logOpType, logStatusType, message)
-		}()
-	}
-
 	// Notify listeners
 	for _, listener := range sm.listeners {
 		go listener.OnStatusUpdate(status)
@@ -225,9 +211,11 @@ func (sm *manager) StartOperation(appIdent string, operation OperationType) func
 		statusType := StatusActive
 
 		// Determine status type based on message content
+		lowerMessage := strings.ToLower(message)
 		if message == "completed" || message == "start successful" || message == "build successful" ||
-			strings.Contains(strings.ToLower(message), "completed") ||
-			strings.Contains(strings.ToLower(message), "successful") {
+			strings.Contains(lowerMessage, "completed") ||
+			strings.Contains(lowerMessage, "successful") ||
+			strings.Contains(lowerMessage, "stopped") {
 			statusType = StatusCompleted
 		} else if isErrorMessage(message) || strings.Contains(strings.ToLower(message), "failed") {
 			statusType = StatusFailed
@@ -288,23 +276,4 @@ func (sm *manager) GetOperationType(appIdent string) OperationType {
 		return ""
 	}
 	return status.Operation
-}
-
-func (sm *manager) convertStatusType(statusType StatusType) logging.StatusType {
-	switch statusType {
-	case StatusPending:
-		return logging.StatusPending
-	case StatusActive:
-		return logging.StatusInProgress
-	case StatusCompleted:
-		return logging.StatusCompleted
-	case StatusFailed:
-		return logging.StatusFailed
-	default:
-		return logging.StatusPending
-	}
-}
-
-func (sm *manager) convertOperationType(operation OperationType) logging.OperationType {
-	return logging.OperationType(string(operation))
 }

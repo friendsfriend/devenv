@@ -1,8 +1,9 @@
 import { getLogger } from '@devenv/core';
 import type { DevEnvClient } from '@devenv/core';
-import type { ScriptParameter, SshHost, StatusLogEntry, TableRow } from '@devenv/types';
+import type { ScriptParameter, SshHost, TableRow } from '@devenv/types';
 import { EDITOR_OPTIONS, type EditorChoice } from '@devenv/ui';
 import type { AppStore } from '../stores/app-store';
+import type { ActionRunStore } from '../stores/action-run-store';
 import type { AgentStore } from '../stores/agent-store';
 import type { UiStore } from '../stores/ui-store';
 import { formatDuration } from './task-status-utils';
@@ -81,9 +82,17 @@ export function createUtilActions(
   uiStore: UiStore,
   renderer: ReturnType<typeof import('@opentui/solid').useRenderer>,
   client: DevEnvClient,
+  actionRunStore: ActionRunStore,
 ) {
   const getSelectedApp = (): TableRow | undefined =>
     appStore.tableFilteredApps()[appStore.selectedIndex()] ?? appStore.filteredApps()[appStore.selectedIndex()];
+  let actionPersistenceQueue = Promise.resolve();
+  const reportActionEvent = (type: string, properties: Record<string, unknown>) => {
+    actionRunStore.handleEvent(type, properties);
+    actionPersistenceQueue = actionPersistenceQueue
+      .then(() => client.reportActionEvent(type, properties))
+      .catch((error) => getLogger().write('ERROR', `Failed to persist task action: ${error instanceof Error ? error.message : String(error)}`));
+  };
 
   const getTaskRowByRelativePath = (relativePath: string): TableRow | undefined => {
     const rows = [...appStore.tableFilteredApps(), ...appStore.filteredApps()];
@@ -334,6 +343,22 @@ export function createUtilActions(
     }
 
     getLogger().write('INFO', `Starting task ${app.scriptRelativePath || app.displayName}: ${[cmd, ...cmdArgs].join(' ')}`);
+    const runId = `task-${crypto.randomUUID()}`;
+    const stepId = `${runId}-step-0`;
+    const commandId = `${stepId}-command-0`;
+    const startedAt = new Date().toISOString();
+    reportActionEvent('action.started', { run: {
+      id: runId,
+      appIdent: app.ident,
+      action: 'task.run',
+      kind: 'task',
+      targetLabel: app.scriptRelativePath || app.displayName,
+      title: `Task ${app.scriptRelativePath || app.displayName}`,
+      status: 'active',
+      startedAt,
+      metadata: { arguments: taskArgs.join(' ') },
+      steps: [{ id: stepId, label: app.scriptRelativePath || app.displayName, status: 'active', startedAt, commands: [{ id: commandId, command: [cmd, ...cmdArgs].join(' '), status: 'active', stdout: '', stderr: '', startedAt }] }],
+    } });
 
     if (isTmuxSession()) {
       const windowName = app.displayName || path.basename(app.scriptPath);
@@ -343,24 +368,16 @@ export function createUtilActions(
       if (!result.success) {
         const message = result.error || 'tmux window could not be opened';
         getLogger().write('ERROR', `Task tmux launch failed for ${app.scriptRelativePath || app.displayName}: ${message}`);
+        reportActionEvent('action.command.failed', { runId, stepId, commandId, error: message });
+        reportActionEvent('action.step.failed', { runId, stepId, error: message });
+        reportActionEvent('action.completed', { runId, status: 'failed' });
         uiStore.showError('Task Launch Failed', `Failed to open tmux window: ${message}`);
         return false;
       }
       getLogger().write('INFO', `Task ${app.scriptRelativePath || app.displayName} opened in tmux window ${result.windowId || '(unknown)'}`);
-      // Push status log entry for tmux-launched task
-      const argsSummary = taskArgs.length > 0 ? taskArgs.join(' ') : '';
-      const taskName = app.scriptRelativePath || app.displayName;
-      const message = argsSummary ? `${taskName} ${argsSummary}` : taskName;
-      const entry: StatusLogEntry = {
-        Timestamp: new Date().toISOString(),
-        AppIdent: app.ident,
-        AppName: app.displayName,
-        Operation: 'task',
-        Status: 'completed',
-        Message: `${message} [launched]`,
-        source: 'task',
-      };
-      appStore.setStatusLogEntries(prev => [...prev, entry]);
+      reportActionEvent('action.command.completed', { runId, stepId, commandId });
+      reportActionEvent('action.step.completed', { runId, stepId });
+      reportActionEvent('action.completed', { runId, status: 'completed' });
       return true;
     }
 
@@ -373,21 +390,17 @@ export function createUtilActions(
       if (result.error) getLogger().write('ERROR', `Task execution failed for ${app.scriptRelativePath || app.displayName}: ${result.error.message}`);
       else getLogger().write('INFO', `Task ${app.scriptRelativePath || app.displayName} exited with ${result.status ?? 0}`);
 
-      // Build args summary and push status log entry
-      const argsSummary = taskArgs.length > 0 ? taskArgs.join(' ') : '';
-      const taskName = app.scriptRelativePath || app.displayName;
-      const message = argsSummary ? `${taskName} ${argsSummary}` : taskName;
-      const status = result.error ? 'error' : (result.status === 0 ? 'completed' : 'failed');
-      const entry: StatusLogEntry = {
-        Timestamp: new Date().toISOString(),
-        AppIdent: app.ident,
-        AppName: app.displayName,
-        Operation: 'task',
-        Status: status,
-        Message: `${message} [${formatDuration(taskDurationMs)}]`,
-        source: 'task',
-      };
-      appStore.setStatusLogEntries(prev => [...prev, entry]);
+      getLogger().write('INFO', `Task duration: ${formatDuration(taskDurationMs)}`);
+      const failed = Boolean(result.error) || result.status !== 0;
+      if (failed) {
+        const error = result.error?.message ?? `exit code ${result.status ?? -1}`;
+        reportActionEvent('action.command.failed', { runId, stepId, commandId, error });
+        reportActionEvent('action.step.failed', { runId, stepId, error });
+      } else {
+        reportActionEvent('action.command.completed', { runId, stepId, commandId });
+        reportActionEvent('action.step.completed', { runId, stepId });
+      }
+      reportActionEvent('action.completed', { runId, status: failed ? 'failed' : 'completed' });
 
       pauseUntilKeypress();
       return !result.error;

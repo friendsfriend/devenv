@@ -12,7 +12,6 @@ export { LogAiOverlay } from "./components/LogAiOverlay";
 export type { LogAiOverlayProps } from "./components/LogAiOverlay";
 export { CrAiReviewOverlay } from "./components/CrAiReviewOverlay";
 export type { CrAiReviewOverlayProps } from "./components/CrAiReviewOverlay";
-export { StatusLogView } from "./components/StatusLogView";
 export { IssueView } from "./components/IssueView";
 export { IssueDetailView } from "./components/IssueDetailView";
 export { IssueScopeModal, ISSUE_SCOPE_OPTIONS } from "./components/IssueScopeModal";
@@ -75,17 +74,22 @@ export { DetailSection } from "./components/DetailSection";
 export type { DetailSectionProps } from "./components/DetailSection";
 export { HighlightedText, highlightColor, highlightForIndex } from "./components/Highlight";
 export type { Highlight, HighlightedTextProps } from "./components/Highlight";
+export { InlineProgressAnimation, DEFAULT_INLINE_PROGRESS_HIGHLIGHTS } from "./components/InlineProgressAnimation";
+export type { InlineProgressAnimationProps, InlineProgressHighlights } from "./components/InlineProgressAnimation";
+export { AnimatedStatusText, statusAnimationIntentForOperation, statusAnimationIntentForText, statusAnimationModel } from "./components/AnimatedStatusText";
+export type { AnimatedStatusTextProps, StatusAnimationIntent, StatusAnimationModel } from "./components/AnimatedStatusText";
+export { TextTransitionAnimation } from "./components/TextTransitionAnimation";
+export type { TextTransitionAnimationProps } from "./components/TextTransitionAnimation";
+export { ProgressAnimationDemo, PROGRESS_ANIMATION_DEMO_LINES } from "./components/ProgressAnimationDemo";
 export { FilterStatusBar } from "./components/FilterStatusBar";
 export type { FilterStatusBarProps } from "./components/FilterStatusBar";
 export { Badge } from "./components/Badge";
 export type { BadgeProps } from "./components/Badge";
 export { MatchedText, splitMatches } from "./components/MatchedText";
 export type { MatchedTextProps } from "./components/MatchedText";
-export { StatusLogModal } from "./components/StatusLogModal";
-export type { StatusLogModalProps } from "./components/StatusLogModal";
 export { PropertiesList, propertyBadges } from "./components/PropertiesList";
 export type { PropertiesListProps, PropertyBadge, PropertyBadgeListValue, PropertyHighlight, PropertyLayout, PropertyRow, PropertyValue } from "./components/PropertiesList";
-export { KubernetesClusterView } from "./components/KubernetesClusterView";
+export { KubernetesClusterView, PanelBox } from "./components/KubernetesClusterView";
 export type { KubernetesClusterViewProps } from "./components/KubernetesClusterView";
 export { ResourceTimelineCharts } from "./components/ResourceTimelineCharts";
 export type { ResourceTimelineChartsProps, TimelineMetric } from "./components/ResourceTimelineCharts";
@@ -98,9 +102,9 @@ export { SshHostPickerView } from "./components/SshHostPickerView";
 export type { SshHostPickerViewProps } from "./components/SshHostPickerView";
 export { PassphraseModal } from "./components/PassphraseModal";
 export type { PassphraseModalProps } from "./components/PassphraseModal";
-export { ProfilePickerView } from "./components/ProfilePickerView";
+export { ProfilePickerView, formatProfileLabel } from "./components/ProfilePickerView";
 export type { ProfilePickerProps } from "./components/ProfilePickerView";
-export { ActionTargetPickerView } from "./components/ActionTargetPickerView";
+export { ActionTargetPickerView, formatActionTargetLabel } from "./components/ActionTargetPickerView";
 export type { ActionTargetPickerProps } from "./components/ActionTargetPickerView";
 export { DependencyTreeView, buildDependencyTree, expandNode } from "./components/DependencyTreeView";
 export type { DependencyNode, DependencyTreeViewProps } from "./components/DependencyTreeView";
@@ -127,7 +131,7 @@ export type { LayoutProps } from "./components/Layout";
 export type { ContentFrameProps, ContentStackProps, ContentPanelProps, GridLayoutProps, GridColumn } from "./components/ContentStack";
 export type { TableProps, TableColumn, TableTab } from "./components/Table";
 export type { LogViewProps } from "./components/LogView";
-export type { StatusLogViewProps } from "./components/StatusLogView";
+
 export type { HelpViewProps, HelpSection } from "./components/HelpView";
 export type { ConfirmDialogProps } from "./components/ConfirmDialog";
 export type {
@@ -155,6 +159,9 @@ export { MarkdownModal } from "./components/MarkdownModal";
 export {
 	getStatusStyle,
 	formatStatus,
+	formatRuntimeStatus,
+	runtimeState,
+	runtimeStatusText,
 	getGitStatusStyle,
 	formatGitStatus,
 	formatShortDate,
@@ -178,15 +185,6 @@ export {
 	LAYOUT_CHROME_LINES,
 } from "./components/ScrollableList";
 export type { ScrollableListProps } from "./components/ScrollableList";
-
-// Export Knight Rider spinner utilities
-export {
-	createFrames,
-	createColors,
-	deriveTrailColors,
-	deriveInactiveColor,
-} from "./spinner";
-export type { KnightRiderOptions, KnightRiderStyle } from "./spinner";
 
 // Export ANSI escape sequence utilities
 export { ansiToStyledText, stripAnsi } from "./ansiToStyledText";

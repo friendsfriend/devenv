@@ -3,6 +3,7 @@ import { For, Show, createMemo, type JSXElement } from 'solid-js';
 import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
+import { statusAnimationModel, type StatusAnimationIntent } from './AnimatedStatusText';
 import { Badge } from './Badge';
 import type { Highlight } from './Highlight';
 import { RunningText } from './RunningText';
@@ -15,6 +16,8 @@ export interface WorkItemCardProps {
   statusText: string;
   statusColor?: string;
   statusBadgeHighlight?: string;
+  statusAnimationIntent?: StatusAnimationIntent;
+  statusTransitionKey?: string;
   /** Replaces statusText/statusBadgeHighlight rendering when multiple status badges are needed. */
   statusBadges?: Array<{ text: string | number; highlight?: Highlight }>;
   metadata: string | JSXElement;
@@ -43,7 +46,7 @@ const MIN_TITLE_WIDTH = 12;
 export function WorkItemCard(props: WorkItemCardProps) {
   const dimensions = useTerminalDimensions();
   const contentWidth = () => Math.max(1, dimensions().width - 4);
-  const fixedPrefix = () => props.marker.length + 1 + (props.prefixBadge ? String(props.prefixBadge.text).length + 3 : (props.prefix?.length ?? 0));
+  const fixedPrefix = () => props.marker.length + 1 + (props.prefixBadge ? String(props.prefixBadge.text).length + 5 : (props.prefix?.length ?? 0));
 
   /** Row-internal content width — subtracts 1 for ScrollableList scrollbar. */
   const rowWidth = () => Math.max(1, contentWidth() - 1);
@@ -76,14 +79,14 @@ export function WorkItemCard(props: WorkItemCardProps) {
   const statusBadgesWidth = () => {
     const badges = props.statusBadges ?? [];
     if (badges.length === 0) return 0;
-    return badges.reduce((sum, badge) => sum + String(badge.text).length + 2, 0) + Math.max(0, badges.length - 1);
+    return badges.reduce((sum, badge) => sum + String(badge.text).length + 4, 0) + Math.max(0, badges.length - 1);
   };
 
   const statusRightWidth = () => {
     const badgesWidth = statusBadgesWidth();
     if (badgesWidth > 0) return badgesWidth;
     const status = statusDisplay();
-    const textWidth = props.statusBadgeHighlight && status.text ? status.text.length + 2 : status.text.length;
+    const textWidth = (props.statusAnimationIntent || props.statusBadgeHighlight) && status.text ? status.text.length + 4 : status.text.length;
     const suffixWidth = status.suffix.length;
     const gap = textWidth > 0 && suffixWidth > 0 ? 1 : 0;
     return textWidth + suffixWidth + gap;
@@ -104,7 +107,7 @@ export function WorkItemCard(props: WorkItemCardProps) {
   const metadataBadgesWidth = () => {
     const badges = props.metadataBadges ?? [];
     if (badges.length === 0) return 0;
-    return badges.reduce((sum, badge) => sum + String(badge.text).length + 2, 0) + Math.max(0, badges.length - 1);
+    return badges.reduce((sum, badge) => sum + String(badge.text).length + 4, 0) + Math.max(0, badges.length - 1);
   };
 
   const metadataRightWidth = () => {
@@ -120,6 +123,11 @@ export function WorkItemCard(props: WorkItemCardProps) {
     Math.max(1, rowWidth() - metadataRightWidth() - 1);
 
   const bgColor = () => props.selected ? uiColors.bgSurface0 : uiColors.bgMantle;
+  const statusAnimation = () => props.statusAnimationIntent ? statusAnimationModel(props.statusAnimationIntent) : undefined;
+  const statusHighlight = () => statusAnimation()?.tone
+    ?? statusAnimation()?.highlights?.[0]
+    ?? (props.statusBadgeHighlight as Highlight | undefined)
+    ?? 'primary';
 
   return (
     <box
@@ -176,13 +184,15 @@ export function WorkItemCard(props: WorkItemCardProps) {
             <box style={{ flexDirection: 'row', gap: 1, flexShrink: 0, marginLeft: 'auto' }}>
               <Show when={props.statusBadges && props.statusBadges.length > 0} fallback={
                 <>
-                  <Show when={props.statusBadgeHighlight} fallback={
-                    <text fg={props.statusColor} attributes={TextAttributes.BOLD}>
-                      {statusDisplay().text}
-                    </text>
-                  }>
-                    <Badge text={statusDisplay().text} highlight={props.statusBadgeHighlight as any} />
-                  </Show>
+                  <Badge
+                    text={statusDisplay().text}
+                    appearance={props.statusAnimationIntent || !props.statusBadgeHighlight ? 'text' : 'badge'}
+                    highlight={statusHighlight()}
+                    color={!props.statusAnimationIntent && !props.statusBadgeHighlight ? props.statusColor : undefined}
+                    animatedTone={statusAnimation()?.tone}
+                    animatedHighlights={statusAnimation()?.highlights}
+                    transitionKey={props.statusTransitionKey}
+                  />
                   <Show when={statusDisplay().suffix}>
                     <text fg={props.statusSuffixColor ?? props.statusColor} attributes={TextAttributes.BOLD}>
                       {statusDisplay().suffix}

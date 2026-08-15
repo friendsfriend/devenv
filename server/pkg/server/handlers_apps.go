@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -14,7 +12,6 @@ import (
 	"github.com/friendsfriend/devenv/pkg/docker"
 	"github.com/friendsfriend/devenv/pkg/github"
 	"github.com/friendsfriend/devenv/pkg/gitlab"
-	"github.com/friendsfriend/devenv/pkg/logging"
 	"github.com/friendsfriend/devenv/pkg/provider"
 )
 
@@ -74,20 +71,10 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 
 	for _, svc := range infraServices {
 		var dockerInfo *docker.Info
-		statusValue := svc.Status
-		logPath := svc.LogPath
-		executionHandle := svc.ExecutionHandle
-		if svc.Type == "" || svc.Type == app.InfraServiceTypeDocker {
-			if info, exists := dockerInfoMap[svc.Ident]; exists {
-				dockerInfo = &info
-				statusValue = strings.ToLower(info.Status)
-			}
-		} else if svc.Type == app.InfraServiceTypeScript {
-			statusValue, logPath = s.services.OperationsService().ScriptInfrastructureStatus(svc.Ident)
-			executionHandle = s.services.OperationsService().ScriptInfrastructureExecutionHandle(svc.Ident)
-		} else if svc.Type == app.InfraServiceTypeKubernetes {
-			statusValue = s.services.OperationsService().KubernetesInfrastructureStatus(svc)
+		if info, exists := dockerInfoMap[svc.Ident]; exists {
+			dockerInfo = &info
 		}
+		snapshot := s.resolveInfrastructureStatus(svc, dockerInfo)
 
 		s.opStatusMu.RLock()
 		opStatus := s.opStatus[svc.Ident]
@@ -95,17 +82,20 @@ func (s *Server) handleGetInfraServices(w http.ResponseWriter, r *http.Request) 
 
 		responses = append(responses, InfraServiceResponse{
 			Ident:             svc.Ident,
+			ResourceID:        svc.Ident,
+			ResourceKind:      "infrastructure",
 			DisplayName:       svc.DisplayName,
 			Type:              svc.Type,
 			ContainerBaseName: svc.GetContainerBaseName(),
-			DockerInfo:        dockerInfo,
-			Status:            statusValue,
-			LogPath:           logPath,
+			DockerInfo:        snapshot.dockerInfo,
+			RuntimeStatus:     &snapshot.runtimeStatus,
+			Status:            snapshot.runtimeStatus.String(),
+			LogPath:           snapshot.logPath,
 			ShellPath:         svc.ShellPath,
 			PowerShellPath:    svc.PowerShellPath,
 			DefaultRunner:     svc.DefaultRunner,
 			OperationStatus:   opStatus,
-			ExecutionHandle:   executionHandle,
+			ExecutionHandle:   snapshot.executionHandle,
 		})
 	}
 
@@ -126,7 +116,9 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 	appAdapters := make([]docker.App, 0, len(s.apps))
 	for idx := range s.apps {
-		appAdapters = append(appAdapters, &appAdapter{app: &s.apps[idx]})
+		if s.apps[idx].AppType == app.TypeAPP {
+			appAdapters = append(appAdapters, &appAdapter{app: &s.apps[idx]})
+		}
 	}
 
 	dockerInfoMap, err := dockerClient.BatchGetInfo(appAdapters, nil)
@@ -138,20 +130,32 @@ func (s *Server) handleGetStatus(w http.ResponseWriter, r *http.Request) {
 
 	statuses := make([]AppStatusResponse, 0, len(s.apps))
 	for _, a := range s.apps {
-		dockerInfo := dockerInfoMap[a.Ident]
+		var dockerInfo *docker.Info
+		observedDocker := docker.Info{Status: "not found"}
+		if info, ok := dockerInfoMap[a.Ident]; ok {
+			dockerInfo = &info
+			observedDocker = info
+		}
 		gitStatus := gitRepo.GetStatus(&appAdapter{app: &a})
 		currentBranch := gitRepo.GetCurrentBranch(&appAdapter{app: &a})
 		opStatus := s.getOperationStatus(a.Ident)
 
-		appRunStatus := s.appRuntimeStatus(a.Ident, dockerInfo)
+		appRunStatus := s.appRuntimeStatus(a, observedDocker)
+		legacyStatus := ""
+		if appRunStatus != nil {
+			legacyStatus = appRunStatus.String()
+		}
 		resp := AppStatusResponse{
 			Ident:           a.Ident,
-			DockerInfo:      &dockerInfo,
+			ResourceID:      a.Ident,
+			ResourceKind:    appResourceKind(a),
+			DockerInfo:      dockerInfo,
 			GitStatus:       gitStatus,
 			Branch:          currentBranch,
 			ActiveWorktree:  a.ActiveWorktree,
 			OperationStatus: opStatus,
-			Status:          appRunStatus,
+			RuntimeStatus:   appRunStatus,
+			Status:          legacyStatus,
 		}
 		if s.services != nil && s.services.BuildService() != nil {
 			if info, ok := s.services.BuildService().RunTargetInfo(a.Ident); ok {
@@ -209,225 +213,6 @@ func (s *Server) handleGetGitInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, info, http.StatusOK)
-}
-
-// handleOperationLogs fetches operation logs for a specific app
-func (s *Server) handleOperationLogs(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	// Extract app ident from URL path
-	// URL format: /api/logs/operation/{appIdent}?limit=100
-	path := r.URL.Path
-	prefix := "/api/logs/operation/"
-	if !strings.HasPrefix(path, prefix) {
-		respondBadRequest(w, "Invalid path")
-		return
-	}
-
-	appIdent := path[len(prefix):]
-	if appIdent == "" {
-		respondBadRequest(w, "App ident required")
-		return
-	}
-
-	// Get limit from query parameters (default 100)
-	limit := 100
-	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-		if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
-			respondBadRequest(w, "Invalid limit parameter")
-			return
-		}
-	}
-
-	debugLog("Operation logs request: appIdent=%s, limit=%d", appIdent, limit)
-
-	// Put current temp action log first. It contains live full command/output and the
-	// latest failure should be visible immediately in operation log view.
-	var logs string
-	if path, ok := s.services.BuildService().ActiveOperationLogPath(appIdent); ok {
-		if content, readErr := os.ReadFile(path); readErr == nil && len(content) > 0 {
-			logs += "Active action command log\n=========================\n" + string(content)
-		}
-	} else if path, ok := s.services.OperationsService().ActiveOperationLogPath(appIdent); ok {
-		if content, readErr := os.ReadFile(path); readErr == nil && len(content) > 0 {
-			logs += "Active action command log\n=========================\n" + string(content)
-		}
-	}
-
-	persistentLogs, err := s.services.Logger().ReadAppLogs(appIdent, limit)
-	if err != nil {
-		log.Printf("[ERROR] Failed to fetch operation logs: %v", err)
-		respondErrorMessage(w, fmt.Sprintf("Failed to fetch operation logs: %v", err), http.StatusInternalServerError)
-		return
-	}
-	if persistentLogs != "" {
-		if logs != "" {
-			logs += "\n"
-		}
-		logs += "Persistent operation log\n========================\n" + persistentLogs
-	}
-
-	if logs == "" {
-		logs = fmt.Sprintf("No operation logs found for %s", appIdent)
-	}
-
-	debugLog("Successfully fetched %d bytes of operation logs", len(logs))
-
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(logs))
-}
-
-// handleStatusLog fetches recent status log entries (GET) or appends a new entry (POST).
-func (s *Server) handleActionLog(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	appIdent := strings.TrimPrefix(r.URL.Path, "/api/logs/action/")
-	if appIdent == "" {
-		respondBadRequest(w, "App ident required")
-		return
-	}
-
-	path, ok := s.services.BuildService().ActiveOperationLogPath(appIdent)
-	if !ok {
-		path, ok = s.services.OperationsService().ActiveOperationLogPath(appIdent)
-	}
-	if !ok {
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte("No active action log found for " + appIdent))
-		return
-	}
-	content, err := os.ReadFile(path)
-	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("Failed to read action log: %v", err), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write(content)
-}
-
-func (s *Server) handleLogHistory(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	rawPath := strings.TrimPrefix(r.URL.Path, "/api/logs/history/")
-	parts := strings.SplitN(rawPath, "/", 2)
-	if len(parts) != 2 || parts[1] == "" {
-		respondBadRequest(w, "Log type and app ident required")
-		return
-	}
-	logType, appIdent := parts[0], parts[1]
-
-	limit := 1000
-	if raw := r.URL.Query().Get("limit"); raw != "" {
-		if _, err := fmt.Sscanf(raw, "%d", &limit); err != nil || limit < 1 {
-			respondBadRequest(w, "Invalid limit parameter")
-			return
-		}
-	}
-	before := int64(0)
-	if raw := r.URL.Query().Get("before"); raw != "" {
-		if _, err := fmt.Sscanf(raw, "%d", &before); err != nil || before < 0 {
-			respondBadRequest(w, "Invalid before parameter")
-			return
-		}
-	}
-
-	var (
-		lines      []string
-		nextBefore int64
-		hasMore    bool
-		err        error
-	)
-
-	switch logType {
-	case "action", "operation", "script":
-		// action, operation, and script infra logs are all file-backed in {homeDir}/logs/{appIdent}.log
-		lines, nextBefore, hasMore, err = s.services.Logger().ReadAppLogHistory(appIdent, before, limit)
-	case "status":
-		statusLogPath := filepath.Join(s.services.HomeDir(), "logs", "status.log")
-		lines, nextBefore, hasMore, err = logging.ReadLinesBefore(statusLogPath, before, limit)
-	default:
-		respondBadRequest(w, "Unsupported log history type")
-		return
-	}
-
-	if err != nil {
-		respondErrorMessage(w, fmt.Sprintf("Failed to read log history: %v", err), http.StatusInternalServerError)
-		return
-	}
-	respondJSON(w, map[string]interface{}{
-		"lines":      lines,
-		"nextBefore": nextBefore,
-		"hasMore":    hasMore,
-	}, http.StatusOK)
-}
-
-func (s *Server) handleStatusLog(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		// Get limit from query parameters (default 50)
-		limit := 50
-		if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
-			if _, err := fmt.Sscanf(limitStr, "%d", &limit); err != nil {
-				respondBadRequest(w, "Invalid limit parameter")
-				return
-			}
-		}
-
-		entries, err := s.services.Logger().ReadRecentLogEntries(limit)
-		if err != nil {
-			log.Printf("[ERROR] Failed to fetch status log: %v", err)
-			respondErrorMessage(w, fmt.Sprintf("Failed to fetch status log: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"entries": entries,
-		})
-
-	case http.MethodPost:
-		var body struct {
-			AppIdent  string `json:"appIdent"`
-			AppName   string `json:"appName"`
-			Operation string `json:"operation"`
-			Status    string `json:"status"`
-			Message   string `json:"message"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			respondBadRequest(w, "Invalid request body")
-			return
-		}
-		if body.AppIdent == "" || body.Operation == "" || body.Status == "" {
-			respondBadRequest(w, "appIdent, operation, and status are required")
-			return
-		}
-
-		if err := s.services.Logger().LogStatus(
-			body.AppIdent,
-			body.AppName,
-			logging.OperationType(body.Operation),
-			logging.StatusType(body.Status),
-			body.Message,
-		); err != nil {
-			log.Printf("[ERROR] Failed to write status log entry: %v", err)
-			respondErrorMessage(w, fmt.Sprintf("Failed to write status log entry: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusNoContent)
-
-	default:
-		respondMethodNotAllowed(w)
-	}
 }
 
 // handleProviders handles CRUD operations for git provider credentials.

@@ -18,7 +18,6 @@ import (
 	"time"
 
 	"github.com/friendsfriend/devenv/pkg/resources"
-	"github.com/friendsfriend/devenv/pkg/status"
 )
 
 type ScriptNode struct {
@@ -439,12 +438,11 @@ func (s *Server) handleExecuteScript(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opIdent := "script:" + scriptFile.RelativePath
-	statusCb := s.services.StatusManager().StartOperation(opIdent, status.OpScript)
-	statusCb(fmt.Sprintf("running %s...", scriptFile.RelativePath))
-
-	runErr, output := s.services.Executor().RunCommandWithLogging(opIdent, plan.Command, plan.Args, []string{}, plan.WorkingDir)
+	command := strings.Join(append([]string{plan.Command}, plan.Args...), " ")
+	runErr, output := s.runScriptAction(opIdent, "Run task "+scriptFile.RelativePath, command, func() (error, string, string) {
+		return s.services.Executor().RunCommandDetailed(opIdent, plan.Command, plan.Args, []string{}, plan.WorkingDir)
+	})
 	if runErr != nil {
-		statusCb("Error: " + runErr.Error())
 		respondJSON(w, executeScriptResponse{
 			Success:      false,
 			RelativePath: scriptFile.RelativePath,
@@ -454,7 +452,6 @@ func (s *Server) handleExecuteScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	statusCb("completed")
 	respondJSON(w, executeScriptResponse{
 		Success:      true,
 		RelativePath: scriptFile.RelativePath,

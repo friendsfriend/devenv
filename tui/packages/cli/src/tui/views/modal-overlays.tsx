@@ -28,16 +28,17 @@ import {
 	AssigneePickerModal,
 	FilterModal,
 	SortModal,
-	StatusLogModal,
 	HelpView,
 	ThemePickerView,
 	ProvidersView,
+	AnimatedStatusText,
 	themeNames,
 	uiColors,
 } from '@devenv/ui';
 import type { ModalOverlaysProps } from "./types";
 import { FirstStepsView } from "./first-steps-view";
 import { getGuide, guides as allGuides } from "../guides";
+import { ActionRunModal } from './action-run-modal';
 
 export function ModalOverlays(props: ModalOverlaysProps) {
 	const {
@@ -53,6 +54,9 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 
 	return (
 		<>
+			<Show when={appStore.activeModal() === "actions"}>
+				<ActionRunModal store={props.stores.actionRunStore} onClose={() => appStore.popModal("actions")} />
+			</Show>
 			<Show when={appStore.viewMode() === "providers"}>
 				<ProvidersView
 					providers={providerStore.providers()}
@@ -534,12 +538,7 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 							gap: 1,
 						}}
 					>
-						<text fg={uiColors.primary}>
-							{props.spinnerFrames[appStore.spinnerFrame()]}
-						</text>
-						<text fg={uiColors.textPrimary}>
-							{uiStore.loadingModalMessage()}
-						</text>
+						<AnimatedStatusText text={uiStore.loadingModalMessage()} intent="load" backgroundColor={uiColors.bgBase} />
 					</box>
 				</box>
 			</Show>
@@ -638,16 +637,6 @@ export function ModalOverlays(props: ModalOverlaysProps) {
 				/>
 			</Show>
 
-			<Show when={appStore.showStatusLogModal()}>
-				<StatusLogModal
-					entries={appStore.statusLogEntries()}
-					searchMode={appStore.statusLogSearchMode()}
-					searchQuery={appStore.statusLogSearchQuery()}
-					selectedIndex={appStore.statusLogSelectedIndex()}
-					onScrollBoxReady={(sb) => { appStore.statusLogModalScrollBoxRef = sb; }}
-					onClose={() => appStore.setShowStatusLogModal(false)}
-				/>
-			</Show>
 
 			<Show when={changeRequestStore.crAiVisible()}>
 				<CrAiReviewOverlay

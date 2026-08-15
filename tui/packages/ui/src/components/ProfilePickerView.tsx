@@ -5,6 +5,8 @@ import { ListViewModal } from './ListViewModal';
 import { formatHelpText } from './HelpText';
 import { highlightColor } from './Highlight';
 
+export const formatProfileLabel = (profile?: string) => profile?.trim() || 'default (no profile)';
+
 export interface ProfilePickerProps {
   profiles: string[];
   hasDockerfile: boolean;
@@ -44,7 +46,7 @@ export function ProfilePickerView(props: ProfilePickerProps) {
   const allOptions = (): string[] => {
     const opts: string[] = [];
     if (props.hasDockerfile) {
-      opts.push('default (no profile)');
+      opts.push(formatProfileLabel());
     }
     opts.push(...props.profiles);
     return opts;

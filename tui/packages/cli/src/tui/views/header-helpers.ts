@@ -1,4 +1,4 @@
-import { uiColors } from '@devenv/ui';
+import { runtimeState, uiColors } from '@devenv/ui';
 import type { App, InfraService } from '@devenv/types';
 import type { AppStore, AppDetailStore, IssueStore, ChangeRequestStore } from "../stores";
 import type { HelpActions } from "../actions";
@@ -8,7 +8,8 @@ export type TabType =
 	| "infrastructure"
 	| "libraries"
 	| "scripts"
-	| "kubernetes";
+	| "kubernetes"
+	| "ui-test";
 
 export const getTabName = (tab: TabType): string => {
 	switch (tab) {
@@ -22,12 +23,14 @@ export const getTabName = (tab: TabType): string => {
 			return "Tasks";
 		case "kubernetes":
 			return "Kubernetes";
+		case "ui-test":
+			return "UI Test";
 	}
 };
 
 function hasRunningAppInTab(tab: TabType, appStore: AppStore): boolean {
 	const allApps = appStore.apps();
-	if (tab === "scripts") return false;
+	if (tab === "scripts" || tab === "ui-test") return false;
 	if (tab === "kubernetes") return appStore.kubernetesClusterStatus()?.state === "running";
 
 	const appsInTab: (App | InfraService)[] =
@@ -37,10 +40,7 @@ function hasRunningAppInTab(tab: TabType, appStore: AppStore): boolean {
 				? allApps.filter((app) => app.appType === "LIB")
 				: appStore.infraServices();
 
-	return appsInTab.some((app) => {
-		const status = (app.status ? app.status : app.dockerInfo?.Status)?.toLowerCase();
-		return status === "running" || status === "up";
-	});
+	return appsInTab.some((app) => runtimeState(app.runtimeStatus, app.status || app.dockerInfo?.Status) === "running");
 }
 
 export function getTabBorderColor(tab: TabType, appStore: AppStore): string {

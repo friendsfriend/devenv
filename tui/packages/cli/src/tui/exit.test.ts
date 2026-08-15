@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { __resetExitForTests, exitApp, registerGracefulShutdownHandler, setExitRenderer } from './exit';
+import { __resetExitForTests, confirmExitApp, exitApp, registerExitGuard, registerGracefulShutdownHandler, setExitRenderer } from './exit';
 
 afterEach(() => {
   __resetExitForTests();
@@ -14,6 +14,26 @@ describe('exitApp', () => {
 
     expect(destroyed).toBe(1);
     expect(process.exitCode).toBe(0);
+  });
+
+  test('blocks graceful shutdown when exit guard rejects', async () => {
+    let runs = 0;
+    registerExitGuard(() => false);
+    registerGracefulShutdownHandler(() => { runs += 1; });
+
+    await exitApp();
+
+    expect(runs).toBe(0);
+  });
+
+  test('confirmed exit bypasses guard', async () => {
+    let runs = 0;
+    registerExitGuard(() => false);
+    registerGracefulShutdownHandler(() => { runs += 1; });
+
+    await confirmExitApp();
+
+    expect(runs).toBe(1);
   });
 
   test('runs registered graceful shutdown once for duplicate exits', async () => {

@@ -8,10 +8,7 @@ function getProviderIcon(app: TableRow): string {
   return '?';
 }
 
-/**
- * Creates table column definitions for the main app table.
- * The spinner columns need reactive access to spinnerFrames and the current frame index.
- */
+/** Creates table column definitions for the main app table. */
 export function createColumns(): TableColumn[] {
   return [
     {

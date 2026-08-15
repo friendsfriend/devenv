@@ -137,15 +137,30 @@ func kubernetesActionTarget(appIdent string, cfg KubernetesRunTargetConfig, sour
 	if label == "" {
 		label = fmt.Sprintf("Kubernetes %s", profile)
 	}
+	provider := cfg.Provider
+	if provider == "" {
+		provider = ContainerProviderDocker
+	}
+	clusterName := cfg.Cluster
+	if clusterName == "" {
+		clusterName = "devenv"
+	}
+	contextName := cfg.Context
+	if contextName == "" {
+		contextName = "kind-" + clusterName
+	}
 	return ActionTarget{
 		ID:         actionTargetID(appIdent, AppActionRun, ActionRuntimeKubernetes, profile),
+		Provider:   provider,
 		Action:     AppActionRun,
 		Runtime:    ActionRuntimeKubernetes,
 		Label:      label,
 		Profile:    profile,
 		SourcePath: sourcePath,
 		Requires:   cfg.Requires,
-		Kubernetes: &KubernetesTargetMetadata{ChartPath: cfg.Chart.Path, Release: cfg.Release, Namespace: cfg.Namespace, ValuesFiles: values, Image: cfg.Image, Secrets: secrets, Ports: cfg.Ports, Wait: cfg.Wait, SourcePath: sourcePath},
+		Exports:    cfg.Exports,
+		Bindings:   cfg.Bindings,
+		Kubernetes: &KubernetesTargetMetadata{Provider: provider, ClusterName: clusterName, ContextName: contextName, ChartPath: cfg.Chart.Path, Release: cfg.Release, Namespace: cfg.Namespace, ValuesFiles: values, Image: cfg.Image, Secrets: secrets, Ports: cfg.Ports, Wait: cfg.Wait, Exports: cfg.Exports, Bindings: cfg.Bindings, SourcePath: sourcePath},
 	}
 }
 

@@ -34,7 +34,10 @@ export function FilterModal(props: FilterModalProps) {
 	return (
 		<GenericModal
 			title="Filter"
-			helpText="h/l focus • j/k move • Space toggle • x clear all • Enter apply • Esc close"
+			helpText={[
+			{ key: 'h/l', action: 'Focus' }, { key: 'j/k', action: 'Move' }, { key: 'Space', action: 'Toggle' },
+			{ key: 'x', action: 'Clear all' }, { key: 'Enter', action: 'Apply' }, { key: 'Esc', action: 'Close' },
+		]}
 			widthPercent={0.7}
 			heightPercent={0.65}
 		>

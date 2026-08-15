@@ -34,6 +34,15 @@ const (
 	ActionRuntimeKubernetes  ActionRuntime = "kubernetes"
 )
 
+// ContainerProvider identifies a Docker-compatible engine used by a target.
+// It is distinct from ActionRuntimeDocker, which identifies a Compose target.
+type ContainerProvider string
+
+const (
+	ContainerProviderDocker ContainerProvider = "docker"
+	ContainerProviderPodman ContainerProvider = "podman"
+)
+
 // LaunchMode identifies how a shell action target launches.
 type LaunchMode string
 
@@ -43,22 +52,49 @@ const (
 )
 
 // ActionTarget is normalized action target data for clients.
+type EndpointExport struct {
+	Name      string `json:"name"`
+	Protocol  string `json:"protocol"`
+	Host      string `json:"host,omitempty"`
+	Port      int    `json:"port"`
+	Strategy  string `json:"strategy"`
+	Resource  string `json:"resource,omitempty"`
+	LocalPort int    `json:"localPort,omitempty"`
+	Readiness string `json:"readiness,omitempty"`
+}
+
+type EndpointBinding struct {
+	Name        string `json:"name"`
+	Dependency  string `json:"dependency,omitempty"`
+	Export      string `json:"export"`
+	Destination string `json:"destination"`
+	ValuePath   string `json:"valuePath,omitempty"`
+}
+
 type ActionTarget struct {
 	ID         string                    `json:"id"`
 	Action     AppAction                 `json:"action"`
 	Runtime    ActionRuntime             `json:"runtime"`
 	Label      string                    `json:"label"`
 	Profile    string                    `json:"profile,omitempty"`
+	Provider   ContainerProvider         `json:"provider,omitempty"`
+	Env        map[string]string         `json:"env,omitempty"`
 	LaunchMode LaunchMode                `json:"launchMode,omitempty"`
 	SourcePath string                    `json:"sourcePath"`
+	WorkingDir string                    `json:"workingDir,omitempty"`
 	Command    string                    `json:"command,omitempty"`
 	Args       []string                  `json:"args,omitempty"`
 	Requires   []DependencyRef           `json:"requires,omitempty"`
+	Exports    []EndpointExport          `json:"exports,omitempty"`
+	Bindings   []EndpointBinding         `json:"bindings,omitempty"`
 	Kubernetes *KubernetesTargetMetadata `json:"kubernetes,omitempty"`
 }
 
 // KubernetesTargetMetadata contains redacted Kubernetes target explanation data.
 type KubernetesTargetMetadata struct {
+	Provider    ContainerProvider             `json:"provider,omitempty"`
+	ClusterName string                        `json:"clusterName,omitempty"`
+	ContextName string                        `json:"contextName,omitempty"`
 	ChartPath   string                        `json:"chartPath"`
 	Release     string                        `json:"release"`
 	Namespace   string                        `json:"namespace"`
@@ -67,6 +103,8 @@ type KubernetesTargetMetadata struct {
 	Secrets     []KubernetesSecretSummary     `json:"secrets,omitempty"`
 	Ports       []KubernetesPortForwardConfig `json:"ports,omitempty"`
 	Wait        KubernetesWaitConfig          `json:"wait,omitempty"`
+	Exports     []EndpointExport              `json:"exports,omitempty"`
+	Bindings    []EndpointBinding             `json:"bindings,omitempty"`
 	SourcePath  string                        `json:"sourcePath"`
 }
 
@@ -77,10 +115,12 @@ type KubernetesSecretSummary struct {
 
 // DependencyRef identifies app run or infrastructure dependency.
 type DependencyRef struct {
-	App     string `json:"app,omitempty"`
-	Runtime string `json:"runtime,omitempty"`
-	Profile string `json:"profile,omitempty"`
-	Infra   string `json:"infra,omitempty"`
+	App       string            `json:"app,omitempty"`
+	Runtime   string            `json:"runtime,omitempty"`
+	Profile   string            `json:"profile,omitempty"`
+	Provider  ContainerProvider `json:"provider,omitempty"`
+	Lifecycle string            `json:"lifecycle,omitempty"`
+	Infra     string            `json:"infra,omitempty"`
 }
 
 type shellScriptMetadata struct {
@@ -242,7 +282,7 @@ func (m *manager) discoverRootBuildToolTargets(appIdent, localDir string, action
 			if action == AppActionRun {
 				mode = LaunchModeTmux
 			}
-			targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: candidate.label, LaunchMode: mode, SourcePath: path, Command: candidate.command, Args: candidate.args})
+			targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: candidate.label, Profile: profile, LaunchMode: mode, SourcePath: path, Command: candidate.command, Args: candidate.args})
 			break
 		}
 	}
@@ -259,7 +299,7 @@ func (m *manager) discoverLanguageBuildToolTargets(appIdent, localDir string, ac
 		if action == AppActionRun {
 			mode = LaunchModeTmux
 		}
-		targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: label, LaunchMode: mode, SourcePath: sourcePath, Command: command, Args: args})
+		targets = append(targets, ActionTarget{ID: actionTargetID(appIdent, action, ActionRuntimeShell, profile), Action: action, Runtime: ActionRuntimeShell, Label: label, Profile: profile, LaunchMode: mode, SourcePath: sourcePath, Command: command, Args: args})
 	}
 
 	packageJSON := filepath.Join(localDir, "package.json")

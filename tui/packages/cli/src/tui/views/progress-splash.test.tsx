@@ -1,3 +1,4 @@
+/** @jsxImportSource @opentui/solid */
 import { describe, expect, test } from 'bun:test';
 import { testRender } from '@opentui/solid';
 import { StartupSplash } from './startup-splash';
@@ -15,7 +16,7 @@ describe('lifecycle splash rendering', () => {
       { phase: 'server-ready', message: 'Loading initial data...', error: null },
       { phase: 'idle', message: '', error: null },
     );
-    const view = await testRender(() => <StartupSplash appStore={store} spinnerFrames={['*']} spinnerFrame={() => 0} />, { width: 100, height: 30 });
+    const view = await testRender(() => <StartupSplash appStore={store} />, { width: 100, height: 30 });
     await view.renderOnce();
     const frame = view.captureCharFrame();
     view.renderer.destroy();
@@ -23,7 +24,7 @@ describe('lifecycle splash rendering', () => {
     expect(frame).toContain('DevEnv Startup');
     expect(frame).toContain('Loading initial data...');
     expect(frame).toContain('✓ Connecting to server');
-    expect(frame).toContain('* Server ready');
+    expect(frame).toContain('Server ready');
   });
 
   test('shutdown splash uses same status row styling with shutdown copy', async () => {
@@ -31,7 +32,7 @@ describe('lifecycle splash rendering', () => {
       { phase: 'complete', message: 'Ready', error: null },
       { phase: 'stopping-input', message: 'Stopping input handlers...', error: null },
     );
-    const view = await testRender(() => <ShutdownSplash appStore={store} spinnerFrames={['*']} spinnerFrame={() => 0} />, { width: 100, height: 30 });
+    const view = await testRender(() => <ShutdownSplash appStore={store} />, { width: 100, height: 30 });
     await view.renderOnce();
     const frame = view.captureCharFrame();
     view.renderer.destroy();
@@ -40,6 +41,6 @@ describe('lifecycle splash rendering', () => {
     expect(frame).toContain('Stopping input handlers...');
     expect(frame).toContain('✓ Preparing shutdown');
     expect(frame).toContain('✓ Canceling background work');
-    expect(frame).toContain('* Stopping input');
+    expect(frame).toContain('Stopping input');
   });
 });

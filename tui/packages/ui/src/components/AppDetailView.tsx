@@ -2,6 +2,7 @@
 import { TextAttributes } from '@opentui/core';
 import { Show, For } from 'solid-js';
 import { uiColors } from '../colors';
+import { runtimeStatusText, runtimeState } from '../statusUtils';
 import { ContentFrame } from './ContentStack';
 import { DetailSection } from './DetailSection';
 import type { ActionTarget, App, ChangeRequest, ContainerStats } from '@devenv/types';
@@ -75,13 +76,14 @@ export function AppDetailView(props: AppDetailViewProps) {
     return '';
   };
   const runTargetLabel = () => props.app.runTargetInfo?.display;
-  const statusText = () => props.app.status || props.app.dockerInfo?.Status || 'unknown';
+  const statusText = () => runtimeStatusText(props.app.runtimeStatus) || props.app.status || props.app.dockerInfo?.Status || 'unknown';
   const statusHighlight = (status: string) => {
-    const normalized = status.toLowerCase();
-    if (normalized.includes('running') || normalized.includes('healthy') || normalized === 'up') return 'positive' as const;
-    if (normalized.includes('error') || normalized.includes('failed') || normalized.includes('exited') || normalized.includes('dead')) return 'negative' as const;
-    if (normalized.includes('starting') || normalized.includes('restarting') || normalized.includes('warning')) return 'warning' as const;
-    return 'secondary' as const;
+    switch (runtimeState(props.app.runtimeStatus, status)) {
+      case 'running': return 'positive' as const;
+      case 'failed': return 'negative' as const;
+      case 'starting': return 'warning' as const;
+      default: return 'secondary' as const;
+    }
   };
   const gitStatusHighlight = () => {
     if (!props.gitInfo) return 'warning' as const;

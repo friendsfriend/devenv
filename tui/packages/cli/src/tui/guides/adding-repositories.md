@@ -82,7 +82,7 @@ x-devenv:
   requires: [{"infra":"postgres"},{"app":"api","runtime":"systemshell","profile":"dev"}]
 services:
   my-service:
-    image: my-service:latest
+    image: devenv-my-service:latest
     ports:
       - "3000:3000"
     env_file:

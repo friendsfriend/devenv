@@ -3,7 +3,7 @@ import type { DevEnvClient } from '@devenv/core';
 
 type LogEffectStore = {
   logRefreshParams: () => {
-    type: 'container' | 'kubernetes' | 'operation' | 'action' | 'job' | null;
+    type: 'container' | 'kubernetes' | 'job' | null;
     containerID?: string;
     appIdent?: string;
     jobId?: number;
@@ -92,11 +92,7 @@ export function setupLogEffects(logStore: LogEffectStore, client: DevEnvClient) 
       if (inFlight) return;
       inFlight = true;
       try {
-        if (params.type === 'operation' && params.appIdent) {
-          updatePolledLogs(await client.getOperationLogs(params.appIdent, 1000));
-        } else if (params.type === 'action' && params.appIdent) {
-          updatePolledLogs(await client.getActionLog(params.appIdent));
-        } else if (params.type === 'kubernetes' && params.appIdent) {
+        if (params.type === 'kubernetes' && params.appIdent) {
           updatePolledLogs(await client.getKubernetesLogs(params.appIdent));
         } else if (params.type === 'job' && params.jobId) {
           updatePolledLogs(await client.getJobLogs(params.appIdent || '', params.jobId, params.sourceType));

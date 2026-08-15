@@ -415,14 +415,17 @@ export async function handleTableKeys(
 
 	switch (key) {
 		case "/":
+			if (appStore.activeTab() === "ui-test") break;
 			appStore.setTableSearchMode(true);
 			appStore.setTableSearchQuery("");
 			appStore.setSelectedIndex(0);
 			break;
 		case "F":
+			if (appStore.activeTab() === "ui-test") break;
 			appStore.setShowTableFilterModal(true);
 			break;
 		case "O":
+			if (appStore.activeTab() === "ui-test") break;
 			appStore.setShowTableSortModal(true);
 			break;
 		case "T": {
@@ -459,26 +462,12 @@ export async function handleTableKeys(
 			break;
 		case "tab":
 		case "\t":
-			if (isReverseTabKey(event)) {
-				// Reverse cycle through tabs
-				appStore.setActiveTab((tab) => {
-					if (tab === "applications") return "kubernetes";
-					if (tab === "infrastructure") return "applications";
-					if (tab === "libraries") return "infrastructure";
-					if (tab === "scripts") return "libraries";
-					if (tab === "kubernetes") return "scripts";
-					return "applications";
-				});
-			} else {
-				// Forward cycle through tabs
-				appStore.setActiveTab((tab) => {
-					if (tab === "applications") return "infrastructure";
-					if (tab === "infrastructure") return "libraries";
-					if (tab === "libraries") return "scripts";
-					if (tab === "scripts") return "kubernetes";
-					return "applications";
-				});
-			}
+			appStore.setActiveTab((tab) => {
+				const tabs = appStore.tableTabs().map((item) => item.id);
+				const current = Math.max(0, tabs.indexOf(tab));
+				const offset = isReverseTabKey(event) ? -1 : 1;
+				return tabs[(current + offset + tabs.length) % tabs.length] ?? "applications";
+			});
 			appStore.setSelectedIndex(0); // Reset selection when switching tabs
 			appStore.setTableSearchQuery("");
 			appStore.setTableSearchMode(false);
@@ -551,12 +540,7 @@ export async function handleTableKeys(
 				logActions.loadContainerLogs();
 			break;
 		case "L":
-			// Open status log modal (uppercase L)
-			appStore.setShowStatusLogModal(true);
-			break;
-		case "o":
-			if (appStore.activeTab() !== "scripts" && appList.length > 0)
-				logActions.loadOperationLogs();
+			appStore.pushModal('actions');
 			break;
 		case "m":
 			// Show CR detail for current branch (lowercase m)
@@ -594,10 +578,17 @@ export async function handleTableKeys(
 			}
 			// Start selected item.
 			if (appList.length > 0) {
-				const app = getSelectedApp();
+				// getSelectedApp intentionally excludes rowKind:"infra". Resolve
+				// infrastructure from its own registry, or `s` silently exits before
+				// invoking the start operation.
+				const selectedRow = appList[appStore.selectedIndex()];
+				const infra = selectedRow?.rowKind === "infra"
+					? appStore.infraServices().find((svc) => svc.ident === selectedRow.ident)
+					: undefined;
+				const app = infra ?? getSelectedApp();
 				if (!app) break;
 				if (app.operationStatus?.status === "active") {
-					await logActions.openActionLogForApp(app.ident, app.displayName || app.ident, "Action Log");
+					appStore.pushModal('actions');
 					break;
 				}
 				if (appStore.operationInProgressForApp()) {
@@ -606,11 +597,11 @@ export async function handleTableKeys(
 					const active = appStore.apps().find((a) => a.ident === activeIdent)
 						|| appStore.infraServices().find((svc) => svc.ident === activeIdent)
 						|| app;
-					await logActions.openActionLogForApp(activeIdent, active.displayName || active.ident, "Action Log");
+					appStore.pushModal('actions');
 					break;
 				}
-				if (appStore.activeTab() === "infrastructure") {
-					void dockerActions.performDockerOperation("start", app as any);
+				if (infra) {
+					dockerActions.openInfrastructureStartTargetPicker(infra);
 				} else {
 					void dockerActions.performAppAction("run");
 				}
@@ -695,13 +686,13 @@ export async function handleTableKeys(
 			break;
 		case "b":
 		case "B": {
-			// Build. If build already running, toggle live operation logs.
+			// Build. If already running, open unified action history.
 			if (appStore.activeTab() !== "scripts" && appList.length > 0) {
 				const selected = getSelectedApp();
 				if (!selected) break;
 				const app = appStore.apps().find((a) => a.ident === selected.ident) ?? selected;
 				if (app.operationStatus?.operation === "build" && app.operationStatus.status === "active") {
-					void logActions.toggleActionLogForApp(app.ident, app.displayName, "Build Output");
+					appStore.pushModal("actions");
 				} else {
 					void dockerActions.performBuild();
 				}
@@ -709,13 +700,13 @@ export async function handleTableKeys(
 			break;
 		}
 		case "t": {
-			// Test. If test already running, toggle live operation logs.
+			// Test. If already running, open unified action history.
 			if (appStore.activeTab() !== "scripts" && appList.length > 0) {
 				const selected = getSelectedApp();
 				if (!selected) break;
 				const app = appStore.apps().find((a) => a.ident === selected.ident) ?? selected;
 				if (app.operationStatus?.operation === "test" && app.operationStatus.status === "active") {
-					void logActions.toggleActionLogForApp(app.ident, app.displayName, "Test Output");
+					appStore.pushModal("actions");
 				} else {
 					void dockerActions.performTest();
 				}

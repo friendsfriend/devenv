@@ -27,7 +27,7 @@ func (s *Server) handleKubernetesClusterCreate(w http.ResponseWriter, r *http.Re
 		return
 	}
 	log.Printf("[INFO] Kubernetes cluster create requested")
-	if err := s.kubernetesClusterService().Create(r.Context()); err != nil {
+	if err := s.runKubernetesClusterAction(r.Context(), "Create Kubernetes cluster", "create", func(service k8s.ClusterService) error { return service.Create(r.Context()) }); err != nil {
 		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -40,7 +40,7 @@ func (s *Server) handleKubernetesClusterDelete(w http.ResponseWriter, r *http.Re
 		return
 	}
 	log.Printf("[INFO] Kubernetes cluster delete requested")
-	if err := s.kubernetesClusterService().Delete(r.Context()); err != nil {
+	if err := s.runKubernetesClusterAction(r.Context(), "Delete Kubernetes cluster", "delete", func(service k8s.ClusterService) error { return service.Delete(r.Context()) }); err != nil {
 		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -54,7 +54,7 @@ func (s *Server) handleKubernetesClusterRecreate(w http.ResponseWriter, r *http.
 		return
 	}
 	log.Printf("[INFO] Kubernetes cluster recreate requested")
-	if err := s.kubernetesClusterService().Recreate(r.Context()); err != nil {
+	if err := s.runKubernetesClusterAction(r.Context(), "Recreate Kubernetes cluster", "recreate", func(service k8s.ClusterService) error { return service.Recreate(r.Context()) }); err != nil {
 		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -67,7 +67,7 @@ func (s *Server) handleKubernetesClusterExport(w http.ResponseWriter, r *http.Re
 		return
 	}
 	log.Printf("[INFO] Kubernetes kubeconfig export requested")
-	if err := s.kubernetesClusterService().ExportKubeconfig(r.Context()); err != nil {
+	if err := s.runKubernetesClusterAction(r.Context(), "Export Kubernetes kubeconfig", "export", func(service k8s.ClusterService) error { return service.ExportKubeconfig(r.Context()) }); err != nil {
 		respondErrorMessage(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

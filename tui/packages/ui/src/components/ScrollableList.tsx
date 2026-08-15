@@ -5,6 +5,7 @@ import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { calculateVisibleItems } from '../utils/virtualScroll';
 import { focusSoon } from '../utils/focusSoon';
+import { AnimatedStatusText } from './AnimatedStatusText';
 
 // ─── Layout constants ────────────────────────────────────────────────────────
 
@@ -379,9 +380,7 @@ export function ScrollableList<T>(props: ScrollableListProps<T>): JSX.Element {
               alignItems: 'center',
             }}
           >
-            <text fg={uiColors.primary} attributes={TextAttributes.BOLD}>
-              {props.loadingText ?? 'Loading…'}
-            </text>
+            <AnimatedStatusText text={props.loadingText ?? 'Loading…'} intent="load" backgroundColor={uiColors.bgMantle} />
           </box>
         }
       >

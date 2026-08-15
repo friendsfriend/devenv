@@ -210,7 +210,6 @@ export async function handleLogModalKeys(
   if (isUpKey(event)) {
     if (sb) sb.scrollBy(-1);
     logActions.syncLogScroll();
-    logActions.maybeLoadOlderLogs();
     return true;
   }
 
@@ -225,7 +224,6 @@ export async function handleLogModalKeys(
   if (event.name === 'u') {
     if (sb) sb.scrollBy(-Math.floor((sb.viewport.height || 10) / 2));
     logActions.syncLogScroll();
-    logActions.maybeLoadOlderLogs();
     return true;
   }
 
@@ -233,7 +231,6 @@ export async function handleLogModalKeys(
   if (event.name === 'g' && !event.shift) {
     if (sb) sb.scrollTo(0);
     logActions.syncLogScroll();
-    logActions.maybeLoadOlderLogs();
     return true;
   }
 

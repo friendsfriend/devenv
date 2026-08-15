@@ -1,60 +1,15 @@
-# Using the Log Viewer
+# Using logs and action history
 
-DevEnv provides a built-in log viewer for container logs and operation logs.
+DevEnv separates operational history from runtime logs.
 
-## 1. Opening logs
+## Action history
 
-- Press `l` to view container logs for the selected item
-- Press `o` to view operation logs for the selected item
-- Press `L` to toggle the status log maximized view
+Press uppercase `L` from main table to open action history. Compact strip under table shows active, failed, and recent completed actions. Action modal contains commands, stdout, stderr, exit failures, nested steps, and retained history.
 
-## 2. Log navigation
+Use `j`/`k` to move, `J`/`K` to switch panels, and `Escape` or `L` to close.
 
-| Key | Action |
-|---|---|
-| `j`/`k` | Scroll up/down |
-| `h`/`l` or `←`/`→` | Scroll left/right |
-| `u`/`d` | Half page up/down |
-| `g`/`G` | Go to top/bottom |
+## Runtime logs
 
-Navigation motions scroll the viewport directly — there is no cursor line.
-Select text with the mouse (OS-native selection) to copy.
+Press lowercase `l` on selected application to inspect container/application runtime logs. Log viewer supports `/` search, scrolling, and visual selection. Kubernetes workload logs remain available from Kubernetes view.
 
-## 3. Search
-
-Press `/` to enter search mode:
-
-| Key | Action |
-|---|---|
-| Type | Enter search query |
-| `Enter` | Confirm search and jump to first match |
-| `n`/`p` | Next/previous match |
-| `Backspace` | Delete last character |
-| `Esc` | Cancel search |
-
-Matches are highlighted in yellow; the current match is highlighted in peach.
-
-## 4. AI analysis
-
-Press `Shift+A` to analyze log content with AI. Type a prompt and press `Enter` to submit.
-Results appear in an overlay. Use `Ctrl+j`/`Ctrl+k` to scroll. Type follow-up questions
-and press `Enter` to refine.
-
-## 5. Other actions
-
-| Key | Action |
-|---|---|
-| `e` | Open logs in `$EDITOR` |
-| `Shift+E` | Choose an editor for logs |
-| `Esc` | Close log viewer |
-| `q` | Quit DevEnv |
-
-## 6. Keyboard shortcuts summary
-
-All log viewer keybinds:
-
-- Navigation: `j`/`k`, `h`/`l` or `←`/`→`, `u`/`d`, `g`/`G`
-- Search: `/`, `n`/`p`, `Enter`, `Esc`
-- AI: `Shift+A`
-- File: `e`, `Shift+E`
-- Close: `Esc`, `q`
+Server diagnostic logging remains separate and does not create user-facing actions.

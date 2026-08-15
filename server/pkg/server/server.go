@@ -7,30 +7,45 @@ import (
 	"log"
 	"net/http"
 	"os"
+	osExec "os/exec"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/friendsfriend/devenv/pkg/actionexec"
+	"github.com/friendsfriend/devenv/pkg/actionregistry"
+	"github.com/friendsfriend/devenv/pkg/actionrun"
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/docker"
-	"github.com/friendsfriend/devenv/pkg/logging"
+	"github.com/friendsfriend/devenv/pkg/runstatus"
 	"github.com/friendsfriend/devenv/pkg/services"
+	"github.com/friendsfriend/devenv/pkg/state"
 	"github.com/friendsfriend/devenv/pkg/status"
 )
 
 type Server struct {
-	port           int
-	services       services.Container
-	apps           []app.App
-	infraServices  []app.InfraService
-	listeners      map[chan Event]bool
-	listenerMu     sync.RWMutex
-	opStatus       map[string]*OperationStatus
-	opStatusMu     sync.RWMutex
-	statusEventMu  sync.Mutex
-	statusEventSig map[string]string
+	port                int
+	services            services.Container
+	apps                []app.App
+	infraServices       []app.InfraService
+	listeners           map[chan Event]bool
+	listenerMu          sync.RWMutex
+	opStatus            map[string]*OperationStatus
+	opStatusMu          sync.RWMutex
+	statusEventMu       sync.Mutex
+	statusEventSig      map[string]string
+	actionRuns          *actionrun.Registry
+	actionDefinitions   *actionregistry.Registry
+	actionRegistryError error
+	actionProcesses     *actionexec.MemoryProcessStore
+	actionCoordinator   *actionexec.Coordinator
+	toolAvailability    actionregistry.ToolSet
+	actionCancelMu      sync.Mutex
+	actionCancels       map[string]context.CancelFunc
+	leaseMu             sync.Mutex
+	dependencyLeases    []state.DependencyLease
 
 	// CR review sessions: token → session (created per review, cleaned up on stream close)
 	crSessions   map[string]*crReviewSession
@@ -64,22 +79,28 @@ type AppResponse struct {
 }
 
 type AppStatusResponse struct {
-	Ident           string           `json:"ident"`
-	DockerInfo      *docker.Info     `json:"dockerInfo,omitempty"`
-	GitStatus       string           `json:"gitStatus,omitempty"`
-	Branch          string           `json:"branch,omitempty"`
-	ActiveWorktree  string           `json:"activeWorktree,omitempty"`
-	OperationStatus *OperationStatus `json:"operationStatus,omitempty"`
-	Status          string           `json:"status,omitempty"`
-	RunTargetInfo   interface{}      `json:"runTargetInfo,omitempty"`
+	Ident           string            `json:"ident"`
+	ResourceID      string            `json:"resourceId"`
+	ResourceKind    string            `json:"resourceKind"`
+	DockerInfo      *docker.Info      `json:"dockerInfo,omitempty"`
+	GitStatus       string            `json:"gitStatus,omitempty"`
+	Branch          string            `json:"branch,omitempty"`
+	ActiveWorktree  string            `json:"activeWorktree,omitempty"`
+	OperationStatus *OperationStatus  `json:"operationStatus,omitempty"`
+	RuntimeStatus   *runstatus.Status `json:"runtimeStatus"`
+	Status          string            `json:"status,omitempty"`
+	RunTargetInfo   interface{}       `json:"runTargetInfo,omitempty"`
 }
 
 type InfraServiceResponse struct {
 	Ident             string               `json:"ident"`
+	ResourceID        string               `json:"resourceId"`
+	ResourceKind      string               `json:"resourceKind"`
 	DisplayName       string               `json:"displayName"`
 	Type              string               `json:"type,omitempty"`
 	ContainerBaseName string               `json:"containerBaseName,omitempty"`
 	DockerInfo        *docker.Info         `json:"dockerInfo,omitempty"`
+	RuntimeStatus     *runstatus.Status    `json:"runtimeStatus"`
 	Status            string               `json:"status,omitempty"`
 	LogPath           string               `json:"logPath,omitempty"`
 	ShellPath         string               `json:"shellPath,omitempty"`
@@ -89,13 +110,32 @@ type InfraServiceResponse struct {
 	ExecutionHandle   *app.ExecutionHandle `json:"executionHandle,omitempty"`
 }
 
+type infrastructureStatusSnapshot struct {
+	dockerInfo      *docker.Info
+	runtimeStatus   runstatus.Status
+	logPath         string
+	executionHandle *app.ExecutionHandle
+}
+
+func appResourceKind(a app.App) string {
+	if a.AppType == app.TypeLIB {
+		return "library"
+	}
+	return "app"
+}
+
 func NewServer(port int) *Server {
 	s := &Server{
-		port:           port,
-		listeners:      make(map[chan Event]bool),
-		opStatus:       make(map[string]*OperationStatus),
-		statusEventSig: make(map[string]string),
-		crSessions:     make(map[string]*crReviewSession),
+		port:              port,
+		listeners:         make(map[chan Event]bool),
+		opStatus:          make(map[string]*OperationStatus),
+		statusEventSig:    make(map[string]string),
+		actionRuns:        actionrun.NewRegistry(),
+		actionDefinitions: actionregistry.New(),
+		actionProcesses:   actionexec.NewMemoryProcessStore(),
+		actionCoordinator: actionexec.NewCoordinator(nil),
+		actionCancels:     make(map[string]context.CancelFunc),
+		crSessions:        make(map[string]*crReviewSession),
 	}
 	return s
 }
@@ -112,23 +152,15 @@ func (s *Server) Start() error {
 	}
 	s.apps = s.services.AppManager().GetApps()
 	s.infraServices = s.services.AppManager().GetInfraServices()
+	if leases, err := s.services.StateStore().GetDependencyLeases(); err == nil {
+		s.dependencyLeases = leases
+	}
+	if err := s.rebuildActionDefinitions(); err != nil {
+		s.actionRegistryError = err
+		log.Printf("[WARN] Failed to compile action registry: %v", err)
+	}
 	s.services.BuildService().RecoverShellTmuxRuns(s.apps)
 	s.services.OperationsService().RecoverScriptInfrastructureRuns(s.infraServices)
-
-	logging.SetStatusLogBroadcaster(func(entry logging.LogEntry) {
-		s.BroadcastEvent(Event{
-			Type: "statuslog.entry",
-			Properties: map[string]interface{}{
-				"timestamp": entry.Timestamp.Format(time.RFC3339),
-				"appIdent":  entry.AppIdent,
-				"appName":   entry.AppName,
-				"operation": string(entry.Operation),
-				"status":    string(entry.Status),
-				"message":   entry.Message,
-			},
-			Timestamp: time.Now(),
-		})
-	})
 
 	s.services.StatusManager().AddListener(s)
 	log.Printf("[INFO] Registered server as StatusManager listener for SSE broadcasts")
@@ -149,7 +181,7 @@ func (s *Server) Start() error {
 	go s.startScriptHealthPoller()
 	go s.startKubernetesStatusWatchers()
 	go s.startKubernetesClusterPoller()
-	go s.startStatusLogCleanup()
+	go s.startContainerPrunePoller()
 
 	mux := http.NewServeMux()
 	s.registerRoutes(mux)
@@ -176,6 +208,9 @@ func (s *Server) Start() error {
 		}
 	}
 
+	if s.actionProcesses != nil {
+		s.actionProcesses.KillAll()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	return httpSrv.Shutdown(ctx)
@@ -272,25 +307,6 @@ func (s *Server) findIdentByContainerName(containerName string) string {
 	return ""
 }
 
-func (s *Server) startStatusLogCleanup() {
-	// Clean old entries daily (runs 1h after startup, then every 24h)
-	const cleanupInterval = 24 * time.Hour
-	const maxAge = 3 * 24 * time.Hour
-
-	timer := time.NewTimer(1 * time.Hour)
-	defer timer.Stop()
-
-	for {
-		select {
-		case <-timer.C:
-			if logger := s.services.Logger(); logger != nil {
-				_ = logger.CleanOldLogEntries(maxAge)
-			}
-			timer.Reset(cleanupInterval)
-		}
-	}
-}
-
 func (s *Server) startScriptHealthPoller() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -326,6 +342,54 @@ func (s *Server) startScriptHealthPoller() {
 	}
 }
 
+func (s *Server) startContainerPrunePoller() {
+	// Periodically remove stopped containers, unused pods/networks, dangling
+	// images, and dangling build cache. Do not use --all: application images
+	// loaded into kind are tagged in Podman but have no Podman container, so
+	// Podman correctly considers them unused and --all would delete them.
+	// Runs once after a short startup delay, then every 24h.
+	const interval = 24 * time.Hour
+
+	log.Printf("[Prune] Container system prune poller active, interval=%v", interval)
+
+	// Initial run after 5s startup delay (don't slow boot)
+	time.Sleep(5 * time.Second)
+	s.runSystemPrune()
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for range ticker.C {
+		s.runSystemPrune()
+	}
+}
+
+func (s *Server) runSystemPrune() {
+	log.Println("[Prune] Pruning container artifacts for all runtimes...")
+	for _, rt := range []string{"docker", "podman"} {
+		if err, _ := runPruneCommand(rt, "version"); err != nil {
+			// Runtime not installed, skip
+			continue
+		}
+		log.Printf("[Prune] Pruning %s...", rt)
+		if err, _ := runPruneCommand(rt, containerPruneArgs()...); err != nil {
+			log.Printf("[Prune] %s system prune failed: %v", rt, err)
+		}
+	}
+}
+
+func containerPruneArgs() []string {
+	return []string{"system", "prune", "--force", "--filter", "until=24h"}
+}
+
+func runPruneCommand(command string, args ...string) (error, string) {
+	cmd := osExec.Command(command, args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("%s %s: %w", command, strings.Join(args, " "), err), string(output)
+	}
+	return nil, strings.TrimSpace(string(output))
+}
+
 func (s *Server) startGitPoller() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
@@ -338,43 +402,48 @@ func (s *Server) startGitPoller() {
 		dockerClient := s.services.DockerClient()
 
 		for i := range s.apps {
-			app := &s.apps[i]
-			if app.AppType != "APP" {
-				continue
-			}
+			targetApp := &s.apps[i]
 
 			time.Sleep(10 * time.Millisecond)
 
-			adapter := &appAdapter{app: app}
+			adapter := &appAdapter{app: targetApp}
 			branch := gitRepo.GetCurrentBranch(adapter)
 			if branch == "" {
 				// Repo not yet cloned or unreadable — fall back to the last
 				// known branch so we never broadcast an empty value that would
 				// overwrite valid state in the TUI.
-				branch = app.Branch
+				branch = targetApp.Branch
 			} else {
 				// Keep the in-memory branch current for future fallbacks.
-				app.Branch = branch
+				targetApp.Branch = branch
 			}
 			gitStatus := gitRepo.GetStatus(adapter)
 
-			prev := previousGit[app.Ident]
+			prev := previousGit[targetApp.Ident]
 			if prev.branch == branch && prev.status == gitStatus {
 				continue
 			}
 
-			previousGit[app.Ident] = struct{ branch, status string }{branch, gitStatus}
-			dockerInfo := dockerClient.GetInfo(adapter)
+			previousGit[targetApp.Ident] = struct{ branch, status string }{branch, gitStatus}
+			var dockerInfo *docker.Info
+			if targetApp.AppType == app.TypeAPP {
+				info := dockerClient.GetInfo(adapter)
+				dockerInfo = &info
+			}
 
 			s.opStatusMu.RLock()
-			opStatus := s.opStatus[app.Ident]
+			opStatus := s.opStatus[targetApp.Ident]
 			s.opStatusMu.RUnlock()
 
-			appRunStatus := s.appRuntimeStatus(app.Ident, dockerInfo)
-			s.broadcastStatusUpdated(app.Ident, s.appStatusEventProperties(app.Ident, dockerInfo, gitStatus, branch, opStatus, appRunStatus))
+			observedDocker := docker.Info{Status: "not found"}
+			if dockerInfo != nil {
+				observedDocker = *dockerInfo
+			}
+			appRunStatus := s.appRuntimeStatus(*targetApp, observedDocker)
+			s.broadcastStatusUpdated(targetApp.Ident, s.appStatusEventProperties(*targetApp, dockerInfo, gitStatus, branch, opStatus, appRunStatus))
 
 			if os.Getenv("DEVENV_DEBUG_POLLER") == "1" {
-				log.Printf("[Git poller] Change detected for %s — branch: %s, gitStatus: %s", app.Ident, branch, gitStatus)
+				log.Printf("[Git poller] Change detected for %s — branch: %s, gitStatus: %s", targetApp.Ident, branch, gitStatus)
 			}
 		}
 	}
@@ -387,66 +456,12 @@ func (s *Server) startReconciliationPoller() {
 	log.Println("[Reconciliation poller] Starting (60s interval)")
 
 	for range ticker.C {
-		dockerClient := s.services.DockerClient()
-		gitRepo := s.services.GitRepository()
-
-		appAdapters := make([]docker.App, 0, len(s.apps))
 		for i := range s.apps {
-			appAdapters = append(appAdapters, &appAdapter{app: &s.apps[i]})
+			s.broadcastAppStatus(s.apps[i].Ident)
 		}
-
-		dockerInfoMap, err := dockerClient.BatchGetInfo(appAdapters, nil)
-		if err != nil {
-			log.Printf("[Reconciliation poller] BatchGetInfo (apps) error: %v", err)
-		} else {
-			for i := range s.apps {
-				app := &s.apps[i]
-				if app.AppType != "APP" {
-					continue
-				}
-
-				time.Sleep(10 * time.Millisecond)
-				adapter := &appAdapter{app: app}
-				dockerInfo := dockerInfoMap[app.Ident]
-				branch := gitRepo.GetCurrentBranch(adapter)
-				gitStatus := gitRepo.GetStatus(adapter)
-
-				s.opStatusMu.RLock()
-				opStatus := s.opStatus[app.Ident]
-				s.opStatusMu.RUnlock()
-
-				appRunStatus := s.appRuntimeStatus(app.Ident, dockerInfo)
-				s.broadcastStatusUpdated(app.Ident, s.appStatusEventProperties(app.Ident, dockerInfo, gitStatus, branch, opStatus, appRunStatus))
-			}
+		for i := range s.infraServices {
+			s.broadcastAppStatus(s.infraServices[i].Ident)
 		}
-
-		if len(s.infraServices) > 0 {
-			infraAdapters := make([]docker.InfraService, 0, len(s.infraServices))
-			for i := range s.infraServices {
-				infraAdapters = append(infraAdapters, &infraServiceAdapter{service: &s.infraServices[i]})
-			}
-
-			infraDockerMap, err := dockerClient.BatchGetInfo(nil, infraAdapters)
-			if err != nil {
-				log.Printf("[Reconciliation poller] BatchGetInfo (infra) error: %v", err)
-			} else {
-				for _, svc := range s.infraServices {
-					dockerInfo := infraDockerMap[svc.Ident]
-
-					s.opStatusMu.RLock()
-					opStatus := s.opStatus[svc.Ident]
-					s.opStatusMu.RUnlock()
-
-					s.broadcastStatusUpdated(svc.Ident, map[string]interface{}{
-						"ident":           svc.Ident,
-						"dockerInfo":      dockerInfo,
-						"operationStatus": opStatus,
-						"status":          dockerRuntimeStatus(dockerInfo),
-					})
-				}
-			}
-		}
-
 		log.Printf("[Reconciliation poller] Full status broadcast complete (%d apps, %d infra)", len(s.apps), len(s.infraServices))
 	}
 }
@@ -469,7 +484,9 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
 
-	eventChan := make(chan Event, 100)
+	// Action output is bursty; keep enough backlog to avoid dropping chunks while
+	// TUI batches rendering. Other SSE events remain small.
+	eventChan := make(chan Event, 10000)
 	s.listenerMu.Lock()
 	s.listeners[eventChan] = true
 	s.listenerMu.Unlock()
@@ -483,6 +500,11 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 
 	data, _ := json.Marshal(Event{Type: "connection.established", Properties: map[string]string{"status": "connected"}, Timestamp: time.Now()})
 	fmt.Fprintf(w, "data: %s\n\n", data)
+	s.actionRuns.Cleanup(time.Now())
+	for _, run := range s.actionRuns.Active() {
+		active, _ := json.Marshal(Event{Type: "action.started", Properties: map[string]interface{}{"run": run}, Timestamp: time.Now()})
+		fmt.Fprintf(w, "data: %s\n\n", active)
+	}
 	w.(http.Flusher).Flush()
 
 	for {
@@ -501,10 +523,30 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) BroadcastEvent(event Event) {
+	if strings.HasPrefix(event.Type, "action.") && s.services != nil {
+		if payload, err := json.Marshal(event); err == nil {
+			if isActionOutputType(event.Type) {
+				properties, _ := event.Properties.(map[string]interface{})
+				runID, _ := properties["runId"].(string)
+				stepID, _ := properties["stepId"].(string)
+				if runID != "" && stepID != "" {
+					if err := s.services.StateStore().AddActionLogEvent(runID, stepID, string(payload), 50000); err != nil {
+						log.Printf("[WARN] Failed to persist action log event: %v", err)
+					}
+				}
+			} else if err := s.services.StateStore().AddActionEvent(string(payload), 50000); err != nil {
+				log.Printf("[WARN] Failed to persist action event: %v", err)
+			}
+		}
+	}
 	s.listenerMu.RLock()
 	defer s.listenerMu.RUnlock()
 
 	for listener := range s.listeners {
+		if event.Type == "action.command.output" || event.Type == "action.step.output" {
+			listener <- event
+			continue
+		}
 		select {
 		case listener <- event:
 		default:
@@ -531,12 +573,37 @@ func (s *Server) broadcastStatusUpdated(ident string, props map[string]interface
 	s.BroadcastEvent(Event{Type: "status.updated", Properties: props, Timestamp: time.Now()})
 }
 
-func (s *Server) broadcastAppStatus(appIdent string) {
-	dockerClient := s.services.DockerClient()
+func (s *Server) resolveInfrastructureStatus(target app.InfraService, dockerInfo *docker.Info) infrastructureStatusSnapshot {
+	snapshot := infrastructureStatusSnapshot{}
+	switch target.Type {
+	case app.InfraServiceTypeScript:
+		statusValue, logPath := s.services.OperationsService().ScriptInfrastructureStatus(target.Ident)
+		snapshot.runtimeStatus = runstatus.Normalize(statusValue)
+		snapshot.logPath = logPath
+		snapshot.executionHandle = s.services.OperationsService().ScriptInfrastructureExecutionHandle(target.Ident)
+	case app.InfraServiceTypeKubernetes:
+		snapshot.runtimeStatus = runstatus.Normalize(s.services.OperationsService().KubernetesInfrastructureStatus(target))
+	default:
+		if dockerInfo == nil {
+			info := s.services.DockerClient().GetInfoForInfra(&infraServiceAdapter{service: &target})
+			dockerInfo = &info
+		}
+		snapshot.dockerInfo = dockerInfo
+		snapshot.runtimeStatus = runstatus.Normalize(dockerRuntimeStatus(*dockerInfo))
+	}
+	return snapshot
+}
 
+func (s *Server) broadcastAppStatus(appIdent string) {
 	if targetApp := s.findAppByIdent(appIdent); targetApp != nil {
 		adapter := &appAdapter{app: targetApp}
-		dockerInfo := dockerClient.GetInfo(adapter)
+		var dockerInfo *docker.Info
+		observedDocker := docker.Info{Status: "not found"}
+		if targetApp.AppType == app.TypeAPP {
+			info := s.services.DockerClient().GetInfo(adapter)
+			dockerInfo = &info
+			observedDocker = info
+		}
 
 		gitRepo := s.services.GitRepository()
 		gitStatus := gitRepo.GetStatus(adapter)
@@ -546,8 +613,8 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 		opStatus := s.opStatus[appIdent]
 		s.opStatusMu.RUnlock()
 
-		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
-		s.broadcastStatusUpdated(appIdent, s.appStatusEventProperties(appIdent, dockerInfo, gitStatus, currentBranch, opStatus, appRunStatus))
+		appRunStatus := s.appRuntimeStatus(*targetApp, observedDocker)
+		s.broadcastStatusUpdated(appIdent, s.appStatusEventProperties(*targetApp, dockerInfo, gitStatus, currentBranch, opStatus, appRunStatus))
 		return
 	}
 
@@ -556,24 +623,18 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 		opStatus := s.opStatus[appIdent]
 		s.opStatusMu.RUnlock()
 
-		props := map[string]interface{}{
+		snapshot := s.resolveInfrastructureStatus(*targetInfraService, nil)
+		s.broadcastStatusUpdated(appIdent, map[string]interface{}{
 			"ident":           appIdent,
+			"resourceId":      appIdent,
+			"resourceKind":    "infrastructure",
+			"dockerInfo":      snapshot.dockerInfo,
 			"operationStatus": opStatus,
-		}
-		if targetInfraService.Type == app.InfraServiceTypeScript {
-			statusValue, logPath := s.services.OperationsService().ScriptInfrastructureStatus(appIdent)
-			props["status"] = statusValue
-			props["logPath"] = logPath
-			props["executionHandle"] = s.services.OperationsService().ScriptInfrastructureExecutionHandle(appIdent)
-		} else if targetInfraService.Type == app.InfraServiceTypeKubernetes {
-			props["status"] = s.services.OperationsService().KubernetesInfrastructureStatus(*targetInfraService)
-		} else {
-			adapter := &infraServiceAdapter{service: targetInfraService}
-			dockerInfo := dockerClient.GetInfoForInfra(adapter)
-			props["dockerInfo"] = dockerInfo
-			props["status"] = dockerRuntimeStatus(dockerInfo)
-		}
-		s.broadcastStatusUpdated(appIdent, props)
+			"runtimeStatus":   snapshot.runtimeStatus,
+			"status":          snapshot.runtimeStatus.String(),
+			"logPath":         snapshot.logPath,
+			"executionHandle": snapshot.executionHandle,
+		})
 		return
 	}
 
@@ -588,11 +649,15 @@ func (s *Server) broadcastAppStatus(appIdent string) {
 // in-memory app state. Falls back to GetCurrentBranch when knownBranch is
 // empty.
 func (s *Server) broadcastAppStatusWithBranch(appIdent, knownBranch string) {
-	dockerClient := s.services.DockerClient()
-
 	if targetApp := s.findAppByIdent(appIdent); targetApp != nil {
 		adapter := &appAdapter{app: targetApp}
-		dockerInfo := dockerClient.GetInfo(adapter)
+		var dockerInfo *docker.Info
+		observedDocker := docker.Info{Status: "not found"}
+		if targetApp.AppType == app.TypeAPP {
+			info := s.services.DockerClient().GetInfo(adapter)
+			dockerInfo = &info
+			observedDocker = info
+		}
 
 		gitRepo := s.services.GitRepository()
 		gitStatus := gitRepo.GetStatus(adapter)
@@ -606,8 +671,8 @@ func (s *Server) broadcastAppStatusWithBranch(appIdent, knownBranch string) {
 		opStatus := s.opStatus[appIdent]
 		s.opStatusMu.RUnlock()
 
-		appRunStatus := s.appRuntimeStatus(appIdent, dockerInfo)
-		props := s.appStatusEventProperties(appIdent, dockerInfo, gitStatus, branch, opStatus, appRunStatus)
+		appRunStatus := s.appRuntimeStatus(*targetApp, observedDocker)
+		props := s.appStatusEventProperties(*targetApp, dockerInfo, gitStatus, branch, opStatus, appRunStatus)
 		if targetApp.ActiveWorktree != "" {
 			props["activeWorktree"] = targetApp.ActiveWorktree
 		}
@@ -640,43 +705,54 @@ func (s *Server) broadcastAppStatusWithRetry(appIdent string, prevDockerStatus s
 	}()
 }
 
-func (s *Server) appStatusEventProperties(appIdent string, dockerInfo docker.Info, gitStatus, branch string, opStatus *OperationStatus, appRunStatus string) map[string]interface{} {
+func (s *Server) appStatusEventProperties(targetApp app.App, dockerInfo *docker.Info, gitStatus, branch string, opStatus *OperationStatus, runtimeStatus *runstatus.Status) map[string]interface{} {
+	legacyStatus := ""
+	if runtimeStatus != nil {
+		legacyStatus = runtimeStatus.String()
+	}
 	props := map[string]interface{}{
-		"ident":           appIdent,
+		"ident":           targetApp.Ident,
+		"resourceId":      targetApp.Ident,
+		"resourceKind":    appResourceKind(targetApp),
 		"dockerInfo":      dockerInfo,
 		"gitStatus":       gitStatus,
 		"branch":          branch,
 		"operationStatus": opStatus,
-		"status":          appRunStatus,
+		"runtimeStatus":   runtimeStatus,
+		"status":          legacyStatus,
 	}
 	if s.services != nil && s.services.BuildService() != nil {
-		if info, ok := s.services.BuildService().RunTargetInfo(appIdent); ok {
+		if info, ok := s.services.BuildService().RunTargetInfo(targetApp.Ident); ok {
 			props["runTargetInfo"] = info
+		} else {
+			props["runTargetInfo"] = nil
 		}
 	}
 	return props
 }
 
-func (s *Server) appRuntimeStatus(appIdent string, dockerInfo docker.Info) string {
+func (s *Server) appRuntimeStatus(targetApp app.App, dockerInfo docker.Info) *runstatus.Status {
+	if targetApp.AppType == app.TypeLIB {
+		return nil
+	}
+
+	// Status is selected from all live runtime observations. A runtime name or
+	// last-run cache must never make a lower-health state hide a running target.
+	candidates := []runstatus.Candidate{{Source: "container", Status: dockerRuntimeStatus(dockerInfo)}}
 	if s.services != nil && s.services.BuildService() != nil {
-		switch s.services.BuildService().LastRunRuntime(appIdent) {
-		case "docker":
-			return dockerRuntimeStatus(dockerInfo)
-		case "kubernetes":
-			return s.services.BuildService().KubernetesRunStatus(appIdent)
+		candidates = append(candidates, runstatus.Candidate{
+			Source: "kubernetes",
+			Status: s.services.BuildService().DiscoverKubernetesRunStatus(targetApp.Ident, targetApp.LocalDirectoryPath),
+		})
+		switch s.services.BuildService().LastRunRuntime(targetApp.Ident) {
 		case "shell", "powershell", "systemshell":
-			if s.services.BuildService().IsShellTmuxRunActive(appIdent) {
-				return "running"
-			}
-			return "stopped"
-		}
-		if targetApp := s.findAppByIdent(appIdent); targetApp != nil {
-			if status := s.services.BuildService().DiscoverKubernetesRunStatus(appIdent, targetApp.LocalDirectoryPath); !strings.HasPrefix(status, "stopped") {
-				return status
+			if s.services.BuildService().IsShellTmuxRunActive(targetApp.Ident) {
+				candidates = append(candidates, runstatus.Candidate{Source: "shell", Status: "running"})
 			}
 		}
 	}
-	return dockerRuntimeStatus(dockerInfo)
+	selected := runstatus.SelectStatus(candidates)
+	return &selected
 }
 
 func dockerRuntimeStatus(dockerInfo docker.Info) string {
@@ -759,22 +835,6 @@ func (s *Server) setOperationStatus(appIdent, operation, status, message string)
 	s.opStatus[appIdent] = &OperationStatus{Operation: operation, Status: status, Message: message}
 
 	s.opStatusMu.Unlock()
-
-	// Log to status log
-	if logger := s.services.Logger(); logger != nil {
-		appName := appIdent
-		if app := s.findAppByIdent(appIdent); app != nil {
-			appName = app.DisplayName
-		}
-		logOpType := logging.OperationType(operation)
-		logStatusType := logging.StatusCompleted
-		if status == "active" {
-			logStatusType = logging.StatusInProgress
-		} else if status == "failed" {
-			logStatusType = logging.StatusFailed
-		}
-		_ = logger.LogStatus(appIdent, appName, logOpType, logStatusType, message)
-	}
 
 	s.BroadcastEvent(Event{
 		Type: "operation.status.changed",
@@ -862,6 +922,10 @@ func (s *Server) reloadAppConfig() {
 	}
 	s.apps = s.services.AppManager().GetApps()
 	s.infraServices = s.services.AppManager().GetInfraServices()
+	if err := s.rebuildActionDefinitions(); err != nil {
+		s.actionRegistryError = err
+		log.Printf("[WARN] Failed to compile action registry reload: %v", err)
+	}
 	s.services.BuildService().RecoverShellTmuxRuns(s.apps)
 	s.services.OperationsService().RecoverScriptInfrastructureRuns(s.infraServices)
 }

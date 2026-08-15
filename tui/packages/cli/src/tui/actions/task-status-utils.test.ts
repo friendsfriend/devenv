@@ -1,5 +1,4 @@
 import { describe, expect, test } from 'bun:test';
-import type { StatusLogEntry } from '@devenv/types';
 import { formatTaskArgsSummary, formatDuration } from './task-status-utils';
 
 describe('formatTaskArgsSummary', () => {
@@ -60,31 +59,3 @@ describe('formatDuration', () => {
   });
 });
 
-describe('StatusLogEntry with task source', () => {
-  test('creates entry with source field', () => {
-    const entry: StatusLogEntry = {
-      Timestamp: new Date().toISOString(),
-      AppIdent: 'test-app',
-      AppName: 'Test App',
-      Operation: 'task',
-      Status: 'completed',
-      Message: 'deploy.sh --env prod [3.7s]',
-      source: 'task',
-    };
-    expect(entry.source).toBe('task');
-    expect(entry.Operation).toBe('task');
-    expect(entry.Status).toBe('completed');
-  });
-
-  test('app entry has no source by default', () => {
-    const entry: StatusLogEntry = {
-      Timestamp: new Date().toISOString(),
-      AppIdent: 'my-app',
-      AppName: 'My App',
-      Operation: 'start',
-      Status: 'completed',
-      Message: 'Container started',
-    };
-    expect(entry.source).toBeUndefined();
-  });
-});

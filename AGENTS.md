@@ -1,6 +1,8 @@
 * Always run the full test suite when finishing a feature
 * Always check the pi-lens issues if available when finishing a feature
 * Prefer reusable components over new implementations
+* Action history operations must use one action step per executed backend command; each step owns exactly one command and its stdout, stderr, exit code, and error. Never group multiple executed commands into one step or create placeholder steps for commands that did not run.
+* Action step and action type labels must resolve through the shared registry (`server/pkg/actionrun/labels.go` on the server, `tui/packages/types/src/action-labels.ts` on the TUI) instead of ad hoc per-producer formatting, ID-suffix parsing, or step position/order. Add new canonical kinds/labels there rather than inventing local label logic.
 * For semantic UI coloring, use the shared highlight types/component instead of custom color handling; direct color overrides are last resort only
 * Information priority: badges only for prominently highlighted information; normal highlight color is second-tier emphasis; primary text is third-tier default content; muted text is fourth-tier supporting/chrome text
 * Semantic feedback colors: green/positive only for success/healthy feedback, red/negative only for failure/destructive feedback, yellow/warning only for warning/attention feedback
@@ -26,3 +28,8 @@
 * For TUI performance investigations, generate a disposable large fixture with `bun run perf:fixture -- --apps <count> --scripts <count>` (defaults write to `/tmp/devenv-perf-config` and `/tmp/devenv-perf-home`), then run with `DEVENV_CONFIG_DIR=<config> DEVENV_HOME=<home> OTUI_SHOW_STATS=true bun run dev -p <port>` and use the OpenTUI debug overlay stats.
 * This project uses bun. Don't use pnpm or npm
 * Never run `bun run build` unless explicitly requested. Use `bun run build:single` instead.
+* Operational actions must be immutable backend registry definitions with stable resource/action/runtime/profile IDs; never derive IDs from labels, array positions, or checkout paths.
+* Action runs must retain their registry version and compact definition snapshot so config reloads cannot change active or historical trees.
+* Semantic step identity and deduplicated execution identity are separate: duplicate dependency nodes share an execution key, one canonical node owns commands, and references mirror outcomes.
+* Step data flow must use named typed values with explicit scope and visibility; never use positional previous-step output, and never persist secret or ephemeral values.
+* Process startup succeeds only after its readiness step passes. Already-running is an explicit successful outcome and must not fabricate a command.

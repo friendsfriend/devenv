@@ -1,5 +1,6 @@
 /** @jsxImportSource @opentui/solid */
 import { TextAttributes } from '@opentui/core';
+import { useTerminalDimensions } from '@opentui/solid';
 import { uiColors } from '../colors';
 import { GenericModal } from './GenericModal';
 import { formatHelpText } from './HelpText';
@@ -13,7 +14,12 @@ export interface ConfirmDialogProps {
 }
 
 export function ConfirmDialog(props: ConfirmDialogProps) {
+  const dimensions = useTerminalDimensions();
   const confirmText = () => props.confirmText || 'y';
+  const heightLines = () => Math.min(
+    Math.max(8, props.message.split('\n').length + 6),
+    Math.max(8, dimensions().height - 2),
+  );
   const cancelText = () => props.cancelText || 'n';
 
   return (
@@ -24,7 +30,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
         { key: cancelText(), action: 'Cancel' },
       ])}
       widthPercent={0.4}
-      heightPercent={0.25}
+      heightLines={heightLines()}
       customHeader={
         <SearchHeader>
           <box style={{ width: '100%', flexDirection: 'row' }}>

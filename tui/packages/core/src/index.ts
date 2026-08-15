@@ -1,4 +1,6 @@
 import type {
+	ActionDefinition,
+	ActionDefinitionList,
 	App,
 	AppStatus,
 	ContainerStats,
@@ -11,19 +13,20 @@ import type {
 	ProviderUpdateRequest,
 	RepoSearchResult,
 	ServerEvent,
-	StatusLogEntry,
 	CRVersion,
 } from "@devenv/types";
 import type { ClientDeps, FetchFunction } from "./client-types";
 import { getPiSessions } from "./agent-client";
 import {
+	getActionDefinition,
+	getActionDefinitions,
+	getActionRegistryStatus,
 	getApps,
 	getDockerInfo,
 	getGitInfo,
 	getInfraServices,
-	startInfraService,
-	stopInfraService,
 	getInfraServiceLogs,
+	startActionRun,
 	getProfiles,
 	getStatus,
 	createApp,
@@ -40,6 +43,7 @@ import {
 import { createCustomFetch, createCustomFetchWithSSE } from "./custom-fetch";
 import {
 	buildApp,
+	cancelAction,
 	createShellActionScript,
 	getActionTargets,
 	getContainerLogs,
@@ -61,7 +65,7 @@ import {
 	streamContainerStats,
 	testApp,
 } from "./docker-client";
-import { health, subscribeToEvents } from "./events-client";
+import { getActionHistory, getActionLogs, health, reportActionEvent, subscribeToEvents } from "./events-client";
 import { createExampleConfig } from "./example-config-client";
 import {
 	getBranches,
@@ -95,11 +99,6 @@ import {
 	analyzeLogsWithAI,
 	analyzeLogsWithAIStream,
 	analyzeCRWithAIStream,
-	getActionLog,
-	getLogHistory,
-	getOperationLogs,
-	getStatusLog,
-	addStatusLog,
 } from "./logs-client";
 import {
 	approveChangeRequest,
@@ -160,6 +159,22 @@ export class DevEnvClient {
 		);
 	}
 
+	startActionRun(actionId: string, inputs: Record<string, unknown> = {}): Promise<void> {
+		return startActionRun(this.deps, actionId, inputs);
+	}
+
+	getActionDefinitions(ident: string, kind = "app"): Promise<ActionDefinitionList> {
+		return getActionDefinitions(this.deps, ident, kind);
+	}
+
+	getActionDefinition(id: string): Promise<ActionDefinition> {
+		return getActionDefinition(this.deps, id);
+	}
+
+	getActionRegistryStatus(): Promise<import("./apps-client").ActionRegistryStatus> {
+		return getActionRegistryStatus(this.deps);
+	}
+
 	getApps(): Promise<App[]> {
 		return getApps(this.deps);
 	}
@@ -210,12 +225,6 @@ export class DevEnvClient {
 	}
 	getInfraServices(): Promise<InfraService[]> {
 		return getInfraServices(this.deps);
-	}
-	startInfraService(ident: string, runner?: string): Promise<void> {
-		return startInfraService(this.deps, ident, runner);
-	}
-	stopInfraService(ident: string): Promise<void> {
-		return stopInfraService(this.deps, ident);
 	}
 	getInfraServiceLogs(ident: string): Promise<string> {
 		return getInfraServiceLogs(this.deps, ident);
@@ -270,26 +279,6 @@ export class DevEnvClient {
 		onError?: (err: Error) => void,
 	): Promise<void> {
 		return streamJobLogs(this.deps, appIdent, jobId, signal, onLine, onError);
-	}
-	getOperationLogs(appIdent: string, limit: number = 100): Promise<string> {
-		return getOperationLogs(this.deps, appIdent, limit);
-	}
-	getActionLog(appIdent: string): Promise<string> {
-		return getActionLog(this.deps, appIdent);
-	}
-	getLogHistory(type: import("./logs-client").LogHistoryType, appIdent: string, before?: number, limit: number = 1000) {
-		return getLogHistory(this.deps, type, appIdent, before, limit);
-	}
-	getStatusLog(limit: number = 50): Promise<StatusLogEntry[]> {
-		return getStatusLog(this.deps, limit);
-	}
-	addStatusLog(
-		entry: Pick<
-			StatusLogEntry,
-			"AppIdent" | "AppName" | "Operation" | "Status" | "Message"
-		>,
-	): Promise<void> {
-		return addStatusLog(this.deps, entry);
 	}
 	getChangeRequests(
 		appIdent: string,
@@ -682,11 +671,11 @@ export class DevEnvClient {
 	): Promise<import("@devenv/types").ActionTarget[]> {
 		return getActionTargets(this.deps, appIdent, action);
 	}
-	testApp(appIdent: string, targetId?: string): Promise<void> {
-		return testApp(this.deps, appIdent, targetId);
+	testApp(appIdent: string, targetId?: string, profile?: string, targetLabel?: string): Promise<void> {
+		return testApp(this.deps, appIdent, targetId, profile, targetLabel);
 	}
-	runApp(appIdent: string, profile: string = "", targetId?: string): Promise<void> {
-		return runApp(this.deps, appIdent, profile, targetId);
+	runApp(appIdent: string, profile: string = "", targetId?: string, targetLabel?: string): Promise<void> {
+		return runApp(this.deps, appIdent, profile, targetId, targetLabel);
 	}
 	stopApp(appIdent: string, targetId?: string): Promise<void> {
 		return stopApp(this.deps, appIdent, targetId);
@@ -737,14 +726,24 @@ export class DevEnvClient {
 	gitCreateBranch(appIdent: string, branchName: string): Promise<void> {
 		return gitCreateBranch(this.deps, appIdent, branchName);
 	}
-	buildApp(appIdent: string, targetId?: string): Promise<void> {
-		return buildApp(this.deps, appIdent, targetId);
+	cancelAction(appIdent: string): Promise<void> { return cancelAction(this.deps, appIdent); }
+	buildApp(appIdent: string, targetId?: string, profile?: string, targetLabel?: string): Promise<void> {
+		return buildApp(this.deps, appIdent, targetId, profile, targetLabel);
 	}
 	retryJob(appIdent: string, jobId: number): Promise<void> {
 		return retryJob(this.deps, appIdent, jobId);
 	}
 	cancelJob(appIdent: string, jobId: number): Promise<void> {
 		return cancelJob(this.deps, appIdent, jobId);
+	}
+	reportActionEvent(type: string, properties: Record<string, unknown>): Promise<void> {
+		return reportActionEvent(this.deps, type, properties);
+	}
+	getActionHistory(scope?: import('./events-client').ActionHistoryScope, limit?: number): Promise<ServerEvent[]> {
+		return getActionHistory(this.deps, scope, limit);
+	}
+	getActionLogs(runId: string, stepId?: string): Promise<ServerEvent[]> {
+		return getActionLogs(this.deps, runId, stepId);
 	}
 	subscribeToEvents(signal?: AbortSignal): AsyncGenerator<ServerEvent> {
 		return subscribeToEvents(this.deps, signal);
@@ -766,7 +765,6 @@ export function createClient(
 }
 
 export type { FetchFunction };
-export type { LogHistoryType } from "./logs-client";
 export * from "@devenv/types";
 export * from "./logger";
 export * from "./custom-fetch";

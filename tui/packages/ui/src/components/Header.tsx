@@ -3,6 +3,7 @@ import { TextAttributes } from '@opentui/core';
 import { useTerminalDimensions } from '@opentui/solid';
 import { colors, uiColors } from '../colors';
 import { highlightColor } from './Highlight';
+import { InlineProgressAnimation, type InlineProgressHighlights } from './InlineProgressAnimation';
 import { RunningText } from './RunningText';
 
 export type HeaderDetail = Record<string, string | number | undefined | null>;
@@ -17,9 +18,10 @@ export interface HeaderProps {
   severity?: 'normal' | 'success' | 'warning' | 'error';
   runningTextEnabled?: boolean;
   runningTextOffset?: number;
+  logoHighlights?: InlineProgressHighlights;
 }
 
-const LOGO_WIDTH = 6;
+const LOGO_WIDTH = 3;
 const TITLE_WIDTH = 0;
 const RIGHT_WIDTH = 24;
 
@@ -59,7 +61,7 @@ export function Header(props: HeaderProps) {
     >
       <box style={{ width: '100%', height: 1, flexDirection: 'row' }}>
         <box style={{ width: LOGO_WIDTH }}>
-          <text fg={colors.mauve} attributes={TextAttributes.BOLD}>DΞV</text>
+          <InlineProgressAnimation text="DΞV" highlights={props.logoHighlights} backgroundColor={uiColors.bgMantle} />
         </box>
         <box style={{ width: middleWidth() }}>
           <RunningText text={primaryDetail()} width={middleWidth()} fg={highlightColor('secondary')} enabled={props.runningTextEnabled} active offset={props.runningTextOffset} />

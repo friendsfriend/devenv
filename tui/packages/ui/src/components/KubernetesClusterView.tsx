@@ -8,6 +8,7 @@ import { highlightColor, HighlightedText } from './Highlight';
 import { ResourceTimelineCharts } from './ResourceTimelineCharts';
 import { PropertiesList, propertyBadges, type PropertyRow } from './PropertiesList';
 import { SearchHeader } from './SearchHeader';
+import { AnimatedStatusText } from './AnimatedStatusText';
 
 export interface KubernetesClusterViewProps {
   status?: KubernetesClusterStatus | null;
@@ -56,7 +57,7 @@ function PanelHeader(props: { title: string; children?: JSX.Element }) {
   );
 }
 
-function PanelBox(props: { title: string; active: boolean; headerChildren?: JSX.Element; children: JSX.Element; style?: any }) {
+export function PanelBox(props: { title: string; active: boolean; headerChildren?: JSX.Element; children: JSX.Element; style?: any }) {
   return (
     <box
       backgroundColor={uiColors.bgMantle}
@@ -130,7 +131,7 @@ export function KubernetesClusterView(props: KubernetesClusterViewProps) {
         >
           {/* Cluster Info Panel */}
           <PanelBox title="Cluster" active={props.activePanelIndex === 0}
-            headerChildren={<Show when={props.loading}><text fg={highlightColor('secondary')}> refreshing...</text></Show>}
+            headerChildren={<Show when={props.loading}><AnimatedStatusText text="refreshing…" intent="load" backgroundColor={uiColors.bgSurface1} /></Show>}
           >
             <ScrollableContent
               axes={['x', 'y']}

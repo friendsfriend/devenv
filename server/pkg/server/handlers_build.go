@@ -2,243 +2,12 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/friendsfriend/devenv/pkg/app"
 	"github.com/friendsfriend/devenv/pkg/resources"
 )
-
-// handleBuild triggers a build operation for an app
-func (s *Server) handleBuild(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	// Parse request body
-	var req struct {
-		Ident    string `json:"ident"`
-		TargetID string `json:"targetId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, "Invalid request body")
-		return
-	}
-
-	if req.Ident == "" {
-		respondBadRequest(w, "ident field required")
-		return
-	}
-
-	// Find the app
-	var targetApp *app.App
-	targetApp = s.findAppByIdent(req.Ident)
-
-	if targetApp == nil {
-		respondNotFound(w, "App not found")
-		return
-	}
-
-	log.Printf("[INFO] Build started for app: %s", req.Ident)
-
-	// Perform build operation asynchronously using BuildService
-	// The BuildService will handle status updates via the status manager
-	if req.TargetID != "" {
-		go s.services.BuildService().BuildAppTargetWithStatus(targetApp, req.TargetID)
-	} else {
-		go s.services.BuildService().BuildAppWithStatus(targetApp)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": fmt.Sprintf("Build started for %s", targetApp.DisplayName),
-	})
-}
-
-// handleStart triggers a start operation for an app (using docker compose)
-func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	var req struct {
-		Ident    string `json:"ident"`
-		Profile  string `json:"profile"`
-		TargetID string `json:"targetId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, "Invalid request body")
-		return
-	}
-
-	if req.Ident == "" {
-		respondBadRequest(w, "ident field required")
-		return
-	}
-
-	// Check if it's an infra service (try ident, then fallback to displayName/containerBaseName case-insensitive)
-	infraService := s.findInfraServiceByIdent(req.Ident)
-	if infraService == nil {
-		// fallback matching
-		lc := strings.ToLower(req.Ident)
-		for i := range s.infraServices {
-			if strings.ToLower(s.infraServices[i].DisplayName) == lc || strings.ToLower(s.infraServices[i].ContainerBaseName) == lc {
-				infraService = &s.infraServices[i]
-				break
-			}
-		}
-	}
-	if infraService != nil {
-		if s.services.OperationsService() != nil {
-			log.Printf("[INFO] Starting infrastructure service: %s", req.Ident)
-			go s.services.OperationsService().StartInfrastructureServiceWithStatus(*infraService)
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"success": true,
-				"message": fmt.Sprintf("Infrastructure service start initiated for %s", infraService.DisplayName),
-			})
-			return
-		}
-		respondServiceUnavailable(w, "Operations service not available")
-		return
-	}
-
-	var targetApp *app.App
-	targetApp = s.findAppByIdent(req.Ident)
-	if targetApp == nil {
-		// fallback: try matching by displayName (case-insensitive)
-		lc := strings.ToLower(req.Ident)
-		for i := range s.apps {
-			if strings.ToLower(s.apps[i].DisplayName) == lc {
-				targetApp = &s.apps[i]
-				break
-			}
-		}
-	}
-
-	if targetApp == nil {
-		respondNotFound(w, "App not found")
-		return
-	}
-
-	log.Printf("[INFO] Run initiated for app: %s", req.Ident)
-
-	// Check for missing env vars before starting compose.
-	var missingEnvVars []string
-	if req.TargetID == "" {
-		missingEnvVars = s.services.BuildService().ComposeMissingEnvVars(targetApp.Ident, targetApp.LocalDirectoryPath, req.Profile)
-	}
-
-	if req.TargetID != "" {
-		go s.services.BuildService().RunAppTargetWithStatus(targetApp, req.TargetID)
-	} else {
-		go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
-	}
-
-	resp := map[string]interface{}{
-		"success": true,
-		"message": fmt.Sprintf("Run initiated for %s", targetApp.DisplayName),
-	}
-	if len(missingEnvVars) > 0 {
-		resp["missingEnvVars"] = missingEnvVars
-	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
-}
-
-// handleTest triggers a test operation for an app
-func (s *Server) handleTest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	var req struct {
-		Ident    string `json:"ident"`
-		TargetID string `json:"targetId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, "Invalid request body")
-		return
-	}
-
-	if req.Ident == "" {
-		respondBadRequest(w, "ident field required")
-		return
-	}
-
-	var targetApp *app.App
-	targetApp = s.findAppByIdent(req.Ident)
-
-	if targetApp == nil {
-		respondNotFound(w, "App not found")
-		return
-	}
-
-	log.Printf("[INFO] Test started for app: %s", req.Ident)
-
-	if req.TargetID != "" {
-		go s.services.BuildService().TestAppTargetWithStatus(targetApp, req.TargetID)
-	} else {
-		go s.services.BuildService().TestAppWithStatus(targetApp)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": fmt.Sprintf("Test started for %s", targetApp.DisplayName),
-	})
-}
-
-// handleRun triggers a run operation for an app (using docker compose)
-func (s *Server) handleRun(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	var req struct {
-		Ident    string `json:"ident"`
-		Profile  string `json:"profile"`
-		TargetID string `json:"targetId"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, "Invalid request body")
-		return
-	}
-
-	if req.Ident == "" {
-		respondBadRequest(w, "ident field required")
-		return
-	}
-
-	var targetApp *app.App
-	targetApp = s.findAppByIdent(req.Ident)
-
-	if targetApp == nil {
-		respondNotFound(w, "App not found")
-		return
-	}
-
-	log.Printf("[INFO] Run initiated for app: %s", req.Ident)
-
-	if req.TargetID != "" {
-		go s.services.BuildService().RunAppTargetWithStatus(targetApp, req.TargetID)
-	} else {
-		go s.services.BuildService().RunAppWithStatus(targetApp, req.Profile)
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"message": fmt.Sprintf("Run initiated for %s", targetApp.DisplayName),
-	})
-}
 
 func (s *Server) handleShellActionScript(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost && r.Method != http.MethodPut {
@@ -284,37 +53,6 @@ func (s *Server) handleShellActionScript(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	respondJSON(w, map[string]interface{}{"success": true, "path": path}, http.StatusOK)
-}
-
-func (s *Server) handleGetActionTargets(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		respondMethodNotAllowed(w)
-		return
-	}
-
-	ident := r.PathValue("ident")
-	action := r.PathValue("action")
-	if ident == "" || action == "" {
-		respondBadRequest(w, "ident and action path parameters required")
-		return
-	}
-
-	targetApp := s.findAppByIdent(ident)
-	if targetApp == nil {
-		respondNotFound(w, "App not found")
-		return
-	}
-
-	targets, err := s.services.ResourcesManager().DiscoverActionTargets(targetApp.Ident, targetApp.LocalDirectoryPath, resources.AppAction(action))
-	if err != nil {
-		respondInternalError(w, err)
-		return
-	}
-	if targets == nil {
-		targets = []resources.ActionTarget{}
-	}
-
-	respondJSON(w, map[string]interface{}{"targets": targets}, http.StatusOK)
 }
 
 func (s *Server) handleGetProfiles(w http.ResponseWriter, r *http.Request) {
@@ -373,28 +111,28 @@ func (s *Server) handleGetProfiles(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleStopApp(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCancelAction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondMethodNotAllowed(w)
 		return
 	}
 	var req struct {
-		Ident    string `json:"ident"`
-		TargetID string `json:"targetId"`
+		Ident string `json:"ident"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondBadRequest(w, "Invalid request body")
-		return
-	}
-	if req.Ident == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Ident == "" {
 		respondBadRequest(w, "ident field required")
 		return
 	}
-	targetApp := s.findAppByIdent(req.Ident)
-	if targetApp == nil {
-		respondNotFound(w, "App not found")
-		return
+	s.services.BuildService().CancelAction(req.Ident)
+	for _, run := range s.actionRuns.ActiveForApp(req.Ident) {
+		s.actionCancelMu.Lock()
+		cancel := s.actionCancels[run.ID]
+		s.actionCancelMu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+		s.actionRuns.Cancel(run.ID)
+		s.BroadcastEvent(Event{Type: "action.completed", Properties: map[string]interface{}{"runId": run.ID, "status": "canceled"}, Timestamp: time.Now()})
 	}
-	go s.services.BuildService().StopAppWithStatus(targetApp, req.TargetID)
-	respondJSON(w, map[string]interface{}{"success": true, "message": fmt.Sprintf("Stop initiated for %s", targetApp.DisplayName)}, http.StatusOK)
+	respondJSON(w, map[string]interface{}{"success": true}, http.StatusOK)
 }

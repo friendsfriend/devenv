@@ -1,40 +1,59 @@
-## Context
+## Dependency-aware execution
 
-`TargetRegistry.ResolveStartPlan(rootID)` returns an ordered list of targets to start, with dependencies first. The executor currently starts each target in order but doesn't wait for health between steps. Docker containers have a `Health` field in `docker inspect` that reflects healthcheck status. For containers without healthchecks, we can use "container running" as the health signal.
+`TargetRegistry.ResolveStartPlan(rootID)` produces dependency-first ordered steps. Executor starts each step, then waits for Docker health before starting next dependent step. Poll `State.Health.Status` every 2 seconds; containers without healthchecks are ready when `State.Running` is true. Default timeout is 60 seconds per step and is configurable. Health failure aborts action and marks step failed.
 
-## Goals / Non-Goals
+## Action run model
 
-**Goals:**
-- Wait for each dependency to be healthy before starting the next target in the plan
-- Support both Docker healthcheck-based health and simple "container running" fallback
-- Emit SSE events for dependency startup progress
-- Timeout after configurable duration (default 60s) and fail with clear error
+Each triggered action creates an action run with dependency-first ordered steps. Each step retains every command execution separately:
 
-**Non-Goals:**
-- Application-level health checks (e.g., HTTP endpoint readiness) — Docker healthcheck covers this
-- Custom health check scripts
-- Retry logic beyond timeout
+```text
+ActionRun
+  id, title, status
+  steps[]
+    id, label, status, startedAt, finishedAt, error
+    commands[]
+      id, command, status, stdout, stderr, startedAt, finishedAt, error
+```
 
-## Decisions
+Start plans label dependency steps as `Start dependency: <name>` and root steps as `Start application: <name>`. Build, test, stop, and run actions use the same command execution model.
 
-### 1. Health check polling via Docker inspect
+Step statuses: `pending`, `active`, `completed`, `failed`.
 
-Poll `docker inspect --format '{{.State.Health.Status}}'` every 2 seconds. Possible values: `starting`, `healthy`, `unhealthy`. For containers without healthchecks, check `State.Running`.
+## Event protocol
 
-**Alternative considered:** Use Docker events stream. Rejected because it adds complexity and latency; polling is simpler and sufficient for startup flow.
+Emit structured SSE events:
 
-### 2. 60-second default timeout per dependency
+- `action.started`: run metadata and complete ordered step list
+- `action.step.started`: run ID, step ID, command, index
+- `action.step.output`: run ID, step ID, output chunk, stream
+- `action.step.health`: run ID, step ID, status (`starting`, `healthy`, `failed`)
+- `action.step.completed`: run ID, step ID
+- `action.step.failed`: run ID, step ID, error
+- `action.completed`: run ID, final status
 
-If a dependency doesn't become healthy within 60 seconds, fail the entire start operation with a clear error identifying the stuck dependency.
+Output chunks append to focused step log and render live.
 
-**Alternative considered:** No timeout. Rejected because it could hang indefinitely.
+## TUI behavior
 
-### 3. SSE events for progress
+Opening action screen happens on action trigger. Screen uses two panels. Left panel shows dependency-first steps; right panel shows all commands and combined live output retained for focused step. Shift+J/Shift+K switches panel focus. Standard j/k/d/u/g/G navigation applies to focused panel:
 
-Emit `{ type: "dependency.starting", app: "postgres", status: "starting" | "healthy" | "failed" }` events during the startup sequence. TUI renders these in the status column.
 
-## Risks / Trade-offs
 
-- **[Risk] Containers without healthchecks always report "running"** → Acceptable; "running" is the best signal available
-- **[Risk] Timeout too short for slow-starting services** → 60s is reasonable for most containers; can be made configurable later
-- **[Trade-off] Polling adds 2s latency per check** → Acceptable for startup flow; not a hot path
+```text
+┌─ Steps ───────────────┬─ Log: focused step ─────────────┐
+│ ✓ Build               │ $ command                       │
+│ ⟳ Start backend       │ live stdout/stderr              │
+│ ○ Start frontend      │                                 │
+└───────────────────────┴─────────────────────────────────┘
+```
+
+Focus policy:
+- Before manual navigation, focus latest started step.
+- Failed step takes focus immediately.
+- Any explicit focus movement sets `userMovedFocus`; automatic focus no longer changes selection.
+- Selecting step changes log pane to that step's accumulated output.
+- Active step uses shared splash/shutdown loading indicator styling.
+
+## Compatibility
+
+Keep existing operation status and status-log events. Action events provide richer data and are ignored by older clients.

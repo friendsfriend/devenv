@@ -1,5 +1,5 @@
 /**
- * Task status log utility helpers.
+ * Task action metadata utility helpers.
  */
 
 /** Truncate long arg values; empty Record returns empty string. */

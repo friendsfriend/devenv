@@ -7,11 +7,10 @@ import {
 import { createCliRenderer } from '@opentui/core';
 import { createDefaultOpenTuiKeymap } from '@opentui/keymap/opentui';
 import { KeymapProvider, useKeymap } from '@opentui/keymap/solid';
-import { abortExitSignal, destroyExitRenderer, exitApp, getExitSignal, registerGracefulShutdownHandler, setExitRenderer } from "./exit";
-import { onMount, createEffect, on, onCleanup } from 'solid-js';
-import "opentui-spinner/solid";
+import { abortExitSignal, confirmExitApp, destroyExitRenderer, exitApp, getExitSignal, registerExitGuard, registerGracefulShutdownHandler, setExitRenderer } from "./exit";
+import { onMount, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js';
 import { APP_VERSION } from "../version";
-import { createClient, registerFatalCleanup } from '@devenv/core';
+import { createClient, getLogger, registerFatalCleanup } from '@devenv/core';
 import type { App } from '@devenv/types';
 import {
 	Header,
@@ -19,9 +18,7 @@ import {
 	Layout,
 	getSelectableRows,
 	setGlobalSelectionMouseUpHandler,
-	uiColors,
 } from '@devenv/ui';
-import { createFrames } from "./spinner";
 import {
 	createAppStore,
 	createIssueStore,
@@ -31,6 +28,7 @@ import {
 	createUiStore,
 	createAgentStore,
 	createAppDetailStore,
+	createActionRunStore,
 } from "./stores";
 import {
 	createAppActions,
@@ -93,6 +91,7 @@ function TUIApp(props: TUIAppProps) {
 	const uiStore = createUiStore();
 	const agentStore = createAgentStore();
 	const appDetailStore = createAppDetailStore();
+	const actionRunStore = createActionRunStore();
 	loadCustomThemes();
 	const initialTheme = loadThemeName();
 	applyTheme(initialTheme);
@@ -108,6 +107,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		client,
 		showError,
+		actionRunStore,
 	);
 	const issueActions = createIssueActions(
 		appStore,
@@ -123,7 +123,7 @@ function TUIApp(props: TUIAppProps) {
 		client,
 		showError,
 	);
-	const dockerActions = createDockerActions(appStore, uiStore, client, showError, (appIdent, appName) => logActions.openActionLogForApp(appIdent, appName, "Action Log"));
+	const dockerActions = createDockerActions(appStore, uiStore, client, showError, async () => { appStore.pushModal("actions"); });
 	const gitActions = createGitActions(appStore, uiStore, client, showError);
 	const providerActions = createProviderActions(
 		appStore,
@@ -139,6 +139,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		renderer,
 		client,
+		actionRunStore,
 	);
 	const pipelineActions = createPipelineActions(
 		appStore,
@@ -171,38 +172,6 @@ function TUIApp(props: TUIAppProps) {
 
 	// --- Effects ---
 	setupLogEffects(logStore, client);
-
-	const spinnerFrames = createFrames({
-		color: uiColors.primary,
-		style: "blocks",
-		width: 6,
-		inactiveFactor: 0.6,
-		minAlpha: 0.3,
-	});
-
-	const hasActiveSpinner = () =>
-		appStore.loading() ||
-		appStore.startupState().phase !== "complete" ||
-		appStore.exampleConfigLoading() ||
-		!!appStore.operationInProgressForApp() ||
-		appStore.isShuttingDown() ||
-		appStore.hasActiveOperation() ||
-		changeRequestStore.crLoading() ||
-		changeRequestStore.crChangesLoading() ||
-		changeRequestStore.crTestLoading() ||
-		changeRequestStore.crJobsForDetailLoading() ||
-		changeRequestStore.crDiscussionsLoading() ||
-		changeRequestStore.jobsLoading() ||
-		changeRequestStore.crAiLoading() ||
-		logStore.logAiLoading() ||
-		logStore.logAiStreaming();
-
-	const spinnerInterval = setInterval(() => {
-		if (hasActiveSpinner()) {
-			appStore.setSpinnerFrame((prev) => (prev + 1) % spinnerFrames.length);
-		}
-	}, 80);
-	onCleanup(() => clearInterval(spinnerInterval));
 
 	createEffect(() => {
 		if (!uiStore.runningTextEnabled()) return;
@@ -252,6 +221,34 @@ function TUIApp(props: TUIAppProps) {
 		await runWithTimeout(message, fn, timeoutMs);
 	};
 	onMount(() => {
+		const unregisterExitGuard = registerExitGuard(() => {
+			const activeRuns = actionRunStore.runs().filter((run) => run.status === 'active' || run.status === 'pending');
+			if (activeRuns.length === 0) return true;
+			if (uiStore.showConfirmDialog()) return false;
+
+			const targets = [...new Set(activeRuns.map((run) => run.appIdent).filter((ident): ident is string => Boolean(ident)))];
+			const details = activeRuns
+				.slice(0, 5)
+				.map((run) => `• ${run.title}${run.appIdent ? ` (${run.appIdent})` : ''}`)
+				.join('\n');
+			const more = activeRuns.length > 5 ? `\n• and ${activeRuns.length - 5} more` : '';
+			uiStore.setConfirmDialogTitle('Running actions');
+			uiStore.setConfirmDialogMessage(`These actions are still running:\n\n${details}${more}\n\nTerminate them and quit?`);
+			uiStore.setConfirmDialogAction(() => () => {
+				void (async () => {
+					await Promise.all(targets.map(async (ident) => {
+						try {
+							await client.cancelAction(ident);
+						} catch (error) {
+							getLogger().write('WARN', `Failed to cancel action for ${ident}: ${error instanceof Error ? error.message : String(error)}`);
+						}
+					}));
+					await confirmExitApp();
+				})();
+			});
+			uiStore.setShowConfirmDialog(true);
+			return false;
+		});
 		const unregister = registerGracefulShutdownHandler(async () => {
 			appStore.setIsShuttingDown(true);
 			try {
@@ -285,6 +282,7 @@ function TUIApp(props: TUIAppProps) {
 			}
 		});
 		onCleanup(unregister);
+		onCleanup(unregisterExitGuard);
 	});
 
 	// --- Columns ---
@@ -301,6 +299,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		agentStore,
 		appDetailStore,
+		actionRunStore,
 	};
 	const kbActions: KeyboardActions = {
 		appActions,
@@ -327,12 +326,28 @@ function TUIApp(props: TUIAppProps) {
 	const keymap = useKeymap();
 	helpActions.setKeymap(keymap);
 	onCleanup(() => helpActions.setKeymap(undefined));
-	syncKeymapRuntimeState(keymap, kbStores);
+	const [keymapVersion, setKeymapVersion] = createSignal(0);
+	syncKeymapRuntimeState(keymap, kbStores, () => setKeymapVersion((version) => version + 1));
+	const footerKeybinds = createMemo(() => {
+		keymapVersion();
+		// Keymap state is external to Solid. Read panel signals here so StatusBar
+		// rerenders when panel-specific keymap layers become active.
+		appStore.viewMode();
+		appStore.activeTab();
+		appStore.activeModal();
+		actionRunStore.focusedPanel();
+		appStore.kubernetesPanelIndex();
+		appDetailStore.appDetailPanelIndex();
+		issueStore.issueDetailPanelIndex();
+		changeRequestStore.crDetailPanelIndex();
+		return helpActions.getKeybinds();
+	});
 	onMount(() => {
 		const disposeGlobalLayers = registerGlobalKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
 		const disposeModalLayers = registerModalKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
 		const disposeTableLayer = registerTableKeymapLayer(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
 		const disposeWorkflowLayers = registerWorkflowKeymapLayers(keymap, { stores: kbStores, actions: kbActions, ctx: kbCtx });
+		setKeymapVersion((version) => version + 1);
 		onCleanup(() => {
 			disposeWorkflowLayers();
 			disposeTableLayer();
@@ -356,6 +371,7 @@ function TUIApp(props: TUIAppProps) {
 		uiStore,
 		agentStore,
 		appDetailStore,
+		actionRunStore,
 	};
 	const viewActions: ViewActions = {
 		appActions,
@@ -401,7 +417,6 @@ function TUIApp(props: TUIAppProps) {
 						actions={viewActions}
 						columns={columns}
 						scriptColumns={scriptColumns}
-						spinnerFrames={spinnerFrames}
 						dimensions={dimensions()}
 						runningTextEnabled={uiStore.runningTextEnabled()}
 						runningTextOffset={uiStore.runningTextOffset()}
@@ -410,7 +425,7 @@ function TUIApp(props: TUIAppProps) {
 				}
 				footer={
 					<StatusBar
-						left={`${getTabName(appStore.activeTab())}: ${appStore.filteredApps().length}`}
+						left={appStore.activeTab() === "ui-test" ? "UI Test" : `${getTabName(appStore.activeTab())}: ${appStore.filteredApps().length}`}
 						center={
 							appStore.viewMode() === "providers"
 								? "Providers"
@@ -431,7 +446,7 @@ function TUIApp(props: TUIAppProps) {
 								? `Selected: ${appStore.selectedIndex() + 1}/${appStore.filteredApps().length}`
 								: ""
 						}
-						keybinds={helpActions.getKeybinds()}
+						keybinds={footerKeybinds()}
 						runningTextEnabled={uiStore.runningTextEnabled()}
 						runningTextOffset={uiStore.runningTextOffset()}
 					/>
@@ -441,7 +456,6 @@ function TUIApp(props: TUIAppProps) {
 			<ModalOverlays
 				stores={viewStores}
 				actions={viewActions}
-				spinnerFrames={spinnerFrames}
 				dimensions={dimensions()}
 			/>
 		</box>

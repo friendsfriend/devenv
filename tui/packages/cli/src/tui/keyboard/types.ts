@@ -7,6 +7,7 @@ import type {
 	UiStore,
 	AgentStore,
 	AppDetailStore,
+	ActionRunStore,
 } from "../stores";
 import type {
 	AppActions,
@@ -43,6 +44,7 @@ export interface KeyboardStores {
 	uiStore: UiStore;
 	agentStore: AgentStore;
 	appDetailStore: AppDetailStore;
+	actionRunStore: ActionRunStore;
 }
 
 /** All actions bundled for dispatcher access */

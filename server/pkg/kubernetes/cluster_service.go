@@ -17,25 +17,61 @@ type CommandRunner interface {
 type ExecCommandRunner struct{}
 
 func (ExecCommandRunner) Run(ctx context.Context, cmd Command) ([]byte, error) {
-	c := exec.CommandContext(ctx, cmd.Name, cmd.Args...)
-	if len(cmd.Env) > 0 {
-		c.Env = append(c.Environ(), cmd.Env...)
-	}
-	out, err := c.CombinedOutput()
+	stdout, stderr, err := (ExecCommandRunner{}).RunDetailed(ctx, cmd)
+	out := append(stdout, stderr...)
 	if err != nil {
-		return out, fmt.Errorf("%s %s: %w: %s", cmd.Name, strings.Join(cmd.Args, " "), err, strings.TrimSpace(string(out)))
+		return out, fmt.Errorf("%s %s: %w: %s", cmd.Name, strings.Join(cmd.Args, " "), err, strings.TrimSpace(string(stderr)))
 	}
 	return out, nil
 }
 
+func (ExecCommandRunner) RunDetailed(ctx context.Context, cmd Command) ([]byte, []byte, error) {
+	c := exec.CommandContext(ctx, cmd.Name, cmd.Args...)
+	if len(cmd.Env) > 0 {
+		c.Env = append(c.Environ(), cmd.Env...)
+	}
+	var stdout, stderr strings.Builder
+	c.Stdout, c.Stderr = &stdout, &stderr
+	err := c.Run()
+	return []byte(stdout.String()), []byte(stderr.String()), err
+}
+
+type CommandObservation struct {
+	Command Command
+	Output  string
+	Stderr  string
+	Err     error
+}
+
 type ClusterService struct {
-	Runner Runner
-	Exec   CommandRunner
-	Now    func() time.Time
+	Runner  Runner
+	Exec    CommandRunner
+	Now     func() time.Time
+	Observe func(CommandObservation)
 }
 
 func NewClusterService(r Runner) ClusterService {
 	return ClusterService{Runner: r, Exec: ExecCommandRunner{}, Now: time.Now}
+}
+
+func (s ClusterService) run(ctx context.Context, cmd Command) ([]byte, error) {
+	if detailed, ok := s.commandRunner().(interface {
+		RunDetailed(context.Context, Command) ([]byte, []byte, error)
+	}); ok {
+		stdout, stderr, err := detailed.RunDetailed(ctx, cmd)
+		if s.Observe != nil {
+			s.Observe(CommandObservation{Command: cmd, Output: string(stdout), Stderr: string(stderr), Err: err})
+		}
+		if err != nil {
+			return append(stdout, stderr...), fmt.Errorf("%s %s: %w: %s", cmd.Name, strings.Join(cmd.Args, " "), err, strings.TrimSpace(string(stderr)))
+		}
+		return append(stdout, stderr...), nil
+	}
+	out, err := s.commandRunner().Run(ctx, cmd)
+	if s.Observe != nil {
+		s.Observe(CommandObservation{Command: cmd, Output: string(out), Err: err})
+	}
+	return out, err
 }
 
 func (s ClusterService) Create(ctx context.Context) error {
@@ -43,13 +79,12 @@ func (s ClusterService) Create(ctx context.Context) error {
 	if err := r.Preflight(); err != nil {
 		return err
 	}
-	exec := s.commandRunner()
-	clusters, err := exec.Run(ctx, r.KindGetClustersCommand())
+	clusters, err := s.run(ctx, r.KindGetClustersCommand())
 	if err != nil {
 		return err
 	}
 	if !clusterListContains(clusters, r.ClusterName) {
-		if _, err := exec.Run(ctx, r.KindCreateClusterCommand()); err != nil {
+		if _, err := s.run(ctx, r.KindCreateClusterCommand()); err != nil {
 			return err
 		}
 	}
@@ -61,7 +96,7 @@ func (s ClusterService) Delete(ctx context.Context) error {
 	if err := r.Preflight(); err != nil {
 		return err
 	}
-	_, err := s.commandRunner().Run(ctx, r.KindDeleteClusterCommand())
+	_, err := s.run(ctx, r.KindDeleteClusterCommand())
 	return err
 }
 
@@ -77,7 +112,7 @@ func (s ClusterService) ExportKubeconfig(ctx context.Context) error {
 	if err := r.Preflight(); err != nil {
 		return err
 	}
-	_, err := s.commandRunner().Run(ctx, r.KindExportKubeconfigCommand())
+	_, err := s.run(ctx, r.KindExportKubeconfigCommand())
 	return err
 }
 

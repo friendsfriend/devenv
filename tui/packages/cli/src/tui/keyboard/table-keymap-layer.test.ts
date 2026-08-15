@@ -3,6 +3,7 @@ import { createTestKeymap } from '@opentui/keymap/testing';
 import { setupDevenvKeymap } from './keymap-setup';
 import { applyKeymapRuntimeSnapshot } from './keymap-runtime';
 import { registerTableKeymapLayer } from './table-keymap-layer';
+import { handleTableKeys } from './table-keys';
 import type { KeyboardActions, KeyboardContext, KeyboardStores } from './types';
 
 const signalStore = (overrides: Record<string, unknown> = {}) => new Proxy(overrides, {
@@ -63,6 +64,42 @@ describe('table keymap layer', () => {
 			stores.appStore.setShowTableFilterModal(false);
 			host.press('o', { shift: true });
 			expect(stores.appStore.showTableSortModal()).toBe(true);
+		} finally {
+			cleanup();
+		}
+	});
+
+	test('s starts selected infrastructure service even though getSelectedApp excludes infra rows', async () => {
+		const infra = { ident: 'postgres', displayName: 'Postgres', type: 'docker', operationStatus: undefined };
+		const stores = makeStores({
+			activeTab: () => 'infrastructure',
+			tableFilteredApps: () => [{ rowKind: 'infra', ident: 'postgres' }],
+			infraServices: () => [infra],
+			selectedIndex: () => 0,
+			operationInProgressForApp: () => null,
+			apps: () => [],
+		});
+		let started: unknown;
+		const keyboardActions = actions({ dockerActions: signalStore({ openInfrastructureStartTargetPicker: (service: unknown) => { started = ['picker', service]; } }) as never });
+		await handleTableKeys({ name: 's', sequence: 's' }, stores, keyboardActions, ctx());
+		expect(started).toEqual(['picker', infra]);
+	});
+
+	test('l opens live logs and uppercase L opens action history', () => {
+		const { keymap, host, cleanup } = createTestKeymap({ defaultKeys: true });
+		let pushed = '';
+		let openedLogs = 0;
+		const stores = makeStores({ pushModal: (name: string) => { pushed = name; }, tableFilteredApps: () => [{ ident: 'api' }] });
+		try {
+			setupDevenvKeymap(keymap as never);
+			setRuntime(keymap);
+			registerTableKeymapLayer(keymap as never, { stores, actions: actions({ logActions: signalStore({ loadContainerLogs: () => { openedLogs++; } }) as never }), ctx: ctx() });
+			host.press('l');
+			expect(openedLogs).toBe(1);
+			expect(pushed).toBe('');
+			host.press('l', { shift: true });
+			expect(pushed).toBe('actions');
+			expect(keymap.getCommandEntries().some((entry: any) => entry.command.name === 'actions.toggle')).toBe(true);
 		} finally {
 			cleanup();
 		}

@@ -13,11 +13,7 @@ import (
 
 func (s *service) StopAppWithStatus(a *app.App, targetID string) {
 	callback := s.statusMgr.StartOperation(a.Ident, status.OpStop)
-	logPath, err := s.startOperationLog(a.Ident, "stop")
-	if err != nil {
-		callback("Error: " + err.Error())
-		return
-	}
+	logPath := ""
 	if targetID != "" {
 		target, ok, err := s.selectActionTarget(a, resources.AppActionRun, targetID, "")
 		if err != nil {
@@ -69,7 +65,7 @@ func (s *service) StopAppWithStatus(a *app.App, targetID string) {
 		if resolved, err := s.resourceMgr.ResolveComposeFile(a.Ident, a.LocalDirectoryPath, profile); err == nil {
 			composeFilePath = strings.TrimSpace(resolved)
 		}
-		if runErr, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.ComposeCommand(), s.composeDownArgs(composeFilePath), []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
+		if runErr, _ := s.runActionCommand(a.Ident, docker.ComposeCommand(), s.composeDownArgs(composeFilePath), []string{}, a.LocalDirectoryPath, logPath); runErr != nil {
 			callback("Error: " + runErr.Error())
 			return
 		}
@@ -141,7 +137,7 @@ func (s *service) stopRunTarget(a *app.App, target resources.ActionTarget, logPa
 		s.stopKubernetesPortForwards(a.Ident)
 		runner := k8s.NewRunner(docker.Runtime{Name: docker.RuntimeName(), Command: docker.RuntimeCommand()})
 		cmd := runner.HelmCommandFor("uninstall", target.Kubernetes.Release, "--namespace", target.Kubernetes.Namespace, "--ignore-not-found")
-		if err, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, cmd.Name, cmd.Args, cmd.Env, a.LocalDirectoryPath, logPath); err != nil {
+		if err, _ := s.runActionCommand(a.Ident, cmd.Name, cmd.Args, cmd.Env, a.LocalDirectoryPath, logPath); err != nil {
 			callback("Error: " + err.Error())
 			return false
 		}
@@ -151,7 +147,7 @@ func (s *service) stopRunTarget(a *app.App, target resources.ActionTarget, logPa
 			return false
 		}
 	case resources.ActionRuntimeDocker:
-		if err, _ := s.executor.RunCommandWithLoggingToFile(a.Ident, docker.ComposeCommand(), s.composeDownArgs(target.SourcePath), []string{}, a.LocalDirectoryPath, logPath); err != nil {
+		if err, _ := s.runActionCommand(a.Ident, docker.ComposeCommand(), s.composeDownArgs(target.SourcePath), []string{}, a.LocalDirectoryPath, logPath); err != nil {
 			callback("Error: " + err.Error())
 			return false
 		}

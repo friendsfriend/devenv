@@ -17,7 +17,7 @@ export interface LogViewProps {
 }
 
 /**
- * LogView - Displays scrollable container/operation logs in a bordered panel
+ * LogView - Displays scrollable runtime logs in a bordered panel
  * 
  * Based on Go's tui/logView.go but adapted for OpenTUI/SolidJS.
  * 

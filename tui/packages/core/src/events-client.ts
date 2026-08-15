@@ -2,6 +2,37 @@ import type { ServerEvent } from '@devenv/types';
 import type { ClientDeps } from './client-types';
 import { handleFetchError } from './error-handler';
 
+export async function reportActionEvent(deps: ClientDeps, type: string, properties: Record<string, unknown>): Promise<void> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ type, properties }),
+  });
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
+export type ActionHistoryScope = 'recent' | 'older' | 'all';
+
+export async function getActionHistory(deps: ClientDeps, scope: ActionHistoryScope = 'recent', limit = 50000): Promise<ServerEvent[]> {
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/history?scope=${scope}&limit=${limit}`);
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+    throw new Error(`Failed to load action history: ${response.statusText}`);
+  }
+  return response.json() as Promise<ServerEvent[]>;
+}
+
+export async function getActionLogs(deps: ClientDeps, runId: string, stepId?: string): Promise<ServerEvent[]> {
+  const params = new URLSearchParams({ runId });
+  if (stepId) params.set('stepId', stepId);
+  const response = await deps.fetchFn(`${deps.baseUrl}/api/actions/logs?${params}`);
+  if (!response.ok) {
+    await handleFetchError(response, deps.onError);
+    throw new Error(`Failed to load action logs: ${response.statusText}`);
+  }
+  return response.json() as Promise<ServerEvent[]>;
+}
+
 /**
  * Subscribe to server events (SSE).
  * Pass optional AbortSignal to cancel the subscription gracefully.

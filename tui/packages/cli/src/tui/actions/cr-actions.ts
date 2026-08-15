@@ -424,7 +424,7 @@ export function createCrActions(
 		changeRequestStore.setSelectedCR(null);
 		changeRequestStore.setCrSearchMode(false);
 		changeRequestStore.setCrSearchQuery("");
-		appStore.pushView("changeRequests");
+		appStore.popView();
 	};
 
 	const toggleCRApproval = async () => {
