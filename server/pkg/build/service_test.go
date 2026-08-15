@@ -384,20 +384,25 @@ func TestBuildAppDockerUsesBuildKitAndCache(t *testing.T) {
 	runner := &fakeCommandRunner{silentOut: `{}`}
 	svc := &service{resourceMgr: &fakeResourceMgr{}, executor: runner}
 
+	var commands []recordedCommand
 	svc.buildAppInternal(&app.App{
 		Ident:              "test-app",
 		LocalDirectoryPath: appDir,
-	}, "", func(string) {})
+	}, "", func(status string) {
+		if status == "build successful" {
+			commands = append(commands, runner.commands...)
+		}
+	})
 
 	var buildCmd *recordedCommand
-	for i := range runner.commands {
-		if len(runner.commands[i].args) > 0 && runner.commands[i].args[0] == "build" {
-			buildCmd = &runner.commands[i]
+	for i := range commands {
+		if len(commands[i].args) > 0 && commands[i].args[0] == "build" {
+			buildCmd = &commands[i]
 			break
 		}
 	}
 	if buildCmd == nil {
-		t.Fatalf("expected docker build command, got %#v", runner.commands)
+		t.Fatalf("expected docker build command, got %#v", commands)
 	}
 	args := strings.Join(buildCmd.args, " ")
 	if !strings.Contains(args, "--cache-from devenv-test-app:latest") {

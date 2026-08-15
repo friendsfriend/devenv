@@ -56,7 +56,7 @@ func (l *fileLogger) RunCommandWithLoggingToFile(appIdent, command string, args 
 	defer closeLog()
 
 	var output bytes.Buffer
-	writer := &lockedMultiWriter{writers: []io.Writer{&output}}
+	writer := &lockedMultiWriter{mu: &sync.Mutex{}, writers: []io.Writer{&output}}
 	for _, logFile := range logFiles {
 		writer.writers = append(writer.writers, logFile)
 	}
@@ -87,8 +87,12 @@ func (l *fileLogger) RunCommandWithActionLoggingToFile(ctx context.Context, appI
 	logFiles, closeLog := l.openCommandLogs(appIdent, command, args, envVars, workingDir, logPath)
 	defer closeLog()
 	var combined bytes.Buffer
+	var outputMu sync.Mutex
 	makeWriter := func(stream string) io.Writer {
-		return io.MultiWriter(&combined, chunkWriter{stream: stream, callback: output}, logWriter{files: logFiles})
+		return &lockedMultiWriter{
+			mu:      &outputMu,
+			writers: []io.Writer{&combined, chunkWriter{stream: stream, callback: output}, logWriter{files: logFiles}},
+		}
 	}
 	cmd.Stdout = makeWriter("stdout")
 	cmd.Stderr = makeWriter("stderr")
@@ -121,7 +125,7 @@ func (w logWriter) Write(p []byte) (int, error) {
 }
 
 type lockedMultiWriter struct {
-	mu      sync.Mutex
+	mu      *sync.Mutex
 	writers []io.Writer
 }
 
