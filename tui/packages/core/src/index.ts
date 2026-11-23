@@ -71,6 +71,7 @@ import {
 	getBranches,
 	gitCheckout,
 	gitFetch,
+	gitInitialCheckout,
 	gitPull,
 	gitPush,
 	listWorktrees,
@@ -708,6 +709,9 @@ export class DevEnvClient {
 	}
 	gitCheckout(appIdent: string, branch: string): Promise<void> {
 		return gitCheckout(this.deps, appIdent, branch);
+	}
+	gitInitialCheckout(appIdent: string, branch: string): Promise<void> {
+		return gitInitialCheckout(this.deps, appIdent, branch);
 	}
 	listWorktrees(
 		appIdent: string,

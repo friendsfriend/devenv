@@ -843,7 +843,19 @@ func (gr *gitRepository) Checkout(app App, branch string) error {
 		gr.lockRepo(path)
 		defer gr.unlockRepo(path)
 		if _, err := os.Stat(filepath.Join(path, ".git")); os.IsNotExist(err) {
-			_, _, cloneErr := gr.runGitCommand(".", "clone", "--branch", branch, app.GetRepositoryPath(), path)
+			// Fresh checkout (e.g. after loading a shared config repository): the
+			// app root directory does not exist yet, but git clone cannot create
+			// missing parents.
+			if mkErr := os.MkdirAll(filepath.Dir(path), 0755); mkErr != nil {
+				return fmt.Errorf("failed to create repository root directory: %w", mkErr)
+			}
+			// An empty branch clones the remote default branch.
+			args := []string{"clone"}
+			if branch != "" {
+				args = append(args, "--branch", branch)
+			}
+			args = append(args, app.GetRepositoryPath(), path)
+			_, _, cloneErr := gr.runGitCommand(".", args...)
 			return cloneErr
 		}
 		if _, _, err := gr.runGitCommand(path, "status", "--porcelain"); err != nil {
@@ -882,8 +894,10 @@ func (gr *gitRepository) Checkout(app App, branch string) error {
 	if !repoExists {
 		cloneOptions := &git.CloneOptions{
 			URL:           app.GetRepositoryPath(),
-			ReferenceName: plumbing.NewBranchReferenceName(branch),
 			SingleBranch:  false,
+		}
+		if branch != "" {
+			cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(branch)
 		}
 		cloneUsername, cloneToken := gr.credentialsFor(app.GetRepositoryPath())
 		if cloneUsername != "" && cloneToken != "" {
