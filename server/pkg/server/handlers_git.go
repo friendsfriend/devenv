@@ -296,10 +296,9 @@ func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if branch == "" {
-		respondBadRequest(w, "branch parameter required")
-		return
-	}
+	// An empty branch means "clone the remote default branch". This is used for
+	// the initial checkout when the branch is not known yet (e.g. pull, push or
+	// fetch on an app that only exists in a shared config repository).
 
 	// Reload app config from disk before processing so that any manual edits
 	// to definition files (e.g. changing gitMode) are always picked up
@@ -315,11 +314,17 @@ func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("[INFO] Git checkout started for app %s to branch %s", appIdent, branch)
 
+	// Empty branch means clone/add the remote default branch.
+	branchLabel := branch
+	if branchLabel == "" {
+		branchLabel = "default branch"
+	}
+
 	// Set operation status to active
-	s.setOperationStatus(appIdent, "checkout", "active", fmt.Sprintf("Checking out %s...", branch))
+	s.setOperationStatus(appIdent, "checkout", "active", fmt.Sprintf("Checking out %s...", branchLabel))
 
 	// Perform checkout operation
-	err := s.runGitAction(appIdent, fmt.Sprintf("Git checkout %s", branch), "git.checkout", branch, func() error {
+	err := s.runGitAction(appIdent, fmt.Sprintf("Git checkout %s", branchLabel), "git.checkout", branch, func() error {
 		return s.services.GitRepository().Checkout(appObj, branch)
 	})
 	if err != nil {
@@ -340,7 +345,7 @@ func (s *Server) handleGitCheckout(w http.ResponseWriter, r *http.Request) {
 	log.Printf("[INFO] Git checkout completed successfully for app %s to branch %s", appIdent, branch)
 
 	// Set operation status to completed
-	s.setOperationStatus(appIdent, "checkout", "completed", fmt.Sprintf("Checked out %s", branch))
+	s.setOperationStatus(appIdent, "checkout", "completed", fmt.Sprintf("Checked out %s", branchLabel))
 	// Auto-clear after 2 seconds
 	go func() {
 		time.Sleep(2 * time.Second)

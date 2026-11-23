@@ -41,6 +41,9 @@ func (s *Server) routes() []routeSpec {
 		{Domain: "kubernetes", Method: http.MethodPost, Path: "/api/kubernetes/cluster/refresh", Handler: s.handleKubernetesClusterRefresh},
 
 		{Domain: "git", Method: http.MethodGet, Path: "/api/git/branches", Handler: s.handleGitBranches},
+		// Initial checkout only: clones the repository when it is missing. Branch
+		// switching on an existing clone uses the git.checkout action run instead.
+		{Domain: "git", Method: http.MethodPost, Path: "/api/git/checkout", Handler: s.handleGitCheckout},
 		{Domain: "git", Method: http.MethodGet, Path: "/api/git/worktrees", Handler: s.handleWorktrees},
 
 		{Domain: "actions", Method: http.MethodPost, Path: "/api/actions/cancel", Handler: s.handleCancelAction},

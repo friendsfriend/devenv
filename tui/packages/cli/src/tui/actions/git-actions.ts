@@ -18,8 +18,52 @@ export function createGitActions(
     getLogger().write(status === 'failed' ? 'ERROR' : 'INFO', `${operation} ${app.ident}: ${message}`);
   };
 
+  // Shared prompt for apps that only exist in the config (no local clone yet).
+  const confirmNotCheckedOut = (app: { displayName: string }, message: string, run: () => Promise<void>) => {
+    uiStore.setConfirmDialogTitle('Repository Not Checked Out');
+    uiStore.setConfirmDialogMessage(message);
+    uiStore.setConfirmDialogAction(() => () => {
+      void run();
+    });
+    uiStore.setShowConfirmDialog(true);
+  };
+
+  // Clones the remote default branch, then continues with the requested git action.
+  const cloneThenRun = async (app: { ident: string; displayName: string }, run: () => Promise<void>) => {
+    logActionDiagnostic(app, 'clone', 'in progress', `Cloning ${app.displayName}...`);
+    uiStore.setLoadingModalMessage(`Cloning ${app.displayName}...`);
+    uiStore.setShowLoadingModal(true);
+    try {
+      await client.gitInitialCheckout(app.ident, '');
+      logActionDiagnostic(app, 'clone', 'completed', `Cloned ${app.displayName}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      logActionDiagnostic(app, 'clone', 'failed', msg);
+      showError('Git Clone Failed', `Failed to clone ${app.displayName}.\n\nError: ${msg}`);
+      return;
+    } finally {
+      uiStore.setShowLoadingModal(false);
+    }
+    await run();
+  };
+
   const performGitPull = async () => {
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+    const app = getSelectedApp();
+    if (!app) return;
+    if (!app.branch) {
+      return confirmNotCheckedOut(
+        app,
+        `${app.displayName} has not been checked out yet.\n\nClone it now and continue with pull?`,
+        () => cloneThenRun(app, runGitPull),
+      );
+    }
+    await runGitPull();
+  };
+
+  // Pulling requires a local clone, so it is also used as the follow-up after
+  // an initial clone triggered from pull.
+  const runGitPull = async () => {
     const app = getSelectedApp();
     if (!app) return;
     logActionDiagnostic(app, 'pull', 'in progress', `Pulling ${app.branch}...`);
@@ -41,6 +85,19 @@ export function createGitActions(
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
     const app = getSelectedApp();
     if (!app) return;
+    if (!app.branch) {
+      return confirmNotCheckedOut(
+        app,
+        `${app.displayName} has not been checked out yet.\n\nClone it now and continue with push?`,
+        () => cloneThenRun(app, runGitPush),
+      );
+    }
+    await runGitPush();
+  };
+
+  const runGitPush = async () => {
+    const app = getSelectedApp();
+    if (!app) return;
     logActionDiagnostic(app, 'push', 'in progress', `Pushing ${app.branch}...`);
     uiStore.setLoadingModalMessage(`Pushing ${app.displayName} (${app.branch})...`);
     uiStore.setShowLoadingModal(true);
@@ -58,6 +115,19 @@ export function createGitActions(
 
   const performGitFetch = async () => {
     if (appStore.operationInProgressForApp()) return showError('Operation In Progress', 'Another operation is already in progress. Please wait for it to complete.');
+    const app = getSelectedApp();
+    if (!app) return;
+    if (!app.branch) {
+      return confirmNotCheckedOut(
+        app,
+        `${app.displayName} has not been checked out yet.\n\nClone it now and continue with fetch?`,
+        () => cloneThenRun(app, runGitFetch),
+      );
+    }
+    await runGitFetch();
+  };
+
+  const runGitFetch = async () => {
     const app = getSelectedApp();
     if (!app) return;
     logActionDiagnostic(app, 'fetch', 'in progress', `Fetching ${app.displayName}...`);
@@ -147,25 +217,46 @@ export function createGitActions(
     uiStore.setBranchSelectorWorktreeCreateMode(false);
   };
 
+  const checkoutBranch = async (
+    app: { ident: string; displayName: string },
+    branchName: string,
+    selectedLabel: string,
+    clone: boolean,
+  ) => {
+    logActionDiagnostic(app, 'checkout', 'in progress', `Checking out ${branchName}...`);
+    uiStore.setLoadingModalMessage(clone ? `Cloning ${app.displayName} (${branchName})...` : `Checking out ${branchName}...`);
+    uiStore.setShowLoadingModal(true);
+    try {
+      if (clone) await client.gitInitialCheckout(app.ident, branchName);
+      else await client.gitCheckout(app.ident, branchName);
+      logActionDiagnostic(app, 'checkout', 'completed', `Checked out ${branchName}`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      logActionDiagnostic(app, 'checkout', 'failed', msg);
+      showError('Git Checkout Failed', `Failed to checkout branch "${selectedLabel}" for ${app.displayName}.\n\nError: ${msg}`);
+    } finally {
+      uiStore.setShowLoadingModal(false);
+    }
+  };
+
   const performCheckout = async () => {
     const app = uiStore.targetAppForBranch();
     const selected = uiStore.filteredBranches()[uiStore.branchSelectorIndex()];
     if (!app || !selected) return;
     const branchName = selected.name.startsWith('origin/') ? selected.name.substring(7) : selected.name;
     closeBranchSelector();
-    logActionDiagnostic(app, 'checkout', 'in progress', `Checking out ${branchName}...`);
-    uiStore.setLoadingModalMessage(`Checking out ${branchName}...`);
-    uiStore.setShowLoadingModal(true);
-    try {
-      await client.gitCheckout(app.ident, branchName);
-      logActionDiagnostic(app, 'checkout', 'completed', `Checked out ${branchName}`);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Unknown error';
-      logActionDiagnostic(app, 'checkout', 'failed', msg);
-      showError('Git Checkout Failed', `Failed to checkout branch "${selected.name}" for ${app.displayName}.\n\nError: ${msg}`);
-    } finally {
-      uiStore.setShowLoadingModal(false);
+
+    // An app without a branch has no local checkout (e.g. apps that only exist
+    // in a shared config repository), so there is nothing to switch yet.
+    if (!app.branch) {
+      return confirmNotCheckedOut(
+        app,
+        `${app.displayName} has not been checked out yet.\n\nClone it now and check out ${branchName}?`,
+        () => checkoutBranch(app, branchName, selected.name, true),
+      );
     }
+
+    await checkoutBranch(app, branchName, selected.name, false);
   };
 
   const createBranch = async () => {

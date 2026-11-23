@@ -52,6 +52,18 @@ export async function getBranches(
 }
 
 /**
+ * Clone the repository onto a branch. Works for apps that were never checked
+ * out (e.g. after loading a shared config repository).
+ */
+export async function gitInitialCheckout(deps: ClientDeps, appIdent: string, branch: string): Promise<void> {
+  const response = await deps.fetchFn(
+    `${deps.baseUrl}/api/git/checkout?appIdent=${encodeURIComponent(appIdent)}&branch=${encodeURIComponent(branch)}`,
+    { method: 'POST' }
+  );
+  if (!response.ok) await handleFetchError(response, deps.onError);
+}
+
+/**
  * Perform git checkout operation to switch branches
  */
 export async function gitCheckout(deps: ClientDeps, appIdent: string, branch: string): Promise<void> {
