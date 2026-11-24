@@ -154,14 +154,32 @@ func gitExitCode(err error) int {
 }
 
 func (gr *gitRepository) runGitCommand(dir string, args ...string) (string, string, error) {
+	return gr.runGitCommandWithAuth(NativeAuth{}, dir, args...)
+}
+
+func (gr *gitRepository) runAuthenticatedGitCommand(repoURL, dir string, args ...string) (string, string, error) {
+	auth, err := gr.NativeAuthFor(repoURL)
+	if err != nil {
+		return "", "", err
+	}
+	return gr.runGitCommandWithAuth(auth, dir, args...)
+}
+
+func (gr *gitRepository) runGitCommandWithAuth(auth NativeAuth, dir string, args ...string) (string, string, error) {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
+	env, err := auth.Environment(os.Environ())
+	if err != nil {
+		return "", "", err
+	}
+	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
-	err := cmd.Run()
+	err = auth.RedactError(cmd.Run())
+	out, errOut := auth.Redact(stdout.String()), auth.Redact(stderr.String())
 	label := strings.Join(args, " ")
-	gr.record(ActionStep{Label: label, Command: "git -C " + dir + " " + strings.Join(args, " "), Stdout: stdout.String(), Stderr: stderr.String(), ExitCode: gitExitCode(err), Err: err})
-	return stdout.String(), stderr.String(), err
+	gr.record(ActionStep{Label: label, Command: "git -C " + dir + " " + strings.Join(args, " "), Stdout: out, Stderr: errOut, ExitCode: gitExitCode(err), Err: err})
+	return out, errOut, err
 }
 
 // runWtCommand runs a worktrunk (wt) command in dir with the devenv path
@@ -652,7 +670,7 @@ func (gr *gitRepository) Push(app App) error {
 		path := app.GetLocalDirectoryPath()
 		gr.lockRepo(path)
 		defer gr.unlockRepo(path)
-		_, _, err := gr.runGitCommand(path, "push", "origin")
+		_, _, err := gr.runAuthenticatedGitCommand(app.GetRepositoryPath(), path, "push", "origin")
 		return err
 	}
 	// Lock this repository for the duration of the operation
@@ -693,7 +711,7 @@ func (gr *gitRepository) Fetch(app App) error {
 		path := app.GetLocalDirectoryPath()
 		gr.lockRepo(path)
 		defer gr.unlockRepo(path)
-		_, _, err := gr.runGitCommand(path, "fetch", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*")
+		_, _, err := gr.runAuthenticatedGitCommand(app.GetRepositoryPath(), path, "fetch", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*")
 		return err
 	}
 	// Lock this repository for the duration of the operation
@@ -738,7 +756,7 @@ func (gr *gitRepository) Pull(app App) error {
 			return err
 		}
 		branch := strings.TrimSpace(branchOut)
-		if _, _, err = gr.runGitCommand(path, "fetch", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*"); err != nil {
+		if _, _, err = gr.runAuthenticatedGitCommand(app.GetRepositoryPath(), path, "fetch", "--force", "origin", "+refs/heads/*:refs/remotes/origin/*"); err != nil {
 			return err
 		}
 		_, _, err = gr.runGitCommand(path, "reset", "--hard", "origin/"+branch)
@@ -855,7 +873,7 @@ func (gr *gitRepository) Checkout(app App, branch string) error {
 				args = append(args, "--branch", branch)
 			}
 			args = append(args, app.GetRepositoryPath(), path)
-			_, _, cloneErr := gr.runGitCommand(".", args...)
+			_, _, cloneErr := gr.runAuthenticatedGitCommand(app.GetRepositoryPath(), ".", args...)
 			return cloneErr
 		}
 		if _, _, err := gr.runGitCommand(path, "status", "--porcelain"); err != nil {
@@ -893,8 +911,8 @@ func (gr *gitRepository) Checkout(app App, branch string) error {
 	}
 	if !repoExists {
 		cloneOptions := &git.CloneOptions{
-			URL:           app.GetRepositoryPath(),
-			SingleBranch:  false,
+			URL:          app.GetRepositoryPath(),
+			SingleBranch: false,
 		}
 		if branch != "" {
 			cloneOptions.ReferenceName = plumbing.NewBranchReferenceName(branch)
@@ -991,8 +1009,16 @@ func (gr *gitRepository) cloneIntoPrimaryWorktree(app App, targetDir, branch str
 		if err := os.MkdirAll(filepath.Dir(targetDir), 0755); err != nil {
 			return "", fmt.Errorf("failed to create primary worktree directory: %w", err)
 		}
-		if _, _, err := gr.runGitCommand(".", "clone", "--branch", branch, app.GetRepositoryPath(), targetDir); err != nil {
-			if _, _, fallbackErr := gr.runGitCommand(".", "clone", app.GetRepositoryPath(), targetDir); fallbackErr != nil {
+		args := []string{"clone"}
+		if branch != "" {
+			args = append(args, "--branch", branch)
+		}
+		args = append(args, app.GetRepositoryPath(), targetDir)
+		if _, stderr, err := gr.runAuthenticatedGitCommand(app.GetRepositoryPath(), ".", args...); err != nil {
+			if branch == "" || !strings.Contains(stderr, "not found in upstream origin") {
+				return "", err
+			}
+			if _, _, fallbackErr := gr.runAuthenticatedGitCommand(app.GetRepositoryPath(), ".", "clone", app.GetRepositoryPath(), targetDir); fallbackErr != nil {
 				return "", fallbackErr
 			}
 		}

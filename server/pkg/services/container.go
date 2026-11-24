@@ -70,6 +70,30 @@ func (m *multiAuthProvider) CredentialsFor(repoURL string) (username, token stri
 	return "", ""
 }
 
+func (m *multiAuthProvider) CredentialsForWithError(repoURL string) (username, token string, err error) {
+	if m.appManager != nil {
+		for _, a := range m.appManager.GetApps() {
+			if a.RepositoryPath != repoURL || a.GetProviderName() == "" {
+				continue
+			}
+			name := a.GetProviderName()
+			p, ok := m.providers.Get(name)
+			if !ok {
+				return "", "", fmt.Errorf("Git provider %q is missing or invalid; check provider configuration", name)
+			}
+			if len(p.MissingVars) > 0 {
+				return "", "", fmt.Errorf("Git provider %q has unresolved credential variables; check the config .env file", name)
+			}
+			if (p.Username == "") != (p.Token == "") {
+				return "", "", fmt.Errorf("Git provider %q requires both username and token", name)
+			}
+			return p.Username, p.Token, nil
+		}
+	}
+	username, token = m.CredentialsFor(repoURL)
+	return username, token, nil
+}
+
 func contains(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
