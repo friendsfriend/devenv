@@ -285,6 +285,8 @@ See Help → Guides → Custom Themes for full field guidance.
 
 Git provider definitions are stored as individual JSON files in `~/.config/devenv/providers/`. Actual credentials live in `.env`; provider JSON must use `${...}` placeholders for `username` and `token`, making provider metadata safe to share in a config repository. Clear-text credentials in provider JSON are blocked: startup continues, the provider is shown as invalid in the TUI, and credentials are unusable until migrated to `.env` placeholders.
 
+An application's configured provider credentials also authenticate HTTP(S) Git clone, fetch, pull, and push, including recorded and registry-driven actions. Native Git receives repository-scoped authentication through its process environment; tokens are not written to command arguments, repository configuration, or action history. Authenticated native Git does not follow HTTP redirects: configure the repository's final URL. SSH repositories and providers without credentials retain their existing authentication behavior.
+
 **Schema:**
 
 ```json

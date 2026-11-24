@@ -182,6 +182,10 @@ func (s engineCommandSink) EmitCommand(event actionexec.CommandEvent) {
 }
 
 func (s *Server) startEngineDefinition(definition actiondef.Action, rawInputs map[string]json.RawMessage) (string, error) {
+	commandRunner, err := s.commandRunnerForDefinition(definition)
+	if err != nil {
+		return "", err
+	}
 	runID := "action-" + uuid.NewString()
 	now := time.Now()
 	snapshot := actionrun.DefinitionSnapshot(definition)
@@ -210,7 +214,7 @@ func (s *Server) startEngineDefinition(definition actiondef.Action, rawInputs ma
 	}
 	events := engineEventSink{projection: actionexec.ActionRunProjection{Registry: s.actionRuns}, server: s}
 	commands := engineCommandSink{server: s, runID: runID}
-	commandHandler := actionexec.CommandHandler{Runner: actionexec.OSCommandRunner{}, Events: commands}
+	commandHandler := actionexec.CommandHandler{Runner: commandRunner, Events: commands}
 	processHandler := actionexec.ProcessHandler{Store: s.actionProcesses, Events: commands}
 	runtimeCmd := docker.RuntimeCommand()
 	if string(definition.ActionRuntime) == "podman" {
